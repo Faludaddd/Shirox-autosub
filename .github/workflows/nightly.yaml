@@ -1,4 +1,10 @@
 # shamelessly copied from https://github.com/cranci1/Luna/blob/main/.github/workflows/build.yml
+#
+# Fork modifications:
+#   - Added Swift Package Manager dependency caching
+#   - Added a unit-test step that fail-fast blocks the build on test failures
+#   - Added SHA-256 checksum alongside each published IPA
+#   - Kept the existing beta-release + apps.json flow so AltStore/SideStore keep working
 
 name: Build and upload nightly
 
@@ -10,6 +16,11 @@ on:
 env:
  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+# Cancel superseded runs on main — saves CI minutes when commits land quickly.
+concurrency:
+ group: nightly-${{ github.ref }}
+ cancel-in-progress: true
+
 jobs:
  build-ios:
    name: Build iOS IPA
@@ -20,24 +31,83 @@ jobs:
      - name: Checkout repository
        uses: actions/checkout@v6
 
+     - name: Select Xcode
+       run: |
+         sudo xcode-select -s /Applications/Xcode.app
+         xcodebuild -version
+
+     - name: Cache Swift Package Manager
+       uses: actions/cache@v4
+       with:
+         path: |
+           ~/Library/Caches/org.swift.swiftpm
+           .build
+           **/SourcePackages
+         key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved', 'Shirox.xcodeproj/project.pbxproj') }}
+         restore-keys: |
+           ${{ runner.os }}-spm-
+
+     - name: Resolve package dependencies
+       run: |
+         xcodebuild -resolvePackageDependencies \
+           -project Shirox.xcodeproj \
+           -scheme Shirox_iOS
+
+     - name: Run unit tests
+       run: |
+         # Fail-fast: never ship an IPA if unit tests are red.
+         # Pick any available iOS Simulator at runtime so the workflow isn't brittle
+         # to Xcode version changes (iPhone 16 vs 17, etc.).
+         SIM_ID=$(xcrun simctl list devices available iOS | grep -E 'iPhone' | head -1 | grep -oE '[A-F0-9-]{36}' | head -1)
+         if [ -z "$SIM_ID" ]; then
+           echo "::error::No available iOS Simulator found"
+           xcrun simctl list devices available iOS
+           exit 1
+         fi
+         echo "Using simulator UDID: $SIM_ID"
+         xcodebuild test \
+           -project Shirox.xcodeproj \
+           -scheme Shirox_iOS \
+           -destination "id=$SIM_ID" \
+           -skipPackagePluginValidation \
+           -resultBundlePath TestResults.xcresult \
+           CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED="NO" || \
+         (echo "::error::Unit tests failed — see TestResults.xcresult artifact" && exit 1)
+
+     - name: Upload test results on failure
+       if: failure()
+       uses: actions/upload-artifact@v4
+       with:
+         name: test-results
+         path: TestResults.xcresult
+         retention-days: 7
+         if-no-files-found: ignore
+
      - name: Make build script executable
        run: chmod +x ./buildipa.sh
 
      - name: Build iOS IPA
        run: ./buildipa.sh
 
+     - name: Generate SHA-256 checksum
+       run: |
+         shasum -a 256 build/Shirox.ipa > build/Shirox.ipa.sha256
+         cat build/Shirox.ipa.sha256
+
      - name: Upload IPA
-       uses: actions/upload-artifact@v7
+       uses: actions/upload-artifact@v4
        with:
          name: Shirox-Nightly-IPA
-         path: build/Shirox.ipa
+         path: |
+           build/Shirox.ipa
+           build/Shirox.ipa.sha256
 
      - name: Upload IPA to beta release
        env:
          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
        run: |
          gh release create beta --title "beta" --notes "Latest nightly build" 2>/dev/null || true
-         gh release upload beta build/Shirox.ipa --clobber
+         gh release upload beta build/Shirox.ipa build/Shirox.ipa.sha256 --clobber
 
      - name: Update apps.json
        env:
@@ -69,7 +139,7 @@ jobs:
        run: ./buildcatalyst.sh
 
      - name: Upload Catalyst DMG
-       uses: actions/upload-artifact@v7
+       uses: actions/upload-artifact@v4
        with:
          name: Shirox-Nightly-Catalyst-DMG
          path: build/Shirox-Catalyst.dmg

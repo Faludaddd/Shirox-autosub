@@ -252,6 +252,13 @@ final class DetailViewModel: ObservableObject {
                 if sorted.count == 1 {
                     pendingStream = sorted[0]
                     showStreamPicker = false
+                } else if let autoPick = StreamPreferenceMatcher.preferredStream(in: sorted, preference: StreamPreferenceMatcher.currentPreference()) {
+                    // Sub/dub auto-pick — skip the picker, remember the choice for "Auto-pick Last Stream".
+                    if let moduleId = ModuleManager.shared.activeModule?.id {
+                        ModuleSearchAliasManager.shared.setLastStreamTitle(moduleId: moduleId, title: autoPick.title)
+                    }
+                    pendingStream = autoPick
+                    showStreamPicker = false
                 } else if UserDefaults.standard.bool(forKey: "autoPickLastStream"),
                           let moduleId = ModuleManager.shared.activeModule?.id,
                           let savedTitle = ModuleSearchAliasManager.shared.getLastStreamTitle(moduleId: moduleId),
@@ -321,14 +328,20 @@ final class DetailViewModel: ObservableObject {
                 let sorted = streams.sorted { $0.title < $1.title }
                 isLoadingStreams = false
 
-                let autoPickLastStream = UserDefaults.standard.bool(forKey: "autoPickLastStream")
                 let moduleId = ModuleManager.shared.activeModule?.id ?? ""
                 let savedTitle = ModuleSearchAliasManager.shared.getLastStreamTitle(moduleId: moduleId)
 
                 if sorted.count == 1 {
                     pendingStreams = sorted
                     downloadWithSelectedStream(sorted[0])
-                } else if autoPickLastStream,
+                } else if let autoPick = StreamPreferenceMatcher.preferredStream(in: sorted, preference: StreamPreferenceMatcher.currentPreference()) {
+                    // Sub/dub auto-pick — skip the picker, remember the choice.
+                    if !moduleId.isEmpty {
+                        ModuleSearchAliasManager.shared.setLastStreamTitle(moduleId: moduleId, title: autoPick.title)
+                    }
+                    pendingStreams = sorted
+                    downloadWithSelectedStream(autoPick)
+                } else if UserDefaults.standard.bool(forKey: "autoPickLastStream"),
                           let title = savedTitle,
                           let match = sorted.first(where: { $0.title == title }) {
                     pendingStreams = sorted

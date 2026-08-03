@@ -443,9 +443,14 @@ private struct ModuleStreamRow: View {
         }
         .onChangeOf(rowVm.readyStreams) { streams in
             guard let streams else { return }
-            
+
             if streams.count == 1 {
                 fireStreamsLoaded(streams, selected: streams[0], href: rowVm.selectedEpisodeHref, count: rowVm.availableCount, episodeHref: rowVm.selectedEpisodeActualHref)
+            } else if let autoPick = StreamPreferenceMatcher.preferredStream(in: streams, preference: StreamPreferenceMatcher.currentPreference()) {
+                // Sub/dub auto-pick — skip the picker entirely. Remember the choice so
+                // the legacy "Auto-pick Last Stream" toggle keeps working for next time.
+                ModuleSearchAliasManager.shared.setLastStreamTitle(moduleId: module.id, title: autoPick.title)
+                fireStreamsLoaded(streams, selected: autoPick, href: rowVm.selectedEpisodeHref, count: rowVm.availableCount, episodeHref: rowVm.selectedEpisodeActualHref)
             } else if autoPickLastStream,
                isPreferredModule,
                let savedTitle = ModuleSearchAliasManager.shared.getLastStreamTitle(moduleId: module.id),
