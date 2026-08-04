@@ -359,9 +359,6 @@ final class LibraryViewModel: ObservableObject {
                     let m = r.media   // AniListMedia
                     // Build a manga-tagged Media directly so `isManga` is reliable and the
                     // chapter total (episodes field) is populated from `chapters`.
-                        type: "MANGA", format: m.format,
-                        studioNames: nil, source: nil, duration: nil, airDateRange: nil
-)
                     return LibraryEntry(
                         id: r.id, media: media,
                         status: r.status, progress: r.progress, score: r.score,
@@ -372,9 +369,6 @@ final class LibraryViewModel: ObservableObject {
                 let entries = try await MALMangaLibraryService.shared.fetchLibrary()
                 return entries.map { e in
                     let node = e.node
-                        nextAiringEpisode: nil, relations: nil, type: "MANGA", format: node.media_type,
-            studioNames: nil, source: nil, duration: nil, airDateRange: nil
-)
                     return LibraryEntry(
                         id: node.id, media: media,
                         status: MALMangaLibraryService.shared.mapStatusFromMAL(e.list_status.status),

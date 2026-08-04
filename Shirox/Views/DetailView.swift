@@ -246,9 +246,6 @@ struct DetailView: View {
         }
         .adaptiveSheet(isPresented: $showAniListEdit) {
             if let aid = vm.aniListID, let detail = vm.detail {
-                ,
-                    studioNames: nil, source: nil, duration: nil, airDateRange: nil
-)
                 LibraryEntryEditSheet(
                     entry: existingEntry,
                     media: tempMedia,
@@ -288,9 +285,6 @@ struct DetailView: View {
         }
         .adaptiveSheet(isPresented: $showMALEdit) {
             if let mid = malID, let detail = vm.detail {
-                ,
-                    studioNames: nil, source: nil, duration: nil, airDateRange: nil
-)
                 LibraryEntryEditSheet(
                     entry: existingMALEntry,
                     media: tempMedia,
@@ -408,9 +402,6 @@ struct DetailView: View {
     }
 
     private func makeLibraryMedia(aid: Int, detail: MediaDetail) -> Media {
-        ,
-            studioNames: nil, source: nil, duration: nil, airDateRange: nil
-)
     }
 
     #if os(iOS)
@@ -732,9 +723,6 @@ struct DetailView: View {
             let mid = malID
             let sheetProvider: ProviderType = aid != nil ? .anilist : .mal
             let sheetId = aid ?? mid ?? 0
-            ,
-                studioNames: nil, source: nil, duration: nil, airDateRange: nil
-)
             LibraryEntryEditSheet(
                 entry: existingEntry ?? existingMALEntry,
                 media: tempMedia,

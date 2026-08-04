@@ -150,9 +150,6 @@ final class DetailViewModel: ObservableObject {
         let bannerURLString: String? = snapshot.bannerFile.map {
             DownloadedMediaSnapshotStore.shared.localFileURL(in: snapshot, relative: $0).absoluteString
         }
-        ,
-            studioNames: nil, source: nil, duration: nil, airDateRange: nil
-)
 
         self.aniListID = snapshot.aniListID
         self.detailHref = nil

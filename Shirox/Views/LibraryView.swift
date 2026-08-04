@@ -791,9 +791,6 @@ struct LibraryView: View {
                     Task {
                         if let aniListId = await IDMappingService.shared.anilistId(forMALId: entry.media.id) {
                             let fetched = try? await AniListProvider.shared.fetchEntry(mediaId: aniListId)
-                            ,
-                                studioNames: nil, source: nil, duration: nil, airDateRange: nil
-)
                             otherEntry = fetched
                             otherMedia = aniListMedia
                             showOtherSheet = true
@@ -811,9 +808,6 @@ struct LibraryView: View {
                     isLoadingOtherEntry = true
                     Task {
                         let fetched = try? await MALProvider.shared.fetchEntry(mediaId: idMal)
-                        ,
-                            studioNames: nil, source: nil, duration: nil, airDateRange: nil
-)
                         otherEntry = fetched
                         otherMedia = malMedia
                         showOtherSheet = true

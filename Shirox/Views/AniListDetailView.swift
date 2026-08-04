@@ -407,9 +407,6 @@ struct AniListDetailView: View {
         }
         .adaptiveSheet(isPresented: $showMALEdit) {
             if let media = vm.media, let idMal = malMediaId {
-                ,
-                    studioNames: nil, source: nil, duration: nil, airDateRange: nil
-)
                 LibraryEntryEditSheet(
                     entry: existingMALEntry,
                     media: malMedia,
@@ -436,9 +433,6 @@ struct AniListDetailView: View {
         }
         .adaptiveSheet(isPresented: $showAniListEdit) {
             if let media = vm.media, let aniId = anilistMediaId {
-                ,
-                    studioNames: nil, source: nil, duration: nil, airDateRange: nil
-)
                 LibraryEntryEditSheet(
                     entry: existingAniListCrossEntry,
                     media: aniMedia,
