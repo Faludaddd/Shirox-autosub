@@ -19,6 +19,7 @@ struct SettingsView: View {
     @AppStorage("useDefaultExtension") private var useDefaultExtension = false
     @AppStorage("autoPickLastSearchResult") private var autoPickLastSearchResult = false
     @AppStorage("autoPickLastStream") private var autoPickLastStream = false
+    @AppStorage("autoPickSubDub") private var autoPickSubDub = "off"
     @AppStorage("dualSync") private var dualSync = false
     @AppStorage("rateOnFinish") private var rateOnFinish = true
     @AppStorage("localAutoTrackEnabled") private var localAutoTrackEnabled = true
@@ -94,6 +95,12 @@ struct SettingsView: View {
                         .tint(.secondary)
                     Toggle("Auto-pick Last Stream", isOn: $autoPickLastStream)
                         .tint(.secondary)
+                    Picker("Auto-pick Sub/Dub", selection: $autoPickSubDub) {
+                        Text("Off (ask each time)").tag("off")
+                        Text("Sub").tag("sub")
+                        Text("Dub").tag("dub")
+                    }
+                    .tint(.secondary)
                 }
 
                 ProvidersSettingsSection()
