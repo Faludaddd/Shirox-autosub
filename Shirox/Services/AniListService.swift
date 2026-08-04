@@ -58,25 +58,25 @@ final class AniListService {
         var status: String? = nil          // "FINISHED", "RELEASING", "NOT_YET_RELEASED", "CANCELLED"
         var genres: [String] = []
         var sort: String = "SEARCH_MATCH"
-        var isAdult: Bool = false
 
         static let defaultSort = "SEARCH_MATCH"
         static let empty = SearchFilters()
         var isEmpty: Bool {
             year == nil && season == nil && format == nil && status == nil
-                && genres.isEmpty && sort == Self.defaultSort && !isAdult
+                && genres.isEmpty && sort == Self.defaultSort
         }
     }
 
     func search(keyword: String, filters: SearchFilters = SearchFilters()) async throws -> [AniListMedia] {
-        var variables: [String: Any] = ["search": keyword, "sort": [filters.sort], "isAdult": filters.isAdult]
+        var variables: [String: Any] = ["search": keyword, "sort": [filters.sort]]
         if let year = filters.year { variables["seasonYear"] = year }
         if let season = filters.season, !season.isEmpty { variables["season"] = season }
         if let format = filters.format, !format.isEmpty { variables["format"] = format }
         if let status = filters.status, !status.isEmpty { variables["status"] = status }
         if !filters.genres.isEmpty { variables["genres"] = filters.genres }
 
-        var mediaArgs = ["search: $search", "type: ANIME", "sort: $sort", "isAdult: $isAdult"]
+        // isAdult is hardcoded to false — adult content is never included in search results.
+        var mediaArgs = ["search: $search", "type: ANIME", "sort: $sort", "isAdult: false"]
         if filters.year != nil { mediaArgs.append("seasonYear: $seasonYear") }
         if filters.season != nil { mediaArgs.append("season: $season") }
         if filters.format != nil { mediaArgs.append("format: $format") }
@@ -84,7 +84,7 @@ final class AniListService {
         if !filters.genres.isEmpty { mediaArgs.append("genres: $genres") }
 
         let argList = mediaArgs.joined(separator: ", ")
-        var varDecls = ["$search: String", "$sort: [MediaSort]", "$isAdult: Boolean"]
+        var varDecls = ["$search: String", "$sort: [MediaSort]"]
         if filters.year != nil { varDecls.append("$seasonYear: Int") }
         if filters.season != nil { varDecls.append("$season: MediaSeason") }
         if filters.format != nil { varDecls.append("$format: MediaFormat") }
