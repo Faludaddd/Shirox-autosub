@@ -99,6 +99,22 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 }
 #endif
 
+// MARK: - Hex Color Extension
+
+extension UIColor {
+    /// Initializes a UIColor from a hex string (e.g. "#FF6B6B" or "FF6B6B").
+    /// Returns nil for invalid input.
+    convenience init?(hex: String) {
+        var cleaned = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        if cleaned.hasPrefix("#") { cleaned.removeFirst() }
+        guard cleaned.count == 6, let value = UInt32(cleaned, radix: 16) else { return nil }
+        let r = CGFloat((value >> 16) & 0xFF) / 255.0
+        let g = CGFloat((value >> 8) & 0xFF) / 255.0
+        let b = CGFloat(value & 0xFF) / 255.0
+        self.init(red: r, green: g, blue: b, alpha: 1.0)
+    }
+}
+
 @main
 struct ShiroxApp: App {
 #if os(iOS)
@@ -106,6 +122,32 @@ struct ShiroxApp: App {
 #endif
     @StateObject private var moduleManager = ModuleManager.shared
     @Environment(\.scenePhase) private var scenePhase
+
+    // Appearance settings — applied globally via .preferredColorScheme and .tint
+    @AppStorage("appearanceMode") private var appearanceMode = "system"
+    @AppStorage("accentColorHex") private var accentColorHex = ""
+
+    /// Resolves the appearance mode to a ColorScheme (nil = follow system).
+    private var colorScheme: ColorScheme? {
+        switch appearanceMode {
+        case "dark": return .dark
+        case "light": return .light
+        default: return nil
+        }
+    }
+
+    /// Resolves the user's custom accent color, falling back to the system default.
+    private var accentColor: Color {
+        if let hex = accentColorHex, !hex.isEmpty,
+           let uiColor = UIColor(hex: hex) {
+            #if canImport(UIKit)
+            return Color(uiColor)
+            #else
+            return Color(hex)
+            #endif
+        }
+        return .primary
+    }
 
     init() {
         KingfisherImageCache.configure()
@@ -127,7 +169,8 @@ struct ShiroxApp: App {
         WindowGroup {
             RootTabView()
                 .environmentObject(moduleManager)
-                .tint(.primary)
+                .tint(accentColor)
+                .preferredColorScheme(colorScheme)
                 .onChange(of: scenePhase) { phase in
                     if phase == .active { Task { await PendingWriteQueue.shared.flush() } }
                 }

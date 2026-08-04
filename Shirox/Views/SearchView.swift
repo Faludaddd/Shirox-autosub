@@ -21,6 +21,9 @@ struct SearchView: View {
     // plays once a subtitle is chosen or explicitly skipped.
     @State private var pendingVideoURL: URL?
     @State private var pendingVideoTitle: String?
+    /// Debounce task for live search-as-you-type. Cancelled and restarted on each
+    /// keystroke so we only search after the user stops typing for 500ms.
+    @State private var liveSearchTask: Task<Void, Never>?
 
     private var isLocalModule: Bool { moduleManager.activeModule?.isLocalPlayback == true }
     private var isJellyfinModule: Bool { moduleManager.activeModule?.isJellyfin == true }
@@ -68,9 +71,20 @@ struct SearchView: View {
                 }
                 .onChangeOf(vm.query) { new in
                     if new.isEmpty {
+                        liveSearchTask?.cancel()
                         vm.clearResults()
-                    } else if (vm.hasResults || vm.hasSearched) && !vm.isLoading {
-                        vm.clearResults()
+                    } else {
+                        // Live search: debounce 500ms, then search automatically.
+                        // Cancels any pending search from the previous keystroke so
+                        // fast typing doesn't queue up multiple requests.
+                        liveSearchTask?.cancel()
+                        liveSearchTask = Task {
+                            try? await Task.sleep(nanoseconds: 500_000_000)
+                            guard !Task.isCancelled else { return }
+                            await MainActor.run {
+                                vm.search(usingModule: usingModule)
+                            }
+                        }
                     }
                 }
                 .onChangeOf(moduleManager.moduleReadyId) { newId in

@@ -20,6 +20,8 @@ struct SettingsView: View {
     @AppStorage("autoPickLastSearchResult") private var autoPickLastSearchResult = false
     @AppStorage("autoPickLastStream") private var autoPickLastStream = false
     @AppStorage("autoPickSubDub") private var autoPickSubDub = "off"
+    @AppStorage("appearanceMode") private var appearanceMode = "system"
+    @AppStorage("accentColorHex") private var accentColorHex = ""
     @AppStorage("dualSync") private var dualSync = false
     @AppStorage("rateOnFinish") private var rateOnFinish = true
     @AppStorage("localAutoTrackEnabled") private var localAutoTrackEnabled = true
@@ -53,7 +55,31 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack {
-            List {                
+            List {
+                // Appearance — theme + accent color
+                Section("Appearance") {
+                    Picker("Theme", selection: $appearanceMode) {
+                        Text("System").tag("system")
+                        Text("Light").tag("light")
+                        Text("Dark").tag("dark")
+                    }
+                    .tint(.secondary)
+
+                    Picker("Accent Color", selection: $accentColorHex) {
+                        Text("Default").tag("")
+                        Text("Red").tag("#FF453A")
+                        Text("Orange").tag("#FF9F0A")
+                        Text("Yellow").tag("#FFD60A")
+                        Text("Green").tag("#30D158")
+                        Text("Mint").tag("#63E6E2")
+                        Text("Blue").tag("#0A84FF")
+                        Text("Indigo").tag("#5E5CE6")
+                        Text("Purple").tag("#BF5AF2")
+                        Text("Pink").tag("#FF375F")
+                    }
+                    .tint(.secondary)
+                }
+
                 Section("Modules") {
                     NavigationLink {
                         ModuleListView()
