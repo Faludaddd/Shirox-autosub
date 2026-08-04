@@ -245,7 +245,8 @@ import Combine
                 coverImage: MediaCoverImage(large: coverImage, extraLarge: nil),
                 bannerImage: nil, description: nil, episodes: match.totalChapters,
                 status: nil, averageScore: nil, genres: nil, season: nil, seasonYear: nil,
-                nextAiringEpisode: nil, relations: nil, type: "MANGA", format: nil)
+                nextAiringEpisode: nil, relations: nil, type: "MANGA", format: nil,
+                studioNames: nil, source: nil, duration: nil, airDateRange: nil)
         } else {
             media = Media.localManga(source: source!, title: title, imageUrl: coverImage,
                                      chapters: match.totalChapters)
@@ -326,7 +327,8 @@ import Combine
             bannerImage: nil, description: nil, episodes: episodes,
             status: nil, averageScore: nil, genres: nil,
             season: nil, seasonYear: nil, nextAiringEpisode: nil,
-            relations: nil, type: nil, format: nil
+            relations: nil, type: nil, format: nil,
+            studioNames: nil, source: nil, duration: nil, airDateRange: nil
         )
     }
 

@@ -217,9 +217,26 @@ final class MALDiscoveryService {
                             .map { entry in
                                 MediaRelationEdge(
                                     relationType: type,
-                                    ,
+                                    node: Media(
+                                        id: entry.mal_id,
+                                        idMal: entry.mal_id,
+                                        provider: .mal,
+                                        title: MediaTitle(romaji: entry.name, english: nil, native: nil),
+                                        coverImage: MediaCoverImage(large: nil, extraLarge: nil),
+                                        bannerImage: nil,
+                                        description: nil,
+                                        episodes: nil,
+                                        status: nil,
+                                        averageScore: nil,
+                                        genres: nil,
+                                        season: nil,
+                                        seasonYear: nil,
+                                        nextAiringEpisode: nil,
+                                        relations: nil,
+                                        type: "TV",
+                                        format: nil,
                                         studioNames: nil, source: nil, duration: nil, airDateRange: nil
-)
+                                    )
                                 )
                             }
                     }
@@ -227,7 +244,8 @@ final class MALDiscoveryService {
                 return edges.isEmpty ? nil : MediaRelations(edges: edges)
             }(),
             type: a.type,
-            format: a.source
+            format: a.source,
+            studioNames: nil, source: nil, duration: nil, airDateRange: nil
         )
     }
 }
