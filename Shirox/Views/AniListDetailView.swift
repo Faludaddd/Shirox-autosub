@@ -407,14 +407,9 @@ struct AniListDetailView: View {
         }
         .adaptiveSheet(isPresented: $showMALEdit) {
             if let media = vm.media, let idMal = malMediaId {
-                let malMedia = Media(
-                    id: idMal, idMal: idMal, provider: .mal,
-                    title: media.title, coverImage: media.coverImage,
-                    bannerImage: nil, description: nil, episodes: media.episodes,
-                    status: nil, averageScore: nil, genres: nil,
-                    season: nil, seasonYear: nil, nextAiringEpisode: nil,
-                    relations: nil, type: nil, format: nil
-                )
+                ,
+                    studioNames: nil, source: nil, duration: nil, airDateRange: nil
+)
                 LibraryEntryEditSheet(
                     entry: existingMALEntry,
                     media: malMedia,
@@ -441,14 +436,9 @@ struct AniListDetailView: View {
         }
         .adaptiveSheet(isPresented: $showAniListEdit) {
             if let media = vm.media, let aniId = anilistMediaId {
-                let aniMedia = Media(
-                    id: aniId, idMal: media.id, provider: .anilist,
-                    title: media.title, coverImage: media.coverImage,
-                    bannerImage: nil, description: nil, episodes: media.episodes,
-                    status: nil, averageScore: nil, genres: nil,
-                    season: nil, seasonYear: nil, nextAiringEpisode: nil,
-                    relations: nil, type: nil, format: nil
-                )
+                ,
+                    studioNames: nil, source: nil, duration: nil, airDateRange: nil
+)
                 LibraryEntryEditSheet(
                     entry: existingAniListCrossEntry,
                     media: aniMedia,

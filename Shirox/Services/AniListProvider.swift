@@ -155,10 +155,16 @@ final class AniListProvider: MediaProvider {
             genres: m.genres,
             season: m.season,
             seasonYear: m.seasonYear,
-            nextAiringEpisode: m.nextAiringEpisode.map { MediaAiringEpisode(episode: $0.episode) },
+            nextAiringEpisode: m.nextAiringEpisode.map {
+                MediaAiringEpisode(episode: $0.episode, airingAt: $0.airingAt, timeUntilAiring: $0.timeUntilAiring)
+            },
             relations: m.relations.map { mapRelations($0) },
             type: m.type,
-            format: m.format
+            format: m.format,
+            studioNames: m.studios?.edges.filter { $0.isAnimation }.map { $0.node.name },
+            source: m.source,
+            duration: m.duration,
+            airDateRange: m.airDateRange
         )
     }
 
@@ -183,7 +189,11 @@ final class AniListProvider: MediaProvider {
             nextAiringEpisode: nil,
             relations: m.relations.map { mapRelations($0) },
             type: "MANGA",
-            format: m.format
+            format: m.format,
+            studioNames: m.studios?.edges.filter { $0.isAnimation }.map { $0.node.name },
+            source: m.source,
+            duration: m.duration,
+            airDateRange: m.airDateRange
         )
     }
 

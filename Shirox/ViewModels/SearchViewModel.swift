@@ -9,6 +9,7 @@ final class SearchViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var query = ""
     @Published var hasSearched = false
+    @Published var filters: AniListService.SearchFilters = .empty
 
     private(set) var isUsingModule = false
     private var searchTask: Task<Void, Never>?
@@ -65,7 +66,14 @@ final class SearchViewModel: ObservableObject {
                         aniListResults = []
                     }
                 } else {
-                    let res = try await ProviderManager.shared.call { try await $0.search(q) }
+                    // AniList path: use AniListService directly so we can pass filters.
+                    let res: [Media]
+                    if filters.isEmpty {
+                        res = try await ProviderManager.shared.call { try await $0.search(q) }
+                    } else {
+                        let aniListMedia = try await AniListService.shared.search(keyword: q, filters: filters)
+                        res = aniListMedia.map { AniListProvider.shared.mapMedia($0) }
+                    }
                     if !Task.isCancelled {
                         var seen = Set<String>()
                         aniListResults = res.filter { seen.insert($0.uniqueId).inserted }

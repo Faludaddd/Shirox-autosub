@@ -22,6 +22,14 @@ struct SettingsView: View {
     @AppStorage("autoPickSubDub") private var autoPickSubDub = "off"
     @AppStorage("appearanceMode") private var appearanceMode = "system"
     @AppStorage("accentColorHex") private var accentColorHex = ""
+    @AppStorage("preferredVideoQuality") private var preferredVideoQuality = "auto"
+    @AppStorage("autoPauseOnInterruption") private var autoPauseOnInterruption = true
+    @AppStorage("holdSpeedEnabled") private var holdSpeedEnabled = true
+    @AppStorage("holdSpeedSensitivity") private var holdSpeedSensitivity: Double = 0.5
+    @AppStorage("holdSpeedMultiplier") private var holdSpeedMultiplier: Double = 2.0
+    @AppStorage("reduceMotion") private var reduceMotion = false
+    @AppStorage("episodeReminders") private var episodeReminders = false
+    @AppStorage("airingNotifications") private var airingNotifications = false
     @AppStorage("dualSync") private var dualSync = false
     @AppStorage("rateOnFinish") private var rateOnFinish = true
     @AppStorage("localAutoTrackEnabled") private var localAutoTrackEnabled = true
@@ -78,6 +86,9 @@ struct SettingsView: View {
                         Text("Pink").tag("#FF375F")
                     }
                     .tint(.secondary)
+
+                    Toggle("Reduce Motion", isOn: $reduceMotion)
+                        .tint(.secondary)
                 }
 
                 Section("Modules") {
@@ -163,6 +174,36 @@ struct SettingsView: View {
                     Text("Automatically skip intros, recaps, credits, and previews")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    Picker("Preferred Video Quality", selection: $preferredVideoQuality) {
+                        Text("Auto").tag("auto")
+                        Text("360p").tag("360p")
+                        Text("480p").tag("480p")
+                        Text("720p").tag("720p")
+                        Text("1080p").tag("1080p")
+                        Text("Highest Available").tag("highest")
+                    }
+                    .tint(.secondary)
+                    Toggle("Auto-Pause on Interruption", isOn: $autoPauseOnInterruption)
+                        .tint(.secondary)
+                    Text("Pauses playback when Control Center or Notification Center is opened.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Toggle("Hold-to-Speed", isOn: $holdSpeedEnabled)
+                        .tint(.secondary)
+                    if holdSpeedEnabled {
+                        VStack(alignment: .leading) {
+                            Text("Movement Sensitivity")
+                            Slider(value: $holdSpeedSensitivity, in: 0.1...1.0, step: 0.1)
+                                .tint(.secondary)
+                        }
+                        Picker("Speed Multiplier", selection: $holdSpeedMultiplier) {
+                            Text("1.5×").tag(1.5)
+                            Text("2×").tag(2.0)
+                            Text("2.5×").tag(2.5)
+                            Text("3×").tag(3.0)
+                        }
+                        .tint(.secondary)
+                    }
                     Toggle("Reverse Episode List by Default", isOn: EpisodeSortManager.shared.$defaultReverseSort)
                         .tint(.secondary)
                     VStack(alignment: .leading, spacing: 12) {
@@ -422,6 +463,19 @@ struct SettingsView: View {
                     }
                 }
                 #endif
+
+                Section("Notifications") {
+                    Toggle("Episode Reminders", isOn: $episodeReminders)
+                        .tint(.secondary)
+                    Text("Get notified before a new episode airs.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Toggle("Airing Notifications", isOn: $airingNotifications)
+                        .tint(.secondary)
+                    Text("Get notified when an anime you track starts airing.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
 
                 Section {
                     ForEach([LegalPage.imprint, .privacy, .contributors, .licenses], id: \.title) { page in

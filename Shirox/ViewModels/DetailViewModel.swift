@@ -150,25 +150,9 @@ final class DetailViewModel: ObservableObject {
         let bannerURLString: String? = snapshot.bannerFile.map {
             DownloadedMediaSnapshotStore.shared.localFileURL(in: snapshot, relative: $0).absoluteString
         }
-        self.aniListMedia = Media(
-            id: snapshot.aniListID ?? 0,
-            idMal: nil,
-            provider: .anilist,
-            title: MediaTitle(romaji: snapshot.mediaTitle, english: snapshot.mediaTitle, native: nil),
-            coverImage: MediaCoverImage(large: poster, extraLarge: poster),
-            bannerImage: bannerURLString,
-            description: snapshot.synopsis,
-            episodes: snapshot.episodes.keys.max(),
-            status: snapshot.statusDisplay.flatMap(Self.aniListStatusRaw),
-            averageScore: snapshot.averageScore,
-            genres: snapshot.genres,
-            season: nil,
-            seasonYear: snapshot.seasonYear,
-            nextAiringEpisode: nil,
-            relations: nil,
-            type: nil,
-            format: snapshot.format
-        )
+        ,
+            studioNames: nil, source: nil, duration: nil, airDateRange: nil
+)
 
         self.aniListID = snapshot.aniListID
         self.detailHref = nil

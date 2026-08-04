@@ -8,6 +8,7 @@ struct SearchView: View {
     @EnvironmentObject private var moduleManager: ModuleManager
     @ObservedObject private var providerManager = ProviderManager.shared
     @State private var showModuleList = false
+    @State private var showFilters = false
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var isLandscape = false
     // A SINGLE file importer drives both phases. Two `.fileImporter` modifiers in one view
@@ -63,6 +64,26 @@ struct SearchView: View {
                     ToolbarItem(placement: .automatic) {
                         moduleButton
                     }
+                    // Filter button — only when NOT using a module (filters are AniList-only)
+                    ToolbarItem(placement: .automatic) {
+                        if !usingModule && !isLocalModule && !isJellyfinModule {
+                            Button {
+                                showFilters = true
+                            } label: {
+                                ZStack(alignment: .topTrailing) {
+                                    Image(systemName: "line.3.horizontal.decrease.circle")
+                                        .font(.system(size: 20))
+                                        .foregroundStyle(.primary)
+                                    if !vm.filters.isEmpty {
+                                        Circle()
+                                            .fill(.tint)
+                                            .frame(width: 8, height: 8)
+                                            .offset(x: 2, y: -2)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
                 .modifier(ConditionalSearchable(enabled: !isLocalModule && !isJellyfinModule, text: $vm.query))
                 .onSubmit(of: .search) {
@@ -106,6 +127,11 @@ struct SearchView: View {
             }
             .environmentObject(moduleManager)
             .tint(.primary)
+        }
+        .adaptiveSheet(isPresented: $showFilters) {
+            SearchFilterSheet(filters: $vm.filters) {
+                if !vm.query.isEmpty { vm.search(usingModule: usingModule) }
+            }
         }
         #if os(iOS)
         .background(
@@ -472,6 +498,157 @@ private final class SearchHistoryManager: ObservableObject {
     func clear() {
         queries = []
         UserDefaults.standard.removeObject(forKey: key)
+    }
+}
+
+// MARK: - Search Filter Sheet
+
+struct SearchFilterSheet: View {
+    @Binding var filters: AniListService.SearchFilters
+    let onApply: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var localFilters: AniListService.SearchFilters = .empty
+
+    private let availableGenres: [String] = [
+        "Action", "Adventure", "Comedy", "Drama", "Fantasy", "Horror",
+        "Mystery", "Psychological", "Romance", "Sci-Fi", "Slice of Life",
+        "Sports", "Supernatural", "Thriller", "Mecha", "Music"
+    ]
+
+    private let seasons: [(String, String)] = [
+        ("Any", ""), ("Winter", "WINTER"), ("Spring", "SPRING"),
+        ("Summer", "SUMMER"), ("Fall", "FALL")
+    ]
+
+    private let formats: [(String, String)] = [
+        ("Any", ""), ("TV", "TV"), ("Movie", "MOVIE"), ("OVA", "OVA"),
+        ("ONA", "ONA"), ("Special", "SPECIAL"), ("Music", "MUSIC")
+    ]
+
+    private let statuses: [(String, String)] = [
+        ("Any", ""), ("Finished", "FINISHED"), ("Releasing", "RELEASING"),
+        ("Upcoming", "NOT_YET_RELEASED"), ("Cancelled", "CANCELLED")
+    ]
+
+    private let sortOptions: [(String, String)] = [
+        ("Best Match", "SEARCH_MATCH"),
+        ("Popularity", "POPULARITY_DESC"),
+        ("Top Rated", "SCORE_DESC"),
+        ("Newest", "START_DATE_DESC"),
+        ("Most Favorites", "FAVORITES_DESC")
+    ]
+
+    private var yearOptions: [Int] {
+        let currentYear = Calendar.current.component(.year, from: Date())
+        return Array((1970...(currentYear + 1)).reversed())
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Sort By") {
+                    Picker("Sort", selection: $localFilters.sort) {
+                        ForEach(sortOptions, id: \.1) { opt in
+                            Text(opt.0).tag(opt.1)
+                        }
+                    }
+                    .tint(.secondary)
+                }
+
+                Section("Release") {
+                    Picker("Year", selection: Binding(
+                        get: { localFilters.year ?? 0 },
+                        set: { localFilters.year = $0 == 0 ? nil : $0 }
+                    )) {
+                        Text("Any").tag(0)
+                        ForEach(yearOptions, id: \.self) { year in
+                            Text("\(year)").tag(year)
+                        }
+                    }
+                    .tint(.secondary)
+
+                    Picker("Season", selection: Binding(
+                        get: { localFilters.season ?? "" },
+                        set: { localFilters.season = $0.isEmpty ? nil : $0 }
+                    )) {
+                        ForEach(seasons, id: \.1) { s in
+                            Text(s.0).tag(s.1)
+                        }
+                    }
+                    .tint(.secondary)
+                    .disabled(localFilters.year == nil)
+                }
+
+                Section("Type") {
+                    Picker("Format", selection: Binding(
+                        get: { localFilters.format ?? "" },
+                        set: { localFilters.format = $0.isEmpty ? nil : $0 }
+                    )) {
+                        ForEach(formats, id: \.1) { f in
+                            Text(f.0).tag(f.1)
+                        }
+                    }
+                    .tint(.secondary)
+
+                    Picker("Status", selection: Binding(
+                        get: { localFilters.status ?? "" },
+                        set: { localFilters.status = $0.isEmpty ? nil : $0 }
+                    )) {
+                        ForEach(statuses, id: \.1) { s in
+                            Text(s.0).tag(s.1)
+                        }
+                    }
+                    .tint(.secondary)
+                }
+
+                Section("Genres") {
+                    ForEach(availableGenres, id: \.self) { genre in
+                        Button {
+                            if localFilters.genres.contains(genre) {
+                                localFilters.genres.removeAll { $0 == genre }
+                            } else {
+                                localFilters.genres.append(genre)
+                            }
+                        } label: {
+                            HStack {
+                                Text(genre).foregroundStyle(.primary)
+                                Spacer()
+                                if localFilters.genres.contains(genre) {
+                                    Image(systemName: "checkmark").foregroundStyle(.tint)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .navigationTitle("Filters")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Reset") {
+                        localFilters = .empty
+                    }
+                    .disabled(localFilters.isEmpty)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Apply") {
+                        filters = localFilters
+                        onApply()
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .onAppear {
+            localFilters = filters
+        }
+        #if os(iOS)
+        .adaptivePresentationDetents([.large])
+        #endif
     }
 }
 

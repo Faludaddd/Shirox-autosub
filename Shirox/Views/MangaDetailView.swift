@@ -482,7 +482,8 @@ struct MangaDetailView: View {
             bannerImage: nil, description: detail.description,
             episodes: vm.match?.totalChapters, status: nil, averageScore: nil, genres: nil,
             season: nil, seasonYear: nil, nextAiringEpisode: nil, relations: nil,
-            type: "MANGA", format: nil)
+            type: "MANGA", format: nil,
+            studioNames: nil, source: nil, duration: nil, airDateRange: nil)
     }
 
     @ViewBuilder private func libraryControls(_ detail: MangaDetail) -> some View {

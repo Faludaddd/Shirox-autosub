@@ -62,6 +62,12 @@ struct HomeView: View {
                             if !vm.topRated.isEmpty {
                                 AnimeSection(title: "Top Rated",        items: vm.topRated, category: .topRated)
                             }
+                            if !vm.recentlyCompleted.isEmpty {
+                                AnimeSection(title: "Recently Completed", items: vm.recentlyCompleted, category: .popular)
+                            }
+                            if !vm.upcoming.isEmpty {
+                                AnimeSection(title: "Upcoming",         items: vm.upcoming,    category: .trending)
+                            }
                         }
                         Spacer().frame(height: 28)
                     }

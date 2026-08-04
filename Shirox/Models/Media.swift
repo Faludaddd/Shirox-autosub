@@ -45,6 +45,12 @@ struct Media: Identifiable, Codable, Equatable, Hashable, Sendable {
     let type: String?
     let format: String?
 
+    // Extended fields (all optional — existing decode paths are unaffected)
+    let studioNames: [String]?     // Animation studio names
+    let source: String?            // "MANGA", "LIGHT_NOVEL", "ORIGINAL", etc.
+    let duration: Int?             // Episode length in minutes
+    let airDateRange: String?      // Pre-formatted "Oct 2007 – Mar 2008"
+
     var uniqueId: String { "\(provider.rawValue)-\(id)" }
 
     var isManga: Bool { type == "MANGA" }
@@ -70,6 +76,15 @@ struct Media: Identifiable, Codable, Equatable, Hashable, Sendable {
         case "HIATUS": return "Hiatus"
         default: return status
         }
+    }
+
+    /// Primary animation studio name (first one), if any.
+    var mainStudioName: String? { studioNames?.first }
+
+    /// Human-readable source material label.
+    var sourceDisplay: String? {
+        guard let source = source, !source.isEmpty else { return nil }
+        return source.replacingOccurrences(of: "_", with: " ").capitalized
     }
 }
 
@@ -100,7 +115,8 @@ extension Media {
             bannerImage: nil, description: nil, episodes: episodes,
             status: nil, averageScore: nil, genres: nil,
             season: nil, seasonYear: nil, nextAiringEpisode: nil,
-            relations: nil, type: nil, format: nil
+            relations: nil, type: nil, format: nil,
+            studioNames: nil, source: nil, duration: nil, airDateRange: nil
         )
     }
 
@@ -114,7 +130,9 @@ extension Media {
             bannerImage: nil, description: nil, episodes: chapters,
             status: nil, averageScore: nil, genres: nil,
             season: nil, seasonYear: nil, nextAiringEpisode: nil,
-            relations: nil, type: "MANGA", format: nil)
+            relations: nil, type: "MANGA", format: nil,
+            studioNames: nil, source: nil, duration: nil, airDateRange: nil
+        )
     }
 }
 
@@ -158,6 +176,19 @@ struct MediaCoverImage: Codable, Equatable, Hashable {
 
 struct MediaAiringEpisode: Codable, Equatable, Hashable {
     let episode: Int
+    let airingAt: Int?        // Unix timestamp
+    let timeUntilAiring: Int? // Seconds until airing
+
+    /// Formatted countdown (e.g. "in 2d 5h").
+    var countdownDisplay: String? {
+        guard let seconds = timeUntilAiring, seconds > 0 else { return nil }
+        let days = seconds / 86400
+        let hours = (seconds % 86400) / 3600
+        let mins = (seconds % 3600) / 60
+        if days > 0 { return "in \(days)d \(hours)h" }
+        if hours > 0 { return "in \(hours)h \(mins)m" }
+        return "in \(mins)m"
+    }
 }
 
 struct MediaRelations: Codable, Equatable, Hashable {

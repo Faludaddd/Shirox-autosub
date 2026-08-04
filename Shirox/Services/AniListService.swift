@@ -49,22 +49,76 @@ final class AniListService {
 
     // MARK: - Public API
 
-    func search(keyword: String) async throws -> [AniListMedia] {
+    /// Search filters for the AniList anime search. All fields are optional — when nil/empty,
+    /// the filter is not applied. Used by `SearchView`'s filter sheet.
+    struct SearchFilters: Equatable {
+        var year: Int? = nil
+        var season: String? = nil          // "WINTER", "SPRING", "SUMMER", "FALL"
+        var format: String? = nil          // "TV", "MOVIE", "OVA", "ONA", "SPECIAL", "MUSIC"
+        var status: String? = nil          // "FINISHED", "RELEASING", "NOT_YET_RELEASED", "CANCELLED"
+        var genres: [String] = []
+        var sort: String = "SEARCH_MATCH"
+        var isAdult: Bool = false
+
+        static let defaultSort = "SEARCH_MATCH"
+        static let empty = SearchFilters()
+        var isEmpty: Bool {
+            year == nil && season == nil && format == nil && status == nil
+                && genres.isEmpty && sort == Self.defaultSort && !isAdult
+        }
+    }
+
+    func search(keyword: String, filters: SearchFilters = SearchFilters()) async throws -> [AniListMedia] {
+        var variables: [String: Any] = ["search": keyword, "sort": filters.sort, "isAdult": filters.isAdult]
+        if let year = filters.year { variables["seasonYear"] = year }
+        if let season = filters.season, !season.isEmpty { variables["season"] = season }
+        if let format = filters.format, !format.isEmpty { variables["format"] = format }
+        if let status = filters.status, !status.isEmpty { variables["status"] = status }
+        if !filters.genres.isEmpty { variables["genres"] = filters.genres }
+
+        var mediaArgs = ["search: $search", "type: ANIME", "sort: $sort", "isAdult: $isAdult"]
+        if filters.year != nil { mediaArgs.append("seasonYear: $seasonYear") }
+        if filters.season != nil { mediaArgs.append("season: $season") }
+        if filters.format != nil { mediaArgs.append("format: $format") }
+        if filters.status != nil { mediaArgs.append("status: $status") }
+        if !filters.genres.isEmpty { mediaArgs.append("genres: $genres") }
+
+        let argList = mediaArgs.joined(separator: ", ")
+        var varDecls = ["$search: String", "$sort: [MediaSort]", "$isAdult: Boolean"]
+        if filters.year != nil { varDecls.append("$seasonYear: Int") }
+        if filters.season != nil { varDecls.append("$season: MediaSeason") }
+        if filters.format != nil { varDecls.append("$format: MediaFormat") }
+        if filters.status != nil { varDecls.append("$status: MediaStatus") }
+        if !filters.genres.isEmpty { varDecls.append("$genres: [String]") }
+        let varDeclList = varDecls.joined(separator: ", ")
+
         let query = """
-        query ($search: String) {
+        query (\(varDeclList)) {
           Page(page: 1, perPage: 25) {
-            media(search: $search, type: ANIME, sort: SEARCH_MATCH, isAdult: false) {
+            media(\(argList)) {
               id
               title { romaji english native }
               coverImage { large extraLarge }
+              bannerImage
               averageScore
               genres
               description(asHtml: false)
+              episodes
+              status
+              format
+              season
+              seasonYear
+              nextAiringEpisode { episode airingAt timeUntilAiring }
+              studios { edges { isAnimation node { id name } } }
             }
           }
         }
         """
-        return try await fetchPage(query: query, variables: ["search": keyword])
+        return try await fetchPage(query: query, variables: variables)
+    }
+
+    func search(keyword: String) async throws -> [AniListMedia] {
+        return try await search(keyword: keyword, filters: SearchFilters())
     }
 
     /// AniList MANGA search, used to auto-match a module-scraped manga to a
@@ -201,6 +255,161 @@ final class AniListService {
         return try await fetchPage(query: query)
     }
 
+    // MARK: - Seasonal & Schedule
+
+    /// Anime from a specific season (e.g. Winter 2025), sorted by popularity.
+    func seasonalBrowse(season: AniListSeason, year: Int, sort: String = "POPULARITY_DESC") async throws -> [AniListMedia] {
+        let query = """
+        query ($season: MediaSeason, $year: Int, $sort: [MediaSort]) {
+          Page(page: 1, perPage: 30) {
+            media(season: $season, seasonYear: $year, type: ANIME, sort: $sort, isAdult: false) {
+              id
+              idMal
+              title { romaji english native }
+              coverImage { large extraLarge }
+              bannerImage
+              description(asHtml: false)
+              episodes
+              duration
+              status
+              source
+              format
+              season
+              seasonYear
+              startDate { year month day }
+              endDate { year month day }
+              averageScore
+              genres
+              nextAiringEpisode { episode airingAt timeUntilAiring }
+              studios { edges { isAnimation node { id name } } }
+            }
+          }
+        }
+        """
+        return try await fetchPage(query: query, variables: ["season": season.rawValue, "year": year, "sort": sort])
+    }
+
+    /// Recently completed anime from the previous season.
+    /// Powers the "Recently Completed Last Season" home section.
+    func recentlyCompletedLastSeason() async throws -> [AniListMedia] {
+        let (season, year) = AniListSeason.previous()
+        let query = """
+        query ($season: MediaSeason, $year: Int) {
+          Page(page: 1, perPage: 20) {
+            media(season: $season, seasonYear: $year, type: ANIME, status: FINISHED, sort: POPULARITY_DESC, isAdult: false) {
+              id
+              idMal
+              title { romaji english native }
+              coverImage { large extraLarge }
+              bannerImage
+              description(asHtml: false)
+              episodes
+              duration
+              status
+              source
+              format
+              season
+              seasonYear
+              startDate { year month day }
+              endDate { year month day }
+              averageScore
+              genres
+              studios { edges { isAnimation node { id name } } }
+            }
+          }
+        }
+        """
+        return try await fetchPage(query: query, variables: ["season": season.rawValue, "year": year])
+    }
+
+    /// Upcoming anime (not yet released), sorted by popularity.
+    func upcoming() async throws -> [AniListMedia] {
+        let query = """
+        query {
+          Page(page: 1, perPage: 30) {
+            media(type: ANIME, status: NOT_YET_RELEASED, sort: POPULARITY_DESC, isAdult: false) {
+              id
+              idMal
+              title { romaji english native }
+              coverImage { large extraLarge }
+              bannerImage
+              description(asHtml: false)
+              episodes
+              status
+              format
+              season
+              seasonYear
+              startDate { year month day }
+              averageScore
+              genres
+              studios { edges { isAnimation node { id name } } }
+            }
+          }
+        }
+        """
+        return try await fetchPage(query: query)
+    }
+
+    /// Anime airing today (next episode within the next 24 hours), sorted by airing time.
+    /// Uses the AiringSchedule API for precise scheduling data.
+    func airingToday() async throws -> [AniListAiringScheduleItem] {
+        let now = Int(Date().timeIntervalSince1970)
+        let tomorrow = now + 86400
+        return try await airingSchedules(from: now, to: tomorrow)
+    }
+
+    /// Anime airing within the next 7 days, sorted by airing time.
+    func airingThisWeek() async throws -> [AniListAiringScheduleItem] {
+        let now = Int(Date().timeIntervalSince1970)
+        let nextWeek = now + (86400 * 7)
+        return try await airingSchedules(from: now, to: nextWeek)
+    }
+
+    /// Fetches airing schedules in a time range. Returns one entry per episode airing.
+    private func airingSchedules(from: Int, to: Int) async throws -> [AniListAiringScheduleItem] {
+        struct AiringPage: Decodable { let Page: AiringSchedulePage }
+        struct AiringSchedulePage: Decodable { let airingSchedules: [AiringScheduleData]? }
+        struct AiringScheduleData: Decodable {
+            let id: Int
+            let episode: Int
+            let airingAt: Int
+            let media: AniListMedia
+        }
+
+        let query = """
+        query ($airingGreater: Int, $airingLess: Int) {
+          Page(page: 1, perPage: 50) {
+            airingSchedules(airing_greater: $airingGreater, airing_lesser: $airingLess) {
+              id
+              episode
+              airingAt
+              media {
+                id
+                idMal
+                title { romaji english native }
+                coverImage { large extraLarge }
+                bannerImage
+                description(asHtml: false)
+                episodes
+                status
+                format
+                season
+                seasonYear
+                averageScore
+                genres
+                nextAiringEpisode { episode airingAt timeUntilAiring }
+                studios { edges { isAnimation node { id name } } }
+              }
+            }
+          }
+        }
+        """
+        let data = try await post(query: query, variables: ["airingGreater": from, "airingLess": to])
+        let response = try JSONDecoder().decode(GraphQLResponse<AiringPage>.self, from: data)
+        let schedules = response.data?.Page.airingSchedules ?? []
+        return schedules.map { AniListAiringScheduleItem(id: $0.id, episode: $0.episode, airingAt: $0.airingAt, media: $0.media) }
+    }
+
     func browse(category: BrowseCategory, page: Int) async throws -> [AniListMedia] {
         switch category {
         case .trending:
@@ -289,14 +498,63 @@ final class AniListService {
             bannerImage
             description(asHtml: false)
             episodes
+            duration
             status
+            source
+            format
+            season
+            seasonYear
+            startDate { year month day }
+            endDate { year month day }
             nextAiringEpisode {
               episode
+              airingAt
+              timeUntilAiring
             }
             averageScore
             genres
-            season
-            seasonYear
+            trailer { id site thumbnail }
+            studios {
+              edges {
+                isAnimation
+                node { id name isAnimation }
+              }
+            }
+            characters(sort: ROLE, perPage: 12) {
+              edges {
+                role
+                node {
+                  id
+                  name { full native }
+                  image { large medium }
+                  description(asHtml: false)
+                }
+                voiceActors(language: JAPANESE, sort: ROLE) {
+                  id
+                  name { full native }
+                  language
+                  image { large medium }
+                }
+              }
+            }
+            recommendations(sort: RATING_DESC, perPage: 12) {
+              nodes {
+                rating
+                mediaRecommendation {
+                  id
+                  title { romaji english native }
+                  coverImage { large extraLarge }
+                  bannerImage
+                  averageScore
+                  episodes
+                  status
+                  format
+                  season
+                  seasonYear
+                  genres
+                }
+              }
+            }
             relations {
               edges {
                 relationType
@@ -307,6 +565,9 @@ final class AniListService {
                   status
                   type
                   format
+                  episodes
+                  season
+                  seasonYear
                 }
               }
             }
