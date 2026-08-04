@@ -115,6 +115,23 @@ extension UIColor {
     }
 }
 
+extension Color {
+    /// Resolves the user's custom accent color from UserDefaults, falling back to
+    /// `.secondary` (the app's default muted look) when no custom color is set.
+    /// Used throughout the app instead of `.tint(.appAccent)` so the accent color
+    /// picker actually affects Toggle/Picker controls.
+    static var appAccent: Color {
+        let hex = UserDefaults.standard.string(forKey: "accentColorHex") ?? ""
+        let trimmed = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty, let uiColor = UIColor(hex: trimmed) {
+            #if canImport(UIKit)
+            return Color(uiColor)
+            #endif
+        }
+        return .secondary
+    }
+}
+
 @main
 struct ShiroxApp: App {
 #if os(iOS)

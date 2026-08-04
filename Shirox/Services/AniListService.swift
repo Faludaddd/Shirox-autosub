@@ -69,7 +69,7 @@ final class AniListService {
     }
 
     func search(keyword: String, filters: SearchFilters = SearchFilters()) async throws -> [AniListMedia] {
-        var variables: [String: Any] = ["search": keyword, "sort": filters.sort, "isAdult": filters.isAdult]
+        var variables: [String: Any] = ["search": keyword, "sort": [filters.sort], "isAdult": filters.isAdult]
         if let year = filters.year { variables["seasonYear"] = year }
         if let season = filters.season, !season.isEmpty { variables["season"] = season }
         if let format = filters.format, !format.isEmpty { variables["format"] = format }

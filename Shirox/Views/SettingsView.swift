@@ -61,9 +61,58 @@ struct SettingsView: View {
         titlePriority.components(separatedBy: ",").filter { !$0.isEmpty }
     }
 
+    @State private var searchText = ""
+
     var body: some View {
         NavigationStack {
             List {
+                if searchText.isEmpty {
+                    fullSettingsList
+                } else {
+                    filteredSettingsList
+                }
+            }
+            .searchable(text: $searchText, prompt: "Search settings…")
+            #if os(iOS)
+            .listStyle(.insetGrouped)
+            #endif
+            .navigationTitle("Settings")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .alert("Reset Continue Watching?", isPresented: $showResetCWConfirmation) {
+                Button("Reset", role: .destructive) {
+                    CacheManager.shared.clearContinueWatching()
+                    #if os(iOS)
+                    updateCacheSizes()
+                    #endif
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This will clear all in-progress playback cards from the Home screen.")
+            }
+            .alert("Reset Watch History?", isPresented: $showResetHistoryConfirmation) {
+                Button("Reset", role: .destructive) {
+                    CacheManager.shared.clearWatchHistory()
+                    #if os(iOS)
+                    updateCacheSizes()
+                    #endif
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This will clear all 'Watched' checkmarks from episode lists.")
+            }
+            .onAppear {
+                #if os(iOS)
+                PlayerPresenter.shared.resetToAppOrientation()
+                updateCacheSizes()
+                #endif
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var fullSettingsList: some View {
                 // Appearance — theme + accent color
                 Section("Appearance") {
                     Picker("Theme", selection: $appearanceMode) {
@@ -71,7 +120,7 @@ struct SettingsView: View {
                         Text("Light").tag("light")
                         Text("Dark").tag("dark")
                     }
-                    .tint(.secondary)
+                    .tint(.appAccent)
 
                     Picker("Accent Color", selection: $accentColorHex) {
                         Text("Default").tag("")
@@ -85,10 +134,10 @@ struct SettingsView: View {
                         Text("Purple").tag("#BF5AF2")
                         Text("Pink").tag("#FF375F")
                     }
-                    .tint(.secondary)
+                    .tint(.appAccent)
 
                     Toggle("Reduce Motion", isOn: $reduceMotion)
-                        .tint(.secondary)
+                        .tint(.appAccent)
                 }
 
                 Section("Modules") {
@@ -126,25 +175,25 @@ struct SettingsView: View {
                         }
                     }
                     Toggle("Use Default Extension", isOn: $useDefaultExtension)
-                        .tint(.secondary)
+                        .tint(.appAccent)
                         .disabled(moduleManager.activeModule == nil)
                     Toggle("Auto-pick Last Search Result", isOn: $autoPickLastSearchResult)
-                        .tint(.secondary)
+                        .tint(.appAccent)
                     Toggle("Auto-pick Last Stream", isOn: $autoPickLastStream)
-                        .tint(.secondary)
+                        .tint(.appAccent)
                     Picker("Auto-pick Sub/Dub", selection: $autoPickSubDub) {
                         Text("Off (ask each time)").tag("off")
                         Text("Sub").tag("sub")
                         Text("Dub").tag("dub")
                     }
-                    .tint(.secondary)
+                    .tint(.appAccent)
                 }
 
                 ProvidersSettingsSection()
 
                 Section("Player") {
                     Toggle("Force Landscape Mode", isOn: $forceLandscape)
-                        .tint(.secondary)
+                        .tint(.appAccent)
                         #if os(iOS)
                         .onChangeOf(forceLandscape) {
                             PlayerPresenter.shared.resetToAppOrientation(shouldRotate: true)
@@ -152,7 +201,7 @@ struct SettingsView: View {
                         #endif
                     if #available(iOS 26.0, macOS 26.0, *) {
                         Toggle("Liquid Glass Controls", isOn: $playerLiquidGlass)
-                            .tint(.secondary)
+                            .tint(.appAccent)
                         Text("Frosted glass buttons in the video player. Turn off for solid controls.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -168,9 +217,9 @@ struct SettingsView: View {
                         }
                     }
                     Toggle("Auto Next Episode", isOn: $autoNextEpisode)
-                        .tint(.secondary)
+                        .tint(.appAccent)
                     Toggle("Auto-Skip Segments", isOn: $autoSkipSegments)
-                        .tint(.secondary)
+                        .tint(.appAccent)
                     Text("Automatically skip intros, recaps, credits, and previews")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -182,19 +231,19 @@ struct SettingsView: View {
                         Text("1080p").tag("1080p")
                         Text("Highest Available").tag("highest")
                     }
-                    .tint(.secondary)
+                    .tint(.appAccent)
                     Toggle("Auto-Pause on Interruption", isOn: $autoPauseOnInterruption)
-                        .tint(.secondary)
+                        .tint(.appAccent)
                     Text("Pauses playback when Control Center or Notification Center is opened.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Toggle("Hold-to-Speed", isOn: $holdSpeedEnabled)
-                        .tint(.secondary)
+                        .tint(.appAccent)
                     if holdSpeedEnabled {
                         VStack(alignment: .leading) {
                             Text("Movement Sensitivity")
                             Slider(value: $holdSpeedSensitivity, in: 0.1...1.0, step: 0.1)
-                                .tint(.secondary)
+                                .tint(.appAccent)
                         }
                         Picker("Speed Multiplier", selection: $holdSpeedMultiplier) {
                             Text("1.5×").tag(1.5)
@@ -202,10 +251,10 @@ struct SettingsView: View {
                             Text("2.5×").tag(2.5)
                             Text("3×").tag(3.0)
                         }
-                        .tint(.secondary)
+                        .tint(.appAccent)
                     }
                     Toggle("Reverse Episode List by Default", isOn: EpisodeSortManager.shared.$defaultReverseSort)
-                        .tint(.secondary)
+                        .tint(.appAccent)
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
                             Text("Episode Progress Threshold")
@@ -224,7 +273,7 @@ struct SettingsView: View {
                 if #available(iOS 26.0, *) {
                     Section("Reader") {
                         Toggle("Liquid Glass Controls", isOn: $readerLiquidGlass)
-                            .tint(.secondary)
+                            .tint(.appAccent)
                         Text("Frosted glass buttons in the manga reader. Turn off for solid controls.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -236,20 +285,20 @@ struct SettingsView: View {
                     Section("Tracking") {
                         if aniListAuth.isLoggedIn {
                             Toggle("Track on AniList", isOn: $aniListTrackingEnabled)
-                                .tint(.secondary)
+                                .tint(.appAccent)
                         }
                         if malAuth.isLoggedIn {
                             Toggle("Track on MyAnimeList", isOn: $malTrackingEnabled)
-                                .tint(.secondary)
+                                .tint(.appAccent)
                         }
                         if aniListAuth.isLoggedIn && malAuth.isLoggedIn {
                             Toggle("Sync edits to both services", isOn: $dualSync)
-                                .tint(.secondary)
+                                .tint(.appAccent)
                         }
                         Toggle("Never reduce progress", isOn: $skipReWatchTracking)
-                            .tint(.secondary)
+                            .tint(.appAccent)
                         Toggle("Prompt to rate after finishing", isOn: $rateOnFinish)
-                            .tint(.secondary)
+                            .tint(.appAccent)
                         Text("Automatically update your watch progress as you watch.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -266,7 +315,7 @@ struct SettingsView: View {
 
                 Section {
                     Toggle("Auto-track what you watch", isOn: $localAutoTrackEnabled)
-                        .tint(.secondary)
+                        .tint(.appAccent)
                     Picker("Score Format", selection: $localScoreFormatRaw) {
                         Text("100 Point").tag(ScoreFormat.point100.rawValue)
                         Text("10 Point (Decimal)").tag(ScoreFormat.point10Decimal.rawValue)
@@ -298,7 +347,7 @@ struct SettingsView: View {
                         }
                     }
                     Toggle("Background Downloads", isOn: $backgroundDownloadsEnabled)
-                        .tint(.secondary)
+                        .tint(.appAccent)
                 }
 
                 Section("Matching") {
@@ -466,12 +515,12 @@ struct SettingsView: View {
 
                 Section("Notifications") {
                     Toggle("Episode Reminders", isOn: $episodeReminders)
-                        .tint(.secondary)
+                        .tint(.appAccent)
                     Text("Get notified before a new episode airs.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Toggle("Airing Notifications", isOn: $airingNotifications)
-                        .tint(.secondary)
+                        .tint(.appAccent)
                     Text("Get notified when an anime you track starts airing.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -493,41 +542,62 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-            }
-            .navigationTitle("Settings")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .alert("Reset Continue Watching?", isPresented: $showResetCWConfirmation) {
-                Button("Reset", role: .destructive) {
-                    CacheManager.shared.clearContinueWatching()
-                    #if os(iOS)
-                    updateCacheSizes()
-                    #endif
+        }
+
+    @ViewBuilder
+    private var filteredSettingsList: some View {
+        Section("Search Results") {
+            if searchText.isEmpty {
+                Text("Start typing to search settings…")
+                    .foregroundStyle(.secondary)
+            } else {
+                let matches = settingsSearchResults
+                if matches.isEmpty {
+                    Text("No settings found for \"\(searchText)\"")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(matches, id: \.self) { match in
+                        Text(match)
+                            .font(.subheadline)
+                    }
                 }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("This will clear all in-progress playback cards from the Home screen.")
-            }
-            .alert("Reset Watch History?", isPresented: $showResetHistoryConfirmation) {
-                Button("Reset", role: .destructive) {
-                    CacheManager.shared.clearWatchHistory()
-                    #if os(iOS)
-                    updateCacheSizes()
-                    #endif
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("This will clear all 'Watched' checkmarks from episode lists.")
-            }
-            .onAppear {
-                #if os(iOS)
-                PlayerPresenter.shared.resetToAppOrientation()
-                updateCacheSizes()
-                #endif
             }
         }
     }
+
+    /// Simple text-matching search across setting labels. Returns labels that contain
+    /// the search text (case-insensitive).
+    private var settingsSearchResults: [String] {
+        let q = searchText.lowercased()
+        var results: [String] = []
+        // Appearance
+        if "theme".contains(q) || "appearance".contains(q) || "dark".contains(q) || "light".contains(q) { results.append("Theme (Appearance)") }
+        if "accent".contains(q) || "color".contains(q) { results.append("Accent Color (Appearance)") }
+        if "motion".contains(q) || "animation".contains(q) { results.append("Reduce Motion (Appearance)") }
+        // Player
+        if "landscape".contains(q) { results.append("Force Landscape Mode (Player)") }
+        if "skip".contains(q) { results.append("Skip Duration (Player)") }
+        if "quality".contains(q) || "resolution".contains(q) || "video".contains(q) { results.append("Preferred Video Quality (Player)") }
+        if "pause".contains(q) || "interruption".contains(q) { results.append("Auto-Pause on Interruption (Player)") }
+        if "hold".contains(q) || "speed".contains(q) { results.append("Hold-to-Speed (Player)") }
+        if "auto next".contains(q) || "autoplay".contains(q) { results.append("Auto Next Episode (Player)") }
+        if "segment".contains(q) || "intro".contains(q) || "outro".contains(q) { results.append("Auto-Skip Segments (Player)") }
+        if "playback speed".contains(q) { results.append("Playback Speed (Player)") }
+        // Streaming
+        if "sub".contains(q) || "dub".contains(q) { results.append("Auto-pick Sub/Dub (Streaming)") }
+        if "stream".contains(q) || "module".contains(q) { results.append("Auto-pick Last Stream (Streaming)") }
+        // Library
+        if "tracking".contains(q) || "anilist".contains(q) || "mal".contains(q) { results.append("Track on AniList/MAL (Library)") }
+        if "score".contains(q) || "rating".contains(q) { results.append("Score Format (Library)") }
+        // Downloads
+        if "download".contains(q) || "concurrent".contains(q) { results.append("Concurrent Downloads (Downloads)") }
+        if "background".contains(q) { results.append("Background Downloads (Downloads)") }
+        // Notifications
+        if "notification".contains(q) || "reminder".contains(q) || "airing".contains(q) { results.append("Episode Reminders / Airing Notifications") }
+        return results
+    }
+
+    // MARK: - Settings actions and computed properties
 
     #if os(iOS)
     private func updateCacheSizes() {

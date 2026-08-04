@@ -215,7 +215,7 @@ struct SearchView: View {
             }
             Toggle("Add subtitle file", isOn: $addSubtitleUpFront)
                 .toggleStyle(.switch)
-                .tint(.secondary)
+                .tint(.appAccent)
                 .fixedSize()
                 .disabled(!needsVideoStep)   // locked once a video is staged; clear it to change
                 .onChangeOf(addSubtitleUpFront) { _ in clearStagedVideo() }
@@ -553,7 +553,7 @@ struct SearchFilterSheet: View {
                             Text(opt.0).tag(opt.1)
                         }
                     }
-                    .tint(.secondary)
+                    .tint(.appAccent)
                 }
 
                 Section("Release") {
@@ -566,7 +566,7 @@ struct SearchFilterSheet: View {
                             Text("\(year)").tag(year)
                         }
                     }
-                    .tint(.secondary)
+                    .tint(.appAccent)
 
                     Picker("Season", selection: Binding(
                         get: { localFilters.season ?? "" },
@@ -576,7 +576,7 @@ struct SearchFilterSheet: View {
                             Text(s.0).tag(s.1)
                         }
                     }
-                    .tint(.secondary)
+                    .tint(.appAccent)
                     .disabled(localFilters.year == nil)
                 }
 
@@ -589,7 +589,7 @@ struct SearchFilterSheet: View {
                             Text(f.0).tag(f.1)
                         }
                     }
-                    .tint(.secondary)
+                    .tint(.appAccent)
 
                     Picker("Status", selection: Binding(
                         get: { localFilters.status ?? "" },
@@ -599,7 +599,7 @@ struct SearchFilterSheet: View {
                             Text(s.0).tag(s.1)
                         }
                     }
-                    .tint(.secondary)
+                    .tint(.appAccent)
                 }
 
                 Section("Genres") {
