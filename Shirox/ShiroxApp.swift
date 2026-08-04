@@ -138,8 +138,8 @@ struct ShiroxApp: App {
 
     /// Resolves the user's custom accent color, falling back to the system default.
     private var accentColor: Color {
-        if let hex = accentColorHex, !hex.isEmpty,
-           let uiColor = UIColor(hex: hex) {
+        let hex = accentColorHex.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !hex.isEmpty, let uiColor = UIColor(hex: hex) {
             #if canImport(UIKit)
             return Color(uiColor)
             #else
