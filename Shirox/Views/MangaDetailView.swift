@@ -144,7 +144,8 @@ struct MangaDetailView: View {
                             bannerImage: nil, description: m.description, episodes: m.chapters,
                             status: nil, averageScore: m.averageScore, genres: m.genres,
                             season: nil, seasonYear: nil, nextAiringEpisode: nil, relations: nil,
-                            type: "MANGA", format: nil)
+                            type: "MANGA", format: nil,
+                            studioNames: nil, source: nil, duration: nil, airDateRange: nil)
                     }
                 }
             )

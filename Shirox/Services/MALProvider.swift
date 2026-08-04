@@ -132,7 +132,8 @@ final class MALProvider: MediaProvider {
             nextAiringEpisode: nil,
             relations: nil,
             type: node.media_type,
-            format: nil
+            format: nil,
+            studioNames: nil, source: nil, duration: nil, airDateRange: nil
         )
         return LibraryEntry(
             id: node.id,

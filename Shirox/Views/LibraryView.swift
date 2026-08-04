@@ -791,6 +791,15 @@ struct LibraryView: View {
                     Task {
                         if let aniListId = await IDMappingService.shared.anilistId(forMALId: entry.media.id) {
                             let fetched = try? await AniListProvider.shared.fetchEntry(mediaId: aniListId)
+                            let aniListMedia = Media(
+                                id: aniListId, idMal: entry.media.id, provider: .anilist,
+                                title: entry.media.title, coverImage: entry.media.coverImage,
+                                bannerImage: nil, description: nil, episodes: entry.media.episodes,
+                                status: nil, averageScore: nil, genres: nil,
+                                season: nil, seasonYear: nil, nextAiringEpisode: nil,
+                                relations: nil, type: nil, format: nil,
+                                studioNames: nil, source: nil, duration: nil, airDateRange: nil
+                            )
                             otherEntry = fetched
                             otherMedia = aniListMedia
                             showOtherSheet = true
@@ -808,6 +817,15 @@ struct LibraryView: View {
                     isLoadingOtherEntry = true
                     Task {
                         let fetched = try? await MALProvider.shared.fetchEntry(mediaId: idMal)
+                        let malMedia = Media(
+                            id: idMal, idMal: idMal, provider: .mal,
+                            title: entry.media.title, coverImage: entry.media.coverImage,
+                            bannerImage: nil, description: nil, episodes: entry.media.episodes,
+                            status: nil, averageScore: nil, genres: nil,
+                            season: nil, seasonYear: nil, nextAiringEpisode: nil,
+                            relations: nil, type: nil, format: nil,
+                            studioNames: nil, source: nil, duration: nil, airDateRange: nil
+                        )
                         otherEntry = fetched
                         otherMedia = malMedia
                         showOtherSheet = true

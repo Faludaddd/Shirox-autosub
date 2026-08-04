@@ -150,6 +150,26 @@ final class DetailViewModel: ObservableObject {
         let bannerURLString: String? = snapshot.bannerFile.map {
             DownloadedMediaSnapshotStore.shared.localFileURL(in: snapshot, relative: $0).absoluteString
         }
+        self.aniListMedia = Media(
+            id: snapshot.aniListID ?? 0,
+            idMal: nil,
+            provider: .anilist,
+            title: MediaTitle(romaji: snapshot.mediaTitle, english: snapshot.mediaTitle, native: nil),
+            coverImage: MediaCoverImage(large: poster, extraLarge: poster),
+            bannerImage: bannerURLString,
+            description: snapshot.synopsis,
+            episodes: snapshot.episodes.keys.max(),
+            status: snapshot.statusDisplay.flatMap(Self.aniListStatusRaw),
+            averageScore: snapshot.averageScore,
+            genres: snapshot.genres,
+            season: nil,
+            seasonYear: snapshot.seasonYear,
+            nextAiringEpisode: nil,
+            relations: nil,
+            type: nil,
+            format: snapshot.format,
+            studioNames: nil, source: nil, duration: nil, airDateRange: nil
+        )
 
         self.aniListID = snapshot.aniListID
         self.detailHref = nil
@@ -233,14 +253,6 @@ final class DetailViewModel: ObservableObject {
                 if sorted.count == 1 {
                     pendingStream = sorted[0]
                     showStreamPicker = false
-                } else if StreamPreferenceMatcher.currentPreference() != .off,
-                          let autoPick = StreamPreferenceMatcher.preferredStream(in: sorted, preference: StreamPreferenceMatcher.currentPreference()) {
-                    // Sub/Dub auto-pick — only when the user has explicitly opted in.
-                    if let moduleId = ModuleManager.shared.activeModule?.id {
-                        ModuleSearchAliasManager.shared.setLastStreamTitle(moduleId: moduleId, title: autoPick.title)
-                    }
-                    pendingStream = autoPick
-                    showStreamPicker = false
                 } else if UserDefaults.standard.bool(forKey: "autoPickLastStream"),
                           let moduleId = ModuleManager.shared.activeModule?.id,
                           let savedTitle = ModuleSearchAliasManager.shared.getLastStreamTitle(moduleId: moduleId),
@@ -317,14 +329,6 @@ final class DetailViewModel: ObservableObject {
                 if sorted.count == 1 {
                     pendingStreams = sorted
                     downloadWithSelectedStream(sorted[0])
-                } else if StreamPreferenceMatcher.currentPreference() != .off,
-                          let autoPick = StreamPreferenceMatcher.preferredStream(in: sorted, preference: StreamPreferenceMatcher.currentPreference()) {
-                    // Sub/Dub auto-pick — only when the user has explicitly opted in.
-                    if !moduleId.isEmpty {
-                        ModuleSearchAliasManager.shared.setLastStreamTitle(moduleId: moduleId, title: autoPick.title)
-                    }
-                    pendingStreams = sorted
-                    downloadWithSelectedStream(autoPick)
                 } else if autoPickLastStream,
                           let title = savedTitle,
                           let match = sorted.first(where: { $0.title == title }) {

@@ -246,6 +246,17 @@ struct DetailView: View {
         }
         .adaptiveSheet(isPresented: $showAniListEdit) {
             if let aid = vm.aniListID, let detail = vm.detail {
+                let tempMedia = Media(
+                    id: aid, idMal: malID, provider: .anilist,
+                    title: MediaTitle(romaji: detail.title, english: detail.title, native: nil),
+                    coverImage: MediaCoverImage(large: detail.image, extraLarge: detail.image),
+                    bannerImage: nil, description: detail.description,
+                    episodes: detail.episodes.count > 0 ? detail.episodes.count : nil,
+                    status: "FINISHED", averageScore: nil, genres: nil,
+                    season: nil, seasonYear: nil, nextAiringEpisode: nil,
+                    relations: nil, type: nil, format: nil,
+                    studioNames: nil, source: nil, duration: nil, airDateRange: nil
+                )
                 LibraryEntryEditSheet(
                     entry: existingEntry,
                     media: tempMedia,
@@ -285,6 +296,17 @@ struct DetailView: View {
         }
         .adaptiveSheet(isPresented: $showMALEdit) {
             if let mid = malID, let detail = vm.detail {
+                let tempMedia = Media(
+                    id: mid, idMal: mid, provider: .mal,
+                    title: MediaTitle(romaji: detail.title, english: detail.title, native: nil),
+                    coverImage: MediaCoverImage(large: detail.image, extraLarge: detail.image),
+                    bannerImage: nil, description: detail.description,
+                    episodes: detail.episodes.count > 0 ? detail.episodes.count : nil,
+                    status: nil, averageScore: nil, genres: nil,
+                    season: nil, seasonYear: nil, nextAiringEpisode: nil,
+                    relations: nil, type: nil, format: nil,
+                    studioNames: nil, source: nil, duration: nil, airDateRange: nil
+                )
                 LibraryEntryEditSheet(
                     entry: existingMALEntry,
                     media: tempMedia,
@@ -402,6 +424,26 @@ struct DetailView: View {
     }
 
     private func makeLibraryMedia(aid: Int, detail: MediaDetail) -> Media {
+        Media(
+            id: aid,
+            idMal: nil,
+            provider: .anilist,
+            title: MediaTitle(romaji: detail.title, english: detail.title, native: detail.title),
+            coverImage: MediaCoverImage(large: detail.image, extraLarge: detail.image),
+            bannerImage: nil,
+            description: detail.description,
+            episodes: detail.episodes.count > 0 ? detail.episodes.count : nil,
+            status: "FINISHED",
+            averageScore: nil,
+            genres: nil,
+            season: nil,
+            seasonYear: nil,
+            nextAiringEpisode: nil,
+            relations: nil,
+            type: nil,
+            format: nil,
+            studioNames: nil, source: nil, duration: nil, airDateRange: nil
+        )
     }
 
     #if os(iOS)
@@ -723,6 +765,17 @@ struct DetailView: View {
             let mid = malID
             let sheetProvider: ProviderType = aid != nil ? .anilist : .mal
             let sheetId = aid ?? mid ?? 0
+            let tempMedia = Media(
+                id: sheetId, idMal: mid, provider: sheetProvider,
+                title: MediaTitle(romaji: detail.title, english: detail.title, native: nil),
+                coverImage: MediaCoverImage(large: detail.image, extraLarge: detail.image),
+                bannerImage: nil, description: detail.description,
+                episodes: detail.episodes.count > 0 ? detail.episodes.count : nil,
+                status: "FINISHED", averageScore: nil, genres: nil,
+                season: nil, seasonYear: nil, nextAiringEpisode: nil,
+                relations: nil, type: nil, format: nil,
+                studioNames: nil, source: nil, duration: nil, airDateRange: nil
+            )
             LibraryEntryEditSheet(
                 entry: existingEntry ?? existingMALEntry,
                 media: tempMedia,
