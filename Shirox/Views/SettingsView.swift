@@ -1251,7 +1251,7 @@ struct SettingsCategoryRow: View {
                     .frame(width: 30, height: 30)
                 Image(systemName: icon)
                     .font(.system(size: 14))
-                    .foregroundStyle(.appAccent)
+                    .foregroundStyle(Color.appAccent)
             }
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
@@ -1590,7 +1590,7 @@ struct ModulesSettingsPage: View {
                             }
                             Spacer()
                             if moduleManager.activeModule?.id == module.id {
-                                Image(systemName: "checkmark.circle.fill").foregroundStyle(.appAccent)
+                                Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.appAccent)
                             }
                         }
                         .contentShape(Rectangle())
