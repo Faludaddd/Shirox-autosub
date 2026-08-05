@@ -94,6 +94,15 @@ struct HomeView: View {
             .toolbarBackgroundHidden()
             #endif
             .toolbar {
+                // Schedule icon — matches the Notifications bell styling exactly
+                ToolbarItem(placement: .primaryAction) {
+                    NavigationLink(destination: ScheduleView()) {
+                        Image(systemName: "calendar")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(.primary)
+                    }
+                }
+                // Notifications bell — same styling as Schedule
                 ToolbarItem(placement: .primaryAction) {
                     NavigationLink(destination: NotificationsPage()) {
                         Image(systemName: "bell")
@@ -698,7 +707,8 @@ private struct HomePressStyle: ButtonStyle {
 
 // MARK: - Schedule View
 
-/// Schedule tab — shows anime airing schedules grouped by Today, This Week, and Upcoming.
+/// Schedule page — opened via the calendar icon in HomeView's toolbar.
+/// Pushed within the navigation stack (not a tab). Shows airing schedules.
 struct ScheduleView: View {
     @State private var todayItems: [AniListAiringScheduleItem] = []
     @State private var weekItems: [AniListAiringScheduleItem] = []
@@ -707,22 +717,20 @@ struct ScheduleView: View {
     @State private var error: String?
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if isLoading && todayItems.isEmpty && weekItems.isEmpty && upcomingItems.isEmpty {
-                    scheduleLoadingView
-                } else if let error = error, todayItems.isEmpty {
-                    ContentUnavailableView("Couldn't Load", systemImage: "wifi.slash", description: Text(error))
-                        .toolbar { ToolbarItem(placement: .primaryAction) { Button("Retry") { Task { await load() } } } }
-                } else {
-                    scheduleList
-                }
+        Group {
+            if isLoading && todayItems.isEmpty && weekItems.isEmpty && upcomingItems.isEmpty {
+                scheduleLoadingView
+            } else if let error = error, todayItems.isEmpty {
+                ContentUnavailableView("Couldn't Load", systemImage: "wifi.slash", description: Text(error))
+                    .toolbar { ToolbarItem(placement: .primaryAction) { Button("Retry") { Task { await load() } } } }
+            } else {
+                scheduleList
             }
-            .navigationTitle("Schedule")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.large)
-            #endif
         }
+        .navigationTitle("Schedule")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
         .task { await load() }
         .refreshable { await load() }
     }

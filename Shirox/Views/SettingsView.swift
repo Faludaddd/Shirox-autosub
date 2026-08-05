@@ -1482,16 +1482,21 @@ struct NotificationsSettingsPage: View {
 // MARK: - Search Settings Page
 
 struct SearchSettingsPage: View {
+    @AppStorage("useDefaultExtension") private var useDefaultExtension = false
+    @EnvironmentObject private var moduleManager: ModuleManager
+
     var body: some View {
         Form {
+            Section("Search") {
+                Toggle("Use Default Extension Only", isOn: $useDefaultExtension)
+                    .tint(.appAccent)
+                    .disabled(moduleManager.activeModule == nil)
+            }
             Section {
                 Text("Live search is always enabled. Results appear as you type with a 500ms delay.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Text("Filters are available via the filter button in the Search toolbar.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text("Default module setting has been moved to Settings → Modules.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -1600,7 +1605,6 @@ struct SourcesSettingsPage: View {
 
 struct ModulesSettingsPage: View {
     @EnvironmentObject private var moduleManager: ModuleManager
-    @AppStorage("useDefaultExtension") private var useDefaultExtension = false
     @State private var showAddModule = false
     @State private var showModuleStore = false
     @State private var moduleURL = ""
@@ -1613,11 +1617,6 @@ struct ModulesSettingsPage: View {
                 Text("Modules are content sources for streaming and downloading anime.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-            }
-            Section("Default Module") {
-                Toggle("Use Active Module as Default", isOn: $useDefaultExtension)
-                    .tint(.appAccent)
-                    .disabled(moduleManager.activeModule == nil)
             }
             Section("Installed Modules") {
                 if moduleManager.modules.isEmpty {
@@ -1698,7 +1697,9 @@ struct ModulesSettingsPage: View {
                 }
             }
             Section {
-                NavigationLink(destination: ModuleStorePage()) {
+                Button {
+                    showModuleStore = true
+                } label: {
                     HStack(spacing: 12) {
                         ZStack {
                             RoundedRectangle(cornerRadius: 8)
@@ -1714,6 +1715,7 @@ struct ModulesSettingsPage: View {
                     }
                     .padding(.vertical, 2)
                 }
+                .buttonStyle(.plain)
             }
         }
         .navigationTitle("Modules")
@@ -1721,6 +1723,10 @@ struct ModulesSettingsPage: View {
         .navigationBarTitleDisplayMode(.inline)
         .environment(\.editMode, .constant(.active))
         #endif
+        .navigationDestination(isPresented: $showModuleStore) {
+            ModuleStorePage()
+                .environmentObject(moduleManager)
+        }
     }
 
     private func addModuleInline() {

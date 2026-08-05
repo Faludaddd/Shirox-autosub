@@ -303,7 +303,7 @@ private struct RootTabView: View {
         switch action {
         case .library:   selectedTab = 1
         case .downloads: selectedTab = 2
-        case .search:    selectedTab = 4
+        case .search:    selectedTab = 3
         }
         quickActions.pending = nil
     }
@@ -349,13 +349,10 @@ private struct RootTabView: View {
                         DownloadsView()
                     }
                     #endif
-                    Tab("Schedule", systemImage: "calendar", value: 3) {
-                        ScheduleView()
-                    }
-                    Tab(value: 4, role: .search) {
+                    Tab(value: 3, role: .search) {
                         SearchView()
                     }
-                    Tab("Settings", systemImage: "gearshape.fill", value: 5) {
+                    Tab("Settings", systemImage: "gearshape.fill", value: 4) {
                         SettingsView()
                     }
                 }
@@ -375,15 +372,12 @@ private struct RootTabView: View {
                         .tabItem { Label("Downloads", systemImage: "arrow.down.circle.fill") }
                         .tag(2)
                     #endif
-                    ScheduleView()
-                        .tabItem { Label("Schedule", systemImage: "calendar") }
-                        .tag(3)
                     SearchView()
                         .tabItem { Label("Search", systemImage: "magnifyingglass") }
-                        .tag(4)
+                        .tag(3)
                     SettingsView()
                         .tabItem { Label("Settings", systemImage: "gearshape.fill") }
-                        .tag(5)
+                        .tag(4)
                 }
                 .tint(.appAccent)
             }
@@ -403,7 +397,7 @@ private struct RootTabView: View {
             #if targetEnvironment(macCatalyst)
             sidebarTab = .settings
             #else
-            selectedTab = 5
+            selectedTab = 4
             #endif
         }
         #if os(iOS)
