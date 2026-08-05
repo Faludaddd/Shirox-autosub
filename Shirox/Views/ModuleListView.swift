@@ -165,6 +165,30 @@ struct ModuleListView: View {
                         addModule()
                     }
 
+                // Paste button — reads clipboard and fills URL field
+                if !isAddingModule {
+                    Button {
+                        pasteFromClipboard()
+                    } label: {
+                        Image(systemName: "doc.on.clipboard")
+                            .font(.body)
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                // Clear button — empties the URL field
+                if !moduleURL.isEmpty && !isAddingModule {
+                    Button {
+                        moduleURL = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.body)
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+
                 Button {
                     addModule()
                 } label: {
@@ -531,6 +555,23 @@ struct ModuleListView: View {
         #elseif os(macOS)
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(localFilesModuleURL, forType: .string)
+        #endif
+    }
+
+    /// Reads the clipboard and fills the module URL field. Validates that the
+    /// clipboard content looks like a URL.
+    private func pasteFromClipboard() {
+        #if os(iOS)
+        guard let clipboard = UIPasteboard.general.string else { return }
+        let trimmed = clipboard.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            moduleURL = trimmed
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        }
+        #elseif os(macOS)
+        guard let clipboard = NSPasteboard.general.string(forType: .string) else { return }
+        let trimmed = clipboard.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { moduleURL = trimmed }
         #endif
     }
 
