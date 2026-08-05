@@ -379,7 +379,7 @@ final class AniListService {
         let query = """
         query ($airingGreater: Int, $airingLess: Int) {
           Page(page: 1, perPage: 50) {
-            airingSchedules(airing_greater: $airingGreater, airing_lesser: $airingLess) {
+            airingSchedules(airingAt_greater: $airingGreater, airingAt_lesser: $airingLess) {
               id
               episode
               airingAt

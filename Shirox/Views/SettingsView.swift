@@ -1606,11 +1606,6 @@ struct ModulesSettingsPage: View {
 
     var body: some View {
         Form {
-            Section {
-                Text("Modules are content sources for streaming and downloading anime.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
             Section("Installed Modules") {
                 if moduleManager.modules.isEmpty {
                     Text("No modules installed. Add one below or browse the store.")
@@ -1709,6 +1704,15 @@ struct ModulesSettingsPage: View {
                     .padding(.vertical, 2)
                 }
                 .buttonStyle(.plain)
+            }
+            Section {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("About Modules")
+                        .font(.caption.weight(.semibold))
+                    Text("Modules are content sources for streaming and downloading anime. Providers (AniList, MAL) handle metadata and tracking.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .navigationTitle("Modules")
@@ -1858,42 +1862,65 @@ struct ModuleStorePage: View {
     /// Parses module data from the HTML page by extracting jsonUrl, sourceName,
     /// and iconUrl from the embedded escaped JSON.
     private func parseModulesFromHTML(_ html: String) -> [StoreModuleItem] {
-        // The HTML contains escaped JSON like:
+        // The HTML contains literal backslash-quoted JSON:
         // \"jsonUrl\":\"https://...\",\"sourceName\":\"AnimePahe\",\"iconUrl\":\"https://...\"
-        // We use regex to extract these triplets.
-        let pattern = "\\\"jsonUrl\\\":\\\"([^\"\\]+)\\\"[^}]*?\\\"sourceName\\\":\\\"([^\"\\]+)\\\"[^}]*?\\\"iconUrl\\\":\\\"([^\"\\]*)\\\""
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { return [] }
+        // We extract these triplets using simple string scanning.
 
-        let range = NSRange(html.startIndex..., in: html)
-        let matches = regex.matches(in: html, options: [], range: range)
-
-        var seen = Set<String>()
         var results: [StoreModuleItem] = []
+        var seen = Set<String>()
 
-        for match in matches {
-            guard let urlRange = Range(match.range(at: 1), in: html),
-                  let nameRange = Range(match.range(at: 2), in: html),
-                  let iconRange = Range(match.range(at: 3), in: html) else { continue }
+        // Find all occurrences of \"jsonUrl\":\" and extract the URL
+        let searchKey = "\\\"jsonUrl\\\":\\\""
+        var searchRange = html.startIndex..<html.endIndex
 
-            let jsonUrl = String(html[urlRange])
-            let name = String(html[nameRange])
-            let iconUrl = String(html[iconRange])
+        while let jsonUrlRange = html.range(of: searchKey, options: .literal, range: searchRange) {
+            // URL starts right after the search key
+            let urlStart = jsonUrlRange.upperBound
+            // URL ends at the next \"
+            guard let urlEnd = html.range(of: "\\\"", options: .literal, range: urlStart..<html.endIndex) else { break }
+            let jsonUrl = String(html[urlStart..<urlEnd.lowerBound])
+
+            // Find sourceName after this jsonUrl
+            let nameKey = "\\\"sourceName\\\":\\\""
+            let nameSearchRange = urlEnd.upperBound..<html.endIndex
+            guard let nameKeyRange = html.range(of: nameKey, options: .literal, range: nameSearchRange) else {
+                searchRange = urlEnd.upperBound..<html.endIndex
+                continue
+            }
+            let nameStart = nameKeyRange.upperBound
+            guard let nameEnd = html.range(of: "\\\"", options: .literal, range: nameStart..<html.endIndex) else {
+                searchRange = nameStart..<html.endIndex
+                continue
+            }
+            let name = String(html[nameStart..<nameEnd.lowerBound])
+
+            // Find iconUrl after sourceName
+            let iconKey = "\\\"iconUrl\\\":\\\""
+            let iconSearchRange = nameEnd.upperBound..<html.endIndex
+            var iconUrl: String? = nil
+            if let iconKeyRange = html.range(of: iconKey, options: .literal, range: iconSearchRange) {
+                let iconStart = iconKeyRange.upperBound
+                if let iconEnd = html.range(of: "\\\"", options: .literal, range: iconStart..<html.endIndex) {
+                    iconUrl = String(html[iconStart..<iconEnd.lowerBound])
+                }
+            }
 
             // Deduplicate by URL
-            if seen.contains(jsonUrl) { continue }
-            seen.insert(jsonUrl)
+            if !seen.contains(jsonUrl) {
+                seen.insert(jsonUrl)
+                results.append(StoreModuleItem(
+                    id: jsonUrl,
+                    name: name,
+                    description: nil,
+                    version: nil,
+                    manifestUrl: jsonUrl,
+                    iconUrl: iconUrl?.isEmpty == true ? nil : iconUrl,
+                    author: "modulesbypaul.dev"
+                ))
+            }
 
-            // Only include anime-type modules (not manga-only or unrelated)
-            // We include all since the user can decide what to install
-            results.append(StoreModuleItem(
-                id: jsonUrl,
-                name: name,
-                description: nil,
-                version: nil,
-                manifestUrl: jsonUrl,
-                iconUrl: iconUrl.isEmpty ? nil : iconUrl,
-                author: "modulesbypaul.dev"
-            ))
+            // Continue searching after this match
+            searchRange = nameEnd.upperBound..<html.endIndex
         }
 
         return results.sorted { $0.name.lowercased() < $1.name.lowercased() }
