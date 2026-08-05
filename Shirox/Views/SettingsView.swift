@@ -1261,12 +1261,8 @@ struct SettingsCategoryRow: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Image(systemName: "chevron.right")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
         }
         .padding(.vertical, 4)
-        .contentShape(Rectangle())
     }
 }
 
@@ -1525,12 +1521,16 @@ struct SourcesSettingsPage: View {
                     .foregroundStyle(.secondary)
             }
             Section("AniList") {
-                HStack {
-                    Image(systemName: anilistAuth.isLoggedIn ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(anilistAuth.isLoggedIn ? .green : .secondary)
+                HStack(spacing: 12) {
+                    // AniList icon
+                    CachedAsyncImage(urlString: ProviderType.anilist.iconURL)
+                        .frame(width: 32, height: 32)
+                        .clipShape(RoundedRectangle(cornerRadius: 7))
+                        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 7))
+
                     VStack(alignment: .leading) {
                         Text("AniList").font(.body.weight(.medium))
-                        Text(anilistAuth.isLoggedIn ? "Connected as \(AniListAuthManager.shared.username ?? "User")" : "Not connected")
+                        Text(anilistAuth.isLoggedIn ? "Connected" : "Not connected")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
@@ -1550,9 +1550,13 @@ struct SourcesSettingsPage: View {
                 }
             }
             Section("MyAnimeList") {
-                HStack {
-                    Image(systemName: malAuth.isLoggedIn ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(malAuth.isLoggedIn ? .green : .secondary)
+                HStack(spacing: 12) {
+                    // MAL icon
+                    CachedAsyncImage(urlString: ProviderType.mal.iconURL)
+                        .frame(width: 32, height: 32)
+                        .clipShape(RoundedRectangle(cornerRadius: 7))
+                        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 7))
+
                     VStack(alignment: .leading) {
                         Text("MyAnimeList").font(.body.weight(.medium))
                         Text(malAuth.isLoggedIn ? "Connected" : "Not connected")
@@ -1694,15 +1698,21 @@ struct ModulesSettingsPage: View {
                 }
             }
             Section {
-                NavigationLink {
-                    ModuleStorePage()
-                } label: {
-                    HStack {
-                        Image(systemName: "bag.fill").foregroundStyle(Color.appAccent)
+                NavigationLink(destination: ModuleStorePage()) {
+                    HStack(spacing: 12) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.secondary.opacity(0.1))
+                                .frame(width: 36, height: 36)
+                            Image(systemName: "bag.fill")
+                                .font(.system(size: 16))
+                                .foregroundStyle(Color.appAccent)
+                        }
                         Text("Browse Modules")
                             .font(.body.weight(.medium))
                         Spacer()
                     }
+                    .padding(.vertical, 2)
                 }
             }
         }

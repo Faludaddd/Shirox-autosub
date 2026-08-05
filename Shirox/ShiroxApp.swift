@@ -303,7 +303,7 @@ private struct RootTabView: View {
         switch action {
         case .library:   selectedTab = 1
         case .downloads: selectedTab = 2
-        case .search:    selectedTab = 3
+        case .search:    selectedTab = 4
         }
         quickActions.pending = nil
     }
@@ -349,15 +349,18 @@ private struct RootTabView: View {
                         DownloadsView()
                     }
                     #endif
-                    Tab("Settings", systemImage: "gearshape.fill", value: 3) {
-                        SettingsView()
+                    Tab("Schedule", systemImage: "calendar", value: 3) {
+                        ScheduleView()
                     }
                     Tab(value: 4, role: .search) {
                         SearchView()
                     }
+                    Tab("Settings", systemImage: "gearshape.fill", value: 5) {
+                        SettingsView()
+                    }
                 }
                 .tabViewStyle(.sidebarAdaptable)
-                .tint(.primary)
+                .tint(.appAccent)
                 #endif
             } else {
                 TabView(selection: $selectedTab) {
@@ -372,11 +375,11 @@ private struct RootTabView: View {
                         .tabItem { Label("Downloads", systemImage: "arrow.down.circle.fill") }
                         .tag(2)
                     #endif
-                    SearchView()
-                        .tabItem { Label("Search", systemImage: "magnifyingglass") }
-                        .tag(3)
                     ScheduleView()
                         .tabItem { Label("Schedule", systemImage: "calendar") }
+                        .tag(3)
+                    SearchView()
+                        .tabItem { Label("Search", systemImage: "magnifyingglass") }
                         .tag(4)
                     SettingsView()
                         .tabItem { Label("Settings", systemImage: "gearshape.fill") }
