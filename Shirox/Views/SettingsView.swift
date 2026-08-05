@@ -1861,7 +1861,7 @@ struct ModuleStorePage: View {
         // The HTML contains escaped JSON like:
         // \"jsonUrl\":\"https://...\",\"sourceName\":\"AnimePahe\",\"iconUrl\":\"https://...\"
         // We use regex to extract these triplets.
-        let pattern = # "\\\"jsonUrl\\\":\\\"([^\"\\]+)\\\"[^}]*?\\\"sourceName\\\":\\\"([^\"\\]+)\\\"[^}]*?\\\"iconUrl\\\":\\\"([^\"\\]*)\\\"" #
+        let pattern = "\\\"jsonUrl\\\":\\\"([^\"\\]+)\\\"[^}]*?\\\"sourceName\\\":\\\"([^\"\\]+)\\\"[^}]*?\\\"iconUrl\\\":\\\"([^\"\\]*)\\\""
         guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { return [] }
 
         let range = NSRange(html.startIndex..., in: html)
