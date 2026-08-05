@@ -1718,7 +1718,7 @@ struct ModulesSettingsPage: View {
         isAddingModule = true
         Task {
             do {
-                try await moduleManager.addModule(url: url)
+                try await moduleManager.addModule(from: url)
                 await MainActor.run {
                     moduleURL = ""
                     isAddingModule = false
@@ -1791,7 +1791,7 @@ struct ModuleStorePage: View {
         isInstalling = true
         Task {
             do {
-                try await moduleManager.addModule(url: url)
+                try await moduleManager.addModule(from: url)
                 await MainActor.run { isInstalling = false }
             } catch {
                 await MainActor.run { isInstalling = false }
@@ -1907,11 +1907,11 @@ struct AdvancedSettingsPage: View {
     @State private var showClearImage = false
     @State private var showClearAll = false
     #if os(iOS)
-    @State private var imageCacheSize: Int64 = 0
-    @State private var websiteDataSize: Int64 = 0
-    @State private var tempFilesSize: Int64 = 0
-    @State private var cwSize: Int64 = 0
-    @State private var historySize: Int64 = 0
+    @State private var imageCacheSize: Int = 0
+    @State private var websiteDataSize: Int = 0
+    @State private var tempFilesSize: Int = 0
+    @State private var cwSize: Int = 0
+    @State private var historySize: Int = 0
     #endif
 
     var body: some View {
@@ -1981,7 +1981,7 @@ struct AdvancedSettingsPage: View {
         }
     }
 
-    private func cacheRow(label: String, size: Int64, action: @escaping () -> Void) -> some View {
+    private func cacheRow(label: String, size: Int, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack {
                 Text(label).foregroundStyle(.primary)
@@ -1999,11 +1999,11 @@ struct AdvancedSettingsPage: View {
         .buttonStyle(.plain)
     }
 
-    private func formatSize(_ bytes: Int64) -> String {
+    private func formatSize(_ bytes: Int) -> String {
         let f = ByteCountFormatter()
         f.allowedUnits = [.useMB, .useKB]
         f.countStyle = .file
-        return f.string(fromByteCount: bytes)
+        return f.string(fromByteCount: Int64(bytes))
     }
 
     #if os(iOS)
