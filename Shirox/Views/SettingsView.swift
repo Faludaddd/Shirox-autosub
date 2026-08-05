@@ -1723,9 +1723,11 @@ struct ModulesSettingsPage: View {
         .navigationBarTitleDisplayMode(.inline)
         .environment(\.editMode, .constant(.active))
         #endif
-        .navigationDestination(isPresented: $showModuleStore) {
-            ModuleStorePage()
-                .environmentObject(moduleManager)
+        .background {
+            NavigationLink(destination: ModuleStorePage().environmentObject(moduleManager), isActive: $showModuleStore) {
+                EmptyView()
+            }
+            .opacity(0)
         }
     }
 
