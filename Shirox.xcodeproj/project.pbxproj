@@ -598,6 +598,8 @@
 		FAFF9AA00DEB80103E5C7F76 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1B3B8F080E9AF4E269AEC3DA /* WebKit.framework */; };
 		FCE3980671F64CF38B707BFA /* LocalPlaybackCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E548862288E04B9EA60BBCF3 /* LocalPlaybackCoordinator.swift */; };
 		FE62CB6A1976842B35891D6B /* LibraryWriteSink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CF6D00FF0F0489890FAF52D /* LibraryWriteSink.swift */; };
+		F6E5D4C3B2A1F6E5D4C3B2A1 /* ScheduleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A1B2C3D4E5F6 /* ScheduleView.swift */; };
+		F7E5D4C3B2A1F7E5D4C3B2A1 /* NotificationsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F7A1B2C3D4E5F7 /* NotificationsPage.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -831,6 +833,8 @@
 		EBAF45C71B3785D9592EA63E /* JellyfinAuthManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JellyfinAuthManagerTests.swift; sourceTree = "<group>"; };
 		EC154F4B51E6E8262096B6AE /* KingfisherImageCacheTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KingfisherImageCacheTests.swift; sourceTree = "<group>"; };
 		EEFA93DA5617959381E10D85 /* BookmarkButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkButton.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6A1B2C3D4E5F6 /* ScheduleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F7A1B2C3D4E5F7 /* NotificationsPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsPage.swift; sourceTree = "<group>"; };
 		F22BAD7B63A9CC4EC7C9F88A /* MangaMatchManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MangaMatchManagerTests.swift; sourceTree = "<group>"; };
 		F5167EDD4F7D833A5721B0FB /* ProfileCacheStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProfileCacheStoreTests.swift; sourceTree = "<group>"; };
 		F6AB4FB215071F688F19B394 /* JellyfinConnectView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JellyfinConnectView.swift; sourceTree = "<group>"; };
@@ -1128,6 +1132,8 @@
 				1279E4E12FCA397700C9BA56 /* ModuleStreamPickerView.swift */,
 				1279E4E22FCA397700C9BA56 /* PlayerView.swift */,
 				1279E4E32FCA397700C9BA56 /* SearchView.swift */,
+				A1B2C3D4E5F6A1B2C3D4E5F6 /* ScheduleView.swift */,
+				A1B2C3D4E5F7A1B2C3D4E5F7 /* NotificationsPage.swift */,
 				1279E4E42FCA397700C9BA56 /* SettingsView.swift */,
 				1279E4E52FCA397700C9BA56 /* StreamPickerView.swift */,
 				1279E4E62FCA397700C9BA56 /* ViewTracker.swift */,
@@ -1565,6 +1571,8 @@
 				121D9BA52FCA563E000FF9B4 /* ThumbnailEpisodeRow.swift in Sources */,
 				121D9BA62FCA563E000FF9B4 /* ContentUnavailableView.swift in Sources */,
 				121D9BA72FCA563E000FF9B4 /* SearchView.swift in Sources */,
+				F6E5D4C3B2A1F6E5D4C3B2A1 /* ScheduleView.swift in Sources */,
+				F7E5D4C3B2A1F7E5D4C3B2A1 /* NotificationsPage.swift in Sources */,
 				121D9BA82FCA563E000FF9B4 /* PlayerView.swift in Sources */,
 				121D9BA92FCA563E000FF9B4 /* AniListDetailView.swift in Sources */,
 				121D9BAA2FCA563E000FF9B4 /* HomeView.swift in Sources */,
