@@ -1169,24 +1169,14 @@ struct AniListDetailView: View {
             }
             #endif
 
-            if moduleManager.modules.isEmpty {
-                HStack(spacing: 10) {
-                    Image(systemName: "puzzlepiece.extension")
-                        .foregroundStyle(.secondary)
-                    Text("Install a module in the Search tab to watch episodes")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-            } else if totalEpisodes > 0 {
+            if totalEpisodes > 0 {
                 let start = selectedRangeIndex * 100 + 1
                 let end = min((selectedRangeIndex + 1) * 100, totalEpisodes)
-                
+
                 if start <= end {
                     let range = Array(start...end)
                     let sortedRange = isReversed ? range.reversed() : range
-                    
+
                     LazyVStack(spacing: 8) {
                         ForEach(sortedRange, id: \.self) { ep in
                             #if os(iOS)
@@ -1255,6 +1245,19 @@ struct AniListDetailView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 16)
+            }
+
+            // Show module install prompt if no modules are installed (below episodes)
+            if moduleManager.modules.isEmpty {
+                HStack(spacing: 10) {
+                    Image(systemName: "puzzlepiece.extension")
+                        .foregroundStyle(.secondary)
+                    Text("Install a streaming module to watch episodes")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
