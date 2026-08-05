@@ -384,7 +384,7 @@ private struct RootTabView: View {
                         .tag(5)
                     #endif
                 }
-                .tint(accentColor)
+                .tint(.appAccent)
             }
         }
         .onOpenURL { url in

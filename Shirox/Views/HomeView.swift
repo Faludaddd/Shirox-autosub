@@ -795,9 +795,9 @@ private struct ScheduleRow: View {
                     Text(item.media.title.displayTitle).font(.subheadline.weight(.semibold)).lineLimit(1)
                     HStack(spacing: 6) {
                         Text("EP \(item.episode)").font(.caption2.weight(.medium)).padding(.horizontal, 6).padding(.vertical, 2).background(Color.secondary.opacity(0.15), in: Capsule())
-                        if let countdown = item.countdownDisplay { Text(countdown).font(.caption2).foregroundStyle(.secondary) }
+                        if !item.countdownDisplay.isEmpty { Text(item.countdownDisplay).font(.caption2).foregroundStyle(.secondary) }
                     }
-                    if let airDate = item.airDateDisplay { Text(airDate).font(.caption2).foregroundStyle(.secondary) }
+                    if !item.airDateDisplay.isEmpty { Text(item.airDateDisplay).font(.caption2).foregroundStyle(.secondary) }
                 }
                 Spacer()
             }
