@@ -117,9 +117,8 @@ extension UIColor {
 
 extension Color {
     /// Resolves the user's custom accent color from UserDefaults, falling back to
-    /// `.secondary` (the app's default muted look) when no custom color is set.
-    /// Used throughout the app instead of `.tint(.appAccent)` so the accent color
-    /// picker actually affects Toggle/Picker controls.
+    /// UIColor.label (adapts: near-black in light mode, near-white in dark mode)
+    /// for a clean monochrome default aesthetic.
     static var appAccent: Color {
         let hex = UserDefaults.standard.string(forKey: "accentColorHex") ?? ""
         let trimmed = hex.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -128,7 +127,11 @@ extension Color {
             return Color(uiColor)
             #endif
         }
-        return .secondary
+        #if canImport(UIKit)
+        return Color(UIColor.label)
+        #else
+        return .primary
+        #endif
     }
 }
 

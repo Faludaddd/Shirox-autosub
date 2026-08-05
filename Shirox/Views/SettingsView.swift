@@ -460,7 +460,6 @@ struct SettingsView: View {
                                     .foregroundStyle(.secondary)
                             }
                         }
-                        .foregroundStyle(.primary)
 
                         Button {
                             guard !isClearing else { return }
@@ -477,7 +476,6 @@ struct SettingsView: View {
                                     .foregroundStyle(.secondary)
                             }
                         }
-                        .foregroundStyle(.primary)
 
                         Button {
                             CacheManager.shared.clearTempFiles()
@@ -488,7 +486,6 @@ struct SettingsView: View {
                                     .foregroundStyle(.secondary)
                             }
                         }
-                        .foregroundStyle(.primary)
 
                         Button {
                             CacheManager.shared.clearSearchAliases()
@@ -499,7 +496,6 @@ struct SettingsView: View {
                                     .foregroundStyle(.secondary)
                             }
                         }
-                        .foregroundStyle(.primary)
 
                         Button {
                             CacheManager.shared.clearIDMappingCache()
@@ -510,7 +506,6 @@ struct SettingsView: View {
                                     .foregroundStyle(.secondary)
                             }
                         }
-                        .foregroundStyle(.primary)
 
                         Button {
                             CacheManager.shared.clearEpisodeSortPreferences()
@@ -521,7 +516,6 @@ struct SettingsView: View {
                                     .foregroundStyle(.secondary)
                             }
                         }
-                        .foregroundStyle(.primary)
 
                         Button {
                             showResetCWConfirmation = true
@@ -784,7 +778,6 @@ struct LogEntryRow: View {
             }
             Text(entry.message)
                 .font(.system(.caption, design: .monospaced))
-                .foregroundStyle(.primary)
                 #if !os(tvOS)
                 .textSelection(.enabled)
                 #endif
@@ -1760,7 +1753,7 @@ struct ModuleStorePage: View {
     @State private var moduleURL = ""
     @State private var isInstalling = false
 
-    private let storeURL = "https://modulesbypaul.dev/api/modules"
+    private let storeURL = "https://modulesbypaul.dev"
 
     var body: some View {
         List {
@@ -1776,7 +1769,28 @@ struct ModuleStorePage: View {
                     }
                 }
             } else if let error = storeError {
-                Section { Text(error).font(.caption).foregroundStyle(.secondary) }
+                Section {
+                    VStack(spacing: 12) {
+                        Image(systemName: "wifi.exclamationmark")
+                            .font(.system(size: 32))
+                            .foregroundStyle(.secondary)
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                        Button("Retry") { Task { await loadStore() } }
+                            .buttonStyle(.bordered)
+                            .tint(.appAccent)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 20)
+                }
+            } else if storeModules.isEmpty {
+                Section {
+                    Text("No modules available")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             } else {
                 ForEach(filteredModules) { mod in
                     StoreItemRow(mod: mod, isInstalled: isModuleInstalled(mod), isInstalling: isInstalling) {
@@ -1817,25 +1831,72 @@ struct ModuleStorePage: View {
         }
     }
 
+    /// Fetches the modulesbypaul.dev HTML page and extracts module data from the
+    /// embedded JSON. The page contains escaped JSON with jsonUrl, sourceName,
+    /// and iconUrl fields for each module.
     private func loadStore() async {
         isLoading = true; storeError = nil
         do {
             let url = URL(string: storeURL)!
-            let (data, response) = try await URLSession.shared.data(from: url)
+            var request = URLRequest(url: url)
+            request.setValue("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", forHTTPHeaderField: "User-Agent")
+            let (data, response) = try await URLSession.shared.data(for: request)
             if let http = response as? HTTPURLResponse, http.statusCode != 200 {
                 throw URLError(.badServerResponse)
             }
-            if let array = try? JSONDecoder().decode([StoreModuleItem].self, from: data) {
-                storeModules = array
-            } else if let wrapper = try? JSONDecoder().decode(StoreModuleWrapper.self, from: data) {
-                storeModules = wrapper.modules
-            } else {
-                storeError = "Could not parse store response"
+            let html = String(data: data, encoding: .utf8) ?? ""
+            storeModules = parseModulesFromHTML(html)
+            if storeModules.isEmpty {
+                storeError = "No modules found. The repository may have changed."
             }
         } catch {
-            storeError = "Could not load store: \(error.localizedDescription)"
+            storeError = "Could not load store. Check your connection and try again."
         }
         isLoading = false
+    }
+
+    /// Parses module data from the HTML page by extracting jsonUrl, sourceName,
+    /// and iconUrl from the embedded escaped JSON.
+    private func parseModulesFromHTML(_ html: String) -> [StoreModuleItem] {
+        // The HTML contains escaped JSON like:
+        // \"jsonUrl\":\"https://...\",\"sourceName\":\"AnimePahe\",\"iconUrl\":\"https://...\"
+        // We use regex to extract these triplets.
+        let pattern = # "\\\"jsonUrl\\\":\\\"([^\"\\]+)\\\"[^}]*?\\\"sourceName\\\":\\\"([^\"\\]+)\\\"[^}]*?\\\"iconUrl\\\":\\\"([^\"\\]*)\\\"" #
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { return [] }
+
+        let range = NSRange(html.startIndex..., in: html)
+        let matches = regex.matches(in: html, options: [], range: range)
+
+        var seen = Set<String>()
+        var results: [StoreModuleItem] = []
+
+        for match in matches {
+            guard let urlRange = Range(match.range(at: 1), in: html),
+                  let nameRange = Range(match.range(at: 2), in: html),
+                  let iconRange = Range(match.range(at: 3), in: html) else { continue }
+
+            let jsonUrl = String(html[urlRange])
+            let name = String(html[nameRange])
+            let iconUrl = String(html[iconRange])
+
+            // Deduplicate by URL
+            if seen.contains(jsonUrl) { continue }
+            seen.insert(jsonUrl)
+
+            // Only include anime-type modules (not manga-only or unrelated)
+            // We include all since the user can decide what to install
+            results.append(StoreModuleItem(
+                id: jsonUrl,
+                name: name,
+                description: nil,
+                version: nil,
+                manifestUrl: jsonUrl,
+                iconUrl: iconUrl.isEmpty ? nil : iconUrl,
+                author: "modulesbypaul.dev"
+            ))
+        }
+
+        return results.sorted { $0.name.lowercased() < $1.name.lowercased() }
     }
 }
 
@@ -2002,7 +2063,6 @@ struct AdvancedSettingsPage: View {
     private func cacheRow(label: String, size: Int, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack {
-                Text(label).foregroundStyle(.primary)
                 Spacer()
                 if size > 0 {
                     Text(formatSize(size))
