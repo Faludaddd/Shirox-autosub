@@ -1918,6 +1918,16 @@ struct StoreModuleItem: Codable, Identifiable {
         case author
     }
 
+    init(id: String, name: String, description: String?, version: String?, manifestUrl: String, iconUrl: String?, author: String?) {
+        self.id = id
+        self.name = name
+        self.description = description
+        self.version = version
+        self.manifestUrl = manifestUrl
+        self.iconUrl = iconUrl
+        self.author = author
+    }
+
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString
