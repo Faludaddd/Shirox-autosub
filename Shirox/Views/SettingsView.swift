@@ -1244,23 +1244,29 @@ struct SettingsCategoryRow: View {
     let subtitle: String
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 16) {
             ZStack {
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: 11)
                     .fill(Color.secondary.opacity(0.1))
-                    .frame(width: 30, height: 30)
+                    .frame(width: 42, height: 42)
                 Image(systemName: icon)
-                    .font(.system(size: 14))
+                    .font(.system(size: 19))
                     .foregroundStyle(Color.appAccent)
             }
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.subheadline.weight(.medium))
+                    .font(.body.weight(.medium))
                 Text(subtitle)
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
         }
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
     }
 }
 
@@ -1480,18 +1486,16 @@ struct NotificationsSettingsPage: View {
 // MARK: - Search Settings Page
 
 struct SearchSettingsPage: View {
-    @AppStorage("useDefaultExtension") private var useDefaultExtension = false
-
     var body: some View {
         Form {
-            Section("Search") {
-                Toggle("Use Default Extension Only", isOn: $useDefaultExtension).tint(.appAccent)
-            }
             Section {
                 Text("Live search is always enabled. Results appear as you type with a 500ms delay.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Text("Filters are available via the filter button in the Search toolbar.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("Default module setting has been moved to Settings → Modules.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -1509,6 +1513,9 @@ struct SourcesSettingsPage: View {
     @ObservedObject private var anilistAuth = AniListAuthManager.shared
     @ObservedObject private var malAuth = MALAuthManager.shared
     @ObservedObject private var providerManager = ProviderManager.shared
+    #if os(iOS)
+    @State private var presentationWindow: UIWindow?
+    #endif
 
     var body: some View {
         Form {
@@ -1519,42 +1526,68 @@ struct SourcesSettingsPage: View {
             }
             Section("AniList") {
                 HStack {
-                    Image(systemName: "checkmark.circle.fill")
+                    Image(systemName: anilistAuth.isLoggedIn ? "checkmark.circle.fill" : "circle")
                         .foregroundStyle(anilistAuth.isLoggedIn ? .green : .secondary)
                     VStack(alignment: .leading) {
-                        Text("AniList").font(.subheadline.weight(.medium))
-                        Text(anilistAuth.isLoggedIn ? "Connected" : "Not connected")
-                            .font(.caption2).foregroundStyle(.secondary)
+                        Text("AniList").font(.body.weight(.medium))
+                        Text(anilistAuth.isLoggedIn ? "Connected as \(AniListAuthManager.shared.username ?? "User")" : "Not connected")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
-                }
-                if anilistAuth.isLoggedIn {
-                    Button("Disconnect", role: .destructive) { anilistAuth.logout() }
+                    Button(anilistAuth.isLoggedIn ? "Sign Out" : "Sign In") {
+                        if anilistAuth.isLoggedIn {
+                            anilistAuth.logout()
+                        } else {
+                            #if os(iOS)
+                            if let window = presentationWindow {
+                                anilistAuth.login(presentationAnchor: window)
+                            }
+                            #endif
+                        }
+                    }
+                    .font(.caption.weight(.semibold))
+                    .tint(.appAccent)
                 }
             }
             Section("MyAnimeList") {
                 HStack {
-                    Image(systemName: "checkmark.circle.fill")
+                    Image(systemName: malAuth.isLoggedIn ? "checkmark.circle.fill" : "circle")
                         .foregroundStyle(malAuth.isLoggedIn ? .green : .secondary)
                     VStack(alignment: .leading) {
-                        Text("MyAnimeList").font(.subheadline.weight(.medium))
+                        Text("MyAnimeList").font(.body.weight(.medium))
                         Text(malAuth.isLoggedIn ? "Connected" : "Not connected")
-                            .font(.caption2).foregroundStyle(.secondary)
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
-                }
-                if malAuth.isLoggedIn {
-                    Button("Disconnect", role: .destructive) { malAuth.logout() }
+                    Button(malAuth.isLoggedIn ? "Sign Out" : "Sign In") {
+                        if malAuth.isLoggedIn {
+                            malAuth.logout()
+                        } else {
+                            #if os(iOS)
+                            if let window = presentationWindow {
+                                malAuth.login(presentationAnchor: window)
+                            }
+                            #endif
+                        }
+                    }
+                    .font(.caption.weight(.semibold))
+                    .tint(.appAccent)
                 }
             }
             Section("Default Provider") {
                 Text("Active: \(providerManager.primary?.displayName ?? "AniList")")
-                    .font(.subheadline)
+                    .font(.body)
             }
         }
         .navigationTitle("Sources")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            presentationWindow = UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap { $0.windows }
+                .first { $0.isKeyWindow }
+        }
         #endif
     }
 }
@@ -1563,6 +1596,12 @@ struct SourcesSettingsPage: View {
 
 struct ModulesSettingsPage: View {
     @EnvironmentObject private var moduleManager: ModuleManager
+    @AppStorage("useDefaultExtension") private var useDefaultExtension = false
+    @State private var showAddModule = false
+    @State private var showModuleStore = false
+    @State private var moduleURL = ""
+    @State private var isAddingModule = false
+    @FocusState private var isTextFieldFocused: Bool
 
     var body: some View {
         Form {
@@ -1571,22 +1610,29 @@ struct ModulesSettingsPage: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Section("Installed") {
+            Section("Default Module") {
+                Toggle("Use Active Module as Default", isOn: $useDefaultExtension)
+                    .tint(.appAccent)
+                    .disabled(moduleManager.activeModule == nil)
+            }
+            Section("Installed Modules") {
                 if moduleManager.modules.isEmpty {
-                    Text("No modules installed")
+                    Text("No modules installed. Add one below or browse the store.")
                         .font(.caption).foregroundStyle(.secondary)
                 } else {
                     ForEach(moduleManager.modules) { module in
-                        HStack(spacing: 10) {
+                        HStack(spacing: 12) {
                             AsyncImage(url: URL(string: module.iconUrl ?? "")) { phase in
                                 if case .success(let img) = phase { img.resizable().scaledToFill() }
                                 else { Image(systemName: "puzzlepiece.extension").foregroundStyle(.secondary) }
                             }
-                            .frame(width: 28, height: 28)
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .frame(width: 32, height: 32)
+                            .clipShape(RoundedRectangle(cornerRadius: 7))
                             VStack(alignment: .leading, spacing: 1) {
-                                Text(module.sourceName).font(.subheadline.weight(.medium))
-                                Text(module.id).font(.caption2).foregroundStyle(.secondary)
+                                Text(module.sourceName).font(.body.weight(.medium))
+                                if let lang = module.language {
+                                    Text(lang.uppercased()).font(.caption2).foregroundStyle(.secondary)
+                                }
                             }
                             Spacer()
                             if moduleManager.activeModule?.id == module.id {
@@ -1601,14 +1647,255 @@ struct ModulesSettingsPage: View {
                     }
                 }
             }
+            Section("Add Module") {
+                HStack(spacing: 10) {
+                    Image(systemName: "link").foregroundStyle(.secondary)
+                    TextField("Module JSON URL", text: $moduleURL)
+                        .textContentType(.URL)
+                        .autocorrectionDisabled()
+                        #if os(iOS)
+                        .textInputAutocapitalization(.never)
+                        .keyboardType(.URL)
+                        #endif
+                        .focused($isTextFieldFocused)
+                        .disabled(isAddingModule)
+                    #if os(iOS)
+                    if !isAddingModule {
+                        Button {
+                            if let clipboard = UIPasteboard.general.string {
+                                let trimmed = clipboard.trimmingCharacters(in: .whitespacesAndNewlines)
+                                if !trimmed.isEmpty { moduleURL = trimmed }
+                            }
+                        } label: {
+                            Image(systemName: "doc.on.clipboard").font(.body).foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    if !moduleURL.isEmpty && !isAddingModule {
+                        Button { moduleURL = "" } label: {
+                            Image(systemName: "xmark.circle.fill").font(.body).foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    #endif
+                    Button {
+                        addModuleInline()
+                    } label: {
+                        if isAddingModule {
+                            ProgressView().scaleEffect(0.8).frame(width: 28, height: 28)
+                        } else {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.title2)
+                                .foregroundStyle(moduleURL.isEmpty ? Color.secondary : Color.appAccent)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(moduleURL.isEmpty || isAddingModule)
+                }
+            }
             Section {
-                NavigationLink("Manage Modules") { ModuleListView() }
+                NavigationLink {
+                    ModuleStorePage()
+                } label: {
+                    HStack {
+                        Image(systemName: "bag.fill").foregroundStyle(Color.appAccent)
+                        Text("Browse Modules")
+                            .font(.body.weight(.medium))
+                        Spacer()
+                    }
+                }
             }
         }
         .navigationTitle("Modules")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        .environment(\.editMode, .constant(.active))
         #endif
+    }
+
+    private func addModuleInline() {
+        guard let url = URL(string: moduleURL.trimmingCharacters(in: .whitespacesAndNewlines)) else { return }
+        isAddingModule = true
+        Task {
+            do {
+                try await moduleManager.addModule(url: url)
+                await MainActor.run {
+                    moduleURL = ""
+                    isAddingModule = false
+                    isTextFieldFocused = false
+                }
+            } catch {
+                await MainActor.run { isAddingModule = false }
+            }
+        }
+    }
+}
+
+// MARK: - Module Store Page
+
+struct ModuleStorePage: View {
+    @EnvironmentObject private var moduleManager: ModuleManager
+    @State private var storeModules: [StoreModuleItem] = []
+    @State private var isLoading = false
+    @State private var storeError: String?
+    @State private var searchText = ""
+    @State private var moduleURL = ""
+    @State private var isInstalling = false
+
+    private let storeURL = "https://modulesbypaul.dev/api/modules"
+
+    var body: some View {
+        List {
+            if isLoading {
+                ForEach(0..<5, id: \.self) { _ in
+                    HStack(spacing: 12) {
+                        RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.15)).frame(width: 36, height: 36)
+                        VStack(alignment: .leading, spacing: 4) {
+                            RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.15)).frame(height: 14)
+                            RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.15)).frame(width: 120, height: 10)
+                        }
+                        Spacer()
+                    }
+                }
+            } else if let error = storeError {
+                Section { Text(error).font(.caption).foregroundStyle(.secondary) }
+            } else {
+                ForEach(filteredModules) { mod in
+                    StoreItemRow(mod: mod, isInstalled: isModuleInstalled(mod), isInstalling: isInstalling) {
+                        installModule(mod)
+                    }
+                }
+            }
+        }
+        .searchable(text: $searchText, prompt: "Search modules…")
+        #if os(iOS)
+        .listStyle(.insetGrouped)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .navigationTitle("Module Store")
+        .task { await loadStore() }
+        .refreshable { await loadStore() }
+    }
+
+    private var filteredModules: [StoreModuleItem] {
+        if searchText.isEmpty { return storeModules }
+        return storeModules.filter { $0.name.lowercased().contains(searchText.lowercased()) }
+    }
+
+    private func isModuleInstalled(_ mod: StoreModuleItem) -> Bool {
+        moduleManager.modules.contains { $0.sourceName == mod.name }
+    }
+
+    private func installModule(_ mod: StoreModuleItem) {
+        guard let url = URL(string: mod.manifestUrl) else { return }
+        isInstalling = true
+        Task {
+            do {
+                try await moduleManager.addModule(url: url)
+                await MainActor.run { isInstalling = false }
+            } catch {
+                await MainActor.run { isInstalling = false }
+            }
+        }
+    }
+
+    private func loadStore() async {
+        isLoading = true; storeError = nil
+        do {
+            let url = URL(string: storeURL)!
+            let (data, response) = try await URLSession.shared.data(from: url)
+            if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+                throw URLError(.badServerResponse)
+            }
+            if let array = try? JSONDecoder().decode([StoreModuleItem].self, from: data) {
+                storeModules = array
+            } else if let wrapper = try? JSONDecoder().decode(StoreModuleWrapper.self, from: data) {
+                storeModules = wrapper.modules
+            } else {
+                storeError = "Could not parse store response"
+            }
+        } catch {
+            storeError = "Could not load store: \(error.localizedDescription)"
+        }
+        isLoading = false
+    }
+}
+
+struct StoreModuleWrapper: Codable { let modules: [StoreModuleItem] }
+
+struct StoreModuleItem: Codable, Identifiable {
+    let id: String
+    let name: String
+    let description: String?
+    let version: String?
+    let manifestUrl: String
+    let iconUrl: String?
+    let author: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, description, version
+        case manifestUrl = "manifest_url"
+        case iconUrl = "icon_url"
+        case author
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString
+        name = try c.decodeIfPresent(String.self, forKey: .name) ?? "Unknown"
+        description = try c.decodeIfPresent(String.self, forKey: .description)
+        version = try c.decodeIfPresent(String.self, forKey: .version)
+        manifestUrl = try c.decodeIfPresent(String.self, forKey: .manifestUrl) ?? ""
+        iconUrl = try c.decodeIfPresent(String.self, forKey: .iconUrl)
+        author = try c.decodeIfPresent(String.self, forKey: .author)
+    }
+}
+
+private struct StoreItemRow: View {
+    let mod: StoreModuleItem
+    let isInstalled: Bool
+    let isInstalling: Bool
+    let onInstall: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Group {
+                if let iconUrl = mod.iconUrl, let url = URL(string: iconUrl) {
+                    AsyncImage(url: url) { phase in
+                        if case .success(let img) = phase { img.resizable().scaledToFill() }
+                        else { fallbackIcon }
+                    }
+                } else { fallbackIcon }
+            }
+            .frame(width: 36, height: 36)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(mod.name).font(.body.weight(.semibold))
+                if let desc = mod.description {
+                    Text(desc).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                }
+                HStack(spacing: 4) {
+                    if let version = mod.version { Text("v\(version)").font(.caption2).foregroundStyle(.secondary) }
+                    if let author = mod.author { Text("• \(author)").font(.caption2).foregroundStyle(.secondary) }
+                }
+            }
+            Spacer()
+            if isInstalled {
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).font(.title3)
+            } else if isInstalling {
+                ProgressView().scaleEffect(0.7)
+            } else {
+                Button("Install", action: onInstall)
+                    .buttonStyle(.bordered).controlSize(.small).tint(.appAccent)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var fallbackIcon: some View {
+        Image(systemName: "puzzlepiece.extension").font(.system(size: 16)).foregroundStyle(.secondary)
     }
 }
 
@@ -1617,22 +1904,62 @@ struct ModulesSettingsPage: View {
 struct AdvancedSettingsPage: View {
     @State private var showResetCW = false
     @State private var showResetHistory = false
+    @State private var showClearImage = false
+    @State private var showClearAll = false
+    #if os(iOS)
+    @State private var imageCacheSize: Int64 = 0
+    @State private var websiteDataSize: Int64 = 0
+    @State private var tempFilesSize: Int64 = 0
+    @State private var cwSize: Int64 = 0
+    @State private var historySize: Int64 = 0
+    #endif
 
     var body: some View {
         Form {
-            Section("Cache") {
-                Text("Image cache: 500 MB (auto-evicted after 7 days)")
-                    .font(.caption).foregroundStyle(.secondary)
+            Section("Cache Management") {
+                #if os(iOS)
+                cacheRow(label: "Image Cache", size: imageCacheSize) { showClearImage = true }
+                cacheRow(label: "Website Data", size: websiteDataSize) {
+                    Task { await CacheManager.shared.clearWebsiteData(); updateSizes() }
+                }
+                cacheRow(label: "Temp Files", size: tempFilesSize) {
+                    CacheManager.shared.clearTempFiles(); updateSizes()
+                }
+                cacheRow(label: "Search Aliases", size: 0) {
+                    CacheManager.shared.clearSearchAliases()
+                }
+                cacheRow(label: "ID Mapping Cache", size: 0) {
+                    CacheManager.shared.clearIDMappingCache()
+                }
+                cacheRow(label: "Episode Sort Prefs", size: 0) {
+                    CacheManager.shared.clearEpisodeSortPreferences()
+                }
+                cacheRow(label: "Library Cache", size: 0) {
+                    CacheManager.shared.clearLibraryCache()
+                }
+                cacheRow(label: "Profile Cache", size: 0) {
+                    CacheManager.shared.clearProfileCache()
+                }
+                #endif
             }
-            Section("Reset") {
-                Button("Reset Continue Watching", role: .destructive) { showResetCW = true }
-                Button("Reset Watch History", role: .destructive) { showResetHistory = true }
+            Section("Watch Data") {
+                cacheRow(label: "Continue Watching", size: 0) { showResetCW = true }
+                cacheRow(label: "Watch History", size: 0) { showResetHistory = true }
+            }
+            Section {
+                Button("Clear All Cache", role: .destructive) { showClearAll = true }
+                    .tint(.appAccent)
             }
         }
         .navigationTitle("Advanced")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear { updateSizes() }
         #endif
+        .alert("Clear Image Cache?", isPresented: $showClearImage) {
+            Button("Clear", role: .destructive) { CacheManager.shared.clearImageCache(); updateSizes() }
+            Button("Cancel", role: .cancel) {}
+        }
         .alert("Reset Continue Watching?", isPresented: $showResetCW) {
             Button("Reset", role: .destructive) { CacheManager.shared.clearContinueWatching() }
             Button("Cancel", role: .cancel) {}
@@ -1641,7 +1968,52 @@ struct AdvancedSettingsPage: View {
             Button("Reset", role: .destructive) { CacheManager.shared.clearWatchHistory() }
             Button("Cancel", role: .cancel) {}
         }
+        .alert("Clear All Cache?", isPresented: $showClearAll) {
+            Button("Clear All", role: .destructive) {
+                Task {
+                    await CacheManager.shared.clearEverything()
+                    updateSizes()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will clear all cache, continue watching, watch history, and search aliases. This cannot be undone.")
+        }
     }
+
+    private func cacheRow(label: String, size: Int64, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack {
+                Text(label).foregroundStyle(.primary)
+                Spacer()
+                if size > 0 {
+                    Text(formatSize(size))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Image(systemName: "chevron.right")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func formatSize(_ bytes: Int64) -> String {
+        let f = ByteCountFormatter()
+        f.allowedUnits = [.useMB, .useKB]
+        f.countStyle = .file
+        return f.string(fromByteCount: bytes)
+    }
+
+    #if os(iOS)
+    private func updateSizes() {
+        websiteDataSize = CacheManager.shared.websiteDataSize
+        tempFilesSize = CacheManager.shared.tempFilesSize
+        cwSize = CacheManager.shared.continueWatchingSize
+        historySize = CacheManager.shared.watchHistorySize
+    }
+    #endif
 }
 
 // MARK: - About Settings Page
