@@ -8,6 +8,8 @@ struct HomeView: View {
     // NavigationLink that performs the push sits OUTSIDE the ScrollView below.
     @State private var cwNavTarget: ContinueWatchingNavTarget?
     @State private var readerContext: ReaderContext?
+    /// Controls navigation to the notifications page via NavigationLink.
+    @State private var navigateToNotifications = false
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -92,6 +94,13 @@ struct HomeView: View {
             .toolbarBackgroundHidden()
             #endif
             .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    NavigationLink(destination: NotificationsPage()) {
+                        Image(systemName: "bell")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(.primary)
+                    }
+                }
                 ToolbarItem(placement: .primaryAction) {
                     ProviderMenuButton()
                 }

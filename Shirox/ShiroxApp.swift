@@ -378,8 +378,13 @@ private struct RootTabView: View {
                     SearchView()
                         .tabItem { Label("Search", systemImage: "magnifyingglass") }
                         .tag(4)
+                    #if os(iOS)
+                    ScheduleView()
+                        .tabItem { Label("Schedule", systemImage: "calendar") }
+                        .tag(5)
+                    #endif
                 }
-                .tint(.primary)
+                .tint(accentColor)
             }
         }
         .onOpenURL { url in
