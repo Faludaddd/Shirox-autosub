@@ -19,7 +19,6 @@ struct SettingsView: View {
     @AppStorage("useDefaultExtension") private var useDefaultExtension = false
     @AppStorage("autoPickLastSearchResult") private var autoPickLastSearchResult = false
     @AppStorage("autoPickLastStream") private var autoPickLastStream = false
-    @AppStorage("autoPickSubDub") private var autoPickSubDub = "off"
     @AppStorage("appearanceMode") private var appearanceMode = "system"
     @AppStorage("accentColorHex") private var accentColorHex = ""
     @AppStorage("preferredVideoQuality") private var preferredVideoQuality = "auto"
@@ -228,12 +227,6 @@ struct SettingsView: View {
                         .tint(.appAccent)
                     Toggle("Auto-pick Last Stream", isOn: $autoPickLastStream)
                         .tint(.appAccent)
-                    Picker("Auto-pick Sub/Dub", selection: $autoPickSubDub) {
-                        Text("Off (ask each time)").tag("off")
-                        Text("Sub").tag("sub")
-                        Text("Dub").tag("dub")
-                    }
-                    .tint(.appAccent)
                 }
 
                 ProvidersSettingsSection()
@@ -625,8 +618,7 @@ struct SettingsView: View {
         if "segment".contains(q) || "intro".contains(q) || "outro".contains(q) { results.append("Auto-Skip Segments (Player)") }
         if "playback speed".contains(q) { results.append("Playback Speed (Player)") }
         // Streaming
-        if "sub".contains(q) || "dub".contains(q) { results.append("Auto-pick Sub/Dub (Streaming)") }
-        if "stream".contains(q) || "module".contains(q) { results.append("Auto-pick Last Stream (Streaming)") }
+                if "stream".contains(q) || "module".contains(q) { results.append("Auto-pick Last Stream (Streaming)") }
         // Library
         if "tracking".contains(q) || "anilist".contains(q) || "mal".contains(q) { results.append("Track on AniList/MAL (Library)") }
         if "score".contains(q) || "rating".contains(q) { results.append("Score Format (Library)") }
@@ -1326,7 +1318,6 @@ struct PlaybackSettingsPage: View {
     @AppStorage("holdSpeedMultiplier") private var holdSpeedMultiplier: Double = 2.0
     @AppStorage("playerPlaybackSpeed") private var playerPlaybackSpeed: Double = 1.0
     @AppStorage("watchedPercentage") private var watchedPercentage: Double = 90.0
-    @AppStorage("autoPickSubDub") private var autoPickSubDub = "off"
     @AppStorage("autoPickLastStream") private var autoPickLastStream = false
     @AppStorage("autoPickLastSearchResult") private var autoPickLastSearchResult = false
 
@@ -1369,9 +1360,6 @@ struct PlaybackSettingsPage: View {
                 }
             }
             Section("Streaming") {
-                Picker("Auto-pick Sub/Dub", selection: $autoPickSubDub) {
-                    Text("Off").tag("off"); Text("Sub").tag("sub"); Text("Dub").tag("dub")
-                }.tint(.appAccent)
                 Toggle("Auto-pick Last Stream", isOn: $autoPickLastStream).tint(.appAccent)
                 Toggle("Auto-pick Last Search Result", isOn: $autoPickLastSearchResult).tint(.appAccent)
             }
