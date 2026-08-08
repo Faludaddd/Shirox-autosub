@@ -51,7 +51,7 @@ struct AniListMedia: Identifiable, Codable {
 
     /// Primary studio (the one with isAnimation = true), if any.
     var mainStudio: AniListStudio? {
-        studios?.edges.first { $0.isAnimation }?.node ?? studios?.edges.first?.node
+        studios?.edges.first { $0.isMain }?.node ?? studios?.edges.first?.node
     }
 
     /// Human-readable source material label.
@@ -206,13 +206,12 @@ struct AniListStudios: Codable {
 
 struct AniListStudioEdge: Codable {
     let node: AniListStudio
-    let isAnimation: Bool
+    let isMain: Bool
 }
 
 struct AniListStudio: Codable, Identifiable {
     let id: Int
     let name: String
-    let isAnimation: Bool?
 }
 
 // MARK: - Characters & Voice Actors

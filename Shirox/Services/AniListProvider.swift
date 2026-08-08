@@ -161,7 +161,7 @@ final class AniListProvider: MediaProvider {
             relations: m.relations.map { mapRelations($0) },
             type: m.type,
             format: m.format,
-            studioNames: m.studios?.edges.filter { $0.isAnimation }.map { $0.node.name },
+            studioNames: m.studios?.edges.filter { $0.isMain }.map { $0.node.name },
             source: m.source,
             duration: m.duration,
             airDateRange: m.airDateRange
@@ -190,7 +190,7 @@ final class AniListProvider: MediaProvider {
             relations: m.relations.map { mapRelations($0) },
             type: "MANGA",
             format: m.format,
-            studioNames: m.studios?.edges.filter { $0.isAnimation }.map { $0.node.name },
+            studioNames: m.studios?.edges.filter { $0.isMain }.map { $0.node.name },
             source: m.source,
             duration: m.duration,
             airDateRange: m.airDateRange

@@ -109,7 +109,7 @@ final class AniListService {
               season
               seasonYear
               nextAiringEpisode { episode airingAt timeUntilAiring }
-              studios { edges { isAnimation node { id name } } }
+              studios { edges { isMain node { id name } } }
             }
           }
         }
@@ -281,7 +281,7 @@ final class AniListService {
               averageScore
               genres
               nextAiringEpisode { episode airingAt timeUntilAiring }
-              studios { edges { isAnimation node { id name } } }
+              studios { edges { isMain node { id name } } }
             }
           }
         }
@@ -314,7 +314,7 @@ final class AniListService {
               endDate { year month day }
               averageScore
               genres
-              studios { edges { isAnimation node { id name } } }
+              studios { edges { isMain node { id name } } }
             }
           }
         }
@@ -342,7 +342,7 @@ final class AniListService {
               startDate { year month day }
               averageScore
               genres
-              studios { edges { isAnimation node { id name } } }
+              studios { edges { isMain node { id name } } }
             }
           }
         }
@@ -398,7 +398,7 @@ final class AniListService {
                 averageScore
                 genres
                 nextAiringEpisode { episode airingAt timeUntilAiring }
-                studios { edges { isAnimation node { id name } } }
+                studios { edges { isMain node { id name } } }
               }
             }
           }
@@ -516,8 +516,8 @@ final class AniListService {
             trailer { id site thumbnail }
             studios {
               edges {
-                isAnimation
-                node { id name isAnimation }
+                isMain
+                node { id name }
               }
             }
             characters(sort: ROLE, perPage: 12) {
