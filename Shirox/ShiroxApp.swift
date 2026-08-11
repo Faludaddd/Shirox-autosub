@@ -245,6 +245,9 @@ struct ShiroxApp: App {
                             .transition(.opacity)
                     }
                 }
+                .overlay {
+                    ToastContainerView()
+                }
                 .task {
                     try? await Task.sleep(nanoseconds: 1_500_000_000)
                     withAnimation(.easeInOut(duration: 0.4)) { showSplash = false }
@@ -486,11 +489,6 @@ private struct RootTabView: View {
                 )
                 .adaptivePresentationDetents([.medium, .large])
             }
-        }
-
-        .overlay(alignment: .bottom) {
-            ToastView()
-                .allowsHitTesting(false)
         }
 
         .onChange(of: cfManager.activeBypassWebView != nil) { presented in

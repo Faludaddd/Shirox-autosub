@@ -5,95 +5,6 @@ import AVFoundation
 import SwiftUI
 import UserNotifications
 
-enum ToastType {
-    case info
-    case success
-    case error
-    case warning
-    
-    var color: Color {
-        switch self {
-        case .info: return .blue
-        case .success: return .green
-        case .error: return .red
-        case .warning: return .orange
-        }
-    }
-    
-    var icon: String {
-        switch self {
-        case .info: return "info.circle.fill"
-        case .success: return "checkmark.circle.fill"
-        case .error: return "exclamationmark.circle.fill"
-        case .warning: return "exclamationmark.triangle.fill"
-        }
-    }
-}
-
-struct Toast: Identifiable {
-    let id = UUID()
-    let message: String
-    let type: ToastType
-    var duration: Double = 3.0
-}
-
-@MainActor
-final class ToastManager: ObservableObject {
-    static let shared = ToastManager()
-    
-    @Published var toasts: [Toast] = []
-    
-    private init() {}
-    
-    func show(message: String, type: ToastType = .info, duration: Double = 3.0) {
-        let toast = Toast(message: message, type: type, duration: duration)
-        withAnimation(.spring()) {
-            toasts.append(toast)
-        }
-        
-        Task {
-            try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
-            self.remove(toast)
-        }
-    }
-    
-    func remove(_ toast: Toast) {
-        withAnimation(.spring()) {
-            toasts.removeAll { $0.id == toast.id }
-        }
-    }
-}
-
-struct ToastView: View {
-    @ObservedObject var manager = ToastManager.shared
-
-    var body: some View {
-        VStack(spacing: 8) {
-            ForEach(manager.toasts) { toast in
-                HStack(spacing: 10) {
-                    Image(systemName: toast.type.icon)
-                        .foregroundStyle(toast.type.color)
-                        .font(.system(size: 15, weight: .semibold))
-                    Text(toast.message)
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.primary)
-                        .lineLimit(2)
-                    Spacer(minLength: 0)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 11)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 4)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .onTapGesture { manager.remove(toast) }
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 88)
-        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: manager.toasts.map(\.id))
-    }
-}
-
 struct DownloadContext {
     let mediaTitle: String
     let episodeNumber: Int
@@ -243,7 +154,12 @@ final class DownloadManager: NSObject, ObservableObject {
         // Prevent duplicates
         if let existing = items.first(where: { $0.episodeNumber == context.episodeNumber && $0.episodeHref == episodeHref && $0.streamTitle == context.streamTitle }) {
             let status = existing.state == .completed ? "already downloaded" : "already in queue"
-            ToastManager.shared.show(message: "\(context.mediaTitle) - \(context.episodeNumber) is \(status)", type: .warning)
+            ToastManager.shared.show(
+                title: "Downloads",
+                message: "\(context.mediaTitle) - \(context.episodeNumber) is \(status)",
+                icon: "exclamationmark.triangle.fill",
+                iconColor: .orange
+            )
             return
         }
         
@@ -272,7 +188,12 @@ final class DownloadManager: NSObject, ObservableObject {
         items.append(item)
         persist()
 
-        ToastManager.shared.show(message: "Download added: \(context.mediaTitle) - \(context.episodeNumber)", type: .info)
+        ToastManager.shared.show(
+            title: "Downloads",
+            message: "Added: \(context.mediaTitle) - \(context.episodeNumber)",
+            icon: "arrow.down.circle.fill",
+            iconColor: .accentColor
+        )
 
         if enrichSnapshot {
             let enrichItem = item
@@ -427,14 +348,21 @@ final class DownloadManager: NSObject, ObservableObject {
         if !unmatched.isEmpty {
             let list = unmatched.sorted().map(String.init).joined(separator: ", ")
             ToastManager.shared.show(
+                title: "Downloads",
                 message: "Couldn't match episode\(unmatched.count == 1 ? "" : "s") \(list) on this source — its numbering may differ",
-                type: .warning,
+                icon: "exclamationmark.triangle.fill",
+                iconColor: .orange,
                 duration: 5
             )
         }
 
         guard !queuedIDs.isEmpty else { return }
-        ToastManager.shared.show(message: "Queued \(queuedIDs.count) episode\(queuedIDs.count == 1 ? "" : "s")", type: .info)
+        ToastManager.shared.show(
+            title: "Downloads",
+            message: "Queued \(queuedIDs.count) episode\(queuedIDs.count == 1 ? "" : "s")",
+            icon: "arrow.down.circle.fill",
+            iconColor: .accentColor
+        )
 
         // Only stream hosts behind Cloudflare apply the 13–14s cooldown on
         // back-to-back extractStreamUrl calls. For non-CF modules (no cached
@@ -535,8 +463,10 @@ final class DownloadManager: NSObject, ObservableObject {
         items[idx].error = reason
         persist()
         ToastManager.shared.show(
+            title: "Downloads",
             message: "Failed to fetch Ep \(items[idx].episodeNumber): \(reason)",
-            type: .warning
+            icon: "exclamationmark.triangle.fill",
+            iconColor: .orange
         )
     }
 
@@ -616,7 +546,12 @@ final class DownloadManager: NSObject, ObservableObject {
             mediaTitle: item.mediaTitle,
             moduleId: item.moduleId
         )
-        ToastManager.shared.show(message: "Download removed: \(item.mediaTitle) - \(item.episodeNumber)", type: .info)
+        ToastManager.shared.show(
+            title: "Downloads",
+            message: "Removed: \(item.mediaTitle) - \(item.episodeNumber)",
+            icon: "trash.fill",
+            iconColor: .accentColor
+        )
         processQueue()
     }
 
@@ -885,7 +820,12 @@ final class DownloadManager: NSObject, ObservableObject {
             if appState == .background || appState == .inactive {
                 sendCompletionNotification(item: item)
             } else {
-                ToastManager.shared.show(message: "Download finished: \(item.mediaTitle) - Ep \(item.episodeNumber)", type: .success)
+                ToastManager.shared.show(
+                    title: "Downloads",
+                    message: "Finished: \(item.mediaTitle) - Ep \(item.episodeNumber)",
+                    icon: "checkmark.circle.fill",
+                    iconColor: .green
+                )
             }
             processQueue()
         }
@@ -914,7 +854,12 @@ final class DownloadManager: NSObject, ObservableObject {
                 items[idx].error = error.localizedDescription
                 persist()
                 
-                ToastManager.shared.show(message: "Download failed: \(item.mediaTitle) - \(item.episodeNumber)", type: .error)
+                ToastManager.shared.show(
+                    title: "Downloads",
+                    message: "Failed: \(item.mediaTitle) - \(item.episodeNumber)",
+                    icon: "exclamationmark.circle.fill",
+                    iconColor: .red
+                )
                 processQueue()
             }
         }

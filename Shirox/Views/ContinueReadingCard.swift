@@ -57,19 +57,34 @@ struct ContinueReadingSection: View {
         Task {
             defer { loadingHref = nil }
             guard let module = ModuleManager.shared.modules.first(where: { $0.id == item.moduleId }) else {
-                ToastManager.shared.show(message: "Module no longer installed", type: .error)
+                ToastManager.shared.show(
+                    title: "Reader",
+                    message: "Module no longer installed",
+                    icon: "exclamationmark.circle.fill",
+                    iconColor: .red
+                )
                 return
             }
             if ModuleManager.shared.moduleReadyId != module.id {
                 guard await ModuleManager.shared.selectAndAwaitReady(module) else {
-                    ToastManager.shared.show(message: "Failed to load \(module.sourceName)", type: .error)
+                    ToastManager.shared.show(
+                        title: "Reader",
+                        message: "Failed to load \(module.sourceName)",
+                        icon: "exclamationmark.circle.fill",
+                        iconColor: .red
+                    )
                     return
                 }
             }
             do {
                 let chapters = try await JSEngine.shared.mangaChapters(url: item.mangaHref)
                 guard !chapters.isEmpty else {
-                    ToastManager.shared.show(message: "No chapters found", type: .error)
+                    ToastManager.shared.show(
+                        title: "Reader",
+                        message: "No chapters found",
+                        icon: "exclamationmark.circle.fill",
+                        iconColor: .red
+                    )
                     return
                 }
                 let idx = chapters.firstIndex(where: { $0.href == item.chapterHref }) ?? 0
@@ -86,7 +101,12 @@ struct ContinueReadingSection: View {
                     match: MangaMatchManager.shared.cachedMatch(mangaHref: item.mangaHref)
                 )
             } catch {
-                ToastManager.shared.show(message: "Failed to load chapters", type: .error)
+                ToastManager.shared.show(
+                    title: "Reader",
+                    message: "Failed to load chapters",
+                    icon: "exclamationmark.circle.fill",
+                    iconColor: .red
+                )
             }
         }
     }

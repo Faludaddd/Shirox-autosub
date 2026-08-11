@@ -75,7 +75,12 @@ struct BatchDownloadModulePickerView: View {
                             streamTitle: streamTitle
                         )
                     } catch {
-                        ToastManager.shared.show(message: "Failed to load episodes: \(error.localizedDescription)", type: .error)
+                        ToastManager.shared.show(
+                            title: "Downloads",
+                            message: "Failed to load episodes: \(error.localizedDescription)",
+                            icon: "exclamationmark.circle.fill",
+                            iconColor: .red
+                        )
                     }
                 }
                 

@@ -28,6 +28,7 @@ FILES_TO_ADD = [
     ("Shirox/Models/UnifiedScheduleEntry.swift",           "Models"),
     ("Shirox/Views/Shared/TransparentNavBarModifier.swift", "Shared"),
     ("Shirox/Views/Shared/AnimatedBackgroundView.swift",   "Shared"),
+    ("Shirox/Views/Shared/ToastSystem.swift",              "Shared"),
 ]
 
 # Sources build phase IDs for each target (looked up from pbxproj).

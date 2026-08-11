@@ -118,7 +118,12 @@ struct ContinueWatchingSection: View {
                     .map { SubtitleTrack(title: $0.deletingPathExtension().lastPathComponent, url: $0, headers: [:]) }
                 LocalPlaybackCoordinator.shared.launch(videoURL: url, subtitle: subtitle, resumeFrom: item.watchedSeconds)
             } else {
-                ToastManager.shared.show(message: "File moved or unavailable — remove this item", type: .error)
+                ToastManager.shared.show(
+                    title: "Playback",
+                    message: "File moved or unavailable — remove this item",
+                    icon: "exclamationmark.circle.fill",
+                    iconColor: .red
+                )
             }
             return
         }
@@ -127,7 +132,12 @@ struct ContinueWatchingSection: View {
             if let url = LocalPlaybackCoordinator.shared.resolveBookmark(data) {
                 LocalPlaybackCoordinator.shared.launch(videoURL: url, subtitle: nil, resumeFrom: item.watchedSeconds)
             } else {
-                ToastManager.shared.show(message: "File moved or unavailable — remove this item", type: .error)
+                ToastManager.shared.show(
+                    title: "Playback",
+                    message: "File moved or unavailable — remove this item",
+                    icon: "exclamationmark.circle.fill",
+                    iconColor: .red
+                )
             }
             return
         }
@@ -269,7 +279,12 @@ struct ContinueWatchingSection: View {
         ) {
             Task {
                 guard let localStream = await DownloadManager.shared.getStream(for: download) else {
-                    ToastManager.shared.show(message: "Downloaded file is missing — re-download to play offline", type: .error)
+                    ToastManager.shared.show(
+                        title: "Playback",
+                        message: "Downloaded file is missing — re-download to play offline",
+                        icon: "exclamationmark.circle.fill",
+                        iconColor: .red
+                    )
                     return
                 }
                 PlayerPresenter.shared.presentPlayer(stream: localStream, context: context, onWatchNext: onWatchNext)

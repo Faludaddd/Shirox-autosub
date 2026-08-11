@@ -1433,15 +1433,22 @@ struct ScheduleView: View {
         if scheduledIds.contains(entry.id) {
             EpisodeNotificationManager.shared.cancel(scheduleId: entry.id)
             scheduledIds.remove(entry.id)
-            ToastManager.shared.show(message: "Notification cancelled", type: .info)
+            ToastManager.shared.show(
+                title: "Schedule",
+                message: "Notification cancelled",
+                icon: "info.circle.fill",
+                iconColor: .accentColor
+            )
             return
         }
         Task {
             let granted = await EpisodeNotificationManager.shared.requestAuthorization()
             guard granted else {
                 ToastManager.shared.show(
+                    title: "Schedule",
                     message: "Enable notifications in Settings to receive episode alerts",
-                    type: .warning
+                    icon: "exclamationmark.triangle.fill",
+                    iconColor: .orange
                 )
                 return
             }
@@ -1457,11 +1464,18 @@ struct ScheduleView: View {
             )
             if success {
                 scheduledIds.insert(entry.id)
-                ToastManager.shared.show(message: "Notification scheduled", type: .success)
+                ToastManager.shared.show(
+                    title: "Schedule",
+                    message: "Notification scheduled",
+                    icon: "checkmark.circle.fill",
+                    iconColor: .green
+                )
             } else {
                 ToastManager.shared.show(
+                    title: "Schedule",
                     message: "Could not schedule — episode may have already aired",
-                    type: .warning
+                    icon: "exclamationmark.triangle.fill",
+                    iconColor: .orange
                 )
             }
         }
@@ -1474,8 +1488,10 @@ struct ScheduleView: View {
     private func addToLibrary(_ entry: UnifiedScheduleEntry, status: MediaListStatus) {
         guard let mediaId = entry.aniListMediaId else {
             ToastManager.shared.show(
+                title: "Library",
                 message: "Western shows can't be tracked here — add them on AniList first",
-                type: .info
+                icon: "info.circle.fill",
+                iconColor: .accentColor
             )
             return
         }
@@ -1487,13 +1503,17 @@ struct ScheduleView: View {
                     progress: 0
                 )
                 ToastManager.shared.show(
+                    title: "Library",
                     message: "Added to \(status.displayName)",
-                    type: .success
+                    icon: "plus.circle.fill",
+                    iconColor: .green
                 )
             } catch {
                 ToastManager.shared.show(
+                    title: "Library",
                     message: "Failed: \(error.localizedDescription)",
-                    type: .error
+                    icon: "exclamationmark.circle.fill",
+                    iconColor: .red
                 )
             }
         }
@@ -1506,8 +1526,10 @@ struct ScheduleView: View {
     private func openDetails(for entry: UnifiedScheduleEntry) {
         guard let mediaId = entry.aniListMediaId else {
             ToastManager.shared.show(
+                title: "Library",
                 message: "Western shows don't have an AniList detail page",
-                type: .info
+                icon: "info.circle.fill",
+                iconColor: .accentColor
             )
             return
         }

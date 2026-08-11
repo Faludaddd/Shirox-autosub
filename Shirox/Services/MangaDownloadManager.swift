@@ -99,12 +99,22 @@ final class MangaDownloadManager: ObservableObject {
         if items.contains(where: { $0.chapterHref == chapter.href }) {
             let existing = items.first { $0.chapterHref == chapter.href }
             let status = existing?.state == .completed ? "already downloaded" : "already in queue"
-            ToastManager.shared.show(message: "\(chapter.displayName) is \(status)", type: .warning)
+            ToastManager.shared.show(
+                title: "Manga",
+                message: "\(chapter.displayName) is \(status)",
+                icon: "exclamationmark.triangle.fill",
+                iconColor: .orange
+            )
             return
         }
         items.append(makeItem(chapter: chapter, context: context))
         persist()
-        ToastManager.shared.show(message: "Download added: \(context.mangaTitle) - \(chapter.displayName)", type: .info)
+        ToastManager.shared.show(
+            title: "Manga",
+            message: "Added: \(context.mangaTitle) - \(chapter.displayName)",
+            icon: "arrow.down.circle.fill",
+            iconColor: .accentColor
+        )
         processQueue()
     }
 
@@ -116,7 +126,12 @@ final class MangaDownloadManager: ObservableObject {
         }
         guard queued > 0 else { return }
         persist()
-        ToastManager.shared.show(message: "Queued \(queued) chapter\(queued == 1 ? "" : "s")", type: .info)
+        ToastManager.shared.show(
+            title: "Manga",
+            message: "Queued \(queued) chapter\(queued == 1 ? "" : "s")",
+            icon: "arrow.down.circle.fill",
+            iconColor: .accentColor
+        )
         processQueue()
     }
 
@@ -159,7 +174,12 @@ final class MangaDownloadManager: ObservableObject {
         items.removeAll { $0.id == item.id }
         persist()
         reconcileDownloadsDirectory()
-        ToastManager.shared.show(message: "Download removed: \(item.mangaTitle) - \(item.chapterName)", type: .info)
+        ToastManager.shared.show(
+            title: "Manga",
+            message: "Removed: \(item.mangaTitle) - \(item.chapterName)",
+            icon: "trash.fill",
+            iconColor: .accentColor
+        )
         processQueue()
     }
 
@@ -274,7 +294,12 @@ final class MangaDownloadManager: ObservableObject {
         items[idx].completedAt = Date()
         items[idx].error = nil
         persist()
-        ToastManager.shared.show(message: "Download finished: \(items[idx].mangaTitle) - \(items[idx].chapterName)", type: .success)
+        ToastManager.shared.show(
+            title: "Manga",
+            message: "Finished: \(items[idx].mangaTitle) - \(items[idx].chapterName)",
+            icon: "checkmark.circle.fill",
+            iconColor: .green
+        )
     }
 
     private func failChapter(id: UUID, error: Error) {
@@ -283,7 +308,12 @@ final class MangaDownloadManager: ObservableObject {
         items[idx].state = .failed
         items[idx].error = error.localizedDescription
         persist()
-        ToastManager.shared.show(message: "Download failed: \(items[idx].mangaTitle) - \(items[idx].chapterName)", type: .error)
+        ToastManager.shared.show(
+            title: "Manga",
+            message: "Failed: \(items[idx].mangaTitle) - \(items[idx].chapterName)",
+            icon: "exclamationmark.circle.fill",
+            iconColor: .red
+        )
     }
 
     // MARK: - Background keep-alive

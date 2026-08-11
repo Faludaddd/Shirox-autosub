@@ -618,7 +618,12 @@ struct LibraryView: View {
         if let url = LocalPlaybackCoordinator.shared.resolveImport(name: name) {
             LocalPlaybackCoordinator.shared.launch(videoURL: url, subtitle: nil, resumeFrom: 0)
         } else {
-            ToastManager.shared.show(message: "File moved or unavailable — remove this item", type: .error)
+            ToastManager.shared.show(
+                title: "Playback",
+                message: "File moved or unavailable — remove this item",
+                icon: "exclamationmark.circle.fill",
+                iconColor: .red
+            )
         }
         #endif
     }
