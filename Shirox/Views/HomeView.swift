@@ -1316,7 +1316,7 @@ struct ScheduleSettingsPage: View {
                     Text("21 days").tag(21)
                     Text("30 days").tag(30)
                 }
-                .onChange(of: windowDays) { _, value in
+                .onChange(of: windowDays) { value in
                     ScheduleSettings.setWindowDays(value)
                 }
             } header: {
@@ -1331,7 +1331,7 @@ struct ScheduleSettingsPage: View {
                         Text(mode.displayName).tag(mode)
                     }
                 }
-                .onChange(of: defaultMode) { _, value in
+                .onChange(of: defaultMode) { value in
                     ScheduleSettings.setDefaultMode(value)
                 }
             } header: {
@@ -1345,7 +1345,7 @@ struct ScheduleSettingsPage: View {
                     Text("Local").tag(false)
                     Text("UTC").tag(true)
                 }
-                .onChange(of: defaultUseUTC) { _, value in
+                .onChange(of: defaultUseUTC) { value in
                     ScheduleSettings.setDefaultUseUTC(value)
                 }
             } header: {
