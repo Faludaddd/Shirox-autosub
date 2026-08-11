@@ -78,6 +78,11 @@ struct SettingsView: View {
                         SettingsCategoryRow(icon: "play.circle.fill", title: "Playback", subtitle: "Player, quality, skip, speed")
                     }
                     NavigationLink {
+                        SubtitleSettingsPage()
+                    } label: {
+                        SettingsCategoryRow(icon: "captions.bubble.fill", title: "Subtitles", subtitle: "Style, color, presets, live preview")
+                    }
+                    NavigationLink {
                         LibrarySettingsPage()
                     } label: {
                         SettingsCategoryRow(icon: "books.vertical.fill", title: "Library", subtitle: "Tracking, sync, scores")
@@ -180,10 +185,10 @@ struct SettingsView: View {
                         Text("Purple").tag("#BF5AF2")
                         Text("Pink").tag("#FF375F")
                     }
-                    .tint(.appAccent)
+                    .tint(Color.gray)
 
                     Toggle("Reduce Motion", isOn: $reduceMotion)
-                        .tint(.appAccent)
+                        .tint(Color.gray)
                 }
 
                 Section("Modules") {
@@ -221,19 +226,19 @@ struct SettingsView: View {
                         }
                     }
                     Toggle("Use Default Extension", isOn: $useDefaultExtension)
-                        .tint(.appAccent)
+                        .tint(Color.gray)
                         .disabled(moduleManager.activeModule == nil)
                     Toggle("Auto-pick Last Search Result", isOn: $autoPickLastSearchResult)
-                        .tint(.appAccent)
+                        .tint(Color.gray)
                     Toggle("Auto-pick Last Stream", isOn: $autoPickLastStream)
-                        .tint(.appAccent)
+                        .tint(Color.gray)
                 }
 
                 ProvidersSettingsSection()
 
                 Section("Player") {
                     Toggle("Force Landscape Mode", isOn: $forceLandscape)
-                        .tint(.appAccent)
+                        .tint(Color.gray)
                         #if os(iOS)
                         .onChangeOf(forceLandscape) {
                             PlayerPresenter.shared.resetToAppOrientation(shouldRotate: true)
@@ -241,7 +246,7 @@ struct SettingsView: View {
                         #endif
                     if #available(iOS 26.0, macOS 26.0, *) {
                         Toggle("Liquid Glass Controls", isOn: $playerLiquidGlass)
-                            .tint(.appAccent)
+                            .tint(Color.gray)
                         Text("Frosted glass buttons in the video player. Turn off for solid controls.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -257,9 +262,9 @@ struct SettingsView: View {
                         }
                     }
                     Toggle("Auto Next Episode", isOn: $autoNextEpisode)
-                        .tint(.appAccent)
+                        .tint(Color.gray)
                     Toggle("Auto-Skip Segments", isOn: $autoSkipSegments)
-                        .tint(.appAccent)
+                        .tint(Color.gray)
                     Text("Automatically skip intros, recaps, credits, and previews")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -271,14 +276,14 @@ struct SettingsView: View {
                         Text("1080p").tag("1080p")
                         Text("Highest Available").tag("highest")
                     }
-                    .tint(.appAccent)
+                    .tint(Color.gray)
                     Toggle("Auto-Pause on Interruption", isOn: $autoPauseOnInterruption)
-                        .tint(.appAccent)
+                        .tint(Color.gray)
                     Text("Pauses playback when Control Center or Notification Center is opened.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Toggle("Hold-to-Speed", isOn: $holdSpeedEnabled)
-                        .tint(.appAccent)
+                        .tint(Color.gray)
                     if holdSpeedEnabled {
                         VStack(alignment: .leading) {
                             Text("Movement Sensitivity")
@@ -291,10 +296,10 @@ struct SettingsView: View {
                             Text("2.5×").tag(2.5)
                             Text("3×").tag(3.0)
                         }
-                        .tint(.appAccent)
+                        .tint(Color.gray)
                     }
                     Toggle("Reverse Episode List by Default", isOn: EpisodeSortManager.shared.$defaultReverseSort)
-                        .tint(.appAccent)
+                        .tint(Color.gray)
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
                             Text("Episode Progress Threshold")
@@ -313,7 +318,7 @@ struct SettingsView: View {
                 if #available(iOS 26.0, *) {
                     Section("Reader") {
                         Toggle("Liquid Glass Controls", isOn: $readerLiquidGlass)
-                            .tint(.appAccent)
+                            .tint(Color.gray)
                         Text("Frosted glass buttons in the manga reader. Turn off for solid controls.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -325,20 +330,20 @@ struct SettingsView: View {
                     Section("Tracking") {
                         if aniListAuth.isLoggedIn {
                             Toggle("Track on AniList", isOn: $aniListTrackingEnabled)
-                                .tint(.appAccent)
+                                .tint(Color.gray)
                         }
                         if malAuth.isLoggedIn {
                             Toggle("Track on MyAnimeList", isOn: $malTrackingEnabled)
-                                .tint(.appAccent)
+                                .tint(Color.gray)
                         }
                         if aniListAuth.isLoggedIn && malAuth.isLoggedIn {
                             Toggle("Sync edits to both services", isOn: $dualSync)
-                                .tint(.appAccent)
+                                .tint(Color.gray)
                         }
                         Toggle("Never reduce progress", isOn: $skipReWatchTracking)
-                            .tint(.appAccent)
+                            .tint(Color.gray)
                         Toggle("Prompt to rate after finishing", isOn: $rateOnFinish)
-                            .tint(.appAccent)
+                            .tint(Color.gray)
                         Text("Automatically update your watch progress as you watch.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -355,7 +360,7 @@ struct SettingsView: View {
 
                 Section {
                     Toggle("Auto-track what you watch", isOn: $localAutoTrackEnabled)
-                        .tint(.appAccent)
+                        .tint(Color.gray)
                     Picker("Score Format", selection: $localScoreFormatRaw) {
                         Text("100 Point").tag(ScoreFormat.point100.rawValue)
                         Text("10 Point (Decimal)").tag(ScoreFormat.point10Decimal.rawValue)
@@ -387,7 +392,7 @@ struct SettingsView: View {
                         }
                     }
                     Toggle("Background Downloads", isOn: $backgroundDownloadsEnabled)
-                        .tint(.appAccent)
+                        .tint(Color.gray)
                 }
 
                 Section("Matching") {
@@ -549,12 +554,12 @@ struct SettingsView: View {
 
                 Section("Notifications") {
                     Toggle("Episode Reminders", isOn: $episodeReminders)
-                        .tint(.appAccent)
+                        .tint(Color.gray)
                     Text("Get notified before a new episode airs.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Toggle("Airing Notifications", isOn: $airingNotifications)
-                        .tint(.appAccent)
+                        .tint(Color.gray)
                     Text("Get notified when an anime you track starts airing.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -1257,6 +1262,7 @@ struct AppearanceSettingsPage: View {
     @AppStorage("appearanceMode") private var appearanceMode = "system"
     @AppStorage("accentColorHex") private var accentColorHex = ""
     @AppStorage("reduceMotion") private var reduceMotion = false
+    @AppStorage("glowIntensity") private var glowIntensity: Double = 0.5
 
     var body: some View {
         Form {
@@ -1285,13 +1291,20 @@ struct AppearanceSettingsPage: View {
             }
             Section("Motion") {
                 Toggle("Reduce Motion", isOn: $reduceMotion)
-                    .tint(.appAccent)
+                    .tint(Color.gray)
+            }
+            Section("Glow") {
+                VStack(alignment: .leading) {
+                    Text("Intensity: \(String(format: "%.1f", glowIntensity))")
+                    Slider(value: $glowIntensity, in: 0.0...1.0, step: 0.1).tint(Color.gray)
+                }
             }
             Section {
                 Button("Reset to Default", role: .destructive) {
                     appearanceMode = "system"
                     accentColorHex = ""
                     reduceMotion = false
+                    glowIntensity = 0.5
                 }
                 .tint(.appAccent)
             }
@@ -1327,7 +1340,7 @@ struct PlaybackSettingsPage: View {
     var body: some View {
         Form {
             Section("Player") {
-                Toggle("Force Landscape Mode", isOn: $forceLandscape).tint(.appAccent)
+                Toggle("Force Landscape Mode", isOn: $forceLandscape).tint(Color.gray)
                 Picker("Skip Duration", selection: $skipShort) {
                     ForEach(shortOptions, id: \.self) { Text("\($0)s").tag($0) }
                 }.tint(.appAccent)
@@ -1346,22 +1359,22 @@ struct PlaybackSettingsPage: View {
                 }.tint(.appAccent)
             }
             Section("Auto-play & Skip") {
-                Toggle("Auto Next Episode", isOn: $autoNextEpisode).tint(.appAccent)
-                Toggle("Auto-Skip Segments", isOn: $autoSkipSegments).tint(.appAccent)
-                Toggle("Auto-Pause on Interruption", isOn: $autoPauseOnInterruption).tint(.appAccent)
+                Toggle("Auto Next Episode", isOn: $autoNextEpisode).tint(Color.gray)
+                Toggle("Auto-Skip Segments", isOn: $autoSkipSegments).tint(Color.gray)
+                Toggle("Auto-Pause on Interruption", isOn: $autoPauseOnInterruption).tint(Color.gray)
             }
             Section("Hold-to-Speed") {
-                Toggle("Enable", isOn: $holdSpeedEnabled).tint(.appAccent)
+                Toggle("Enable", isOn: $holdSpeedEnabled).tint(Color.gray)
                 if holdSpeedEnabled {
-                    Slider(value: $holdSpeedSensitivity, in: 0.1...1.0, step: 0.1).tint(.appAccent)
+                    Slider(value: $holdSpeedSensitivity, in: 0.1...1.0, step: 0.1).tint(Color.gray)
                     Picker("Speed Multiplier", selection: $holdSpeedMultiplier) {
                         Text("1.5x").tag(1.5); Text("2x").tag(2.0); Text("2.5x").tag(2.5); Text("3x").tag(3.0)
                     }.tint(.appAccent)
                 }
             }
             Section("Streaming") {
-                Toggle("Auto-pick Last Stream", isOn: $autoPickLastStream).tint(.appAccent)
-                Toggle("Auto-pick Last Search Result", isOn: $autoPickLastSearchResult).tint(.appAccent)
+                Toggle("Auto-pick Last Stream", isOn: $autoPickLastStream).tint(Color.gray)
+                Toggle("Auto-pick Last Search Result", isOn: $autoPickLastSearchResult).tint(Color.gray)
             }
             Section("Progress") {
                 VStack(alignment: .leading) {
@@ -1391,14 +1404,14 @@ struct LibrarySettingsPage: View {
     var body: some View {
         Form {
             Section("Tracking") {
-                Toggle("Track on AniList", isOn: $aniListTrackingEnabled).tint(.appAccent)
-                Toggle("Track on MyAnimeList", isOn: $malTrackingEnabled).tint(.appAccent)
-                Toggle("Sync edits to both services", isOn: $dualSync).tint(.appAccent)
-                Toggle("Never reduce progress", isOn: $skipReWatchTracking).tint(.appAccent)
-                Toggle("Prompt to rate after finishing", isOn: $rateOnFinish).tint(.appAccent)
+                Toggle("Track on AniList", isOn: $aniListTrackingEnabled).tint(Color.gray)
+                Toggle("Track on MyAnimeList", isOn: $malTrackingEnabled).tint(Color.gray)
+                Toggle("Sync edits to both services", isOn: $dualSync).tint(Color.gray)
+                Toggle("Never reduce progress", isOn: $skipReWatchTracking).tint(Color.gray)
+                Toggle("Prompt to rate after finishing", isOn: $rateOnFinish).tint(Color.gray)
             }
             Section("Local Library") {
-                Toggle("Auto-track what you watch", isOn: $localAutoTrackEnabled).tint(.appAccent)
+                Toggle("Auto-track what you watch", isOn: $localAutoTrackEnabled).tint(Color.gray)
             }
             Section("Title Language Priority") {
                 Text("Current: \(titlePriority)")
@@ -1424,8 +1437,8 @@ struct DownloadsSettingsPage: View {
             Section("Downloads") {
                 Picker("Concurrent Downloads", selection: $maxConcurrentDownloads) {
                     Text("1").tag(1); Text("2").tag(2); Text("3").tag(3); Text("4").tag(4); Text("5").tag(5)
-                }.tint(.appAccent)
-                Toggle("Background Downloads", isOn: $backgroundDownloadsEnabled).tint(.appAccent)
+                }.tint(Color.gray)
+                Toggle("Background Downloads", isOn: $backgroundDownloadsEnabled).tint(Color.gray)
             }
         }
         .navigationTitle("Downloads")
@@ -1444,8 +1457,8 @@ struct NotificationsSettingsPage: View {
     var body: some View {
         Form {
             Section("Notifications") {
-                Toggle("Episode Reminders", isOn: $episodeReminders).tint(.appAccent)
-                Toggle("Airing Notifications", isOn: $airingNotifications).tint(.appAccent)
+                Toggle("Episode Reminders", isOn: $episodeReminders).tint(Color.gray)
+                Toggle("Airing Notifications", isOn: $airingNotifications).tint(Color.gray)
             }
             Section {
                 Text("Notifications require an AniList account and will appear as local notifications on your device.")
@@ -1470,7 +1483,7 @@ struct SearchSettingsPage: View {
         Form {
             Section("Search") {
                 Toggle("Use Default Extension Only", isOn: $useDefaultExtension)
-                    .tint(.appAccent)
+                    .tint(Color.gray)
                     .disabled(moduleManager.activeModule == nil)
             }
             Section {
@@ -1746,22 +1759,50 @@ struct ModuleStorePage: View {
     @State private var isInstalling = false
 
     private let storeURL = "https://modulesbypaul.dev"
+    private let columns: [GridItem] = [
+        GridItem(.flexible(), spacing: 14),
+        GridItem(.flexible(), spacing: 14)
+    ]
 
     var body: some View {
-        List {
-            if isLoading {
-                ForEach(0..<5, id: \.self) { _ in
-                    HStack(spacing: 12) {
-                        RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.15)).frame(width: 36, height: 36)
-                        VStack(alignment: .leading, spacing: 4) {
-                            RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.15)).frame(height: 14)
-                            RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.15)).frame(width: 120, height: 10)
+        ScrollView {
+            VStack(spacing: 14) {
+                // Capsule-shaped search pill at the top
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    TextField("Search modules…", text: $searchText)
+                        .font(.subheadline)
+                        #if os(iOS)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        #endif
+                    if !searchText.isEmpty {
+                        Button {
+                            searchText = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 16))
+                                .foregroundStyle(.tertiary)
                         }
-                        Spacer()
+                        .buttonStyle(.plain)
                     }
                 }
-            } else if let error = storeError {
-                Section {
+                .padding(.horizontal, 14)
+                .padding(.vertical, 11)
+                .background(Color.secondary.opacity(0.1), in: Capsule())
+                .padding(.horizontal, 14)
+                .padding(.top, 12)
+
+                if isLoading {
+                    LazyVGrid(columns: columns, spacing: 14) {
+                        ForEach(0..<6, id: \.self) { _ in
+                            StoreModuleSkeletonTile()
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                } else if let error = storeError {
                     VStack(spacing: 12) {
                         Image(systemName: "wifi.exclamationmark")
                             .font(.system(size: 32))
@@ -1775,25 +1816,45 @@ struct ModuleStorePage: View {
                             .tint(.appAccent)
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 20)
-                }
-            } else if storeModules.isEmpty {
-                Section {
-                    Text("No modules available")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            } else {
-                ForEach(filteredModules) { mod in
-                    StoreItemRow(mod: mod, isInstalled: isModuleInstalled(mod), isInstalling: isInstalling) {
-                        installModule(mod)
+                    .padding(.vertical, 40)
+                    .padding(.horizontal, 14)
+                } else if storeModules.isEmpty {
+                    VStack(spacing: 8) {
+                        Image(systemName: "puzzlepiece.extension")
+                            .font(.system(size: 32))
+                            .foregroundStyle(.tertiary)
+                        Text("No modules available")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+                } else if filteredModules.isEmpty {
+                    VStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 30))
+                            .foregroundStyle(.tertiary)
+                        Text("No matches for \"\(searchText)\"")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+                } else {
+                    LazyVGrid(columns: columns, spacing: 14) {
+                        ForEach(filteredModules) { mod in
+                            StoreModuleTile(mod: mod, isInstalled: isModuleInstalled(mod), isInstalling: isInstalling) {
+                                installModule(mod)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 24)
                 }
             }
         }
-        .searchable(text: $searchText, prompt: "Search modules…")
+        .background(Color.secondary.opacity(0.04))
         #if os(iOS)
-        .listStyle(.insetGrouped)
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .navigationTitle("Module Store")
@@ -1955,14 +2016,15 @@ struct StoreModuleItem: Codable, Identifiable {
     }
 }
 
-private struct StoreItemRow: View {
+private struct StoreModuleTile: View {
     let mod: StoreModuleItem
     let isInstalled: Bool
     let isInstalling: Bool
     let onInstall: () -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
+        VStack(spacing: 8) {
+            // Icon at top, centered, 56x56
             Group {
                 if let iconUrl = mod.iconUrl, let url = URL(string: iconUrl) {
                     AsyncImage(url: url) { phase in
@@ -1971,35 +2033,95 @@ private struct StoreItemRow: View {
                     }
                 } else { fallbackIcon }
             }
-            .frame(width: 36, height: 36)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+            .frame(width: 56, height: 56)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 14))
+            .padding(.top, 2)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(mod.name).font(.body.weight(.semibold))
-                if let desc = mod.description {
-                    Text(desc).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-                }
-                HStack(spacing: 4) {
-                    if let version = mod.version { Text("v\(version)").font(.caption2).foregroundStyle(.secondary) }
-                    if let author = mod.author { Text("• \(author)").font(.caption2).foregroundStyle(.secondary) }
-                }
+            // Name below, bold, 2-line limit, centered
+            Text(mod.name)
+                .font(.subheadline.weight(.bold))
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.top, 2)
+
+            // Author caption
+            if let author = mod.author, !author.isEmpty {
+                Text(author)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
-            Spacer()
+
+            Spacer(minLength: 4)
+
+            // Install button at bottom
             if isInstalled {
-                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).font(.title3)
+                Label("Installed", systemImage: "checkmark.circle.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.green)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 4)
             } else if isInstalling {
-                ProgressView().scaleEffect(0.7)
+                ProgressView()
+                    .scaleEffect(0.75)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 4)
             } else {
-                Button("Install", action: onInstall)
-                    .buttonStyle(.bordered).controlSize(.small).tint(.appAccent)
+                Button(action: onInstall) {
+                    Text("Install")
+                        .font(.caption.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .tint(.appAccent)
             }
         }
-        .padding(.vertical, 4)
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: 196, alignment: .top)
+        .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.secondary.opacity(0.08), lineWidth: 1)
+        )
     }
 
     private var fallbackIcon: some View {
-        Image(systemName: "puzzlepiece.extension").font(.system(size: 16)).foregroundStyle(.secondary)
+        Image(systemName: "puzzlepiece.extension")
+            .font(.system(size: 24))
+            .foregroundStyle(.secondary)
+            .frame(width: 56, height: 56)
+    }
+}
+
+private struct StoreModuleSkeletonTile: View {
+    var body: some View {
+        VStack(spacing: 8) {
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color.secondary.opacity(0.15))
+                .frame(width: 56, height: 56)
+                .padding(.top, 2)
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.secondary.opacity(0.15))
+                .frame(height: 14)
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Color.secondary.opacity(0.12))
+                .frame(width: 70, height: 10)
+            Spacer(minLength: 4)
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.secondary.opacity(0.15))
+                .frame(height: 26)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: 196, alignment: .top)
+        .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.secondary.opacity(0.08), lineWidth: 1)
+        )
+        .redacted(reason: .placeholder)
     }
 }
 
@@ -2117,6 +2239,247 @@ struct AdvancedSettingsPage: View {
         historySize = CacheManager.shared.watchHistorySize
     }
     #endif
+}
+
+// MARK: - Subtitle Settings Page
+
+struct SubtitleSettingsPage: View {
+    @AppStorage("subtitleTextColor") private var subtitleTextColor: String = "white"
+    @AppStorage("subtitleStrokeColor") private var subtitleStrokeColor: String = "black"
+    @AppStorage("subtitleStrokeWidth") private var subtitleStrokeWidth: Double = 1.0
+    @AppStorage("subtitleBackgroundEnabled") private var subtitleBackgroundEnabled: Bool = false
+    @AppStorage("subtitleFontSize") private var subtitleFontSize: Double = 30
+    @AppStorage("subtitleBoldText") private var subtitleBoldText: Bool = false
+    @State private var previewImageURL: String?
+
+    private let textColorOptions = ["white", "yellow", "black", "cyan", "pink", "green"]
+    private let strokeColorOptions = ["none", "black", "white", "gray"]
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                quickPresetsCard
+                livePreviewCard
+                appearanceControlsCard
+            }
+            .padding()
+        }
+        .navigationTitle("Subtitles")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .onAppear {
+            Task {
+                let trending = try? await AniListService.shared.browse(category: .trending, page: 1)
+                if let random = trending?.randomElement() {
+                    previewImageURL = random.bannerImage ?? random.coverImage.extraLarge ?? random.coverImage.large
+                }
+            }
+        }
+    }
+
+    // MARK: - Quick Presets Card
+
+    private var quickPresetsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Quick Presets", systemImage: "wand.and.stars")
+                .font(.headline)
+
+            Text("Tap a preset to apply a full subtitle style instantly.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 8) {
+                presetButton(title: "Minimal") {
+                    subtitleTextColor = "white"
+                    subtitleStrokeColor = "none"
+                    subtitleStrokeWidth = 0
+                    subtitleBackgroundEnabled = false
+                    subtitleFontSize = 24
+                    subtitleBoldText = false
+                }
+                presetButton(title: "Bold") {
+                    subtitleTextColor = "yellow"
+                    subtitleStrokeColor = "black"
+                    subtitleStrokeWidth = 1.5
+                    subtitleBackgroundEnabled = true
+                    subtitleFontSize = 34
+                    subtitleBoldText = true
+                }
+                presetButton(title: "Classic") {
+                    subtitleTextColor = "white"
+                    subtitleStrokeColor = "black"
+                    subtitleStrokeWidth = 1.0
+                    subtitleBackgroundEnabled = false
+                    subtitleFontSize = 30
+                    subtitleBoldText = false
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func presetButton(title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+        }
+        .buttonStyle(.bordered)
+        .tint(.appAccent)
+    }
+
+    // MARK: - Live Preview Card
+
+    private var livePreviewCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("Live Preview", systemImage: "eye")
+                    .font(.headline)
+                Spacer()
+                if previewImageURL == nil {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                }
+            }
+
+            ZStack(alignment: .bottom) {
+                Group {
+                    if let url = previewImageURL {
+                        CachedAsyncImage(urlString: url)
+                            .frame(height: 180)
+                            .clipped()
+                        Color.black.opacity(0.4)
+                            .frame(height: 180)
+                    } else {
+                        LinearGradient(colors: [Color.black, Color.gray.opacity(0.3)], startPoint: .top, endPoint: .bottom)
+                            .frame(height: 180)
+                    }
+                }
+                .frame(height: 180)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+                subtitlePreviewText
+                    .padding(.bottom, 16)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private var subtitlePreviewText: some View {
+        let resolvedStrokeWidth: Double = (subtitleStrokeColor == "none") ? 0 : subtitleStrokeWidth
+        return Text("The journey of a thousand miles begins with a single step.")
+            .font(.system(size: CGFloat(subtitleFontSize),
+                          weight: subtitleBoldText ? .bold : .regular))
+            .foregroundStyle(color(fromName: subtitleTextColor))
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(
+                Group {
+                    if subtitleBackgroundEnabled {
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(Color.black.opacity(0.6))
+                    } else {
+                        Color.clear
+                    }
+                }
+            )
+            .applySubtitleStroke(color: color(fromName: subtitleStrokeColor),
+                                 width: resolvedStrokeWidth)
+    }
+
+    // MARK: - Appearance Controls Card
+
+    private var appearanceControlsCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Label("Appearance", systemImage: "textformat")
+                .font(.headline)
+
+            Picker("Text Color", selection: $subtitleTextColor) {
+                ForEach(textColorOptions, id: \.self) { Text($0.capitalized).tag($0) }
+            }
+            .tint(.appAccent)
+
+            Picker("Stroke Color", selection: $subtitleStrokeColor) {
+                ForEach(strokeColorOptions, id: \.self) { Text($0.capitalized).tag($0) }
+            }
+            .tint(.appAccent)
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("Stroke Width")
+                    Spacer()
+                    Text(String(format: "%.1f", subtitleStrokeWidth))
+                        .foregroundStyle(.secondary)
+                }
+                Slider(value: $subtitleStrokeWidth, in: 0...4, step: 0.5)
+                    .tint(.appAccent)
+                    .disabled(subtitleStrokeColor == "none")
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("Font Size")
+                    Spacer()
+                    Text("\(Int(subtitleFontSize))pt")
+                        .foregroundStyle(.secondary)
+                }
+                Slider(value: $subtitleFontSize, in: 12...48, step: 1)
+                    .tint(.appAccent)
+            }
+
+            Toggle("Background", isOn: $subtitleBackgroundEnabled)
+                .tint(.appAccent)
+            Toggle("Bold Text", isOn: $subtitleBoldText)
+                .tint(.appAccent)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    // MARK: - Color Helpers
+
+    private func color(fromName name: String) -> Color {
+        switch name.lowercased() {
+        case "white":  return .white
+        case "black":  return .black
+        case "yellow": return .yellow
+        case "cyan":   return .cyan
+        case "pink":   return .pink
+        case "green":  return .green
+        case "gray":   return .gray
+        case "none":   return .clear
+        default:       return .white
+        }
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func applySubtitleStroke(color: Color, width: Double) -> some View {
+        if width <= 0 || color == .clear {
+            self
+        } else {
+            let w = CGFloat(width)
+            self
+                .shadow(color: color, radius: 0, x: -w, y:  0)
+                .shadow(color: color, radius: 0, x:  w, y:  0)
+                .shadow(color: color, radius: 0, x:  0, y: -w)
+                .shadow(color: color, radius: 0, x:  0, y:  w)
+                .shadow(color: color, radius: 0, x: -w, y: -w)
+                .shadow(color: color, radius: 0, x:  w, y: -w)
+                .shadow(color: color, radius: 0, x: -w, y:  w)
+                .shadow(color: color, radius: 0, x:  w, y:  w)
+        }
+    }
 }
 
 // MARK: - About Settings Page

@@ -599,7 +599,11 @@
 		FCE3980671F64CF38B707BFA /* LocalPlaybackCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E548862288E04B9EA60BBCF3 /* LocalPlaybackCoordinator.swift */; };
 		FE62CB6A1976842B35891D6B /* LibraryWriteSink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CF6D00FF0F0489890FAF52D /* LibraryWriteSink.swift */; };
 		F6E5D4C3B2A1F6E5D4C3B2A1 /* ScheduleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A1B2C3D4E5F6 /* ScheduleView.swift */; };
-		F7E5D4C3B2A1F7E5D4C3B2A1 /* NotificationsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F7A1B2C3D4E5F7 /* NotificationsPage.swift */; };
+		F7E5D4C3B2A1F7E5D4C3B2A1 /* NotificationsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F7A1B2C3D4E5F7 /* NotificationsPage.swift */; };		F5A6B7C8D9E10000000000A2 /* AnimatedSplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5A6B7C8D9E10000000000A1 /* AnimatedSplashView.swift */; };
+		F5A6B7C8D9E10000000000A3 /* AnimatedSplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5A6B7C8D9E10000000000A1 /* AnimatedSplashView.swift */; };
+		F5A6B7C8D9E10000000000A4 /* AnimatedSplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5A6B7C8D9E10000000000A1 /* AnimatedSplashView.swift */; };
+		F5A6B7C8D9E10000000000A5 /* AnimatedSplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5A6B7C8D9E10000000000A1 /* AnimatedSplashView.swift */; };
+
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -839,7 +843,8 @@
 		F5167EDD4F7D833A5721B0FB /* ProfileCacheStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProfileCacheStoreTests.swift; sourceTree = "<group>"; };
 		F6AB4FB215071F688F19B394 /* JellyfinConnectView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JellyfinConnectView.swift; sourceTree = "<group>"; };
 		FB32994B31FB72D2DAA8327A /* NSFWContentFilter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NSFWContentFilter.swift; sourceTree = "<group>"; };
-		FF4C00BAA407FF400B069044 /* JellyfinEntryView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JellyfinEntryView.swift; sourceTree = "<group>"; };
+		FF4C00BAA407FF400B069044 /* JellyfinEntryView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JellyfinEntryView.swift; sourceTree = "<group>"; };		F5A6B7C8D9E10000000000A1 /* AnimatedSplashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimatedSplashView.swift; sourceTree = "<group>"; };
+
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1093,6 +1098,7 @@
 			isa = PBXGroup;
 			children = (
 				1251C4582FCAE1AA002AD0B2 /* LegalWebView.swift */,
+				F5A6B7C8D9E10000000000A1 /* AnimatedSplashView.swift */,
 				1279E4CC2FCA397700C9BA56 /* CachedAsyncImage.swift */,
 				21201D48C8E94395977F4564 /* ScoreInputView.swift */,
 				1279E4CD2FCA397700C9BA56 /* CloudflareBypassSheetView.swift */,
@@ -1431,7 +1437,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
+								F5A6B7C8D9E10000000000A4 /* AnimatedSplashView.swift in Sources */,
+B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
 				D1A2B3C4E5F60718293A4B5C /* SeasonChainMathTests.swift in Sources */,
 				D1A2B3C4E5F60718293A4B60 /* EpisodeNavigatorTests.swift in Sources */,
 				D1A2B3C4E5F60718293A4B64 /* ContinueWatchingSeasonMatchTests.swift in Sources */,
@@ -1468,7 +1475,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				121D9B462FCA5603000FF9B4 /* EpisodeLink.swift in Sources */,
+								F5A6B7C8D9E10000000000A2 /* AnimatedSplashView.swift in Sources */,
+121D9B462FCA5603000FF9B4 /* EpisodeLink.swift in Sources */,
 				121D9B5A2FCA5612000FF9B4 /* CastProxyServer.swift in Sources */,
 				BAEE9A1A2FCB000000000002 /* BackgroundKeepAlive.swift in Sources */,
 				121D9B5B2FCA5612000FF9B4 /* CacheManager.swift in Sources */,
@@ -1657,7 +1665,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2FFDB0F7AE21B9B527B83D18 /* ShiroxApp.swift in Sources */,
+								F5A6B7C8D9E10000000000A5 /* AnimatedSplashView.swift in Sources */,
+2FFDB0F7AE21B9B527B83D18 /* ShiroxApp.swift in Sources */,
 				1279E4E82FCA397700C9BA56 /* PlayerPresenter.swift in Sources */,
 				1279E4E92FCA397700C9BA56 /* DownloadManager.swift in Sources */,
 				AA01000000000000000003AA /* DownloadedMediaSnapshot.swift in Sources */,
@@ -1845,7 +1854,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				3A42CE0D50F5B4711F556C97 /* ShiroxApp.swift in Sources */,
+								F5A6B7C8D9E10000000000A3 /* AnimatedSplashView.swift in Sources */,
+3A42CE0D50F5B4711F556C97 /* ShiroxApp.swift in Sources */,
 				1279E5612FCA397700C9BA56 /* PlayerPresenter.swift in Sources */,
 				1279E5622FCA397700C9BA56 /* DownloadManager.swift in Sources */,
 				AA01000000000000000004AA /* DownloadedMediaSnapshot.swift in Sources */,

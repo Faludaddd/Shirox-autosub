@@ -41,9 +41,6 @@ struct HomeView: View {
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 24) {
-                            if !vm.trending.isEmpty {
-                                FeaturedCarousel(items: vm.trending)
-                            }
                             #if os(iOS)
                             if !continueWatching.items.isEmpty {
                                 ContinueWatchingSection(items: continueWatching.items, navTarget: $cwNavTarget)
@@ -53,11 +50,20 @@ struct HomeView: View {
                             }
                             #endif
                             if !vm.trending.isEmpty {
+                                FeaturedCarousel(items: vm.trending)
+                            }
+                            Text("Discover")
+                                .font(.title3.weight(.bold))
+                                .padding(.horizontal, 16)
+                            if !vm.trending.isEmpty {
                                 AnimeSection(title: "Trending Now",     items: vm.trending, category: .trending)
                             }
                             if !vm.seasonal.isEmpty {
                                 AnimeSection(title: "This Season",      items: vm.seasonal, category: .seasonal)
                             }
+                            Text("Browse")
+                                .font(.title3.weight(.bold))
+                                .padding(.horizontal, 16)
                             if !vm.popular.isEmpty {
                                 AnimeSection(title: "All-Time Popular", items: vm.popular,  category: .popular)
                             }
@@ -166,7 +172,7 @@ private struct FeaturedCarousel: View {
         let effectiveWidth = containerWidth > 0 ? containerWidth : UIScreen.main.bounds.width
         let imageHeight: CGFloat = isIPad
             ? effectiveWidth * (9.0 / 16.0)
-            : UIScreen.main.bounds.height - 140
+            : UIScreen.main.bounds.height * 0.6
 
         let displayItems = realItems
         let currentMedia = displayItems.isEmpty ? items[0] : displayItems[currentIndex]

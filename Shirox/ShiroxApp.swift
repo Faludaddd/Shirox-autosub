@@ -133,6 +133,10 @@ extension Color {
         return .primary
         #endif
     }
+
+    static var glowIntensity: Double {
+        UserDefaults.standard.object(forKey: "glowIntensity") as? Double ?? 0.5
+    }
 }
 
 @main
@@ -146,6 +150,7 @@ struct ShiroxApp: App {
     // Appearance settings — applied globally via .preferredColorScheme and .tint
     @AppStorage("appearanceMode") private var appearanceMode = "system"
     @AppStorage("accentColorHex") private var accentColorHex = ""
+    @State private var showSplash = true
 
     /// Resolves the appearance mode to a ColorScheme (nil = follow system).
     private var colorScheme: ColorScheme? {
@@ -189,8 +194,18 @@ struct ShiroxApp: App {
         WindowGroup {
             RootTabView()
                 .environmentObject(moduleManager)
-                .tint(accentColor)
+                .tint(Color.gray)
                 .preferredColorScheme(colorScheme)
+                .overlay {
+                    if showSplash {
+                        AnimatedSplashView()
+                            .transition(.opacity)
+                    }
+                }
+                .task {
+                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                    withAnimation(.easeInOut(duration: 0.4)) { showSplash = false }
+                }
                 .onChange(of: scenePhase) { phase in
                     if phase == .active { Task { await PendingWriteQueue.shared.flush() } }
                 }
