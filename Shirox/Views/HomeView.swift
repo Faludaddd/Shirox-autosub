@@ -112,7 +112,7 @@ struct HomeView: View {
                                         title: "Top Rated",
                                         count: vm.topRated.count,
                                         iconName: "trophy.fill",
-                                        gradientColors: [.amber, .yellow],
+                                        gradientColors: [.orange, .yellow],
                                         imageURL: vm.topRated.first?.coverImage.best
                                     )
                                 }
