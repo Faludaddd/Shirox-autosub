@@ -711,128 +711,653 @@ private struct HomePressStyle: ButtonStyle {
     }
 }
 
+// MARK: - Schedule Settings (persisted)
+
+/// Persisted schedule preferences, read by `ScheduleView` (defaults) and edited by
+/// `ScheduleSettingsPage`. Stored in `UserDefaults` so `@AppStorage` can observe them.
+enum ScheduleSettings {
+    private static let windowDaysKey    = "scheduleWindowDays"
+    private static let defaultModeKey   = "scheduleDefaultMode"
+    private static let defaultUseUTCKey = "scheduleDefaultUseUTC"
+
+    /// Look-ahead window in days (7/14/21/30). Defaults to 7.
+    static var windowDays: Int {
+        let stored = UserDefaults.standard.object(forKey: windowDaysKey) as? Int ?? 7
+        return [7, 14, 21, 30].contains(stored) ? stored : 7
+    }
+
+    /// Default content mode (anime / western / combined). Defaults to anime.
+    static var defaultMode: ScheduleMode {
+        let raw = UserDefaults.standard.string(forKey: defaultModeKey) ?? ScheduleMode.anime.rawValue
+        return ScheduleMode(rawValue: raw) ?? .anime
+    }
+
+    /// Default timezone toggle — `true` to show times in UTC. Defaults to local.
+    static var defaultUseUTC: Bool {
+        // `bool(forKey:)` returns `false` when the key is missing, which matches our default.
+        UserDefaults.standard.bool(forKey: defaultUseUTCKey)
+    }
+
+    static func setWindowDays(_ days: Int) {
+        let clamped = [7, 14, 21, 30].contains(days) ? days : 7
+        UserDefaults.standard.set(clamped, forKey: windowDaysKey)
+    }
+    static func setDefaultMode(_ mode: ScheduleMode) {
+        UserDefaults.standard.set(mode.rawValue, forKey: defaultModeKey)
+    }
+    static func setDefaultUseUTC(_ flag: Bool) {
+        UserDefaults.standard.set(flag, forKey: defaultUseUTCKey)
+    }
+}
+
 // MARK: - Schedule View
 
 /// Schedule page — opened via the calendar icon in HomeView's toolbar.
-/// Pushed within the navigation stack (not a tab). Shows airing schedules.
+///
+/// Shows anime (AniList) and/or Western TV (TVMaze) episode schedules grouped by day,
+/// with controls for content source (Anime / Western / Combined), timezone (Local / UTC),
+/// and a look-ahead window (set in `ScheduleSettingsPage`). Each entry shows a card with
+/// poster, badges, countdown, air-time capsule, and a notification bell.
 struct ScheduleView: View {
-    @State private var todayItems: [AniListAiringScheduleItem] = []
-    @State private var weekItems: [AniListAiringScheduleItem] = []
-    @State private var upcomingItems: [Media] = []
+    @State private var entries: [UnifiedScheduleEntry] = []
     @State private var isLoading = false
-    @State private var error: String?
+    @State private var loadError: String?
+
+    // User-facing controls. `mode` and `useUTC` are seeded from persisted defaults on first
+    // appearance; the user can override them via the segmented pickers without changing the
+    // default. `windowDays` is bound to `@AppStorage` so changes from `ScheduleSettingsPage`
+    // propagate live.
+    @AppStorage("scheduleWindowDays")    private var windowDays: Int = 7
+    @State private var mode:   ScheduleMode = ScheduleSettings.defaultMode
+    @State private var useUTC: Bool         = ScheduleSettings.defaultUseUTC
+
+    // Day strip selection (index into `buildBuckets()`).
+    @State private var selectedDayIndex: Int = 0
+
+    // Pending episode-notification schedule ids — drives the bell's on/off state.
+    @State private var scheduledIds: Set<Int> = []
+
+    // Drives push navigation to the AniList detail view from context menus.
+    // `navigationDestinationCompat` honors this on iOS (NavigationView shim), macOS, and tvOS.
+    @State private var detailMediaId: Int?
 
     var body: some View {
         Group {
-            if isLoading && todayItems.isEmpty && weekItems.isEmpty && upcomingItems.isEmpty {
+            if isLoading && entries.isEmpty {
                 scheduleLoadingView
-            } else if let error = error, todayItems.isEmpty {
-                ContentUnavailableView("Couldn't Load", systemImage: "wifi.slash", description: Text(error))
-                    .toolbar { ToolbarItem(placement: .primaryAction) { Button("Retry") { Task { await load() } } } }
+            } else if let loadError = loadError, entries.isEmpty {
+                ContentUnavailableView(
+                    "Couldn't Load",
+                    systemImage: "wifi.slash",
+                    description: Text(loadError)
+                )
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Retry") { Task { await load() } }
+                    }
+                }
+            } else if entries.isEmpty {
+                ContentUnavailableView(
+                    "Nothing Airing",
+                    systemImage: "calendar.badge.exclamationmark",
+                    description: Text("No episodes in the next \(windowDays) day\(windowDays == 1 ? "" : "s") for this mode.")
+                )
             } else {
-                scheduleList
+                scheduleContent
             }
         }
         .navigationTitle("Schedule")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
-        .task { await load() }
-        .refreshable { await load() }
-    }
-
-    @ViewBuilder
-    private var scheduleList: some View {
-        List {
-            if !todayItems.isEmpty {
-                Section("Today") {
-                    ForEach(todayItems) { item in ScheduleRow(item: item) }
-                }
-            }
-            if !weekItems.isEmpty {
-                Section("This Week") {
-                    ForEach(weekItems) { item in ScheduleRow(item: item) }
-                }
-            }
-            if !upcomingItems.isEmpty {
-                Section("Upcoming") {
-                    ForEach(upcomingItems) { media in
-                        NavigationLink { AniListDetailView(mediaId: media.id, preloadedMedia: media) } label: { UpcomingRow(media: media) }
-                    }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                NavigationLink {
+                    ScheduleSettingsPage()
+                } label: {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(.primary)
                 }
             }
         }
-        #if os(iOS)
-        .listStyle(.insetGrouped)
-        #endif
+        // Hidden NavigationLink that performs the push when `detailMediaId` is set
+        // (used by the "View Details" context-menu action — context menus can't host a
+        // NavigationLink themselves).
+        .navigationDestinationCompat(item: $detailMediaId) { mediaId in
+            AniListDetailView(mediaId: mediaId, preloadedMedia: nil)
+        }
+        .task { await load() }
+        .refreshable { await load() }
+        .onChange(of: mode) { _, _ in Task { await load() } }
+        .onChange(of: windowDays) { _, _ in Task { await load() } }
+        .onChange(of: useUTC) { _, _ in selectedDayIndex = 0 }
+    }
+
+    // MARK: - Content
+
+    @ViewBuilder
+    private var scheduleContent: some View {
+        let buckets = buildBuckets()
+        let safeIndex = min(max(selectedDayIndex, 0), max(buckets.count - 1, 0))
+
+        VStack(spacing: 0) {
+            // Controls
+            VStack(spacing: 10) {
+                Picker("Content", selection: $mode) {
+                    ForEach(ScheduleMode.allCases, id: \.self) { m in
+                        Text(m.displayName).tag(m)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Picker("Timezone", selection: $useUTC) {
+                    Text("Local").tag(false)
+                    Text("UTC").tag(true)
+                }
+                .pickerStyle(.segmented)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 6)
+            .padding(.bottom, 8)
+
+            // Day strip with item counts
+            if !buckets.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(buckets.indices, id: \.self) { index in
+                            dayStripTab(bucket: buckets[index], index: index, isSelected: index == safeIndex)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                }
+                .padding(.bottom, 8)
+            }
+
+            // Selected day entries
+            if safeIndex < buckets.count {
+                ScrollView {
+                    LazyVStack(spacing: 12) {
+                        ForEach(buckets[safeIndex].entries) { entry in
+                            ScheduleCard(
+                                entry: entry,
+                                useUTC: useUTC,
+                                isNotificationOn: scheduledIds.contains(entry.id),
+                                onToggleNotification: { toggleNotification(for: entry) },
+                                onAddToPlanning:     { addToLibrary(entry, status: .planning) },
+                                onAddToWatching:     { addToLibrary(entry, status: .current) },
+                                onViewDetails:       { openDetails(for: entry) }
+                            )
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
+                    .padding(.bottom, 24)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func dayStripTab(bucket: ScheduleDayBucket, index: Int, isSelected: Bool) -> some View {
+        Button {
+            withAnimation(.easeOut(duration: 0.18)) {
+                selectedDayIndex = index
+            }
+        } label: {
+            VStack(spacing: 2) {
+                Text(bucket.shortTitle)
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                Text("\(bucket.entries.count)")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                isSelected ? Color.primary.opacity(0.12) : Color.secondary.opacity(0.08),
+                in: Capsule()
+            )
+            .overlay(
+                Capsule().strokeBorder(
+                    isSelected ? Color.primary.opacity(0.35) : .clear,
+                    lineWidth: 1
+                )
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     private var scheduleLoadingView: some View {
         VStack(spacing: 16) {
-            ForEach(0..<5, id: \.self) { _ in
+            ForEach(0..<6, id: \.self) { _ in
                 HStack(spacing: 12) {
-                    RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.15)).frame(width: 50, height: 70)
-                    VStack(alignment: .leading, spacing: 6) {
-                        RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.15)).frame(height: 14)
-                        RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.15)).frame(width: 120, height: 10)
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.secondary.opacity(0.15))
+                        .frame(width: 56, height: 80)
+                    VStack(alignment: .leading, spacing: 8) {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.secondary.opacity(0.15))
+                            .frame(height: 14)
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.secondary.opacity(0.15))
+                            .frame(width: 140, height: 10)
+                        HStack(spacing: 6) {
+                            Capsule().fill(Color.secondary.opacity(0.15)).frame(width: 50, height: 18)
+                            Capsule().fill(Color.secondary.opacity(0.15)).frame(width: 36, height: 18)
+                            Capsule().fill(Color.secondary.opacity(0.15)).frame(width: 60, height: 18)
+                        }
                     }
                     Spacer()
                 }
             }
             Spacer()
         }
-        .padding(.horizontal, 16).padding(.top, 16)
+        .padding(.horizontal, 16)
+        .padding(.top, 16)
     }
 
+    // MARK: - Loading
+
+    /// Fetches schedule entries from the source(s) selected by `mode`, starting at the
+    /// beginning of today (not the current moment) so episodes that aired earlier today
+    /// stay visible. Combined mode fetches both sources concurrently via `async let`.
     private func load() async {
-        isLoading = true; error = nil
+        isLoading = true
+        loadError = nil
+        defer { isLoading = false }
+
+        let calendar = Calendar.current
+        let startOfToday = calendar.startOfDay(for: Date())
+        let startTs = Int(startOfToday.timeIntervalSince1970)
+        let endTs = startTs + max(windowDays, 1) * 86_400
+
+        var fetched: [UnifiedScheduleEntry] = []
         do {
-            async let today = AniListService.shared.airingToday()
-            async let week = AniListService.shared.airingThisWeek()
-            async let upcoming = AniListService.shared.upcoming()
-            let (t, w, u) = try await (today, week, upcoming)
-            todayItems = t
-            weekItems = w.filter { item in !todayItems.contains { $0.media.id == item.media.id && $0.episode == item.episode } }
-            upcomingItems = u.map { AniListProvider.shared.mapMedia($0) }
-        } catch { self.error = error.localizedDescription }
-        isLoading = false
-    }
-}
+            switch mode {
+            case .anime:
+                let items = try await AniListService.shared.airingSchedules(from: startTs, to: endTs)
+                fetched = items.map { UnifiedScheduleEntry(item: $0) }
 
-private struct ScheduleRow: View {
-    let item: AniListAiringScheduleItem
-    var body: some View {
-        NavigationLink { AniListDetailView(mediaId: item.media.id, preloadedMedia: AniListProvider.shared.mapMedia(item.media)) } label: {
-            HStack(spacing: 12) {
-                CachedAsyncImage(urlString: item.media.coverImage.best ?? "").frame(width: 50, height: 70).clipShape(RoundedRectangle(cornerRadius: 8))
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(item.media.title.displayTitle).font(.subheadline.weight(.semibold)).lineLimit(1)
-                    HStack(spacing: 6) {
-                        Text("EP \(item.episode)").font(.caption2.weight(.medium)).padding(.horizontal, 6).padding(.vertical, 2).background(Color.secondary.opacity(0.15), in: Capsule())
-                        if !item.countdownDisplay.isEmpty { Text(item.countdownDisplay).font(.caption2).foregroundStyle(.secondary) }
+            case .western:
+                let items = try await WesternScheduleService.shared.fetchSchedule(dayCount: windowDays)
+                fetched = items.compactMap { entry -> UnifiedScheduleEntry? in
+                    // Drop Western entries without an air timestamp — they can't be bucketed.
+                    guard entry.airTimestamp != nil else { return nil }
+                    return UnifiedScheduleEntry(entry: entry)
+                }
+
+            case .combined:
+                // Fan out both fetches concurrently; await them together.
+                async let animeFetch   = try await AniListService.shared.airingSchedules(from: startTs, to: endTs)
+                async let westernFetch = try await WesternScheduleService.shared.fetchSchedule(dayCount: windowDays)
+                let (animeItems, westernItems) = try await (animeFetch, westernFetch)
+                fetched = animeItems.map { UnifiedScheduleEntry(item: $0) }
+                    + westernItems.compactMap { entry -> UnifiedScheduleEntry? in
+                        guard entry.airTimestamp != nil else { return nil }
+                        return UnifiedScheduleEntry(entry: entry)
                     }
-                    if !item.airDateDisplay.isEmpty { Text(item.airDateDisplay).font(.caption2).foregroundStyle(.secondary) }
-                }
-                Spacer()
             }
-        }.buttonStyle(.plain)
+
+            // Defensive filter: drop anything that fell before the start of today.
+            fetched = fetched.filter { $0.airingAt >= startTs }
+            entries = fetched.sorted { $0.airingAt < $1.airingAt }
+
+            // Reset to the first (earliest) day after every reload.
+            selectedDayIndex = 0
+
+            // Refresh the pending-notification set so the bells reflect current state.
+            scheduledIds = await EpisodeNotificationManager.shared.scheduledScheduleIds()
+        } catch {
+            loadError = error.localizedDescription
+        }
+    }
+
+    // MARK: - Day bucketing (timezone-aware)
+
+    /// Groups entries into day buckets using either the local calendar or a UTC calendar,
+    /// depending on the timezone toggle. This bypasses `ScheduleDayBucket.build` (which is
+    /// hard-wired to `Calendar.current`) so the day boundaries match the displayed times.
+    private func buildBuckets() -> [ScheduleDayBucket] {
+        let calendar = useUTC ? Self.utcCalendar : Calendar.current
+        var grouped: [Date: [UnifiedScheduleEntry]] = [:]
+        for entry in entries {
+            let airDate = Date(timeIntervalSince1970: TimeInterval(entry.airingAt))
+            let dayStart = calendar.startOfDay(for: airDate)
+            grouped[dayStart, default: []].append(entry)
+        }
+        return grouped.keys.sorted().map { day in
+            let dayEntries = grouped[day] ?? []
+            let sorted = dayEntries.sorted { $0.airingAt < $1.airingAt }
+            return ScheduleDayBucket(date: day, entries: sorted)
+        }
+    }
+
+    private static var utcCalendar: Calendar {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC") ?? .current
+        return cal
+    }
+
+    // MARK: - Bell (notifications)
+
+    /// Toggles the episode-airing notification for `entry` on or off via
+    /// `EpisodeNotificationManager`. Scheduling requires notification authorization; if
+    /// the user hasn't granted it, we prompt and bail out on denial.
+    private func toggleNotification(for entry: UnifiedScheduleEntry) {
+        if scheduledIds.contains(entry.id) {
+            EpisodeNotificationManager.shared.cancel(scheduleId: entry.id)
+            scheduledIds.remove(entry.id)
+            ToastManager.shared.show(message: "Notification cancelled", type: .info)
+            return
+        }
+        Task {
+            let granted = await EpisodeNotificationManager.shared.requestAuthorization()
+            guard granted else {
+                ToastManager.shared.show(
+                    message: "Enable notifications in Settings to receive episode alerts",
+                    type: .warning
+                )
+                return
+            }
+            // For Western entries there's no AniList media id; pass 0 so a tap won't try to
+            // deep-link into a non-existent detail page. The notification still fires normally.
+            let mediaId = entry.aniListMediaId ?? 0
+            let success = await EpisodeNotificationManager.shared.schedule(
+                scheduleId: entry.id,
+                mediaId: mediaId,
+                title: entry.title,
+                episode: entry.episode,
+                airingAt: entry.airingAt
+            )
+            if success {
+                scheduledIds.insert(entry.id)
+                ToastManager.shared.show(message: "Notification scheduled", type: .success)
+            } else {
+                ToastManager.shared.show(
+                    message: "Could not schedule — episode may have already aired",
+                    type: .warning
+                )
+            }
+        }
+    }
+
+    // MARK: - Library actions
+
+    /// Adds `entry` to the user's AniList library under the given status (Planning or Watching).
+    /// Only anime entries (which carry an AniList media id) can be tracked this way.
+    private func addToLibrary(_ entry: UnifiedScheduleEntry, status: MediaListStatus) {
+        guard let mediaId = entry.aniListMediaId else {
+            ToastManager.shared.show(
+                message: "Western shows can't be tracked here — add them on AniList first",
+                type: .info
+            )
+            return
+        }
+        Task {
+            do {
+                try await AniListLibraryService.shared.updateEntry(
+                    mediaId: mediaId,
+                    status: status,
+                    progress: 0
+                )
+                ToastManager.shared.show(
+                    message: "Added to \(status.displayName)",
+                    type: .success
+                )
+            } catch {
+                ToastManager.shared.show(
+                    message: "Failed: \(error.localizedDescription)",
+                    type: .error
+                )
+            }
+        }
+    }
+
+    // MARK: - Detail navigation
+
+    /// Sets `detailMediaId` so `navigationDestinationCompat` pushes the AniList detail view.
+    /// Only anime entries have an AniList detail page to push to.
+    private func openDetails(for entry: UnifiedScheduleEntry) {
+        guard let mediaId = entry.aniListMediaId else {
+            ToastManager.shared.show(
+                message: "Western shows don't have an AniList detail page",
+                type: .info
+            )
+            return
+        }
+        detailMediaId = mediaId
     }
 }
 
-private struct UpcomingRow: View {
-    let media: Media
+// MARK: - Schedule Card
+
+/// One row in the schedule list. Shows poster, title, EP badge, colored format badge,
+/// source badge, countdown, air-time capsule, and a notification bell. Long-press for a
+/// context menu with library actions and "View Details".
+private struct ScheduleCard: View {
+    let entry: UnifiedScheduleEntry
+    let useUTC: Bool
+    let isNotificationOn: Bool
+    let onToggleNotification: () -> Void
+    let onAddToPlanning: () -> Void
+    let onAddToWatching: () -> Void
+    let onViewDetails: () -> Void
+
+    private var timeZone: TimeZone {
+        useUTC ? (TimeZone(identifier: "UTC") ?? .current) : .current
+    }
+
+    /// Compact "Apr 15, 3:00 PM" capsule, formatted in the selected timezone.
+    private var airTimeCapsule: String {
+        let date = Date(timeIntervalSince1970: TimeInterval(entry.airingAt))
+        let formatter = DateFormatter()
+        formatter.timeZone = timeZone
+        formatter.dateFormat = "MMM d, h:mm a"
+        return formatter.string(from: date)
+    }
+
+    /// Color for the format badge. Avoids blue/indigo (per app style guide).
+    private var formatBadgeColor: Color {
+        switch (entry.format ?? "").uppercased() {
+        case "TV":      return .green
+        case "MOVIE":   return .pink
+        case "OVA":     return .orange
+        case "ONA":     return .teal
+        case "SPECIAL": return .yellow
+        case "MUSIC":   return .gray
+        default:        return .gray
+        }
+    }
+
+    private var sourceBadgeColor: Color {
+        entry.source == .anime ? .purple : .cyan
+    }
+
     var body: some View {
-        HStack(spacing: 12) {
-            CachedAsyncImage(urlString: media.coverImage.best ?? "").frame(width: 50, height: 70).clipShape(RoundedRectangle(cornerRadius: 8))
-            VStack(alignment: .leading, spacing: 3) {
-                Text(media.title.displayTitle).font(.subheadline.weight(.semibold)).lineLimit(1)
+        HStack(alignment: .top, spacing: 12) {
+            // Poster
+            CachedAsyncImage(urlString: entry.coverImage ?? "")
+                .frame(width: 56, height: 80)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .background(
+                    RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.1))
+                )
+
+            // Title + badges + countdown + time capsule
+            VStack(alignment: .leading, spacing: 6) {
+                Text(entry.title)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(2)
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                // Badges — all `.fixedSize()` so they sit on one row instead of stacking.
                 HStack(spacing: 6) {
-                    if let season = media.season, let year = media.seasonYear { Text("\(season.capitalized) \(year)").font(.caption2).foregroundStyle(.secondary) }
-                    if let status = media.statusDisplay { Text("• \(status)").font(.caption2).foregroundStyle(.secondary) }
+                    Text(entry.episodeBadge)
+                        .font(.caption2.weight(.semibold))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.secondary.opacity(0.18), in: Capsule())
+                        .fixedSize()
+
+                    if let format = entry.format, !format.isEmpty {
+                        Text(format)
+                            .font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(formatBadgeColor.opacity(0.22), in: Capsule())
+                            .foregroundStyle(formatBadgeColor)
+                            .fixedSize()
+                    }
+
+                    Text(entry.source == .anime ? "Anime" : "Western")
+                        .font(.caption2.weight(.semibold))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(sourceBadgeColor.opacity(0.18), in: Capsule())
+                        .foregroundStyle(sourceBadgeColor)
+                        .fixedSize()
+
+                    if entry.isStreamingRelease {
+                        Label("Stream", systemImage: "play.tv.fill")
+                            .labelStyle(.titleAndIcon)
+                            .font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.orange.opacity(0.18), in: Capsule())
+                            .foregroundStyle(.orange)
+                            .fixedSize()
+                    }
+                }
+
+                // Countdown + time capsule
+                HStack(spacing: 8) {
+                    Text(entry.countdownDisplay)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .fixedSize()
+
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock.fill")
+                            .font(.system(size: 9, weight: .semibold))
+                        Text(airTimeCapsule)
+                            .font(.caption2.weight(.medium))
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .foregroundStyle(.secondary)
+                    .fixedSize()
                 }
             }
-            Spacer()
-        }.buttonStyle(.plain)
+
+            Spacer(minLength: 4)
+
+            // Notification bell
+            Button(action: onToggleNotification) {
+                Image(systemName: isNotificationOn ? "bell.badge.fill" : "bell.fill")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(isNotificationOn ? Color.yellow : .secondary)
+                    .frame(width: 32, height: 32)
+                    .background(
+                        Circle().fill(
+                            isNotificationOn ? Color.yellow.opacity(0.18) : Color.secondary.opacity(0.1)
+                        )
+                    )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(isNotificationOn ? "Cancel notification" : "Schedule notification")
+        }
+        .padding(12)
+        .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5)
+        )
+        .contextMenu {
+            Button {
+                onAddToPlanning()
+            } label: {
+                Label("Add to Planning", systemImage: "calendar.badge.plus")
+            }
+            Button {
+                onAddToWatching()
+            } label: {
+                Label("Add to Watching", systemImage: "play.circle")
+            }
+            Button {
+                onViewDetails()
+            } label: {
+                Label("View Details", systemImage: "info.circle")
+            }
+        }
+    }
+}
+
+// MARK: - Schedule Settings Page
+
+/// Settings page for the schedule — pushed from the gear icon in `ScheduleView`'s toolbar.
+/// Edits the persisted defaults: look-ahead window (7/14/21/30 days), default content mode,
+/// and default timezone (Local / UTC).
+struct ScheduleSettingsPage: View {
+    @State private var windowDays: Int        = ScheduleSettings.windowDays
+    @State private var defaultMode: ScheduleMode = ScheduleSettings.defaultMode
+    @State private var defaultUseUTC: Bool    = ScheduleSettings.defaultUseUTC
+
+    var body: some View {
+        Form {
+            Section {
+                Picker("Window Range", selection: $windowDays) {
+                    Text("7 days").tag(7)
+                    Text("14 days").tag(14)
+                    Text("21 days").tag(21)
+                    Text("30 days").tag(30)
+                }
+                .onChange(of: windowDays) { _, value in
+                    ScheduleSettings.setWindowDays(value)
+                }
+            } header: {
+                Text("Window Range")
+            } footer: {
+                Text("How many days ahead to fetch and display in the schedule. Western TV data is limited to roughly 14 days; anime covers the full window.")
+            }
+
+            Section {
+                Picker("Default Content", selection: $defaultMode) {
+                    ForEach(ScheduleMode.allCases, id: \.self) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
+                }
+                .onChange(of: defaultMode) { _, value in
+                    ScheduleSettings.setDefaultMode(value)
+                }
+            } header: {
+                Text("Content Mode")
+            } footer: {
+                Text("Which source to show by default when opening the schedule.")
+            }
+
+            Section {
+                Picker("Default Timezone", selection: $defaultUseUTC) {
+                    Text("Local").tag(false)
+                    Text("UTC").tag(true)
+                }
+                .onChange(of: defaultUseUTC) { _, value in
+                    ScheduleSettings.setDefaultUseUTC(value)
+                }
+            } header: {
+                Text("Timezone")
+            } footer: {
+                Text("Whether air times are shown in your local timezone or UTC by default.")
+            }
+        }
+        .navigationTitle("Schedule Settings")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
     }
 }
 

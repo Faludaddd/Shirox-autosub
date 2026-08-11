@@ -366,9 +366,22 @@ final class AniListService {
     }
 
     /// Fetches airing schedules in a time range. Returns one entry per episode airing.
-    private func airingSchedules(from: Int, to: Int) async throws -> [AniListAiringScheduleItem] {
+    ///
+    /// AniList's `Page` only returns up to `perPage` results per request (here 50), so we
+    /// paginate through all available pages up to a safety cap of 20 (1000 entries). A short
+    /// delay is inserted between requests to stay within AniList's rate limits. This matters
+    /// because long-running series (e.g. *Bleach: Thousand-Year Blood War*) frequently land
+    /// beyond the first page and would otherwise be missing from "airing today/this week".
+    func airingSchedules(from: Int, to: Int) async throws -> [AniListAiringScheduleItem] {
         struct AiringPage: Decodable { let Page: AiringSchedulePage }
-        struct AiringSchedulePage: Decodable { let airingSchedules: [AiringScheduleData]? }
+        struct AiringSchedulePage: Decodable {
+            let airingSchedules: [AiringScheduleData]?
+            let pageInfo: PageInfo?
+        }
+        struct PageInfo: Decodable {
+            let currentPage: Int?
+            let hasNextPage: Bool?
+        }
         struct AiringScheduleData: Decodable {
             let id: Int
             let episode: Int
@@ -377,8 +390,9 @@ final class AniListService {
         }
 
         let query = """
-        query ($airingGreater: Int, $airingLess: Int) {
-          Page(page: 1, perPage: 50) {
+        query ($airingGreater: Int, $airingLess: Int, $page: Int) {
+          Page(page: $page, perPage: 50) {
+            pageInfo { currentPage hasNextPage }
             airingSchedules(airingAt_greater: $airingGreater, airingAt_lesser: $airingLess) {
               id
               episode
@@ -404,10 +418,32 @@ final class AniListService {
           }
         }
         """
-        let data = try await post(query: query, variables: ["airingGreater": from, "airingLess": to])
-        let response = try JSONDecoder().decode(GraphQLResponse<AiringPage>.self, from: data)
-        let schedules = response.data?.Page.airingSchedules ?? []
-        return schedules.map { AniListAiringScheduleItem(id: $0.id, episode: $0.episode, airingAt: $0.airingAt, media: $0.media) }
+
+        let maxPages = 20
+        var all: [AniListAiringScheduleItem] = []
+
+        for page in 1...maxPages {
+            let data = try await post(query: query, variables: [
+                "airingGreater": from,
+                "airingLess": to,
+                "page": page
+            ])
+            let response = try JSONDecoder().decode(GraphQLResponse<AiringPage>.self, from: data)
+            let schedules = response.data?.Page.airingSchedules ?? []
+            all.append(contentsOf: schedules.map {
+                AniListAiringScheduleItem(id: $0.id, episode: $0.episode, airingAt: $0.airingAt, media: $0.media)
+            })
+
+            let hasNextPage = response.data?.Page.pageInfo?.hasNextPage ?? false
+            if !hasNextPage { break }
+
+            // Rate-limit safety: pause between pages (skip after the final request).
+            if page < maxPages {
+                try await Task.sleep(nanoseconds: 400_000_000) // 0.4s
+            }
+        }
+
+        return all
     }
 
     func browse(category: BrowseCategory, page: Int) async throws -> [AniListMedia] {
