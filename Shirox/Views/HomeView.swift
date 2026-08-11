@@ -231,6 +231,8 @@ private struct FeaturedCarousel: View {
     @State private var selectedTab = 1000
     @State private var containerWidth: CGFloat = 0
     @State private var stretchAmount: CGFloat = 0
+    @State private var hasInteracted = false
+    @State private var didSetup = false
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     private var realItems: [Media] { items.prefix(8).map { $0 } }
@@ -338,6 +340,14 @@ private struct FeaturedCarousel: View {
                     .allowsHitTesting(false)
 
                     VStack(spacing: 10) {
+                        Text(currentMedia.title.displayTitle)
+                            .font(.title.weight(.bold))
+                            .foregroundStyle(.primary)
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
+
+                        // Genre capsules — replace the previous multi-line description
+                        // (which was too dense for a carousel). Up to 3 tags, capped.
                         if let genres = currentMedia.genres, !genres.isEmpty {
                             HStack(spacing: 6) {
                                 ForEach(genres.prefix(3), id: \.self) { g in
@@ -352,21 +362,6 @@ private struct FeaturedCarousel: View {
                             }
                         }
 
-                        Text(currentMedia.title.displayTitle)
-                            .font(.title2.weight(.bold))
-                            .foregroundStyle(.primary)
-                            .multilineTextAlignment(.center)
-                            .lineLimit(2)
-
-                        if let desc = currentMedia.plainDescription, !desc.isEmpty {
-                            Text(String(desc.prefix(120)) + (desc.count > 120 ? "…" : ""))
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.center)
-                                .lineLimit(2)
-                                .padding(.horizontal, 8)
-                        }
-
                         NavigationLink {
                             AniListDetailView(mediaId: currentMedia.id, preloadedMedia: currentMedia)
                         } label: {
@@ -375,14 +370,33 @@ private struct FeaturedCarousel: View {
                                 Text("Watch").fontWeight(.semibold)
                             }
                             .foregroundStyle(platformBackground)
-                            .frame(width: 130, height: 42)
+                            .frame(width: 160, height: 42)
                             .background(Color.primary, in: RoundedRectangle(cornerRadius: 12))
                         }
                         .buttonStyle(.plain)
+
+                        // "Slide to browse" hint — fades out after the first swipe.
+                        if !hasInteracted {
+                            HStack(spacing: 6) {
+                                Image(systemName: "chevron.compact.left")
+                                    .font(.subheadline.weight(.bold))
+                                Text("Slide to browse")
+                                    .font(.caption.weight(.semibold))
+                                Image(systemName: "chevron.compact.right")
+                                    .font(.subheadline.weight(.bold))
+                            }
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(.ultraThinMaterial, in: Capsule())
+                            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                        }
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.horizontal, 20)
                     .padding(.bottom, 18)
+                    .animation(.easeOut(duration: 0.35), value: hasInteracted)
                 }
             }
 
@@ -394,6 +408,16 @@ private struct FeaturedCarousel: View {
             if displayCount > 0 {
                 selectedTab = (1000 / displayCount) * displayCount
             }
+            // Defer enabling the swipe detector until the next runloop tick so
+            // the initial `selectedTab` assignment above (which can shift from
+            // 1000 to the nearest displayCount-multiple) isn't mistaken for a
+            // user swipe and instantly dismiss the hint.
+            DispatchQueue.main.async { didSetup = true }
+        }
+        .onChange(of: selectedTab) { _ in
+            guard didSetup else { return }
+            // First swipe dismisses the "Slide to browse" hint.
+            if !hasInteracted { hasInteracted = true }
         }
         #elseif !os(tvOS)
         MacFeaturedCarousel(items: realItems)

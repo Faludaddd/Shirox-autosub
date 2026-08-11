@@ -36,7 +36,7 @@ struct ContinueReadingSection: View {
                             )
                         }
                         .buttonStyle(.plain)
-                        .frame(width: 120)
+                        .frame(width: 260)
                         .contextMenu {
                             Button(role: .destructive) {
                                 MangaProgressManager.shared.remove(item)
@@ -128,65 +128,87 @@ struct ContinueReadingCardDisplay: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Color.clear
-                .aspectRatio(2/3, contentMode: .fit)
-                .overlay(
-                    CachedAsyncImage(urlString: item.coverImage)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .clipped()
-                )
-                .overlay(
-                    LinearGradient(
-                        stops: [
-                            .init(color: .clear, location: 0.55),
-                            .init(color: .black.opacity(0.8), location: 1)
-                        ],
-                        startPoint: .top, endPoint: .bottom
-                    )
-                )
-                .overlay(alignment: .bottomLeading) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "book.fill")
-                            .font(.system(size: 8, weight: .bold))
-                        Text(progressLabel)
-                            .font(.caption2.weight(.medium))
-                            .lineLimit(1)
-                    }
-                    .foregroundStyle(.white.opacity(0.9))
+        // Full-bleed 2:3 cover. Chapter badge, title, and progress bar are all
+        // layered over the cover so the card is a single visual unit (no
+        // trailing title row) — mirrors ContinueWatchingCardDisplay.
+        Color.clear
+            .aspectRatio(2/3, contentMode: .fit)
+            .overlay(
+                CachedAsyncImage(urlString: item.coverImage)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+            )
+            // Chapter badge — top-left corner
+            .overlay(alignment: .topLeading) {
+                Text(item.chapterName)
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
                     .padding(.horizontal, 8)
-                    .padding(.bottom, 8)
-                }
-                .overlay(alignment: .bottom) {
-                    if progressFraction > 0 {
-                        GeometryReader { geo in
-                            ZStack(alignment: .leading) {
-                                Color.white.opacity(0.2)
-                                Color.primary
-                                    .frame(width: geo.size.width * progressFraction)
-                                    .shadow(color: Color.primary.opacity(0.5), radius: 3, x: 0, y: 0)
-                            }
+                    .padding(.vertical, 4)
+                    .background(
+                        Color.black.opacity(0.55),
+                        in: Capsule()
+                    )
+                    .padding(8)
+            }
+            // Bottom gradient overlay carrying the title and page-progress
+            // indicator — replaces the previous trailing title row.
+            .overlay(alignment: .bottom) {
+                LinearGradient(
+                    stops: [
+                        .init(color: .clear, location: 0.0),
+                        .init(color: .black.opacity(0.85), location: 1.0)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 110)
+                .overlay(alignment: .bottomLeading) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "book.fill")
+                                .font(.system(size: 8, weight: .bold))
+                            Text(progressLabel)
+                                .font(.caption2.weight(.medium))
                         }
-                        .frame(height: 3)
-                    }
-                }
-                .overlay {
-                    if isLoading {
-                        ZStack {
-                            Color.black.opacity(0.35)
-                            ProgressView().tint(.white)
-                        }
-                    }
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .shadow(color: .black.opacity(0.3), radius: 6, x: 0, y: 3)
+                        .foregroundStyle(.white.opacity(0.85))
+                        .lineLimit(1)
 
-            Text(item.mangaTitle)
-                .font(.caption)
-                .fontWeight(.semibold)
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-        }
+                        Text(item.mangaTitle)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .lineLimit(2)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.bottom, 10)
+                }
+            }
+            // Progress bar — pinned to the very bottom edge of the card.
+            .overlay(alignment: .bottom) {
+                if progressFraction > 0 {
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Color.white.opacity(0.2)
+                            Color.primary
+                                .frame(width: geo.size.width * progressFraction)
+                                .shadow(color: Color.primary.opacity(0.5), radius: 3, x: 0, y: 0)
+                        }
+                    }
+                    .frame(height: 3)
+                }
+            }
+            .overlay {
+                if isLoading {
+                    ZStack {
+                        Color.black.opacity(0.35)
+                        ProgressView().tint(.white)
+                    }
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .shadow(color: .black.opacity(0.3), radius: 6, x: 0, y: 3)
     }
 }
 #endif

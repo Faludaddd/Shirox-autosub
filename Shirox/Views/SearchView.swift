@@ -7,7 +7,8 @@ struct SearchView: View {
     @StateObject private var history = SearchHistoryManager()
     @EnvironmentObject private var moduleManager: ModuleManager
     @ObservedObject private var providerManager = ProviderManager.shared
-    @State private var showModuleList = false
+    // #90 — Sources picker (custom card sheet) replaces the old Modules toolbar button.
+    @State private var showSources = false
     @State private var showFilters = false
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var isLandscape = false
@@ -61,27 +62,17 @@ struct SearchView: View {
                 .background(SearchActivationObserver { vm.clearResults() })
                 .navigationTitle("Search")
                 .toolbar {
+                    // Sources picker — #90. Same visibility rule as the filter button:
+                    // only shown when a module isn't active (filters/providers are AniList-side).
                     ToolbarItem(placement: .automatic) {
-                        moduleButton
+                        if !usingModule && !isLocalModule && !isJellyfinModule {
+                            sourcesButton
+                        }
                     }
                     // Filter button — only when NOT using a module (filters are AniList-only)
                     ToolbarItem(placement: .automatic) {
                         if !usingModule && !isLocalModule && !isJellyfinModule {
-                            Button {
-                                showFilters = true
-                            } label: {
-                                ZStack(alignment: .topTrailing) {
-                                    Image(systemName: "line.3.horizontal.decrease.circle")
-                                        .font(.system(size: 20))
-                                        .foregroundStyle(.primary)
-                                    if !vm.filters.isEmpty {
-                                        Circle()
-                                            .fill(.tint)
-                                            .frame(width: 8, height: 8)
-                                            .offset(x: 2, y: -2)
-                                    }
-                                }
-                            }
+                            filterButton
                         }
                     }
                 }
@@ -121,15 +112,17 @@ struct SearchView: View {
                     vm.search(usingModule: false)
                 }
         }
-        .adaptiveSheet(isPresented: $showModuleList) {
-            NavigationStack {
-                ModuleListView()
-            }
-            .environmentObject(moduleManager)
-            .tint(.primary)
+        .adaptiveSheet(isPresented: $showSources) {
+            SourcesPickerSheet()
         }
         .adaptiveSheet(isPresented: $showFilters) {
-            SearchFilterSheet(filters: $vm.filters) {
+            // #91 — pass the last-applied result count + hasSearched so the sheet
+            // can show a live "N results" preview / "Apply to update" hint at the bottom.
+            SearchFilterSheet(
+                filters: $vm.filters,
+                currentResultCount: vm.resultCount,
+                hasSearched: vm.hasSearched
+            ) {
                 if !vm.query.isEmpty { vm.search(usingModule: usingModule) }
             }
         }
@@ -425,45 +418,47 @@ struct SearchView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - Module Button
-    @ViewBuilder
-    private var moduleButton: some View {
+    // MARK: - Sources Button (#90)
+    /// Opens the custom Sources picker sheet. SF Symbol "rectangle.stack" mirrors
+    /// the metaphor used on the Sources settings page. A tinted dot calls out when
+    /// the active provider is anything other than the AniList default, so the user
+    /// can see at a glance that MAL is currently powering search.
+    private var sourcesButton: some View {
         Button {
-            showModuleList = true
+            showSources = true
         } label: {
-            HStack(spacing: 6) {
-                // Icon container (rounded)
-                Group {
-                    if usingModule {
-                        if let iconUrlString = moduleManager.activeModule?.iconUrl, !iconUrlString.isEmpty {
-                            CachedAsyncImage(urlString: iconUrlString)
-                        } else {
-                            fallbackIcon
-                        }
-                    } else {
-                        CachedAsyncImage(urlString: primaryProvider.iconURL)
-                    }
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: "rectangle.stack")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.primary)
+                if providerManager.orderedProviders.first?.providerType != .anilist {
+                    Circle()
+                        .fill(.tint)
+                        .frame(width: 8, height: 8)
+                        .offset(x: 2, y: -2)
                 }
-                .frame(width: 20, height: 20)
-                .clipShape(RoundedRectangle(cornerRadius: 4))
-                .background(
-                    (usingModule ? Color.secondary.opacity(0.1) : Color.primary.opacity(0.1)),
-                    in: RoundedRectangle(cornerRadius: 4)
-                )
-
-                // Text label
-                Text(usingModule ? (moduleManager.activeModule?.sourceName ?? "Module") : primaryProvider.displayName)
-                    .font(.callout)
-                    .fontWeight(.medium)
             }
-            .foregroundStyle(.primary)
         }
     }
 
-    private var fallbackIcon: some View {
-        Image(systemName: "puzzlepiece.extension")
-            .font(.system(size: 14))
-            .foregroundStyle(.secondary)
+    // MARK: - Filter Button
+    /// Filter icon with a tinted dot badge whenever any filter is active.
+    private var filterButton: some View {
+        Button {
+            showFilters = true
+        } label: {
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: "line.3.horizontal.decrease.circle")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.primary)
+                if !vm.filters.isEmpty {
+                    Circle()
+                        .fill(.tint)
+                        .frame(width: 8, height: 8)
+                        .offset(x: 2, y: -2)
+                }
+            }
+        }
     }
 }
 
@@ -501,14 +496,23 @@ private final class SearchHistoryManager: ObservableObject {
     }
 }
 
-// MARK: - Search Filter Sheet
+// MARK: - Search Filter Sheet (#91)
+//
+// Richer filter sheet: section headers with icons, chip-style multi-select for
+// genres, new fields (Studio text, Source picker, Min/Max Episodes, Sort direction),
+// a bottom bar with "Reset All" + a live results-count preview that updates once
+// the user taps Apply (and the search re-runs against the new filter set).
 
 struct SearchFilterSheet: View {
     @Binding var filters: AniListService.SearchFilters
+    let currentResultCount: Int
+    let hasSearched: Bool
     let onApply: () -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var localFilters: AniListService.SearchFilters = .empty
+    @State private var maxEpisodesText: String = ""
+    @FocusState private var maxEpisodesFocused: Bool
 
     private let availableGenres: [String] = [
         "Action", "Adventure", "Comedy", "Drama", "Fantasy", "Horror",
@@ -531,12 +535,22 @@ struct SearchFilterSheet: View {
         ("Upcoming", "NOT_YET_RELEASED"), ("Cancelled", "CANCELLED")
     ]
 
+    // AniList `MediaSource` enum values — what the anime was adapted from.
+    private let sources: [(String, String)] = [
+        ("Any", ""), ("Manga", "MANGA"), ("Light Novel", "LIGHT_NOVEL"),
+        ("Original", "ORIGINAL"), ("Anime", "ANIME"), ("Visual Novel", "VISUAL_NOVEL"),
+        ("Video Game", "VIDEO_GAME"), ("Novel", "NOVEL"), ("Other", "OTHER")
+    ]
+
+    // Sort option values are the BASE MediaSort enum (no _DESC suffix). The
+    // direction is toggled separately via `localFilters.sortDescending`, so the
+    // toggle visibly flips any of these between ascending and descending.
     private let sortOptions: [(String, String)] = [
         ("Best Match", "SEARCH_MATCH"),
-        ("Popularity", "POPULARITY_DESC"),
-        ("Top Rated", "SCORE_DESC"),
-        ("Newest", "START_DATE_DESC"),
-        ("Most Favorites", "FAVORITES_DESC")
+        ("Popularity", "POPULARITY"),
+        ("Top Rated", "SCORE"),
+        ("Newest", "START_DATE"),
+        ("Most Favorites", "FAVOURITES")
     ]
 
     private var yearOptions: [Int] {
@@ -544,19 +558,39 @@ struct SearchFilterSheet: View {
         return Array((1970...(currentYear + 1)).reversed())
     }
 
+    /// True when the local (uncommitted) filters differ from the applied ones —
+    /// drives the "Apply to update" hint in the bottom bar.
+    private var hasUncommittedChanges: Bool { localFilters != filters }
+
     var body: some View {
         NavigationStack {
             Form {
-                Section("Sort By") {
-                    Picker("Sort", selection: $localFilters.sort) {
+                // MARK: Sort
+                Section {
+                    Picker("Sort by", selection: $localFilters.sort) {
                         ForEach(sortOptions, id: \.1) { opt in
                             Text(opt.0).tag(opt.1)
                         }
                     }
                     .tint(.appAccent)
+
+                    Toggle(isOn: $localFilters.sortDescending) {
+                        Label(localFilters.sortDescending ? "Descending" : "Ascending",
+                              systemImage: localFilters.sortDescending ? "arrow.down" : "arrow.up")
+                    }
+                    .tint(.appAccent)
+                    .disabled(localFilters.sort == "SEARCH_MATCH")
+                } header: {
+                    sectionHeader("Sort", icon: "arrow.up.arrow.down.circle.fill")
+                } footer: {
+                    if localFilters.sort == "SEARCH_MATCH" {
+                        Text("Sort direction only applies when sort isn't Best Match.")
+                            .font(.caption)
+                    }
                 }
 
-                Section("Release") {
+                // MARK: Release
+                Section {
                     Picker("Year", selection: Binding(
                         get: { localFilters.year ?? 0 },
                         set: { localFilters.year = $0 == 0 ? nil : $0 }
@@ -578,9 +612,12 @@ struct SearchFilterSheet: View {
                     }
                     .tint(.appAccent)
                     .disabled(localFilters.year == nil)
+                } header: {
+                    sectionHeader("Release", icon: "calendar")
                 }
 
-                Section("Type") {
+                // MARK: Type
+                Section {
                     Picker("Format", selection: Binding(
                         get: { localFilters.format ?? "" },
                         set: { localFilters.format = $0.isEmpty ? nil : $0 }
@@ -600,26 +637,91 @@ struct SearchFilterSheet: View {
                         }
                     }
                     .tint(.appAccent)
+
+                    Picker("Source", selection: Binding(
+                        get: { localFilters.source ?? "" },
+                        set: { localFilters.source = $0.isEmpty ? nil : $0 }
+                    )) {
+                        ForEach(sources, id: \.1) { s in
+                            Text(s.0).tag(s.1)
+                        }
+                    }
+                    .tint(.appAccent)
+                } header: {
+                    sectionHeader("Type", icon: "film.fill")
+                } footer: {
+                    Text("Source = what the anime was adapted from (manga, light novel, original…).")
+                        .font(.caption)
                 }
 
-                Section("Genres") {
-                    ForEach(availableGenres, id: \.self) { genre in
-                        Button {
-                            if localFilters.genres.contains(genre) {
-                                localFilters.genres.removeAll { $0 == genre }
-                            } else {
-                                localFilters.genres.append(genre)
-                            }
-                        } label: {
-                            HStack {
-                                Text(genre).foregroundStyle(.primary)
-                                Spacer()
-                                if localFilters.genres.contains(genre) {
-                                    Image(systemName: "checkmark").foregroundStyle(.tint)
-                                }
-                            }
+                // MARK: Episodes
+                Section {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("Min Episodes")
+                            Spacer()
+                            Text(localFilters.minEpisodes.map { "\($0)+" } ?? "Any")
+                                .foregroundStyle(.secondary)
+                                .font(.callout.monospacedDigit())
                         }
-                        .buttonStyle(.plain)
+                        Slider(value: Binding(
+                            get: { Double(localFilters.minEpisodes ?? 0) },
+                            set: { localFilters.minEpisodes = $0 == 0 ? nil : Int($0) }
+                        ), in: 0...200, step: 1)
+                        .tint(.appAccent)
+                    }
+
+                    HStack {
+                        Text("Max Episodes")
+                        Spacer()
+                        TextField("Any", text: $maxEpisodesText)
+                            #if os(iOS)
+                            .keyboardType(.numberPad)
+                            #endif
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 80)
+                            .focused($maxEpisodesFocused)
+                            .onChangeOf(maxEpisodesText) { newValue in
+                                // Strip anything that isn't a digit so the field can't
+                                // ever hold invalid input (and Int() can't fail).
+                                let trimmed = newValue.filter(\.isNumber)
+                                if trimmed != newValue { maxEpisodesText = trimmed }
+                                localFilters.maxEpisodes = Int(trimmed)
+                            }
+                    }
+                } header: {
+                    sectionHeader("Episodes", icon: "number")
+                } footer: {
+                    Text("Use 0 / blank for no limit. Filters by total episode count.")
+                        .font(.caption)
+                }
+
+                // MARK: Studio
+                Section {
+                    TextField("e.g. MAPPA, Ufotable, Bones", text: Binding(
+                        get: { localFilters.studio ?? "" },
+                        set: { localFilters.studio = $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
+                    ))
+                    #if os(iOS)
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled()
+                    #endif
+                } header: {
+                    sectionHeader("Studio", icon: "building.2.fill")
+                } footer: {
+                    Text("Case-insensitive match against any credited studio.")
+                        .font(.caption)
+                }
+
+                // MARK: Genres (chip-style multi-select)
+                Section {
+                    genresChips
+                } header: {
+                    sectionHeader("Genres", icon: "tag.fill")
+                } footer: {
+                    if !localFilters.genres.isEmpty {
+                        Text("\(localFilters.genres.count) selected")
+                            .font(.caption)
                     }
                 }
             }
@@ -628,12 +730,6 @@ struct SearchFilterSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Reset") {
-                        localFilters = .empty
-                    }
-                    .disabled(localFilters.isEmpty)
-                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Apply") {
                         filters = localFilters
@@ -641,13 +737,350 @@ struct SearchFilterSheet: View {
                         dismiss()
                     }
                 }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { maxEpisodesFocused = false }
+                }
+            }
+            .safeAreaInset(edge: .bottom) {
+                bottomBar
             }
         }
         .onAppear {
             localFilters = filters
+            maxEpisodesText = localFilters.maxEpisodes.map { String($0) } ?? ""
         }
         #if os(iOS)
         .adaptivePresentationDetents([.large])
+        #endif
+    }
+
+    // MARK: - Section Header (icon + title)
+    @ViewBuilder
+    private func sectionHeader(_ title: String, icon: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.appAccent)
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+        }
+    }
+
+    // MARK: - Genres Chips (#91)
+    // Chip-style multi-select: filled accent capsule when selected, plain outline
+    // otherwise. Uses an adaptive LazyVGrid so chips wrap naturally on any width.
+    private var genresChips: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 8)], spacing: 8) {
+            ForEach(availableGenres, id: \.self) { genre in
+                let isSelected = localFilters.genres.contains(genre)
+                Button {
+                    if isSelected {
+                        localFilters.genres.removeAll { $0 == genre }
+                    } else {
+                        localFilters.genres.append(genre)
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        if isSelected {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 11, weight: .bold))
+                        }
+                        Text(genre)
+                            .lineLimit(1)
+                    }
+                    .font(.callout.weight(isSelected ? .semibold : .regular))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 10)
+                    .background(
+                        Capsule().fill(isSelected ? Color.appAccent.opacity(0.15) : Color.secondary.opacity(0.1))
+                    )
+                    .overlay(
+                        Capsule().strokeBorder(
+                            isSelected ? Color.appAccent.opacity(0.6) : Color.secondary.opacity(0.2),
+                            lineWidth: 1
+                        )
+                    )
+                    .foregroundStyle(isSelected ? Color.appAccent : .primary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.vertical, 6)
+    }
+
+    // MARK: - Bottom Bar (Reset All + Results preview)
+    private var bottomBar: some View {
+        VStack(spacing: 0) {
+            Divider()
+            HStack(spacing: 12) {
+                Button {
+                    localFilters = .empty
+                    maxEpisodesText = ""
+                } label: {
+                    Label("Reset All", systemImage: "arrow.counterclockwise")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(localFilters.isEmpty ? Color.secondary : Color.red)
+                }
+                .buttonStyle(.plain)
+                .disabled(localFilters.isEmpty)
+
+                Spacer()
+
+                resultsPreview
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(.bar)
+        }
+    }
+
+    @ViewBuilder
+    private var resultsPreview: some View {
+        // Three states — keep the layout stable so the bar doesn't jump as the
+        // user edits filters:
+        //   1. No search yet            → silent (EmptyView)
+        //   2. Uncommitted filter edits → orange "Apply to update" hint
+        //   3. Committed                → green checkmark + result count
+        if !hasSearched {
+            EmptyView()
+        } else if hasUncommittedChanges {
+            Label("Apply to update", systemImage: "exclamationmark.circle")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.orange)
+                .labelStyle(.titleAndIcon)
+        } else {
+            Label("\(currentResultCount) result\(currentResultCount == 1 ? "" : "s")",
+                  systemImage: "checkmark.circle")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(currentResultCount > 0 ? .green : .secondary)
+                .labelStyle(.titleAndIcon)
+        }
+    }
+}
+
+// MARK: - Sources Picker Sheet (#90)
+//
+// Custom card-based source picker (NOT a Form/Menu). Presented from the search
+// toolbar's Sources button. Each provider is a tappable card; tapping selects it
+// via `ProviderManager.shared.selectProvider`. Connected sources get the same
+// green glow used on the Sources settings page; unconnected sources expose a
+// "Connect" button that pushes `SourcesSettingsPage`.
+
+struct SourcesPickerSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var providerManager = ProviderManager.shared
+    @State private var pushSettings = false
+
+    private var activeProviderType: ProviderType? {
+        providerManager.orderedProviders.first?.providerType
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 14) {
+                    headerCard
+                    ForEach(Array(providerManager.orderedProviders.enumerated()),
+                            id: \.offset) { _, provider in
+                        sourceCard(provider)
+                    }
+                    footerCard
+                }
+                .padding(20)
+            }
+            .background(pageBackground.ignoresSafeArea())
+            .navigationTitle("Sources")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+            // Push the Sources settings page when the user taps Connect. Uses a
+            // hidden NavigationLink(isActive:) because the app's NavigationStack
+            // is shimmed over NavigationView on iOS (see Shared/NavigationStack.swift),
+            // which silently ignores `navigationDestination(...)`.
+            .background(
+                NavigationLink(
+                    destination: SourcesSettingsPage(),
+                    isActive: Binding(
+                        get: { pushSettings },
+                        set: { pushSettings = $0 }
+                    )
+                ) { EmptyView() }
+            )
+        }
+    }
+
+    // MARK: - Header
+    private var headerCard: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "rectangle.stack.fill")
+                .font(.system(size: 28))
+                .foregroundStyle(Color.appAccent)
+            Text("Pick a Source")
+                .font(.headline)
+            Text("Choose which metadata provider powers your search and library sync.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 12)
+        }
+        .padding(.vertical, 18)
+        .frame(maxWidth: .infinity)
+        .background(cardBackground, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    // MARK: - Source Card
+    @ViewBuilder
+    private func sourceCard(_ provider: any MediaProvider) -> some View {
+        let type = provider.providerType
+        let isConnected = provider.isAuthenticated
+        let isActive = activeProviderType == type
+
+        // The whole card is a Button that selects the provider. The "Connect"
+        // pill is a nested Button with `.plain` style — SwiftUI routes taps on
+        // the inner Button to it (and does NOT fire the outer Button's action),
+        // so unconnected sources give the user two distinct affordances: tap the
+        // card body to switch the active provider anyway, or tap Connect to go
+        // sign in. (Search auto-re-runs via SearchView's onChangeOf(providerType)
+        // observer when the active provider changes.)
+        Button {
+            providerManager.selectProvider(type)
+            dismiss()
+        } label: {
+            HStack(spacing: 14) {
+                sourceIcon(type: type, isConnected: isConnected)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Text(provider.displayName)
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(.primary)
+                        if isActive {
+                            Text("ACTIVE")
+                                .font(.system(size: 10, weight: .bold))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.appAccent.opacity(0.15), in: Capsule())
+                                .foregroundStyle(Color.appAccent)
+                        }
+                    }
+
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(isConnected ? Color.green : Color.secondary.opacity(0.6))
+                            .frame(width: 7, height: 7)
+                        Text(isConnected ? "Connected" : "Not connected")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Spacer(minLength: 8)
+
+                if isConnected {
+                    Image(systemName: isActive ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 22))
+                        .foregroundStyle(isActive ? Color.appAccent : Color.secondary.opacity(0.35))
+                } else {
+                    Button {
+                        pushSettings = true
+                    } label: {
+                        Text("Connect")
+                            .font(.caption.weight(.semibold))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
+                            .background(Color.appAccent.opacity(0.15), in: Capsule())
+                            .foregroundStyle(Color.appAccent)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(cardBackground)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(
+                        isActive ? Color.appAccent.opacity(0.55) : Color.secondary.opacity(0.15),
+                        lineWidth: isActive ? 2 : 1
+                    )
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Source Icon (with glow on connected)
+    // Mirrors SourcesSettingsPage.iconView exactly: green halo when connected,
+    // red border when not, driven by the global Color.glowIntensity / glowEnabled
+    // settings so the picker matches the Sources settings page.
+    @ViewBuilder
+    private func sourceIcon(type: ProviderType, isConnected: Bool) -> some View {
+        let glowColor: Color = isConnected ? .green : .red
+        let glowOpacity: Double = Color.glowEnabled ? Color.glowIntensity * 1.0 : 0
+        let glowRadius: CGFloat = Color.glowEnabled ? CGFloat(20 * Color.glowIntensity) : 0
+
+        CachedAsyncImage(urlString: type.iconURL)
+            .frame(width: 38, height: 38)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.secondary.opacity(0.12))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(glowColor.opacity(Color.glowEnabled ? 0.85 : 0.5), lineWidth: 1.5)
+            )
+            .shadow(color: glowColor.opacity(glowOpacity), radius: glowRadius, x: 0, y: 0)
+    }
+
+    // MARK: - Footer
+    private var footerCard: some View {
+        VStack(spacing: 6) {
+            Text("Want to connect a new account?")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Button {
+                pushSettings = true
+            } label: {
+                Label("Open Sources Settings", systemImage: "gearshape")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.appAccent)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.top, 8)
+    }
+
+    // MARK: - Cross-platform colors
+    // Form-style backgrounds so the card layout matches the rest of the app on
+    // iOS (systemGroupedBackground) and degrades gracefully on macOS / tvOS.
+    private var pageBackground: Color {
+        #if os(iOS)
+        return Color(.systemGroupedBackground)
+        #elseif os(macOS)
+        return Color(NSColor.windowBackgroundColor)
+        #else
+        return Color.black.opacity(0.05)
+        #endif
+    }
+
+    private var cardBackground: Color {
+        #if os(iOS)
+        return Color(.secondarySystemGroupedBackground)
+        #elseif os(macOS)
+        return Color(NSColor.controlBackgroundColor)
+        #else
+        return Color.secondary.opacity(0.15)
         #endif
     }
 }

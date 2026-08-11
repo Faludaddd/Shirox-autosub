@@ -2,6 +2,9 @@ import SwiftUI
 import Combine
 import UserNotifications
 import UniformTypeIdentifiers
+#if canImport(UIKit)
+import UIKit
+#endif
 
 struct SettingsView: View {
     @AppStorage("maxConcurrentDownloads") private var maxConcurrentDownloads: Int = 3
@@ -2264,6 +2267,12 @@ struct NotificationsSettingsPage: View {
                     .font(.system(size: 28))
                     .foregroundStyle(Color.appAccent)
             }
+            .shadow(
+                color: (anyEnabled && Color.glowEnabled)
+                    ? Color.green.opacity(Color.glowIntensity * 0.6) : .clear,
+                radius: (anyEnabled && Color.glowEnabled)
+                    ? CGFloat(10 * Color.glowIntensity) : 0
+            )
 
             VStack(spacing: 4) {
                 Text("Notification Status")
@@ -2379,6 +2388,12 @@ struct NotificationsSettingsPage: View {
             } label: {
                 Label("Remove All Pending", systemImage: "trash")
                     .frame(maxWidth: .infinity)
+                    .shadow(
+                        color: Color.glowEnabled
+                            ? Color.red.opacity(Color.glowIntensity * 0.4) : .clear,
+                        radius: Color.glowEnabled
+                            ? CGFloat(8 * Color.glowIntensity) : 0
+                    )
             }
             .buttonStyle(.bordered)
             .disabled(pendingCount == 0)
@@ -2769,19 +2784,22 @@ struct ModuleStorePage: View {
         GridItem(.flexible(), spacing: 12)
     ]
 
-    /// Modules shown in the "🔥 Popular" section (first 3 when enough exist).
-    private var popularModules: [StoreModuleItem] {
-        Array(filteredModules.prefix(3))
+    /// Modules shown in the "🔥 Popular Sources" section — anime-typed or
+    /// English-language sources, which are the most commonly requested.
+    private var popularSources: [StoreModuleItem] {
+        filteredModules.filter { $0.isPopularSource }
     }
 
-    /// Modules shown in the "✨ Recommended" section (everything after Popular).
-    private var recommendedModules: [StoreModuleItem] {
-        Array(filteredModules.dropFirst(3))
+    /// Modules shown in the "✨ Community Sources" section — everything else
+    /// (non-anime types and non-English languages).
+    private var communitySources: [StoreModuleItem] {
+        filteredModules.filter { !$0.isPopularSource }
     }
 
     /// Whether we have enough modules to justify splitting into two sections.
+    /// With fewer than 4 total modules we just show a single "All Modules" list.
     private var shouldSplitIntoSections: Bool {
-        filteredModules.count >= 6
+        filteredModules.count >= 4
     }
 
     var body: some View {
@@ -2861,14 +2879,14 @@ struct ModuleStorePage: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 40)
                 } else if shouldSplitIntoSections {
-                    // 🔥 Popular section
-                    if !popularModules.isEmpty {
+                    // 🔥 Popular Sources section (anime-typed or English-language)
+                    if !popularSources.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("🔥 Popular")
+                            Text("🔥 Popular Sources")
                                 .font(.subheadline.weight(.bold))
                                 .padding(.horizontal, 14)
                             LazyVGrid(columns: columns, spacing: 12) {
-                                ForEach(popularModules) { mod in
+                                ForEach(popularSources) { mod in
                                     StoreModuleTile(mod: mod, isInstalled: isModuleInstalled(mod), isInstalling: isInstalling) {
                                         installModule(mod)
                                     }
@@ -2877,15 +2895,15 @@ struct ModuleStorePage: View {
                             .padding(.horizontal, 14)
                         }
                     }
-                    // ✨ Recommended section
-                    if !recommendedModules.isEmpty {
+                    // ✨ Community Sources section (everything else)
+                    if !communitySources.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("✨ Recommended")
+                            Text("✨ Community Sources")
                                 .font(.subheadline.weight(.bold))
                                 .padding(.horizontal, 14)
                                 .padding(.top, 4)
                             LazyVGrid(columns: columns, spacing: 12) {
-                                ForEach(recommendedModules) { mod in
+                                ForEach(communitySources) { mod in
                                     StoreModuleTile(mod: mod, isInstalled: isModuleInstalled(mod), isInstalling: isInstalling) {
                                         installModule(mod)
                                     }
@@ -2896,7 +2914,7 @@ struct ModuleStorePage: View {
                         }
                     }
                 } else {
-                    // All Modules (fewer than 6 modules)
+                    // All Modules (fewer than 4 modules total)
                     VStack(alignment: .leading, spacing: 8) {
                         Text("All Modules")
                             .font(.subheadline.weight(.bold))
@@ -2970,48 +2988,72 @@ struct ModuleStorePage: View {
     }
 
     /// Parses module data from the HTML page by extracting jsonUrl, sourceName,
-    /// and iconUrl from the embedded escaped JSON.
+    /// iconUrl, type and language from the embedded escaped JSON.
+    ///
+    /// Each module's JSON block is bounded by its `jsonUrl` key and the next
+    /// module's `jsonUrl` key, so fields can appear in any order without
+    /// leaking into neighbouring modules.
     private func parseModulesFromHTML(_ html: String) -> [StoreModuleItem] {
-        // The HTML contains literal backslash-quoted JSON:
-        // \"jsonUrl\":\"https://...\",\"sourceName\":\"AnimePahe\",\"iconUrl\":\"https://...\"
-        // We extract these triplets using simple string scanning.
+        // The HTML contains literal backslash-quoted JSON, one block per module:
+        //   \"jsonUrl\":\"https://...\",\"sourceName\":\"AnimePahe\",
+        //   \"iconUrl\":\"https://...\",\"language\":\"English\",
+        //   \"type\":\"anime/movies/shows\",...
 
         var results: [StoreModuleItem] = []
         var seen = Set<String>()
 
-        // Find all occurrences of \"jsonUrl\":\" and extract the URL
-        let searchKey = "\\\"jsonUrl\\\":\\\""
+        let jsonKey = "\\\"jsonUrl\\\":\\\""
         var searchRange = html.startIndex..<html.endIndex
 
-        while let jsonUrlRange = html.range(of: searchKey, options: .literal, range: searchRange) {
-            // URL starts right after the search key
+        while let jsonUrlRange = html.range(of: jsonKey, options: .literal, range: searchRange) {
+            // URL starts right after the search key, ends at the next \"
             let urlStart = jsonUrlRange.upperBound
-            // URL ends at the next \"
             guard let urlEnd = html.range(of: "\\\"", options: .literal, range: urlStart..<html.endIndex) else { break }
             let jsonUrl = String(html[urlStart..<urlEnd.lowerBound])
 
-            // Find sourceName after this jsonUrl
-            let nameKey = "\\\"sourceName\\\":\\\""
-            let nameSearchRange = urlEnd.upperBound..<html.endIndex
-            guard let nameKeyRange = html.range(of: nameKey, options: .literal, range: nameSearchRange) else {
-                searchRange = urlEnd.upperBound..<html.endIndex
-                continue
-            }
-            let nameStart = nameKeyRange.upperBound
-            guard let nameEnd = html.range(of: "\\\"", options: .literal, range: nameStart..<html.endIndex) else {
-                searchRange = nameStart..<html.endIndex
-                continue
-            }
-            let name = String(html[nameStart..<nameEnd.lowerBound])
+            // Bound this module's block: from after the jsonUrl value to the
+            // next jsonUrl occurrence (or end of HTML for the last module).
+            let nextJsonRange = html.range(of: jsonKey, options: .literal, range: urlEnd.upperBound..<html.endIndex)
+            let blockEnd = nextJsonRange?.lowerBound ?? html.endIndex
+            let blockRange = urlEnd.upperBound..<blockEnd
 
-            // Find iconUrl after sourceName
-            let iconKey = "\\\"iconUrl\\\":\\\""
-            let iconSearchRange = nameEnd.upperBound..<html.endIndex
+            // sourceName (anywhere inside this module's block)
+            var name = "Unknown"
+            let nameKey = "\\\"sourceName\\\":\\\""
+            if let nameKeyRange = html.range(of: nameKey, options: .literal, range: blockRange) {
+                let nameStart = nameKeyRange.upperBound
+                if let nameEnd = html.range(of: "\\\"", options: .literal, range: nameStart..<blockEnd) {
+                    name = String(html[nameStart..<nameEnd.lowerBound])
+                }
+            }
+
+            // iconUrl (optional)
             var iconUrl: String? = nil
-            if let iconKeyRange = html.range(of: iconKey, options: .literal, range: iconSearchRange) {
+            let iconKey = "\\\"iconUrl\\\":\\\""
+            if let iconKeyRange = html.range(of: iconKey, options: .literal, range: blockRange) {
                 let iconStart = iconKeyRange.upperBound
-                if let iconEnd = html.range(of: "\\\"", options: .literal, range: iconStart..<html.endIndex) {
+                if let iconEnd = html.range(of: "\\\"", options: .literal, range: iconStart..<blockEnd) {
                     iconUrl = String(html[iconStart..<iconEnd.lowerBound])
+                }
+            }
+
+            // type (e.g. "anime", "anime/movies/shows", "mangas", "novels")
+            var type: String? = nil
+            let typeKey = "\\\"type\\\":\\\""
+            if let typeKeyRange = html.range(of: typeKey, options: .literal, range: blockRange) {
+                let typeStart = typeKeyRange.upperBound
+                if let typeEnd = html.range(of: "\\\"", options: .literal, range: typeStart..<blockEnd) {
+                    type = String(html[typeStart..<typeEnd.lowerBound])
+                }
+            }
+
+            // language (e.g. "English", "Arabic", "Tamil")
+            var language: String? = nil
+            let languageKey = "\\\"language\\\":\\\""
+            if let languageKeyRange = html.range(of: languageKey, options: .literal, range: blockRange) {
+                let languageStart = languageKeyRange.upperBound
+                if let languageEnd = html.range(of: "\\\"", options: .literal, range: languageStart..<blockEnd) {
+                    language = String(html[languageStart..<languageEnd.lowerBound])
                 }
             }
 
@@ -3025,12 +3067,15 @@ struct ModuleStorePage: View {
                     version: nil,
                     manifestUrl: jsonUrl,
                     iconUrl: iconUrl?.isEmpty == true ? nil : iconUrl,
-                    author: "modulesbypaul.dev"
+                    author: "modulesbypaul.dev",
+                    type: type?.isEmpty == true ? nil : type,
+                    language: language?.isEmpty == true ? nil : language
                 ))
             }
 
-            // Continue searching after this match
-            searchRange = nameEnd.upperBound..<html.endIndex
+            // Continue searching at the next module's jsonUrl (or stop)
+            guard let nextJsonRange = nextJsonRange else { break }
+            searchRange = nextJsonRange.lowerBound..<html.endIndex
         }
 
         return results.sorted { $0.name.lowercased() < $1.name.lowercased() }
@@ -3047,15 +3092,29 @@ struct StoreModuleItem: Codable, Identifiable {
     let manifestUrl: String
     let iconUrl: String?
     let author: String?
+    let type: String?
+    let language: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, name, description, version
+        case id, name, description, version, type, language
         case manifestUrl = "manifest_url"
         case iconUrl = "icon_url"
         case author
     }
 
-    init(id: String, name: String, description: String?, version: String?, manifestUrl: String, iconUrl: String?, author: String?) {
+    /// Whether this module qualifies as a "Popular Source" — either an
+    /// anime-typed source (type contains "anime" as one of its slash-separated
+    /// segments) or an English-language source. Used by `ModuleStorePage` to
+    /// split the store into Popular vs. Community sections.
+    var isPopularSource: Bool {
+        let types = (type ?? "").lowercased()
+            .split(separator: "/")
+            .map { String($0).trimmingCharacters(in: .whitespaces) }
+        if types.contains("anime") { return true }
+        return (language ?? "").lowercased() == "english"
+    }
+
+    init(id: String, name: String, description: String?, version: String?, manifestUrl: String, iconUrl: String?, author: String?, type: String? = nil, language: String? = nil) {
         self.id = id
         self.name = name
         self.description = description
@@ -3063,6 +3122,8 @@ struct StoreModuleItem: Codable, Identifiable {
         self.manifestUrl = manifestUrl
         self.iconUrl = iconUrl
         self.author = author
+        self.type = type
+        self.language = language
     }
 
     init(from decoder: Decoder) throws {
@@ -3074,6 +3135,8 @@ struct StoreModuleItem: Codable, Identifiable {
         manifestUrl = try c.decodeIfPresent(String.self, forKey: .manifestUrl) ?? ""
         iconUrl = try c.decodeIfPresent(String.self, forKey: .iconUrl)
         author = try c.decodeIfPresent(String.self, forKey: .author)
+        type = try c.decodeIfPresent(String.self, forKey: .type)
+        language = try c.decodeIfPresent(String.self, forKey: .language)
     }
 }
 
@@ -3137,9 +3200,7 @@ private struct StoreModuleTile: View {
                         .lineLimit(1)
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .tint(.appAccent)
+                .buttonStyle(GlowingInstallButtonStyle())
             }
         }
         .padding(10)
@@ -3149,6 +3210,17 @@ private struct StoreModuleTile: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(Color.secondary.opacity(0.08), lineWidth: 1)
         )
+        // Subtle accent glow on installed tiles — mirrors the active-module
+        // glow used in `ModulesSettingsPage`. Gated by the global Glow
+        // preference and scaled by its intensity slider.
+        .shadow(
+            color: isInstalled && Color.glowEnabled
+                ? Color.appAccent.opacity(Color.glowIntensity * 0.5)
+                : .clear,
+            radius: isInstalled && Color.glowEnabled
+                ? CGFloat(8 * Color.glowIntensity)
+                : 0
+        )
     }
 
     private var fallbackIcon: some View {
@@ -3156,6 +3228,34 @@ private struct StoreModuleTile: View {
             .font(.system(size: 18))
             .foregroundStyle(.secondary)
             .frame(width: 40, height: 40)
+    }
+}
+
+/// Button style for the Store tile "Install" button. Mimics the system
+/// `.bordered` look (tinted capsule background + tinted label) and adds an
+/// accent glow while the button is pressed. The glow is gated by the global
+/// `Color.glowEnabled` flag and scaled by `Color.glowIntensity`, matching the
+/// pattern used elsewhere in the app (e.g. `ModulesSettingsPage`).
+private struct GlowingInstallButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(Color.appAccent)
+            .padding(.vertical, 4)
+            .padding(.horizontal, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color.appAccent.opacity(configuration.isPressed ? 0.30 : 0.16))
+            )
+            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
+            .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+            .shadow(
+                color: configuration.isPressed && Color.glowEnabled
+                    ? Color.appAccent.opacity(Color.glowIntensity * 0.5)
+                    : .clear,
+                radius: configuration.isPressed && Color.glowEnabled
+                    ? CGFloat(8 * Color.glowIntensity)
+                    : 0
+            )
     }
 }
 
@@ -3534,6 +3634,20 @@ struct SubtitleSettingsPage: View {
                     .padding(.bottom, 16)
             }
             .frame(maxWidth: .infinity)
+
+            // Caption text in this preview is scaled down by 50% so the preview
+            // fits inside the card without overflowing. The styling (color,
+            // stroke, background, weight) is preserved — only the rendered size
+            // is reduced. See the disclaimer below for why.
+            HStack(spacing: 6) {
+                Image(systemName: "info.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("True caption size is only visible in fullscreen landscape mode during playback.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
@@ -3542,17 +3656,24 @@ struct SubtitleSettingsPage: View {
 
     private var subtitlePreviewText: some View {
         let resolvedStrokeWidth: Double = (subtitleStrokeColor == "none") ? 0 : subtitleStrokeWidth
+        // Preview is rendered at 50% of the user-selected font size so the
+        // caption fits inside the (180pt-tall) preview card. Stroke width is
+        // scaled by the same factor to keep the visual ratio between glyph
+        // and outline consistent with playback.
+        let previewFontScale: Double = 0.5
+        let previewFontSize = max(CGFloat(subtitleFontSize * previewFontScale), 8)
+        let previewStrokeWidth = resolvedStrokeWidth * previewFontScale
         return Text("The journey of a thousand miles begins with a single step.")
-            .font(.system(size: CGFloat(subtitleFontSize),
+            .font(.system(size: previewFontSize,
                           weight: subtitleBoldText ? .bold : .regular))
             .foregroundStyle(color(fromName: subtitleTextColor))
             .multilineTextAlignment(.center)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
             .background(
                 Group {
                     if subtitleBackgroundEnabled {
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
                             .fill(Color.black.opacity(0.6))
                     } else {
                         Color.clear
@@ -3560,7 +3681,7 @@ struct SubtitleSettingsPage: View {
                 }
             )
             .applySubtitleStroke(color: color(fromName: subtitleStrokeColor),
-                                 width: resolvedStrokeWidth)
+                                 width: previewStrokeWidth)
     }
 
     // MARK: - Appearance Controls Card
@@ -3678,21 +3799,54 @@ struct AboutSettingsPage: View {
 
     private var heroCard: some View {
         VStack(spacing: 14) {
+            // App icon tile — prefers the real bundled app icon (iOS / tvOS /
+            // Catalyst). Falls back to a polished SF Symbol on macOS or when
+            // the asset lookup fails. Tile uses the same black → blue → purple
+            // gradient as the splash so the two screens feel cohesive.
             ZStack {
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .fill(
                         LinearGradient(
-                            colors: [Color.appAccent.opacity(0.7), Color.appAccent.opacity(0.25)],
+                            stops: [
+                                .init(color: Color.black, location: 0.0),
+                                .init(color: Color(red: 0.10, green: 0.22, blue: 0.55), location: 0.5),
+                                .init(color: Color(red: 0.32, green: 0.10, blue: 0.55), location: 1.0)
+                            ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
-                    .frame(width: 96, height: 96)
-                Image(systemName: "play.tv.fill")
-                    .font(.system(size: 46))
-                    .foregroundStyle(.white)
+                    .frame(width: 110, height: 110)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [Color.white.opacity(0.35), Color.white.opacity(0.0)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                ),
+                                lineWidth: 1.5
+                            )
+                    )
+
+                Group {
+                    #if canImport(UIKit)
+                    if let uiIcon = UIApplication.shared.icon {
+                        Image(uiImage: uiIcon)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 70, height: 70)
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    } else {
+                        aboutFallbackSymbol
+                    }
+                    #else
+                    aboutFallbackSymbol
+                    #endif
+                }
             }
-            .shadow(color: Color.appAccent.opacity(0.3), radius: 12, y: 6)
+            .shadow(color: Color(red: 0.18, green: 0.22, blue: 0.65).opacity(0.35),
+                    radius: 14, y: 8)
 
             VStack(spacing: 4) {
                 Text("Shirox")
@@ -3717,6 +3871,16 @@ struct AboutSettingsPage: View {
         .frame(maxWidth: .infinity)
         .background(Color.secondary.opacity(0.08),
                     in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
+
+    /// SF Symbol fallback used in `heroCard` when the bundled app icon is
+    /// unavailable (e.g. on pure macOS). Kept larger than the previous generic
+    /// glyph and tinted white over the gradient tile so it still reads as an
+    /// app-icon-style mark.
+    private var aboutFallbackSymbol: some View {
+        Image(systemName: "play.tv.fill")
+            .font(.system(size: 52, weight: .semibold))
+            .foregroundStyle(.white)
     }
 
     // MARK: - Legal Card

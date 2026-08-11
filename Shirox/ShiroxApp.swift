@@ -249,7 +249,19 @@ struct ShiroxApp: App {
                     ToastContainerView()
                 }
                 .task {
-                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                    // Preload Schedule + Notifications in the background during the
+                    // splash. We do NOT await these — the splash dismissal timer is
+                    // the only thing that decides when the splash hides, so a slow
+                    // network never blocks app entry. The fetched data is cached by
+                    // each service and surfaces in the Home tab once it's ready.
+                    Task.detached(priority: .userInitiated) {
+                        async let schedule: Void = AniListService.shared.airingToday()
+                        async let notifications: Void = AniListSocialService.shared.fetchNotifications()
+                        _ = try? await (schedule, notifications)
+                    }
+                    // Extended splash window — gives the preload a head start so the
+                    // Home tab is more likely to be populated when it appears.
+                    try? await Task.sleep(nanoseconds: 2_500_000_000)
                     withAnimation(.easeInOut(duration: 0.4)) { showSplash = false }
                 }
                 .onChange(of: scenePhase) { phase in
@@ -403,50 +415,57 @@ private struct RootTabView: View {
                 #else
                 TabView(selection: $selectedTab) {
                     Tab("Home", systemImage: "house.fill", value: 0) {
-                        HomeView()
+                        HomeView().transition(.opacity)
                     }
                     Tab("Library", systemImage: "books.vertical.fill", value: 1) {
-                        LibraryView()
+                        LibraryView().transition(.opacity)
                     }
                     #if os(iOS)
                     Tab("Downloads", systemImage: "arrow.down.circle.fill", value: 2) {
-                        DownloadsView()
+                        DownloadsView().transition(.opacity)
                     }
                     #endif
                     Tab(value: 3, role: .search) {
-                        SearchView()
+                        SearchView().transition(.opacity)
                     }
                     Tab("Settings", systemImage: "gearshape.fill", value: 4) {
-                        SettingsView()
+                        SettingsView().transition(.opacity)
                     }
                 }
                 .tabViewStyle(.sidebarAdaptable)
                 .tint(.appAccent)
+                .animation(.easeInOut(duration: 0.25), value: selectedTab)
                 #endif
             } else {
                 TabView(selection: $selectedTab) {
                     HomeView()
+                        .transition(.opacity)
                         .tabItem { Label("Home", systemImage: "house.fill") }
                         .tag(0)
                     LibraryView()
+                        .transition(.opacity)
                         .tabItem { Label("Library", systemImage: "books.vertical.fill") }
                         .tag(1)
                     #if os(iOS)
                     DownloadsView()
+                        .transition(.opacity)
                         .tabItem { Label("Downloads", systemImage: "arrow.down.circle.fill") }
                         .tag(2)
                     #endif
                     SearchView()
+                        .transition(.opacity)
                         .tabItem { Label("Search", systemImage: "magnifyingglass") }
                         .tag(3)
                     SettingsView()
+                        .transition(.opacity)
                         .tabItem { Label("Settings", systemImage: "gearshape.fill") }
                         .tag(4)
                 }
                 .tint(.appAccent)
+                .animation(.easeInOut(duration: 0.25), value: selectedTab)
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: selectedTab)
+        .animation(.easeInOut(duration: 0.25), value: selectedTab)
         .onOpenURL { url in
             guard url.scheme == "shirox" else { return }
             AniListAuthManager.shared.handleCallback(url: url)

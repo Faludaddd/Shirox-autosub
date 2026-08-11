@@ -45,9 +45,7 @@ struct ContinueWatchingSection: View {
     @Binding var navTarget: ContinueWatchingNavTarget?
     @Environment(\.horizontalSizeClass) private var sizeClass
 
-    private var cardWidth: CGFloat {
-        sizeClass == .regular ? 260 : 210
-    }
+    private var cardWidth: CGFloat { 260 }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -388,102 +386,115 @@ struct ContinueWatchingCardDisplay: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            // Thumbnail (16:9)
-            Color.clear
-                .aspectRatio(16/9, contentMode: .fit)
-                .overlay(
-                    CachedAsyncImage(urlString: displayImageUrl)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .clipped()
-                )
-                .overlay(
-                    LinearGradient(
-                        stops: [
-                            .init(color: .clear, location: 0.5),
-                            .init(color: .black.opacity(0.75), location: 1)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .overlay(alignment: .bottomLeading) {
-                    HStack(spacing: 4) {
-                        if !item.streamUrl.isEmpty && !isWatched {
-                            Image(systemName: "play.fill")
-                                .font(.system(size: 8, weight: .bold))
-                            Text(episodeLabelText(item: item, prefix: nil))
-                                .font(.caption2.weight(.medium))
-                                .lineLimit(1)
-                                .fixedSize(horizontal: true, vertical: false)
-                        } else if isCaughtUp {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 10, weight: .bold))
-                            Text(episodeLabelText(item: item, prefix: "Caught up"))
-                                .font(.caption2.weight(.bold))
-                                .lineLimit(1)
-                                .fixedSize(horizontal: true, vertical: false)
-                        } else {
-                            Image(systemName: "arrow.right.circle.fill")
-                                .font(.system(size: 10, weight: .bold))
-                            Text(episodeLabelText(item: item, prefix: "Up Next"))
-                                .font(.caption2.weight(.bold))
-                                .lineLimit(1)
-                                .fixedSize(horizontal: true, vertical: false)
-                        }
-                    }
-                    .foregroundStyle(.white.opacity(0.9))
+        // Full-bleed 16:9 card. Title, episode badge, and progress bar are all
+        // layered over the thumbnail so the card is a single visual unit (no
+        // trailing title row).
+        Color.clear
+            .aspectRatio(16/9, contentMode: .fit)
+            .overlay(
+                CachedAsyncImage(urlString: displayImageUrl)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+            )
+            // Episode number badge — top-left corner
+            .overlay(alignment: .topLeading) {
+                Text("EP \(item.episodeNumber)")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.white)
                     .padding(.horizontal, 8)
-                    .padding(.bottom, 8)
-                }
-                .overlay(alignment: .bottom) {
-                    if !item.streamUrl.isEmpty && !isWatched {
-                        GeometryReader { geo in
-                            ZStack(alignment: .leading) {
-                                Color.white.opacity(0.2)
-                                Color.primary
-                                    .frame(width: geo.size.width * progress)
-                                    .shadow(color: Color.primary.opacity(0.5), radius: 3, x: 0, y: 0)
+                    .padding(.vertical, 4)
+                    .background(
+                        Color.black.opacity(0.55),
+                        in: Capsule()
+                    )
+                    .padding(8)
+            }
+            // Bottom gradient overlay carrying the title and compact state
+            // indicator — replaces the previous trailing title row.
+            .overlay(alignment: .bottom) {
+                LinearGradient(
+                    stops: [
+                        .init(color: .clear, location: 0.0),
+                        .init(color: .black.opacity(0.85), location: 1.0)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 96)
+                .overlay(alignment: .bottomLeading) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 4) {
+                            if !item.streamUrl.isEmpty && !isWatched {
+                                Image(systemName: "play.fill")
+                                    .font(.system(size: 8, weight: .bold))
+                                Text(episodeLabelText(item: item, prefix: nil))
+                                    .font(.caption2.weight(.medium))
+                            } else if isCaughtUp {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 10, weight: .bold))
+                                Text(episodeLabelText(item: item, prefix: "Caught up"))
+                                    .font(.caption2.weight(.bold))
+                            } else {
+                                Image(systemName: "arrow.right.circle.fill")
+                                    .font(.system(size: 10, weight: .bold))
+                                Text(episodeLabelText(item: item, prefix: "Up Next"))
+                                    .font(.caption2.weight(.bold))
                             }
                         }
-                        .frame(height: 3)
+                        .foregroundStyle(.white.opacity(0.85))
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+
+                        Text(item.mediaTitle)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .lineLimit(2)
                     }
+                    .padding(.horizontal, 10)
+                    .padding(.bottom, 10)
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .shadow(color: .black.opacity(0.3), radius: 6, x: 0, y: 3)
-
-            // Title below thumbnail
-            Text(item.mediaTitle)
-                .font(.caption)
-                .fontWeight(.semibold)
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-        }
-        .task(id: item.id) {
-            // Resolve the episode-specific thumbnail via the same robust waterfall the
-            // detail episode rows use. getEpisode handles the absolute↔relative episode-number
-            // offset that module-sourced numbers need — a plain `.episode == n` match misses
-            // those and would fall through to a series poster. Only fall back to series
-            // artwork when no per-episode image exists.
-            let id: Int?
-            let provider: ProviderType
-            if let aid = item.aniListID {
-                id = aid; provider = .anilist
-            } else if let mid = item.malID {
-                id = mid; provider = .mal
-            } else {
-                id = nil; provider = .anilist
             }
-            guard let id else { return }
-
-            if let thumb = await TVDBMappingService.shared.getEpisode(
-                for: id, episodeNumber: item.episodeNumber, provider: provider)?.thumbnail {
-                episodeThumbnail = thumb
-                return
+            // Progress bar — pinned to the very bottom edge of the card.
+            .overlay(alignment: .bottom) {
+                if !item.streamUrl.isEmpty && !isWatched {
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Color.white.opacity(0.2)
+                            Color.primary
+                                .frame(width: geo.size.width * progress)
+                                .shadow(color: Color.primary.opacity(0.5), radius: 3, x: 0, y: 0)
+                        }
+                    }
+                    .frame(height: 3)
+                }
             }
-            let artwork = await TVDBMappingService.shared.getArtwork(for: id, provider: provider)
-            episodeThumbnail = artwork.fanart ?? artwork.poster
-        }
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .shadow(color: .black.opacity(0.3), radius: 6, x: 0, y: 3)
+            .task(id: item.id) {
+                // Resolve the episode-specific thumbnail via the same robust waterfall the
+                // detail episode rows use. getEpisode handles the absolute↔relative episode-number
+                // offset that module-sourced numbers need — a plain `.episode == n` match misses
+                // those and would fall through to a series poster. Only fall back to series
+                // artwork when no per-episode image exists.
+                let id: Int?
+                let provider: ProviderType
+                if let aid = item.aniListID {
+                    id = aid; provider = .anilist
+                } else if let mid = item.malID {
+                    id = mid; provider = .mal
+                } else {
+                    id = nil; provider = .anilist
+                }
+                guard let id else { return }
+
+                if let thumb = await TVDBMappingService.shared.getEpisode(
+                    for: id, episodeNumber: item.episodeNumber, provider: provider)?.thumbnail {
+                    episodeThumbnail = thumb
+                    return
+                }
+                let artwork = await TVDBMappingService.shared.getArtwork(for: id, provider: provider)
+                episodeThumbnail = artwork.fanart ?? artwork.poster
+            }
     }
 }
 

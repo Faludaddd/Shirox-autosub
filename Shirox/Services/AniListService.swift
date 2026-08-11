@@ -59,21 +59,49 @@ final class AniListService {
         var genres: [String] = []
         var sort: String = "SEARCH_MATCH"
 
+        // #91 — extended filters. All optional / default-valued so existing
+        // call sites (e.g. `SearchFilters()`) keep their old behavior.
+        var studio: String? = nil              // Animation studio name; client-side filtered (AniList Media has no studio-name arg).
+        var source: String? = nil              // MediaSource — "MANGA", "LIGHT_NOVEL", "ORIGINAL", "ANIME", …
+        var minEpisodes: Int? = nil            // Inclusive lower bound on episode count (AniList's `episodes_greater` is strict >).
+        var maxEpisodes: Int? = nil            // Inclusive upper bound on episode count (AniList's `episodes_lesser` is strict <).
+        var sortDescending: Bool = true        // Toggles the _DESC suffix on sort. SEARCH_MATCH ignores it.
+
         static let defaultSort = "SEARCH_MATCH"
         static let empty = SearchFilters()
         var isEmpty: Bool {
             year == nil && season == nil && format == nil && status == nil
                 && genres.isEmpty && sort == Self.defaultSort
+                && (studio?.trimmingCharacters(in: .whitespaces).isEmpty ?? true)
+                && (source?.isEmpty ?? true)
+                && minEpisodes == nil && maxEpisodes == nil
+                && sortDescending == true
+        }
+
+        /// Effective `[MediaSort]` value to send to AniList, derived from `sort`
+        /// + `sortDescending`. `SEARCH_MATCH` has no direction and is returned as-is;
+        /// everything else has `_DESC` appended (or stripped) per the toggle.
+        var effectiveSort: String {
+            let base = sort.hasSuffix("_DESC") ? String(sort.dropLast(5)) : sort
+            if base == "SEARCH_MATCH" || base.isEmpty { return "SEARCH_MATCH" }
+            return sortDescending ? "\(base)_DESC" : base
         }
     }
 
     func search(keyword: String, filters: SearchFilters = SearchFilters()) async throws -> [AniListMedia] {
-        var variables: [String: Any] = ["search": keyword, "sort": [filters.sort]]
+        var variables: [String: Any] = ["search": keyword, "sort": [filters.effectiveSort]]
         if let year = filters.year { variables["seasonYear"] = year }
         if let season = filters.season, !season.isEmpty { variables["season"] = season }
         if let format = filters.format, !format.isEmpty { variables["format"] = format }
         if let status = filters.status, !status.isEmpty { variables["status"] = status }
         if !filters.genres.isEmpty { variables["genres"] = filters.genres }
+        if let source = filters.source, !source.isEmpty { variables["source"] = source }
+        // AniList's `episodes_greater` / `episodes_lesser` are strict inequalities
+        // (> / <), so subtract 1 from min and add 1 to max to make the filter
+        // inclusive — the slider/field labels read "12+" / "24" and the results
+        // match that intent (anime with episodes >= 12 / <= 24).
+        if let minEp = filters.minEpisodes, minEp > 0 { variables["episodes_greater"] = minEp - 1 }
+        if let maxEp = filters.maxEpisodes, maxEp > 0 { variables["episodes_lesser"] = maxEp + 1 }
 
         // isAdult is hardcoded to false — adult content is never included in search results.
         var mediaArgs = ["search: $search", "type: ANIME", "sort: $sort", "isAdult: false"]
@@ -82,6 +110,9 @@ final class AniListService {
         if filters.format != nil { mediaArgs.append("format: $format") }
         if filters.status != nil { mediaArgs.append("status: $status") }
         if !filters.genres.isEmpty { mediaArgs.append("genres: $genres") }
+        if filters.source != nil { mediaArgs.append("source: $source") }
+        if filters.minEpisodes != nil { mediaArgs.append("episodes_greater: $episodes_greater") }
+        if filters.maxEpisodes != nil { mediaArgs.append("episodes_lesser: $episodes_lesser") }
 
         let argList = mediaArgs.joined(separator: ", ")
         var varDecls = ["$search: String", "$sort: [MediaSort]"]
@@ -90,6 +121,9 @@ final class AniListService {
         if filters.format != nil { varDecls.append("$format: MediaFormat") }
         if filters.status != nil { varDecls.append("$status: MediaStatus") }
         if !filters.genres.isEmpty { varDecls.append("$genres: [String]") }
+        if filters.source != nil { varDecls.append("$source: MediaSource") }
+        if filters.minEpisodes != nil { varDecls.append("$episodes_greater: Int") }
+        if filters.maxEpisodes != nil { varDecls.append("$episodes_lesser: Int") }
         let varDeclList = varDecls.joined(separator: ", ")
 
         let query = """
@@ -108,13 +142,23 @@ final class AniListService {
               format
               season
               seasonYear
+              source
               nextAiringEpisode { episode airingAt timeUntilAiring }
               studios { edges { isMain node { id name } } }
             }
           }
         }
         """
-        return try await fetchPage(query: query, variables: variables)
+        let results = try await fetchPage(query: query, variables: variables)
+
+        // AniList's Media query has no studio-name argument, so studio filtering
+        // is done client-side against the studios already fetched above.
+        let studioQuery = filters.studio?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !studioQuery.isEmpty else { return results }
+        return results.filter { media in
+            guard let edges = media.studios?.edges, !edges.isEmpty else { return false }
+            return edges.contains { $0.node.name.localizedCaseInsensitiveContains(studioQuery) }
+        }
     }
 
     func search(keyword: String) async throws -> [AniListMedia] {
