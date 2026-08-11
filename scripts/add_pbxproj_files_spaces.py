@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-One-off script to register the two new Swift files added for #98/#102
-(CustomRefreshControl.swift, EpisodeLiveActivity.swift) in the Shirox
-pbxproj, which uses SPACE indentation (not tabs).
+One-off script to register the new Swift file added for #98
+(CustomRefreshControl.swift) in the Shirox pbxproj, which uses SPACE
+indentation (not tabs).
 
 This mirrors `add_pbxproj_files.py` but with space-based regex patterns
 that match the current on-disk pbxproj format. Idempotent: files already
@@ -30,7 +30,6 @@ I4 = " " * 32   # children / files entries
 
 FILES_TO_ADD = [
     "Shirox/Views/Shared/CustomRefreshControl.swift",
-    "Shirox/Views/Shared/EpisodeLiveActivity.swift",
 ]
 
 # Sources build phase IDs for each target (looked up from pbxproj).

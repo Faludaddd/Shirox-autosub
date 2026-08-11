@@ -4,6 +4,10 @@ struct HomeView: View {
     @StateObject private var vm = HomeViewModel()
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
     @ObservedObject private var mangaProgress = MangaProgressManager.shared
+    // #111 — Observing AniListAuthManager here lets HomeView re-render the
+    // Continue Watching section's signed-out prompt card the moment the user
+    // completes (or signs out of) AniList auth, without needing a manual reload.
+    @ObservedObject private var anilistAuth = AniListAuthManager.shared
     // Continue Watching context-menu navigation. Driven from here so the hidden
     // NavigationLink that performs the push sits OUTSIDE the ScrollView below.
     @State private var cwNavTarget: ContinueWatchingNavTarget?
@@ -63,6 +67,15 @@ struct HomeView: View {
                             #if os(iOS)
                             if !continueWatching.items.isEmpty {
                                 ContinueWatchingSection(items: continueWatching.items, navTarget: $cwNavTarget)
+                            } else if !anilistAuth.isLoggedIn {
+                                // #111 — When the user has no Continue Watching
+                                // items AND is signed out, surface a sign-in
+                                // prompt card in the same slot so the section
+                                // isn't just invisible. Tapping the button pushes
+                                // SourcesSettingsPage, where the user can connect
+                                // AniList (and MAL) — once authed + watched, the
+                                // real ContinueWatchingSection takes over here.
+                                ContinueWatchingSignInPrompt()
                             }
                             if !mangaProgress.items.isEmpty {
                                 ContinueReadingSection(items: mangaProgress.items, readerContext: $readerContext)
@@ -709,13 +722,28 @@ private struct FeaturedCard: View, Equatable {
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                // iPhone: portrait with horizontal parallax
+                // iPhone: landscape fanart with horizontal parallax.
+                // #110 — Previously this used the default `.poster` type
+                // (portrait 2:3), but the carousel card on iPhone is roughly
+                // square (0.55 * screen height tall, full width wide). A
+                // portrait image `.scaledToFill`-ing a square card gets
+                // cropped hard on the top/bottom, which read as "shortened".
+                // Switching to `.fanart` (landscape banner) matches the iPad
+                // branch and lets the image fill the full card edge-to-edge
+                // with only the sides lightly cropped for parallax headroom.
                 GeometryReader { geo in
                     let pageOffset = geo.frame(in: .global).minX
                     let buffer: CGFloat = 100
-                    TVDBPosterImage(media: media)
+                    TVDBPosterImage(media: media, type: .fanart)
+                        // The frame sets the image's render size to the full
+                        // card height (geo.size.height == carousel imageHeight)
+                        // plus the horizontal parallax buffer. CachedAsyncImage
+                        // already applies `.scaledToFill().clipped()` so the
+                        // image fills this frame completely — no fit/fill
+                        // ambiguity, no whitespace gutters.
                         .frame(width: geo.size.width + buffer, height: geo.size.height)
                         .offset(x: -(buffer / 2) - pageOffset * 0.25)
+                        .clipped()
                 }
                 .clipped()
             }
@@ -1083,11 +1111,13 @@ struct ScheduleView: View {
     @AppStorage("scheduleDefaultMode")   private var mode:   ScheduleMode = .anime
     @AppStorage("scheduleDefaultUseUTC") private var useUTC: Bool         = false
 
-    // Calendar navigation. `weekStartDate` is the Sunday of the currently displayed
-    // week; `selectedDate` is the day whose episodes are shown below the grid. Both
+    // Calendar navigation. `monthStart` is the first day of the currently displayed
+    // month; `selectedDate` is the day whose episodes are shown below the grid. Both
     // are start-of-day dates in the active calendar (local or UTC) so they line up
-    // with the day buckets produced by `buildBuckets()`.
-    @State private var weekStartDate: Date = ScheduleView.startOfWeek(for: Date(), utc: ScheduleSettings.defaultUseUTC)
+    // with the day buckets produced by `buildBuckets()`. The grid renders the whole
+    // month (plus leading/trailing days from adjacent months to fill the 7-column
+    // layout), replacing the previous 7-day week view (#80).
+    @State private var monthStart: Date = ScheduleView.startOfMonth(for: Date(), utc: ScheduleSettings.defaultUseUTC)
     @State private var selectedDate: Date = ScheduleView.calendarFor(utc: ScheduleSettings.defaultUseUTC).startOfDay(for: Date())
 
     // Pending episode-notification schedule ids — drives the bell's on/off state.
@@ -1166,24 +1196,20 @@ struct ScheduleView: View {
         let buckets = buildBuckets()
         // Map each day's start-of-day date → episode count, for the calendar badges.
         let countByDay = Dictionary(uniqueKeysWithValues: buckets.map { ($0.date, $0.entries.count) })
-        let weekDays = currentWeekDays()
+        // #80 — All days needed to fill the 7-column month grid: every day in the
+        // displayed month plus leading/trailing days from adjacent months so the
+        // grid always starts on Sunday and ends on Saturday. Out-of-month days
+        // are styled grey by `dayCell`.
+        let monthDays = currentMonthGridDays()
         let selectedBucket = buckets.first(where: { calendar.isDate($0.date, inSameDayAs: selectedDate) })
 
         VStack(spacing: 0) {
-            // Month / week header — always a single month/year (e.g. "August 2026")
-            // driven by the selected date, never a "Jul – Aug" range. See
-            // `monthYearHeader` for the fallback when the selection is outside
-            // the visible week.
-            Text(monthYearHeader)
-                .font(.headline)
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.top, 6)
-                .padding(.bottom, 8)
-
-            // Week navigation arrows flanking the weekday header + day grid.
+            // Month header — always a single month/year (e.g. "August 2026")
+            // driven by `monthStart` (the first day of the displayed month).
+            // Prev/next arrows shift the calendar by one whole month (#80).
             HStack(spacing: 6) {
                 Button {
-                    shiftWeek(by: -7)
+                    shiftMonth(by: -1)
                 } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 14, weight: .semibold))
@@ -1192,35 +1218,14 @@ struct ScheduleView: View {
                         .foregroundStyle(.primary)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Previous week")
+                .accessibilityLabel("Previous month")
 
-                VStack(spacing: 4) {
-                    // Weekday labels (Sun–Sat).
-                    HStack(spacing: 3) {
-                        ForEach(weekdayLabels, id: \.self) { label in
-                            Text(label)
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity)
-                                .lineLimit(1)
-                        }
-                    }
-                    // Day cells — date number + episode-count badge.
-                    HStack(spacing: 3) {
-                        ForEach(weekDays, id: \.self) { day in
-                            dayCell(
-                                date: day,
-                                count: countByDay[day] ?? 0,
-                                isSelected: calendar.isDate(day, inSameDayAs: selectedDate),
-                                isToday: calendar.isDateInToday(day)
-                            )
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity)
+                Text(monthYearHeader)
+                    .font(.headline)
+                    .frame(maxWidth: .infinity, alignment: .center)
 
                 Button {
-                    shiftWeek(by: 7)
+                    shiftMonth(by: 1)
                 } label: {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 14, weight: .semibold))
@@ -1229,7 +1234,45 @@ struct ScheduleView: View {
                         .foregroundStyle(.primary)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Next week")
+                .accessibilityLabel("Next month")
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 6)
+            .padding(.bottom, 8)
+
+            // Weekday labels (Sun–Sat) — single row above the 7-column grid.
+            HStack(spacing: 6) {
+                ForEach(weekdayLabels, id: \.self) { label in
+                    Text(label)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .lineLimit(1)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 6)
+
+            // Month grid — every day in the displayed month (plus leading/trailing
+            // days from adjacent months to fill the 7-column layout). Standard
+            // months fit in 4–6 rows of 7; cells are sized so 6 rows fit without
+            // scrolling on a typical phone. Each cell shows the date number, an
+            // episode-count badge (if > 0), a today marker, and a selection
+            // highlight. Tapping a leading/trailing day shifts the calendar to
+            // that month and selects the day.
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7),
+                spacing: 4
+            ) {
+                ForEach(monthDays, id: \.self) { day in
+                    dayCell(
+                        date: day,
+                        count: countByDay[day] ?? 0,
+                        isSelected: calendar.isDate(day, inSameDayAs: selectedDate),
+                        isToday: calendar.isDateInToday(day),
+                        isInMonth: calendar.isDate(day, equalTo: monthStart, toGranularity: .month)
+                    )
+                }
             }
             .padding(.horizontal, 12)
             .padding(.bottom, 12)
@@ -1296,45 +1339,60 @@ struct ScheduleView: View {
     }
 
     @ViewBuilder
-    private func dayCell(date: Date, count: Int, isSelected: Bool, isToday: Bool) -> some View {
+    private func dayCell(date: Date, count: Int, isSelected: Bool, isToday: Bool, isInMonth: Bool) -> some View {
         Button {
+            // Tapping a leading/trailing day from an adjacent month shifts the
+            // calendar to that month and selects the tapped day (#80). Tapping
+            // an in-month day just selects it.
             withAnimation(.easeOut(duration: 0.18)) {
+                if !isInMonth {
+                    let cal = calendar
+                    monthStart = cal.dateInterval(of: .month, for: date)?.start ?? monthStart
+                }
                 selectedDate = date
             }
         } label: {
-            VStack(spacing: 5) {
+            VStack(spacing: 4) {
                 Text("\(calendar.component(.day, from: date))")
-                    .font(.body.weight(.bold))
-                    .foregroundStyle(.primary)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(isInMonth ? .primary : .secondary.opacity(0.45))
 
                 if count > 0 {
                     Text("\(count)")
-                        .font(.caption.weight(.bold))
+                        .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1)
                         .background(
                             Capsule().fill(Color.red)
                         )
                         .fixedSize()
+                        .opacity(isInMonth ? 1 : 0.5)
+                } else if isToday {
+                    // Today marker — a filled primary-colored dot under days
+                    // with no episodes. Only rendered for in-month days so the
+                    // marker reads as "today" rather than just a spacer.
+                    Circle()
+                        .fill(isInMonth ? Color.primary : Color.primary.opacity(0.4))
+                        .frame(width: 5, height: 5)
                 } else {
                     Circle()
                         .fill(Color.secondary.opacity(0.3))
                         .frame(width: 5, height: 5)
+                        .opacity(isInMonth ? 1 : 0.35)
                 }
             }
             .frame(maxWidth: .infinity)
-            .frame(minWidth: 48)
-            .frame(height: 64)
+            .frame(minHeight: 48)
             .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(isSelected ? Color.primary.opacity(0.12) : Color.secondary.opacity(0.08))
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(isSelected ? Color.primary.opacity(0.12) : Color.secondary.opacity(0.06))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: 10)
                     .strokeBorder(
                         isSelected ? Color.primary.opacity(0.35) :
-                        (isToday ? Color.primary.opacity(0.3) : Color.clear),
+                        (isToday && isInMonth ? Color.primary.opacity(0.3) : Color.clear),
                         lineWidth: 1
                     )
             )
@@ -1346,20 +1404,21 @@ struct ScheduleView: View {
             )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(accessibilityLabelForDay(date, count: count))
+        .accessibilityLabel(accessibilityLabelForDay(date, count: count, isInMonth: isInMonth))
     }
 
-    private func accessibilityLabelForDay(_ date: Date, count: Int) -> String {
+    private func accessibilityLabelForDay(_ date: Date, count: Int, isInMonth: Bool) -> String {
         let cal = calendar
         let f = DateFormatter()
         f.locale = cal.locale ?? Locale.current
         f.timeZone = cal.timeZone
         f.dateFormat = "EEEE, MMMM d"
         let base = f.string(from: date)
+        let prefix = isInMonth ? "" : "Adjacent month — "
         if count > 0 {
-            return "\(base), \(count) episode\(count == 1 ? "" : "s")"
+            return "\(prefix)\(base), \(count) episode\(count == 1 ? "" : "s")"
         }
-        return "\(base), no episodes"
+        return "\(prefix)\(base), no episodes"
     }
 
     private var scheduleLoadingView: some View {
@@ -1509,10 +1568,19 @@ struct ScheduleView: View {
         return cal.dateInterval(of: .weekOfYear, for: date)?.start ?? date
     }
 
+    /// First day of the month containing `date`, in the active calendar. Used as
+    /// the anchor for the month-grid view (#80) — `monthStart` always points at
+    /// the 1st of the displayed month so the grid can be built deterministically.
+    private static func startOfMonth(for date: Date, utc: Bool) -> Date {
+        let cal = calendarFor(utc: utc)
+        return cal.dateInterval(of: .month, for: date)?.start ?? date
+    }
+
     /// Groups entries into day buckets using the active calendar (local or UTC). This
     /// bypasses `ScheduleDayBucket.build` (which is hard-wired to `Calendar.current`) so
     /// the day boundaries match the displayed times. The bucket keys are start-of-day
-    /// `Date`s, which line up 1:1 with the dates produced by `currentWeekDays()`.
+    /// `Date`s, which line up 1:1 with the dates produced by `currentMonthGridDays()`
+    /// so the calendar grid can look up each day's episode count directly.
     private func buildBuckets() -> [ScheduleDayBucket] {
         let cal = calendar
         var grouped: [Date: [UnifiedScheduleEntry]] = [:]
@@ -1534,12 +1602,29 @@ struct ScheduleView: View {
         }
     }
 
-    /// The seven days of the currently displayed week (Sunday → Saturday).
-    private func currentWeekDays() -> [Date] {
+    /// All days needed to fill the 7-column grid for the displayed month — every
+    /// day in `monthStart`'s month plus leading days from the previous month (so
+    /// the grid starts on Sunday) and trailing days from the next month (so the
+    /// grid ends on Saturday). The result is always a whole number of weeks; for
+    /// a standard month this is 4–6 rows of 7. Capped at 42 days (6 rows) as a
+    /// safety net. Out-of-month days are styled grey by `dayCell` (#80).
+    private func currentMonthGridDays() -> [Date] {
         let cal = calendar
-        return (0..<7).map { offset in
-            cal.date(byAdding: .day, value: offset, to: weekStartDate) ?? weekStartDate
+        guard let monthInterval = cal.dateInterval(of: .month, for: monthStart),
+              let firstWeekInterval = cal.dateInterval(of: .weekOfYear, for: monthInterval.start) else {
+            return []
         }
+        var days: [Date] = []
+        var current = firstWeekInterval.start
+        // Keep adding days until we've fully covered the month AND the row count
+        // is a whole number of weeks. The 42-day cap guards against pathological
+        // calendar configurations.
+        while current < monthInterval.end || days.count % 7 != 0 {
+            days.append(current)
+            current = cal.date(byAdding: .day, value: 1, to: current) ?? current
+            if days.count >= 42 { break }
+        }
+        return days
     }
 
     /// Short weekday symbols (Sun, Mon, …, Sat) for the active calendar's locale.
@@ -1547,42 +1632,39 @@ struct ScheduleView: View {
         Array(calendar.shortWeekdaySymbols.prefix(7))
     }
 
-    /// Month/year header — always a single "August 2026" string, driven by the
-    /// selected date's month. Previously this showed a "Jul – Aug 2026" range
-    /// when the visible week spanned two months, which was confusing when the
-    /// selected day lived in only one of them. Now we always show the month of
-    /// the selected date. If the selection somehow falls outside the visible
-    /// week (e.g. on first appearance before `resetCalendarToToday()` snaps it
-    /// back), we fall back to the middle day of the visible week (Wednesday) so
-    /// the header still shows a single, stable label.
+    /// Month/year header — always a single "August 2026" string driven by
+    /// `monthStart` (the first day of the displayed month). With the month-grid
+    /// view (#80) there's no longer any ambiguity about which month to show,
+    /// so the previous fallback logic (which picked Wednesday of the visible
+    /// week when the selection fell outside it) is no longer needed.
     private var monthYearHeader: String {
-        let days = currentWeekDays()
         let cal = calendar
-
-        let referenceDay: Date
-        if days.contains(where: { cal.isDate($0, inSameDayAs: selectedDate) }) {
-            referenceDay = selectedDate
-        } else if days.indices.contains(3) {
-            // Wednesday — the middle day of a Sunday-first week.
-            referenceDay = days[3]
-        } else {
-            referenceDay = days.first ?? weekStartDate
-        }
-
         let f = DateFormatter()
         f.locale = cal.locale ?? Locale.current
         f.timeZone = cal.timeZone
         f.dateFormat = "MMMM yyyy"
-        return f.string(from: referenceDay)
+        return f.string(from: monthStart)
     }
 
-    /// Shifts the displayed week (and the selection) by `days` (±7). The selection
-    /// moves with the week so a day in the new week stays highlighted.
-    private func shiftWeek(by days: Int) {
+    /// Shifts the displayed month by `months` (±1). The selection follows into
+    /// the new month, keeping the same day-of-month when possible. If the new
+    /// month is shorter (e.g. Jan 31 → Feb 28), the selection clamps to the
+    /// last day of the new month so it always lands on a valid date (#80).
+    private func shiftMonth(by months: Int) {
         let cal = calendar
         withAnimation(.easeOut(duration: 0.2)) {
-            weekStartDate = cal.date(byAdding: .day, value: days, to: weekStartDate) ?? weekStartDate
-            selectedDate = cal.date(byAdding: .day, value: days, to: selectedDate) ?? selectedDate
+            guard let newMonthStart = cal.date(byAdding: .month, value: months, to: monthStart) else { return }
+            monthStart = newMonthStart
+            // Preserve the selected day-of-month in the new month, clamping to
+            // the last valid day if the new month is shorter (e.g. Jan 31 → Feb 28).
+            if let maxDay = cal.range(of: .day, in: .month, for: newMonthStart) {
+                let wantedDay = min(cal.component(.day, from: selectedDate), maxDay.count)
+                var comps = cal.dateComponents([.year, .month], from: newMonthStart)
+                comps.day = wantedDay
+                if let newSelected = cal.date(from: comps) {
+                    selectedDate = cal.startOfDay(for: newSelected)
+                }
+            }
         }
     }
 
@@ -1591,10 +1673,10 @@ struct ScheduleView: View {
     private func resetCalendarToToday() {
         let cal = calendar
         let today = cal.startOfDay(for: Date())
-        let weekStart = Self.startOfWeek(for: Date(), utc: useUTC)
+        let newMonthStart = Self.startOfMonth(for: Date(), utc: useUTC)
         withAnimation(.easeOut(duration: 0.2)) {
             selectedDate = today
-            weekStartDate = weekStart
+            monthStart = newMonthStart
         }
     }
 
@@ -2507,3 +2589,98 @@ private struct NotificationRow: View {
         return f
     }()
 }
+
+// MARK: - Continue Watching Sign-In Prompt (#111)
+
+#if os(iOS)
+/// Placeholder card shown in the Continue Watching slot when the user has no
+/// resume items AND is signed out of AniList. Mirrors the visual rhythm of the
+/// real `ContinueWatchingSection` (heavy title + accent rule + a single
+/// full-width card) so the home screen doesn't have an awkward empty gap where
+/// Continue Watching would normally live.
+///
+/// Tapping the card's "Sign in" button pushes `SourcesSettingsPage`, where the
+/// user can connect AniList (and MAL). Once they're authed and have watched
+/// something, `ContinueWatchingManager` populates `items` and the real
+/// `ContinueWatchingSection` replaces this prompt automatically (driven by
+/// HomeView's `@ObservedObject anilistAuth` + `@ObservedObject continueWatching`
+/// bindings).
+private struct ContinueWatchingSignInPrompt: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Section header — matches ContinueWatchingSection's header
+            // (heavy title + 36pt accent rule) so the slot reads as the same
+            // "Continue Watching" section, just in its signed-out state.
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Continue Watching")
+                        .font(.title2.weight(.heavy))
+                        .tracking(0.3)
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color.primary)
+                        .frame(width: 36, height: 3)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+
+            // Single full-width prompt card. Person icon + copy on the left,
+            // "Sign in" button pinned to the trailing edge. Wrapped in a
+            // NavigationLink so the whole card is tappable as well as the
+            // explicit button — both push SourcesSettingsPage.
+            NavigationLink {
+                SourcesSettingsPage()
+            } label: {
+                HStack(spacing: 14) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.appAccent.opacity(0.15))
+                        Image(systemName: "person.crop.circle.fill")
+                            .font(.system(size: 26, weight: .regular))
+                            .foregroundStyle(Color.appAccent)
+                    }
+                    .frame(width: 48, height: 48)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Sign in to continue watching")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                        Text("Connect AniList to sync your progress and pick up where you left off.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+
+                    Spacer(minLength: 8)
+
+                    // Explicit "Sign in" capsule so the affordance is
+                    // unambiguous even if the user doesn't realise the whole
+                    // card is tappable. `.buttonStyle(.plain)` keeps the
+                    // NavigationLink handling the actual navigation.
+                    Text("Sign in")
+                        .font(.callout.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(
+                            Capsule().fill(Color.appAccent)
+                        )
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(Color.secondary.opacity(0.10))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+                )
+            }
+            .buttonStyle(HomePressStyle())
+            .padding(.horizontal, 16)
+        }
+    }
+}
+#endif

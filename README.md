@@ -10,7 +10,6 @@ Shirox is a free, source-available personal anime library manager for iOS 15+, d
 -   **Continue Watching**: Automatically track your progress and pick up right where you left off.
 -   **Modern Player**: Full support for Picture-in-Picture (PiP), AirPlay, Chromecast and customizable subtitles.
 -   **Clean UI**: A native SwiftUI interface that supports both Light and Dark modes with an adaptive design.
--   **Live Activities & Widgets (optional)**: The app advertises `NSSupportsLiveActivities` in `Info.plist` and ships `EpisodeLiveActivityManager` in the main target so it can start/stop airing-countdown Live Activities on iOS 16.2+. The Home Screen widgets + Live Activity UI rendering live in `Shirox/Widgets/` as reference Swift files plus template `Info.plist` / `.entitlements` files — they are **not** wired into a Widget Extension target in CI to keep the build green. See [`Shirox/Widgets/README.md`](Shirox/Widgets/README.md) for the manual Xcode setup steps.
 
 ## Installation
 
