@@ -37,6 +37,23 @@ final class AniListService {
     private let endpoint = URL(string: "https://graphql.anilist.co")!
     private let session: URLSession
 
+    // #92 — In-memory schedule cache. Populated by the splash preload
+    // (`AniListService.shared.airingToday()` from `ShiroxApp.task`) so that
+    // when `HomeView` / `ScheduleView` load a few moments later they can
+    // reuse the same data instead of re-fetching. Keyed loosely by range:
+    // if the cached range fully contains the requested range AND the cache
+    // is still fresh (within `scheduleCacheTTL`), we filter the cached
+    // entries to the requested window and return them. Otherwise we fetch
+    // fresh and overwrite the cache. Synchronized via `scheduleCacheLock`
+    // because `AniListService` is not actor-isolated and may be called from
+    // any Task (including the `Task.detached` preload in `ShiroxApp`).
+    private var scheduleCacheEntries: [AniListAiringScheduleItem] = []
+    private var scheduleCacheFrom: Int = 0
+    private var scheduleCacheTo: Int = 0
+    private var scheduleCacheAt: Date = .distantPast
+    private let scheduleCacheTTL: TimeInterval = 60  // seconds
+    private let scheduleCacheLock = NSLock()
+
     private init() {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 15
@@ -416,7 +433,20 @@ final class AniListService {
     /// delay is inserted between requests to stay within AniList's rate limits. This matters
     /// because long-running series (e.g. *Bleach: Thousand-Year Blood War*) frequently land
     /// beyond the first page and would otherwise be missing from "airing today/this week".
+    ///
+    /// #92 — Results are cached for `scheduleCacheTTL` seconds (60s). When a
+    /// request arrives whose `[from, to]` window is fully contained in the
+    /// cached window AND the cache is still fresh, the cached entries are
+    /// filtered to the requested window and returned without a network call.
+    /// This lets the splash preload (`airingToday()`) populate the cache so
+    /// that `HomeView` / `ScheduleView` — which fetch slightly different
+    /// windows — can reuse the data instead of re-fetching on first render.
     func airingSchedules(from: Int, to: Int) async throws -> [AniListAiringScheduleItem] {
+        // 1. Try the cache first.
+        if let cached = scheduleCacheLookup(from: from, to: to) {
+            return cached
+        }
+
         struct AiringPage: Decodable { let Page: AiringSchedulePage }
         struct AiringSchedulePage: Decodable {
             let airingSchedules: [AiringScheduleData]?
@@ -487,7 +517,73 @@ final class AniListService {
             }
         }
 
+        // 2. Populate the cache with the freshly fetched window.
+        scheduleCacheStore(entries: all, from: from, to: to)
+
         return all
+    }
+
+    // MARK: - Schedule cache (#92)
+
+    /// Returns the cached schedule entries filtered to the requested
+    /// `[from, to]` window if the cache is fresh AND (with a small tolerance)
+    /// fully contains the requested window. Returns `nil` otherwise (caller
+    /// must fetch fresh).
+    ///
+    /// The tolerance accounts for the fact that `airingToday()` computes
+    /// `now` on every call, so two calls a few seconds apart request slightly
+    /// different windows. Without tolerance, the second call would always
+    /// miss the cache even though the underlying data is identical. We expand
+    /// the cached window by `cacheAge + 5s` on both ends so subsequent calls
+    /// within the TTL still hit.
+    private func scheduleCacheLookup(from: Int, to: Int) -> [AniListAiringScheduleItem]? {
+        scheduleCacheLock.lock()
+        defer { scheduleCacheLock.unlock() }
+        // Cache empty or never populated.
+        guard scheduleCacheAt != .distantPast else { return nil }
+        let age = Date().timeIntervalSince(scheduleCacheAt)
+        // Cache stale?
+        if age > scheduleCacheTTL { return nil }
+        // Tolerance: how much the cached window can be expanded to absorb
+        // small `now`-shifts between calls.
+        let tolerance = Int(age.rounded(.up)) + 5  // +5s safety margin
+        // Cached window (expanded by tolerance) must fully contain the
+        // requested window.
+        guard scheduleCacheFrom - tolerance <= from,
+              scheduleCacheTo + tolerance >= to else { return nil }
+        // Filter to the requested window.
+        return scheduleCacheEntries.filter { $0.airingAt >= from && $0.airingAt <= to }
+    }
+
+    /// Stores the freshly fetched schedule entries in the cache, expanding
+    /// the cached window if the new fetch extends beyond the previous one
+    /// (so subsequent requests for an even larger window can still hit).
+    private func scheduleCacheStore(entries: [AniListAiringScheduleItem], from: Int, to: Int) {
+        scheduleCacheLock.lock()
+        defer { scheduleCacheLock.unlock() }
+        // If we already have a fresh cache that fully contains this new
+        // window, merge the new entries in (deduped by `id`) so we keep the
+        // broadest possible cached window without losing any data. Otherwise
+        // overwrite the cache with this fresh fetch.
+        let now = Date()
+        let isFresh = scheduleCacheAt != .distantPast
+            && now.timeIntervalSince(scheduleCacheAt) <= scheduleCacheTTL
+        if isFresh, scheduleCacheFrom <= from, scheduleCacheTo >= to {
+            // Merge — keep existing entries plus any new ones we hadn't seen.
+            var seen = Set(scheduleCacheEntries.map { $0.id })
+            var merged = scheduleCacheEntries
+            for entry in entries where seen.insert(entry.id).inserted {
+                merged.append(entry)
+            }
+            scheduleCacheEntries = merged
+        } else {
+            // Overwrite with the fresh fetch (broaden the cached window if
+            // the new fetch extends beyond what was cached before).
+            scheduleCacheEntries = entries
+            scheduleCacheFrom = from
+            scheduleCacheTo = to
+        }
+        scheduleCacheAt = now
     }
 
     func browse(category: BrowseCategory, page: Int) async throws -> [AniListMedia] {

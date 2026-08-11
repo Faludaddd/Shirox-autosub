@@ -11,13 +11,21 @@ struct AnimatedSplashView: View {
         ZStack {
             Color(UIColor.systemBackground)
             VStack(spacing: 16) {
-                // App icon — polished rounded square with a black → blue → purple
-                // accent gradient so the generic SF Symbol reads as a real app icon.
-                // Prefers the real app icon from the bundle when available (iOS /
-                // tvOS / Catalyst); falls back to the SF Symbol on macOS.
+                // #92 — App logo. Prefers the bundled `app-logo.png` resource
+                // (added to the Xcode project as a Resources file reference so
+                // `UIImage(named: "app-logo")` resolves at runtime). Falls back
+                // to the alternate / primary app icon from the asset catalog,
+                // then to an SF Symbol on platforms where neither is available
+                // (e.g. macOS without UIKit).
                 Group {
                     #if canImport(UIKit)
-                    if let uiIcon = UIApplication.shared.icon {
+                    if let logo = Self.bundledAppLogo {
+                        Image(uiImage: logo)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 100, height: 100)
+                            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    } else if let uiIcon = UIApplication.shared.icon {
                         Image(uiImage: uiIcon)
                             .resizable()
                             .aspectRatio(contentMode: .fit)
@@ -89,6 +97,27 @@ struct AnimatedSplashView: View {
             .font(.system(size: 78, weight: .bold))
             .foregroundStyle(.white)
     }
+
+    #if canImport(UIKit)
+    /// #92 — Resolves the bundled `app-logo.png` (located at
+    /// `Shirox/Resources/app-logo.png` and registered as a resource in the
+    /// Xcode project). `UIImage(named:)` checks both the asset catalog and
+    /// the bundle's `.resources` directory, so this picks up the loose PNG
+    /// once it's added to a Resources build phase. Returns `nil` on
+    /// platforms without UIKit (handled at the call site).
+    private static let bundledAppLogo: UIImage? = {
+        // Try the SwiftUI-friendly name first.
+        if let img = UIImage(named: "app-logo") { return img }
+        // Some build configurations mangle loose-resource names; try a
+        // filename-with-extension lookup against the main bundle as a
+        // fallback before giving up.
+        if let url = Bundle.main.url(forResource: "app-logo", withExtension: "png"),
+           let img = UIImage(contentsOfFile: url.path) {
+            return img
+        }
+        return nil
+    }()
+    #endif
 }
 
 #if canImport(UIKit)

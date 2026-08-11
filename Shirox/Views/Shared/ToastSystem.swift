@@ -89,6 +89,12 @@ final class ToastManager: ObservableObject {
 /// offset behind the newest. Anchored to the BOTTOM of the screen, just above
 /// the tab bar — so toasts slide up from the bottom edge and never collide
 /// with the navigation bar / status bar.
+///
+/// #89 — the container fills the whole screen (so the toasts can be aligned
+/// to the bottom via `.frame(maxHeight: .infinity, alignment: .bottom)`) but
+/// the empty space above the toasts is touch-transparent so it never blocks
+/// taps on the underlying content. Each individual toast re-enables hit
+/// testing on itself.
 struct ToastContainerView: View {
     @ObservedObject var manager = ToastManager.shared
 
@@ -103,10 +109,17 @@ struct ToastContainerView: View {
                     .zIndex(Double(index))
             }
         }
-        .padding(.bottom, 100)  // just above the tab bar
         .padding(.horizontal, 16)
-        .frame(maxWidth: .infinity, alignment: .bottom)
-        .allowsHitTesting(true)
+        // #89 — anchored just above the tab bar (~90pt). This keeps the toast
+        // clear of the tab bar without overlapping it on any form factor.
+        .padding(.bottom, 90)
+        // Fill the whole screen so `.bottom` alignment can push the toast
+        // stack to the bottom edge of the overlay.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        // The container itself is touch-transparent — empty space above the
+        // toasts must NOT intercept taps on the underlying content. Each
+        // toast re-enables hit testing for its own bounds below.
+        .allowsHitTesting(false)
     }
 }
 
@@ -117,136 +130,123 @@ struct ToastContainerView: View {
 /// relative to `total`) are scaled down and nudged up to create the layered,
 /// "liquid glass" stack visual.
 ///
-/// Interactions (top toast only):
+/// #89 — Interactions (top toast only):
 /// - Tap: fires the optional action (if any) and dismisses.
-/// - Swipe LEFT: slides the card leftward, revealing a red "Dismiss" action
-///   behind it. Release past the threshold to dismiss; otherwise snap back.
-/// - Swipe DOWN: dismisses immediately past the threshold.
+/// - Swipe (any direction) past threshold: dismisses. The toast is COMPLETELY
+///   STATIC during the drag — no visual offset, no revealed-behind panel.
+///   The gesture only inspects the final translation at gesture END.
+/// - Inline "X" button on the trailing edge: tap to dismiss at any time.
 struct ToastView: View {
     let toast: ToastData
     let stackIndex: Int
     let total: Int
 
-    /// Live drag translation; only the top toast updates this.
-    @State private var dragOffset: CGSize = .zero
-
-    /// Horizontal translation (negative) past which a leftward swipe commits
-    /// to dismissal.
-    private let leftDismissThreshold: CGFloat = -100
-    /// Vertical translation (positive) past which a downward swipe commits
-    /// to dismissal.
-    private let downDismissThreshold: CGFloat = 50
+    /// #89 — Horizontal translation past which a swipe commits to dismissal.
+    private let horizontalDismissThreshold: CGFloat = 80
+    /// #89 — Vertical translation past which a swipe commits to dismissal.
+    private let verticalDismissThreshold: CGFloat = 50
 
     var body: some View {
         let isTop = stackIndex == total - 1  // newest is on top of the stack
 
-        ZStack {
-            // Red "Dismiss" action — revealed behind the card as the user
-            // swipes left. Only the top (interactive) toast can reveal it.
-            if isTop && dragOffset.width < -8 {
-                HStack(spacing: 6) {
-                    Spacer()
-                    Image(systemName: "trash.fill")
-                        .font(.system(size: 14, weight: .bold))
-                    Text("Dismiss")
-                        .font(.subheadline.weight(.semibold))
-                }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 20)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .fill(Color.red.opacity(0.92))
-                )
-                .transition(.opacity)
+        HStack(spacing: 12) {
+            // Icon circle
+            ZStack {
+                Circle()
+                    .fill(toast.iconColor.opacity(0.2))
+                Image(systemName: toast.icon)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(toast.iconColor)
+            }
+            .frame(width: 36, height: 36)
+
+            // Text content
+            VStack(alignment: .leading, spacing: 2) {
+                Text(toast.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                Text(toast.message)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
             }
 
-            // Toast content
-            HStack(spacing: 12) {
-                // Icon circle
-                ZStack {
-                    Circle()
-                        .fill(toast.iconColor.opacity(0.2))
-                    Image(systemName: toast.icon)
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(toast.iconColor)
-                }
-                .frame(width: 36, height: 36)
+            Spacer(minLength: 8)
 
-                // Text content
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(toast.title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                    Text(toast.message)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
-
-                Spacer(minLength: 8)
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .background(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(.ultraThinMaterial)  // liquid glass / frosted
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
-            )
-            .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
-            // Stacked visual: non-top toasts are scaled down and nudged up
-            .scaleEffect(isTop ? 1.0 : 0.95)
-            .offset(y: isTop ? 0 : CGFloat((total - 1 - stackIndex)) * -6)
-            .opacity(isTop ? 1.0 : 0.8)
-            // Drag offset — only the top toast receives drags, so non-top
-            // toasts always have dragOffset == .zero and are unaffected.
-            .offset(x: dragOffset.width, y: dragOffset.height)
-            .onTapGesture {
-                if let action = toast.action {
-                    action()
-                }
+            // #89 — Inline "X" dismiss button, ALWAYS visible within the
+            // toast's own bounds. No separate panel, no revealed-behind
+            // layer — just a small circular close button on the trailing
+            // edge. Only the top (interactive) toast shows it; older stacked
+            // toasts hide it since they're not directly dismissible anyway.
+            Button {
+                Haptics.light()
                 ToastManager.shared.dismiss(toast.id)
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 24, height: 24)
+                    .background(
+                        Circle().fill(Color.secondary.opacity(0.18))
+                    )
             }
-            .gesture(
-                DragGesture(minimumDistance: 5)
-                    .onChanged { value in
-                        guard isTop else { return }
-                        // Constrain to leftward (negative width) and downward
-                        // (positive height) translations only — swiping right
-                        // or up does nothing, which keeps the gesture intuitive.
-                        var translation = CGSize.zero
-                        if value.translation.width < 0 {
-                            translation.width = value.translation.width
-                        }
-                        if value.translation.height > 0 {
-                            translation.height = value.translation.height
-                        }
-                        dragOffset = translation
-                    }
-                    .onEnded { value in
-                        guard isTop else { return }
-                        if value.translation.height > downDismissThreshold {
-                            // Swipe DOWN — dismiss immediately.
-                            // #96 — Light haptic feedback when the toast is swiped away.
-                            Haptics.light()
-                            ToastManager.shared.dismiss(toast.id)
-                        } else if value.translation.width < leftDismissThreshold {
-                            // Swipe LEFT past threshold — dismiss.
-                            // #96 — Light haptic feedback when the toast is swiped away.
-                            Haptics.light()
-                            ToastManager.shared.dismiss(toast.id)
-                        } else {
-                            // Release without crossing a threshold — snap back.
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                                dragOffset = .zero
-                            }
-                        }
-                    }
-            )
+            .buttonStyle(.plain)
+            .opacity(isTop ? 1 : 0)
+            .disabled(!isTop)
         }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.ultraThinMaterial)  // liquid glass / frosted
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
+        )
+        .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
+        // Stacked visual: non-top toasts are scaled down and nudged up.
+        // These transforms are layout-only (driven by stackIndex, not user
+        // input) — the toast itself never moves in response to a drag.
+        .scaleEffect(isTop ? 1.0 : 0.95)
+        .offset(y: isTop ? 0 : CGFloat((total - 1 - stackIndex)) * -6)
+        .opacity(isTop ? 1.0 : 0.8)
+        // #89 — Tap fires the optional action (if any) and dismisses.
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if let action = toast.action {
+                action()
+            }
+            ToastManager.shared.dismiss(toast.id)
+        }
+        // #89 — Swipe-to-dismiss: the gesture ONLY inspects the final
+        // translation on gesture END. It does NOT update any state during
+        // the drag, so the toast stays COMPLETELY STATIC — no offset is
+        // applied to the view at any point. We just decide at the end
+        // whether the swipe was big enough to commit to dismissal.
+        .gesture(
+            DragGesture(minimumDistance: 10)
+                .onEnded { value in
+                    guard isTop else { return }
+                    let t = value.translation
+                    // Horizontal swipe (either direction) past threshold.
+                    if abs(t.width) > horizontalDismissThreshold {
+                        // #96 — Light haptic feedback when the toast is swiped away.
+                        Haptics.light()
+                        ToastManager.shared.dismiss(toast.id)
+                    } else if abs(t.height) > verticalDismissThreshold {
+                        // Vertical swipe (either direction) past threshold.
+                        Haptics.light()
+                        ToastManager.shared.dismiss(toast.id)
+                    }
+                    // Otherwise: do nothing. The toast stays put — no snap-
+                    // back animation needed because it never moved.
+                }
+        )
+        // #89 — Re-enable hit testing on this individual toast so taps /
+        // swipes / the X button all work, even though the parent container
+        // has `.allowsHitTesting(false)`.
+        .allowsHitTesting(true)
     }
 }

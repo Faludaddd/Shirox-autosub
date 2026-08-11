@@ -2212,6 +2212,7 @@ struct NotificationsSettingsPage: View {
     @State private var authStatus: UNAuthorizationStatus = .notDetermined
     @State private var pendingCount: Int = 0
     @State private var isRefreshing = false
+    @State private var isSendingTest = false
 
     private var leadTime: EpisodeNotificationManager.LeadTime {
         EpisodeNotificationManager.LeadTime(rawValue: leadTimeRaw) ?? .atAirtime
@@ -2397,6 +2398,23 @@ struct NotificationsSettingsPage: View {
             }
             .buttonStyle(.bordered)
             .disabled(pendingCount == 0)
+
+            Button {
+                Task { await sendTestNotification() }
+            } label: {
+                HStack {
+                    if isSendingTest {
+                        ProgressView().tint(.appAccent)
+                    } else {
+                        Image(systemName: "bell.badge.fill")
+                    }
+                    Text("Send Test Notification")
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .tint(.appAccent)
+            .disabled(isSendingTest)
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -2427,6 +2445,39 @@ struct NotificationsSettingsPage: View {
         let settings = await center.notificationSettings()
         authStatus = settings.authorizationStatus
         pendingCount = await EpisodeNotificationManager.shared.pendingCount()
+    }
+
+    /// Fires a test toast via `ToastManager` and schedules a local UN notification
+    /// so the user can verify how episode-airing notifications will look and behave.
+    private func sendTestNotification() async {
+        isSendingTest = true
+        defer { isSendingTest = false }
+
+        // In-app toast preview — matches the styling used by real airing alerts.
+        ToastManager.shared.show(
+            title: "Test Notification",
+            message: "This is how notifications will appear",
+            icon: "bell.fill",
+            iconColor: .accentColor,
+            duration: 5.0
+        )
+
+        // Real local notification so the user can also see the system banner /
+        // lock-screen presentation that fires when an episode airs.
+        let content = UNMutableNotificationContent()
+        content.title = "Test Notification"
+        content.body = "This is how episode airing notifications will appear"
+        content.sound = .default
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        let request = UNNotificationRequest(
+            identifier: "test-\(UUID().uuidString)",
+            content: content,
+            trigger: trigger
+        )
+        try? await UNUserNotificationCenter.current().add(request)
+
+        // Pending count now includes the scheduled test — refresh so the counter reflects it.
+        await refreshStatus()
     }
 }
 
@@ -3831,7 +3882,19 @@ struct AboutSettingsPage: View {
 
                 Group {
                     #if canImport(UIKit)
-                    if let uiIcon = UIApplication.shared.icon {
+                    // #92 — Prefer the bundled `app-logo` asset from the asset
+                    // catalog. `Image("app-logo")` resolves a named image from the
+                    // main bundle's catalog, but renders empty if the name is
+                    // unknown — so we probe with `UIImage(named: "app-logo")` first
+                    // (which returns `nil` for missing assets) and fall back to the
+                    // installed app icon, then the SF Symbol on macOS.
+                    if UIImage(named: "app-logo") != nil {
+                        Image("app-logo")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 70, height: 70)
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    } else if let uiIcon = UIApplication.shared.icon {
                         Image(uiImage: uiIcon)
                             .resizable()
                             .aspectRatio(contentMode: .fit)

@@ -10,6 +10,16 @@ final class AniListSocialService {
         return URLSession(configuration: cfg)
     }()
 
+    // #92 — In-memory notifications cache. Populated by the splash preload
+    // (`AniListSocialService.shared.fetchNotifications()` from `ShiroxApp.task`)
+    // so that `HomeView`'s notifications card / `NotificationsView` can reuse
+    // the data instead of re-fetching on first render. This service is
+    // `@MainActor`-isolated, so no explicit lock is needed — all reads and
+    // writes are serialized on the main thread.
+    private var cachedNotifications: [AniListNotification] = []
+    private var cachedNotificationsAt: Date = .distantPast
+    private let notificationsCacheTTL: TimeInterval = 60  // seconds
+
     private func performQuery<T: Decodable>(query: String, variables: [String: Any] = [:], auth: Bool = false) async throws -> T {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
@@ -280,6 +290,17 @@ final class AniListSocialService {
     // MARK: - Notifications
 
     func fetchNotifications(filter: AniListNotificationFilter = .all) async throws -> [AniListNotification] {
+        // #92 — Serve from cache when fresh (within `notificationsCacheTTL`).
+        // The splash preload calls this with the default `.all` filter, so we
+        // only consult the cache when the caller also asks for `.all` — a
+        // filtered fetch is rare (notifications UI doesn't filter client-side)
+        // and is always served fresh.
+        if filter == .all,
+           cachedNotificationsAt != .distantPast,
+           Date().timeIntervalSince(cachedNotificationsAt) <= notificationsCacheTTL {
+            return cachedNotifications
+        }
+
         struct Response: Decodable {
             struct Data: Decodable { let Page: PageData }
             let data: Data
@@ -338,7 +359,7 @@ final class AniListSocialService {
         }
         """
         let r: Response = try await performQuery(query: q, variables: variables, auth: true)
-        return r.data.Page.notifications.compactMap { raw in
+        let parsed = r.data.Page.notifications.compactMap { raw in
             guard let id = raw.id else { return nil }
             let createdAt = raw.createdAt ?? 0
             switch raw.__typename {
@@ -386,6 +407,15 @@ final class AniListSocialService {
             default: return nil
             }
         }
+
+        // #92 — Update the cache (only for the default `.all` filter, since
+        // that's what the splash preload and the notifications UI both use).
+        if filter == .all {
+            cachedNotifications = parsed
+            cachedNotificationsAt = Date()
+        }
+
+        return parsed
     }
 
     // MARK: - Mutations

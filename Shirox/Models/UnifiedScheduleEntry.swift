@@ -52,6 +52,15 @@ struct UnifiedScheduleEntry: Identifiable, Hashable, Sendable {
     let format: String?
     /// `true` for streaming-platform releases (Netflix drops, etc.); `false` otherwise.
     let isStreamingRelease: Bool
+    /// Genre tags when known (`nil` for Western entries; populated from AniList for anime).
+    /// Surfaced by `ScheduleDetailView` (#107) — kept optional so Western entries decode
+    /// without it and older call sites don't need to supply a value.
+    let genres: [String]?
+    /// Popularity score used for ordering within a day. For AniList entries this is
+    /// the media's `averageScore` (AniList doesn't expose `popularity` in our airing
+    /// schedule query, so the average score serves as a popularity proxy). Western
+    /// entries have no comparable metric from TVMaze, so they default to `0`.
+    let popularity: Int
 
     // MARK: Init from AniList
 
@@ -67,6 +76,8 @@ struct UnifiedScheduleEntry: Identifiable, Hashable, Sendable {
         self.coverImage = item.media.coverImage.best
         self.format = item.media.format
         self.isStreamingRelease = false
+        self.genres = item.media.genres
+        self.popularity = item.media.averageScore ?? 0
     }
 
     // MARK: Init from Western
@@ -83,6 +94,12 @@ struct UnifiedScheduleEntry: Identifiable, Hashable, Sendable {
         self.coverImage = entry.coverImage
         self.format = "TV"
         self.isStreamingRelease = entry.isStreamingRelease
+        // TVMaze's schedule endpoint doesn't expose genres, so Western entries
+        // carry `nil` here — `ScheduleDetailView` hides the genre row when empty.
+        self.genres = nil
+        // TVMaze doesn't expose a usable popularity/rating on the schedule endpoint,
+        // so Western entries sort neutrally (popularity = 0).
+        self.popularity = 0
     }
 
     // MARK: Computed
@@ -131,7 +148,7 @@ struct UnifiedScheduleEntry: Identifiable, Hashable, Sendable {
 struct ScheduleDayBucket: Identifiable, Hashable, Sendable {
     /// Start-of-day date for this bucket (timezone-aware).
     let date: Date
-    /// Entries airing on this day, sorted by air time ascending.
+    /// Entries airing on this day, sorted by popularity (desc) then air time (asc).
     let entries: [UnifiedScheduleEntry]
 
     var id: TimeInterval { date.timeIntervalSince1970 }
@@ -166,7 +183,12 @@ struct ScheduleDayBucket: Identifiable, Hashable, Sendable {
 
         return grouped.keys.sorted().map { day in
             let dayEntries = grouped[day] ?? []
-            let sorted = dayEntries.sorted { $0.airingAt < $1.airingAt }
+            let sorted = dayEntries.sorted {
+                if $0.popularity != $1.popularity {
+                    return $0.popularity > $1.popularity
+                }
+                return $0.airingAt < $1.airingAt
+            }
             return ScheduleDayBucket(date: day, entries: sorted)
         }
     }

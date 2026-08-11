@@ -89,5 +89,16 @@
     <!-- Appstore Release -->
     <key>ITSAppUsesNonExemptEncryption</key>
     <false/>
+
+    <!-- Live Activities support (#101/102) — enables ActivityKit-based
+         countdown widgets for airing episodes, etc. -->
+    <key>NSSupportsLiveActivities</key>
+    <true/>
+
+    <!-- Live Activities require frequent updates on the Lock Screen; opting
+         in to the frequent-discount API keeps the widget fresh without
+         hitting the standard update budget. -->
+    <key>NSSupportsLiveActivitiesFrequentUpdates</key>
+    <true/>
 </dict>
 </plist>

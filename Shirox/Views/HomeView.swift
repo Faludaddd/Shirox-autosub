@@ -1032,9 +1032,12 @@ struct ScheduleView: View {
     // Pending episode-notification schedule ids — drives the bell's on/off state.
     @State private var scheduledIds: Set<Int> = []
 
-    // Drives push navigation to the AniList detail view from context menus.
-    // `navigationDestinationCompat` honors this on iOS (NavigationView shim), macOS, and tvOS.
-    @State private var detailMediaId: Int?
+    // Drives push navigation to the schedule detail view from card taps and
+    // context menus. `navigationDestinationCompat` honors this on iOS
+    // (NavigationView shim), macOS, and tvOS. The detail view itself pushes
+    // `AniListDetailView` via its own NavigationLink when the user taps
+    // "View Full Details" — see `ScheduleDetailView` (#107).
+    @State private var detailEntry: UnifiedScheduleEntry?
 
     var body: some View {
         Group {
@@ -1076,11 +1079,17 @@ struct ScheduleView: View {
                 }
             }
         }
-        // Hidden NavigationLink that performs the push when `detailMediaId` is set
-        // (used by the "View Details" context-menu action — context menus can't host a
-        // NavigationLink themselves).
-        .navigationDestinationCompat(item: $detailMediaId) { mediaId in
-            AniListDetailView(mediaId: mediaId, preloadedMedia: nil)
+        // Hidden NavigationLink that performs the push when `detailEntry` is set
+        // (used by the context-menu "View Details" action — context menus can't
+        // host a NavigationLink themselves). Card taps use a direct NavigationLink
+        // below; both land on `ScheduleDetailView` (#107).
+        .navigationDestinationCompat(item: $detailEntry) { entry in
+            ScheduleDetailView(
+                entry: entry,
+                useUTC: useUTC,
+                isNotificationOn: scheduledIds.contains(entry.id),
+                onToggleNotification: { toggleNotification(for: entry) }
+            )
         }
         .task { await load() }
         .refreshable { await load() }
@@ -1178,15 +1187,31 @@ struct ScheduleView: View {
                                 .foregroundStyle(.secondary)
                         }
                         ForEach(bucket.entries) { entry in
-                            ScheduleCard(
-                                entry: entry,
-                                useUTC: useUTC,
-                                isNotificationOn: scheduledIds.contains(entry.id),
-                                onToggleNotification: { toggleNotification(for: entry) },
-                                onAddToPlanning:     { addToLibrary(entry, status: .planning) },
-                                onAddToWatching:     { addToLibrary(entry, status: .current) },
-                                onViewDetails:       { openDetails(for: entry) }
-                            )
+                            // #107 — Tapping the card pushes `ScheduleDetailView`
+                            // (the purpose-built airing-countdown screen). The bell
+                            // button inside the card keeps working via nested-button
+                            // hit-testing (both use `.buttonStyle(.plain)`). The
+                            // "View Full Details" button inside the detail view is
+                            // what eventually pushes `AniListDetailView`.
+                            NavigationLink {
+                                ScheduleDetailView(
+                                    entry: entry,
+                                    useUTC: useUTC,
+                                    isNotificationOn: scheduledIds.contains(entry.id),
+                                    onToggleNotification: { toggleNotification(for: entry) }
+                                )
+                            } label: {
+                                ScheduleCard(
+                                    entry: entry,
+                                    useUTC: useUTC,
+                                    isNotificationOn: scheduledIds.contains(entry.id),
+                                    onToggleNotification: { toggleNotification(for: entry) },
+                                    onAddToPlanning:     { addToLibrary(entry, status: .planning) },
+                                    onAddToWatching:     { addToLibrary(entry, status: .current) },
+                                    onViewDetails:       { detailEntry = entry }
+                                )
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                     .padding(.horizontal, 16)
@@ -1353,7 +1378,14 @@ struct ScheduleView: View {
 
             // Defensive filter: drop anything that fell before the start of today.
             fetched = fetched.filter { $0.airingAt >= startTs }
-            entries = fetched.sorted { $0.airingAt < $1.airingAt }
+            // Sort by popularity (desc) first, then airing time (asc) for ties so the
+            // most popular shows surface to the top of each day's section.
+            entries = fetched.sorted {
+                if $0.popularity != $1.popularity {
+                    return $0.popularity > $1.popularity
+                }
+                return $0.airingAt < $1.airingAt
+            }
 
             // Reset the calendar to today after every reload.
             resetCalendarToToday()
@@ -1407,7 +1439,13 @@ struct ScheduleView: View {
         }
         return grouped.keys.sorted().map { day in
             let dayEntries = grouped[day] ?? []
-            let sorted = dayEntries.sorted { $0.airingAt < $1.airingAt }
+            // Within each day: higher popularity first, then earlier air time.
+            let sorted = dayEntries.sorted {
+                if $0.popularity != $1.popularity {
+                    return $0.popularity > $1.popularity
+                }
+                return $0.airingAt < $1.airingAt
+            }
             return ScheduleDayBucket(date: day, entries: sorted)
         }
     }
@@ -1575,20 +1613,11 @@ struct ScheduleView: View {
 
     // MARK: - Detail navigation
 
-    /// Sets `detailMediaId` so `navigationDestinationCompat` pushes the AniList detail view.
-    /// Only anime entries have an AniList detail page to push to.
-    private func openDetails(for entry: UnifiedScheduleEntry) {
-        guard let mediaId = entry.aniListMediaId else {
-            ToastManager.shared.show(
-                title: "Library",
-                message: "Western shows don't have an AniList detail page",
-                icon: "info.circle.fill",
-                iconColor: .accentColor
-            )
-            return
-        }
-        detailMediaId = mediaId
-    }
+    // NOTE: Direct push of `AniListDetailView` from the schedule list was removed in #107.
+    // Card taps and the "View Details" context-menu action now push `ScheduleDetailView`,
+    // which itself hosts the "View Full Details" NavigationLink to `AniListDetailView`
+    // for anime entries. Western entries have no AniList media id, so the detail view
+    // shows an informational hint in place of that button.
 }
 
 // MARK: - Schedule Card
@@ -1813,6 +1842,298 @@ private struct ScheduleCardContextMenu: ViewModifier {
     }
 }
 
+// MARK: - Schedule Detail View (#107)
+
+/// Purpose-built detail screen for a single schedule entry.
+///
+/// Unlike `AniListDetailView` (a full media page), this view focuses on the *airing
+/// countdown* — a big, live-updating timer front and center, with a full-width poster,
+/// episode/format badges, air date+time, genres, a Set Reminder toggle, and a
+/// "View Full Details" button that pushes the standard AniList detail page for anime
+/// entries. The whole screen sits on a frosted-glass material backdrop so it reads as a
+/// distinct, glanceable "what's airing next" surface rather than a second detail page.
+struct ScheduleDetailView: View {
+    let entry: UnifiedScheduleEntry
+    let useUTC: Bool
+    let isNotificationOn: Bool
+    let onToggleNotification: () -> Void
+
+    private var timeZone: TimeZone {
+        useUTC ? (TimeZone(identifier: "UTC") ?? .current) : .current
+    }
+
+    /// Color for the format badge — mirrors `ScheduleCard.formatBadgeColor`. Avoids
+    /// blue/indigo per the app style guide.
+    private var formatBadgeColor: Color {
+        switch (entry.format ?? "").uppercased() {
+        case "TV":      return .green
+        case "MOVIE":   return .pink
+        case "OVA":     return .orange
+        case "ONA":     return .teal
+        case "SPECIAL": return .yellow
+        case "MUSIC":   return .gray
+        default:        return .gray
+        }
+    }
+
+    private var sourceBadgeColor: Color {
+        entry.source == .anime ? .purple : .cyan
+    }
+
+    /// Absolute air date + time formatted in the selected timezone (Local / UTC).
+    private var airDateTimeDisplay: String {
+        let date = Date(timeIntervalSince1970: TimeInterval(entry.airingAt))
+        let formatter = DateFormatter()
+        formatter.timeZone = timeZone
+        formatter.dateStyle = .full
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                heroPoster
+                contentSection
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .background(frostedBackground)
+        .navigationTitle(entry.title)
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+    }
+
+    // MARK: - Hero Poster
+
+    /// Full-width, 200pt-tall cover image with a bottom-up dark gradient scrim for
+    /// text legibility, plus the format + source badges pinned to the top-trailing
+    /// corner over the image.
+    private var heroPoster: some View {
+        ZStack(alignment: .top) {
+            CachedAsyncImage(urlString: entry.coverImage ?? "")
+                .frame(maxWidth: .infinity)
+                .frame(height: 200)
+                .clipped()
+                .overlay(
+                    LinearGradient(
+                        colors: [.black.opacity(0.0), .black.opacity(0.55)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+
+            HStack(alignment: .top) {
+                Spacer()
+                VStack(alignment: .trailing, spacing: 6) {
+                    if let format = entry.format, !format.isEmpty {
+                        Text(format)
+                            .font(.caption.weight(.bold))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(formatBadgeColor.opacity(0.9), in: Capsule())
+                            .foregroundStyle(.white)
+                    }
+                    Text(entry.source == .anime ? "Anime" : "Western")
+                        .font(.caption.weight(.bold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(sourceBadgeColor.opacity(0.9), in: Capsule())
+                        .foregroundStyle(.white)
+                }
+                .padding(12)
+            }
+        }
+        .frame(height: 200)
+    }
+
+    // MARK: - Content Section
+
+    private var contentSection: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            // Title — large bold.
+            Text(entry.title)
+                .font(.title.weight(.bold))
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            // Episode number badge — slightly larger than the card's.
+            Text(entry.episodeBadge)
+                .font(.subheadline.weight(.semibold))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Color.secondary.opacity(0.18), in: Capsule())
+                .fixedSize()
+
+            // BIG countdown timer — live-updating via TimelineView, reuses
+            // `entry.countdownDisplay` so the wording matches the schedule list.
+            countdownCard
+
+            // Air date + time row.
+            HStack(spacing: 8) {
+                Image(systemName: "calendar.badge.clock")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Text(airDateTimeDisplay)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            // Genres — only when the schedule entry actually carries them.
+            if let genres = entry.genres, !genres.isEmpty {
+                genresSection(genres: genres)
+            }
+
+            // Action buttons.
+            VStack(spacing: 10) {
+                reminderButton
+                viewFullDetailsButton
+            }
+            .padding(.top, 4)
+        }
+        .padding(20)
+    }
+
+    // MARK: - Countdown Card
+
+    /// Prominent countdown display. `TimelineView` re-evaluates `entry.countdownDisplay`
+    /// every 30s so the timer stays live without a manual refresh. The label switches
+    /// between "Airs In" (future) and "Aired" (past) to match the countdown's tense.
+    private var countdownCard: some View {
+        TimelineView(.periodic(from: Date(), by: 30)) { _ in
+            let display = entry.countdownDisplay
+            let isPast = display.hasPrefix("aired")
+            VStack(alignment: .leading, spacing: 6) {
+                Text(isPast ? "Aired" : "Airs In")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+
+                Text(display)
+                    .font(.system(size: 36, weight: .heavy, design: .rounded))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(18)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(.regularMaterial)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+        )
+    }
+
+    // MARK: - Reminder Button
+
+    private var reminderButton: some View {
+        Button(action: onToggleNotification) {
+            Label(
+                isNotificationOn ? "Reminder Set" : "Set Reminder",
+                systemImage: isNotificationOn ? "bell.badge.fill" : "bell.fill"
+            )
+            .font(.headline)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(
+                isNotificationOn
+                    ? Color.yellow.opacity(0.22)
+                    : Color.accentColor.opacity(0.18),
+                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+            )
+            .foregroundStyle(isNotificationOn ? Color.yellow : Color.accentColor)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(isNotificationOn ? "Cancel reminder" : "Set reminder")
+    }
+
+    // MARK: - View Full Details Button
+
+    /// Pushes the standard `AniListDetailView` for anime entries that have an AniList
+    /// media id. Western entries (no AniList cross-reference) get an informational hint
+    /// instead — they have no full detail page in the app.
+    @ViewBuilder
+    private var viewFullDetailsButton: some View {
+        if let mediaId = entry.aniListMediaId {
+            NavigationLink {
+                AniListDetailView(mediaId: mediaId, preloadedMedia: nil)
+            } label: {
+                Label("View Full Details", systemImage: "info.circle.fill")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(
+                        Color.secondary.opacity(0.15),
+                        in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    )
+                    .foregroundStyle(.primary)
+            }
+            .buttonStyle(.plain)
+        } else {
+            HStack(spacing: 8) {
+                Image(systemName: "info.circle")
+                    .foregroundStyle(.secondary)
+                Text("Western shows don't have an AniList detail page")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 10)
+            .padding(.horizontal, 12)
+            .background(
+                Color.secondary.opacity(0.08),
+                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+            )
+        }
+    }
+
+    // MARK: - Genres
+
+    @ViewBuilder
+    private func genresSection(genres: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Genres")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 88), spacing: 8)],
+                alignment: .leading,
+                spacing: 8
+            ) {
+                ForEach(genres, id: \.self) { genre in
+                    Text(genre)
+                        .font(.caption.weight(.medium))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Color.secondary.opacity(0.14), in: Capsule())
+                        .foregroundStyle(.primary)
+                        .fixedSize()
+                }
+            }
+        }
+    }
+
+    // MARK: - Frosted Background
+
+    /// Frosted-glass material backdrop spanning the whole screen (including under the
+    /// safe area) — gives the detail page a distinct, airy feel versus the standard
+    /// list/detail backgrounds. The opaque hero poster covers the top 200pt; the content
+    /// below shows the frosted glass behind it.
+    private var frostedBackground: some View {
+        Rectangle()
+            .fill(.regularMaterial)
+            .ignoresSafeArea()
+    }
+}
+
 // MARK: - Schedule Settings Page
 
 /// Settings page for the schedule — pushed from the gear icon in `ScheduleView`'s toolbar.
@@ -1827,10 +2148,10 @@ struct ScheduleSettingsPage: View {
         Form {
             Section {
                 Picker("Window Range", selection: $windowDays) {
-                    Text("7 days").tag(7)
-                    Text("14 days").tag(14)
-                    Text("21 days").tag(21)
-                    Text("30 days").tag(30)
+                    Text("1 Week").tag(7)
+                    Text("2 Weeks").tag(14)
+                    Text("3 Weeks").tag(21)
+                    Text("1 Month").tag(30)
                 }
                 .onChange(of: windowDays) { value in
                     ScheduleSettings.setWindowDays(value)
