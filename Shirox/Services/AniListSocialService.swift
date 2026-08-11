@@ -359,7 +359,7 @@ final class AniListSocialService {
         }
         """
         let r: Response = try await performQuery(query: q, variables: variables, auth: true)
-        let parsed = r.data.Page.notifications.compactMap { raw in
+        let parsed: [AniListNotification] = r.data.Page.notifications.compactMap { (raw: NotificationUnion) -> AniListNotification? in
             guard let id = raw.id else { return nil }
             let createdAt = raw.createdAt ?? 0
             switch raw.__typename {
