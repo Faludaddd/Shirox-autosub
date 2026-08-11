@@ -8,11 +8,44 @@ Extension** target that Xcode builds and embeds into the app bundle.
 > ⚠️ These files compile cleanly once the widget extension target exists.
 > Until then, Xcode will not build them, which is expected.
 
+## Current state — why CI does not build the widget extension
+
+The repository ships **no Widget Extension target** in `Shirox.xcodeproj`.
+This is deliberate. The IPA build (`buildipa.sh`) runs in CI with
+`CODE_SIGNING_ALLOWED=NO`, and a Widget Extension target would require:
+
+  * a second `CODE_SIGN_ENTITLEMENTS` file (App Group) on both the app and
+    the extension target,
+  * embedding the extension's `.appex` into the host `.app`,
+  * an extra `xcodebuild` target whose build settings must stay in sync
+    across iOS/macOS/tvOS/Catalyst schemes,
+
+…any one of which is enough to break the 100+ run green CI build. Instead,
+the project follows the **CI-safe approach**:
+
+  * `Shirox/Views/Shared/EpisodeLiveActivity.swift` (the
+    `EpisodeLiveActivityAttributes` `Codable` shape +
+    `EpisodeLiveActivityManager` that calls `ActivityKit`) **is** part of the
+    main app target, guarded by `#if os(iOS)` and `@available(iOS 16.2, *)`.
+    That is all the app needs to *start*, *update*, and *end* Live Activities.
+  * `ShiroxWidgets.swift` (the `@main` `WidgetBundle` + the three widgets +
+    the `ActivityConfiguration` UI) lives in this directory but is **not** in
+    any target. It compiles only after the developer follows the steps below.
+  * `NSSupportsLiveActivities` and `NSSupportsLiveActivitiesFrequentUpdates`
+    are already set in `Shirox/Info.plist`, so the runtime capability is
+    advertised as soon as the app is installed.
+
+The template files in this directory exist so that the manual Xcode steps
+below are quick and unambiguous — they're not consumed by CI.
+
 ## Files
 
 | File | Purpose | Target membership |
 |------|---------|-------------------|
 | `ShiroxWidgets.swift` | `@main` `WidgetBundle`, the 3 widgets, and the `ActivityConfiguration` for the Live Activity. | **Widget Extension only.** |
+| `WidgetExtension-Info.plist` | Template `Info.plist` for the Widget Extension target (sets `NSExtensionPointIdentifier = com.apple.widgetkit-extension`). Point the new target's `INFOPLIST_FILE` build setting here. | **Widget Extension only** (template, not yet referenced by any target). |
+| `Widget.entitlements` | Template entitlements for the Widget Extension target — declares the `group.com.shirox.app` App Group. Point the new target's `CODE_SIGN_ENTITLEMENTS` build setting here. | **Widget Extension only** (template, not yet referenced by any target). |
+| `../Shirox.entitlements` | Template entitlements for the **main app** target — declares the same `group.com.shirox.app` App Group so the app and extension share `UserDefaults`. | **Main app only** (template, not yet referenced by any target). |
 | `../Views/Shared/EpisodeLiveActivity.swift` | `EpisodeLiveActivityAttributes` + `EpisodeLiveActivityManager` (start/update/end Live Activities from the app). | **Both** the app target (so the app can start activities) **and** the Widget Extension (so the widget can render them). |
 | `../Views/Shared/CustomRefreshControl.swift` | Custom pull-to-refresh overlay (#98). | App target only. (Unrelated to widgets, but tracked alongside this issue batch.) |
 
@@ -31,6 +64,16 @@ Extension** target that Xcode builds and embeds into the app bundle.
    - A new target `ShiroxWidgetsExtension`
    - A boilerplate `.swift` file (delete its contents)
    - A separate `Info.plist` for the extension
+5. **(Optional, recommended) Use the template Info.plist.** In the new
+   target's Build Settings, set `Info.plist File` (`INFOPLIST_FILE`) to
+   `Shirox/Widgets/WidgetExtension-Info.plist` and delete the boilerplate
+   `Info.plist` Xcode generated in the target's group. The template is
+   pre-configured with the `com.apple.widgetkit-extension` extension point.
+6. **(Optional, recommended) Use the template entitlements.** In the new
+   target's Build Settings, set `Code Signing Entitlements`
+   (`CODE_SIGN_ENTITLEMENTS`) to `Shirox/Widgets/Widget.entitlements`.
+   This admits the extension to the `group.com.shirox.app` App Group so
+   `ContinueWatchingWidget` can read shared `UserDefaults`.
 
 ## Step 2 — Replace the boilerplate with our widget code
 
@@ -50,14 +93,18 @@ Extension** target that Xcode builds and embeds into the app bundle.
 ## Step 3 — Enable the Live Activity capability
 
 Live Activities require `NSSupportsLiveActivities = YES` in the **app's**
-`Info.plist` (not the widget's). Add it:
+`Info.plist` (not the widget's). This is **already set** in
+`Shirox/Shirox/Info.plist` — no action needed. The relevant keys are:
 
 ```xml
 <key>NSSupportsLiveActivities</key>
 <true/>
+<key>NSSupportsLiveActivitiesFrequentUpdates</key>
+<true/>
 ```
 
-The app's `Info.plist` is at `Shirox/Shirox/Info.plist`.
+If you're starting from a fork that doesn't have them, add both to
+`Shirox/Shirox/Info.plist`.
 
 ## Step 4 — Configure an App Group (for Continue Watching widget)
 
@@ -65,10 +112,22 @@ The app's `Info.plist` is at `Shirox/Shirox/Info.plist`.
 `UserDefaults` suite so the widget extension (a separate process) can see
 what the app wrote.
 
-1. In Xcode, select the **app target** → **Signing & Capabilities** →
+The App Group identifier is `group.com.shirox.app` and is already declared
+in **both** template entitlements files:
+
+  * `Shirox/Widgets/Widget.entitlements` — for the Widget Extension target.
+  * `Shirox/Shirox.entitlements` — for the main app target.
+
+To activate them:
+
+1. In Xcode, select the **app target** → **Build Settings** → set
+   `Code Signing Entitlements` to `Shirox/Shirox.entitlements`.
+2. In Xcode, select the **app target** → **Signing & Capabilities** →
    **+ Capability** → **App Groups** → add `group.com.shirox.app`.
-2. Repeat for the **Widget Extension** target — same App Group ID.
-3. Update `ContinueWatchingManager.persist()` and `load()` in
+   (Xcode will keep the entry in `Shirox.entitlements` in sync.)
+3. Repeat for the **Widget Extension** target using
+   `Shirox/Widgets/Widget.entitlements` and the same App Group ID.
+4. Update `ContinueWatchingManager.persist()` and `load()` in
    `Shirox/Services/ContinueWatchingManager.swift` to write to **both**
    `UserDefaults.standard` **and** the shared suite:
 
@@ -82,7 +141,7 @@ what the app wrote.
        // also persist watchedKeys / watchedHrefKeys if the widget ever needs them
    }
    ```
-4. After every save, ping WidgetKit so the widget refreshes immediately:
+5. After every save, ping WidgetKit so the widget refreshes immediately:
 
    ```swift
    import WidgetKit
@@ -93,6 +152,12 @@ what the app wrote.
 Until this is wired up, `ContinueWatchingWidget` shows the placeholder "Nothing
 in progress" state — `NextEpisodeWidget` and `MiniScheduleWidget` work without
 an App Group because they fetch directly from AniList.
+
+> ⚠️ **CI note.** `buildipa.sh` runs with `CODE_SIGNING_ALLOWED=NO`, so
+> `Shirox/Shirox.entitlements` is **not** referenced by the iOS target in
+> `Shirox.xcodeproj` today. Don't wire it into `buildipa.sh` without also
+> switching the build to ad-hoc signing — otherwise the entitlement will be
+> ignored (no functional harm) but CI will emit a warning.
 
 ## Step 5 — (Optional) Wire up Live Activity start triggers
 

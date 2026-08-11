@@ -325,6 +325,7 @@ struct SearchView: View {
                             AniListDetailView(mediaId: media.id, preloadedMedia: media)
                         } label: {
                             AniListCardView(media: media)
+                                .equatable()
                         }
                         .buttonStyle(CardPressStyle())
                     }
@@ -1128,8 +1129,17 @@ private struct CardPressStyle: ButtonStyle {
 }
 
 // MARK: - AniList Card
-struct AniListCardView: View {
+struct AniListCardView: View, Equatable {
     let media: Media
+
+    static func == (lhs: AniListCardView, rhs: AniListCardView) -> Bool {
+        // `Media.==` is keyed on `uniqueId` (provider + id), so two cards are
+        // visually identical whenever they reference the same title. Used via
+        // `.equatable()` in the search / browse grids to skip diffing the
+        // poster + gradient + score badge tree on every grid re-evaluation
+        // (e.g. while the live-search debounce or pagination spinner toggles).
+        lhs.media == rhs.media
+    }
 
     var body: some View {
         Color.clear

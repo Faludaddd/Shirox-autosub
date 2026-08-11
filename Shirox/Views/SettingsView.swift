@@ -6,66 +6,28 @@ import UniformTypeIdentifiers
 import UIKit
 #endif
 
-struct SettingsView: View {
-    @AppStorage("maxConcurrentDownloads") private var maxConcurrentDownloads: Int = 3
-    @AppStorage("backgroundDownloadsEnabled") private var backgroundDownloadsEnabled = true
-    @AppStorage("forceLandscape") private var forceLandscape = false
-    @AppStorage("playerSkipShort") private var skipShort: Int = 10
-    @AppStorage("playerSkipLong") private var skipLong: Int = 85
-    @AppStorage("autoNextEpisode") private var autoNextEpisode = true
-    @AppStorage("autoSkipSegments") private var autoSkipSegments = true
-    @AppStorage("watchedPercentage") private var watchedPercentage = 90.0
-    @AppStorage("playerLiquidGlass") private var playerLiquidGlass = true
-    @AppStorage("readerLiquidGlass") private var readerLiquidGlass = true
-    @AppStorage("titleLanguagePriority") private var titlePriority = "english,romaji,native"
-    @AppStorage("aniListTrackingEnabled") private var aniListTrackingEnabled = true
-    @AppStorage("malTrackingEnabled") private var malTrackingEnabled = true
-    @AppStorage("skipReWatchTracking") private var skipReWatchTracking = true
-    @AppStorage("useDefaultExtension") private var useDefaultExtension = false
-    @AppStorage("autoPickLastSearchResult") private var autoPickLastSearchResult = false
-    @AppStorage("autoPickLastStream") private var autoPickLastStream = false
-    @AppStorage("appearanceMode") private var appearanceMode = "system"
-    @AppStorage("accentColorHex") private var accentColorHex = ""
-    @AppStorage("preferredVideoQuality") private var preferredVideoQuality = "auto"
-    @AppStorage("autoPauseOnInterruption") private var autoPauseOnInterruption = true
-    @AppStorage("holdSpeedEnabled") private var holdSpeedEnabled = true
-    @AppStorage("holdSpeedSensitivity") private var holdSpeedSensitivity: Double = 0.5
-    @AppStorage("holdSpeedMultiplier") private var holdSpeedMultiplier: Double = 2.0
-    @AppStorage("reduceMotion") private var reduceMotion = false
-    @AppStorage("episodeReminders") private var episodeReminders = false
-    @AppStorage("airingNotifications") private var airingNotifications = false
-    @AppStorage("dualSync") private var dualSync = false
-    @AppStorage("rateOnFinish") private var rateOnFinish = true
-    @AppStorage("localAutoTrackEnabled") private var localAutoTrackEnabled = true
-    @AppStorage("localScoreFormat") private var localScoreFormatRaw: String = ScoreFormat.point10Decimal.rawValue
-    @State private var showClearLocalLibrary = false
-    @ObservedObject private var aniListAuth = AniListAuthManager.shared
-    @ObservedObject private var malAuth = MALAuthManager.shared
-    @ObservedObject private var providerManager = ProviderManager.shared
-    @EnvironmentObject private var moduleManager: ModuleManager
-    @State private var showResetCWConfirmation = false
-    @State private var showResetHistoryConfirmation = false
-    #if os(iOS)
-    @State private var imageCacheSize = 0
-    @State private var websiteDataSize = 0
-    @State private var tempFilesSize = 0
-    @State private var continueWatchingSize = 0
-    @State private var watchHistorySize = 0
-    @State private var searchAliasSize = 0
-    @State private var idMappingSize = 0
-    @State private var episodeSortSize = 0
-    @State private var totalUsage = 0
-    @State private var isClearing = false
-    #endif
-
-    private let shortOptions = [5, 10, 15, 30]
-    private let longOptions  = [30, 60, 85, 90, 120, 150, 180]
-
-    private var orderedLanguages: [String] {
-        titlePriority.components(separatedBy: ",").filter { !$0.isEmpty }
+// MARK: - Inline nav bar helper
+//
+// Consolidates the `#if os(iOS) .navigationBarTitleDisplayMode(.inline) #endif`
+// pattern that was duplicated ~28× across the settings pages. The macOS / tvOS
+// branch is a no-op so call sites stay single-line and platform-agnostic.
+extension View {
+    @ViewBuilder
+    func inlineNavBar() -> some View {
+        #if os(iOS)
+        self.navigationBarTitleDisplayMode(.inline)
+        #else
+        self
+        #endif
     }
+}
 
-    @State private var searchText = ""
+struct SettingsView: View {
+    // The top-level settings screen is a category menu — each row pushes a
+    // dedicated settings page that owns its own `@AppStorage` bindings. The
+    // per-category `@AppStorage` / cache-size state and the inline storage UI
+    // that previously lived here were migrated to those sub-pages (Appearance,
+    // Playback, Advanced, …), so this view now holds no state of its own.
 
     var body: some View {
         NavigationStack {
@@ -172,538 +134,12 @@ struct SettingsView: View {
             .listStyle(.insetGrouped)
             #endif
             .navigationTitle("Settings")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .alert("Reset Continue Watching?", isPresented: $showResetCWConfirmation) {
-                Button("Reset", role: .destructive) {
-                    CacheManager.shared.clearContinueWatching()
-                    #if os(iOS)
-                    updateCacheSizes()
-                    #endif
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("This will clear all in-progress playback cards from the Home screen.")
-            }
-            .alert("Reset Watch History?", isPresented: $showResetHistoryConfirmation) {
-                Button("Reset", role: .destructive) {
-                    CacheManager.shared.clearWatchHistory()
-                    #if os(iOS)
-                    updateCacheSizes()
-                    #endif
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("This will clear all 'Watched' checkmarks from episode lists.")
-            }
+            .inlineNavBar()
             .onAppear {
                 #if os(iOS)
                 PlayerPresenter.shared.resetToAppOrientation()
-                updateCacheSizes()
                 #endif
             }
-        }
-    }
-
-    @ViewBuilder
-    private var fullSettingsList: some View {
-                // Appearance — theme + accent color
-                Section("Appearance") {
-                    Picker("Theme", selection: $appearanceMode) {
-                        Text("System").tag("system")
-                        Text("Light").tag("light")
-                        Text("Dark").tag("dark")
-                    }
-                    .tint(.appAccent)
-
-                    Picker("Accent Color", selection: $accentColorHex) {
-                        Text("Default").tag("")
-                        Text("Red").tag("#FF453A")
-                        Text("Orange").tag("#FF9F0A")
-                        Text("Yellow").tag("#FFD60A")
-                        Text("Green").tag("#30D158")
-                        Text("Mint").tag("#63E6E2")
-                        Text("Blue").tag("#0A84FF")
-                        Text("Indigo").tag("#5E5CE6")
-                        Text("Purple").tag("#BF5AF2")
-                        Text("Pink").tag("#FF375F")
-                    }
-                    .tint(Color.gray)
-
-                    Toggle("Reduce Motion", isOn: $reduceMotion)
-                        .tint(Color.gray)
-                }
-
-                Section("Modules") {
-                    NavigationLink {
-                        ModuleListView()
-                    } label: {
-                        HStack(spacing: 12) {
-                            // Icon
-                            Group {
-                                if let active = moduleManager.activeModule {
-                                    CachedAsyncImage(urlString: active.iconUrl ?? "", base64String: active.iconData)
-                                } else {
-                                    AsyncImage(url: URL(string: providerManager.primary?.providerType.iconURL ?? "")) { phase in
-                                        if case .success(let image) = phase {
-                                            image.resizable().aspectRatio(contentMode: .fit)
-                                        } else {
-                                            Image(systemName: "list.bullet")
-                                                .font(.title)
-                                                .foregroundStyle(Color.red)
-                                        }
-                                    }
-                                }
-                            }
-                            .frame(width: 48, height: 48)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .background(Color.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
-
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(moduleManager.activeModule?.sourceName ?? providerManager.primary?.providerType.displayName ?? "AniList")
-                                    .font(.headline)
-                                Text("Manage your modules")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    Toggle("Use Default Extension", isOn: $useDefaultExtension)
-                        .tint(Color.gray)
-                        .disabled(moduleManager.activeModule == nil)
-                    Toggle("Auto-pick Last Search Result", isOn: $autoPickLastSearchResult)
-                        .tint(Color.gray)
-                    Toggle("Auto-pick Last Stream", isOn: $autoPickLastStream)
-                        .tint(Color.gray)
-                }
-
-                ProvidersSettingsSection()
-
-                Section("Player") {
-                    Toggle("Force Landscape Mode", isOn: $forceLandscape)
-                        .tint(Color.gray)
-                        #if os(iOS)
-                        .onChangeOf(forceLandscape) {
-                            PlayerPresenter.shared.resetToAppOrientation(shouldRotate: true)
-                        }
-                        #endif
-                    if #available(iOS 26.0, macOS 26.0, *) {
-                        Toggle("Liquid Glass Controls", isOn: $playerLiquidGlass)
-                            .tint(Color.gray)
-                        Text("Frosted glass buttons in the video player. Turn off for solid controls.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Picker("Skip Duration", selection: $skipShort) {
-                        ForEach(shortOptions, id: \.self) { s in
-                            Text("\(s)s").tag(s)
-                        }
-                    }
-                    Picker("Long Skip Duration", selection: $skipLong) {
-                        ForEach(longOptions, id: \.self) { s in
-                            Text("\(s)s").tag(s)
-                        }
-                    }
-                    Toggle("Auto Next Episode", isOn: $autoNextEpisode)
-                        .tint(Color.gray)
-                    Toggle("Auto-Skip Segments", isOn: $autoSkipSegments)
-                        .tint(Color.gray)
-                    Text("Automatically skip intros, recaps, credits, and previews")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Picker("Preferred Video Quality", selection: $preferredVideoQuality) {
-                        Text("Auto").tag("auto")
-                        Text("360p").tag("360p")
-                        Text("480p").tag("480p")
-                        Text("720p").tag("720p")
-                        Text("1080p").tag("1080p")
-                        Text("Highest Available").tag("highest")
-                    }
-                    .tint(Color.gray)
-                    Toggle("Auto-Pause on Interruption", isOn: $autoPauseOnInterruption)
-                        .tint(Color.gray)
-                    Text("Pauses playback when Control Center or Notification Center is opened.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Toggle("Hold-to-Speed", isOn: $holdSpeedEnabled)
-                        .tint(Color.gray)
-                    if holdSpeedEnabled {
-                        VStack(alignment: .leading) {
-                            Text("Movement Sensitivity")
-                            Slider(value: $holdSpeedSensitivity, in: 0.1...1.0, step: 0.1)
-                                .tint(.appAccent)
-                        }
-                        Picker("Speed Multiplier", selection: $holdSpeedMultiplier) {
-                            Text("1.5×").tag(1.5)
-                            Text("2×").tag(2.0)
-                            Text("2.5×").tag(2.5)
-                            Text("3×").tag(3.0)
-                        }
-                        .tint(Color.gray)
-                    }
-                    Toggle("Reverse Episode List by Default", isOn: EpisodeSortManager.shared.$defaultReverseSort)
-                        .tint(Color.gray)
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Text("Episode Progress Threshold")
-                            Spacer()
-                            Text("\(Int(watchedPercentage))%")
-                                .font(.headline)
-                                .monospacedDigit()
-                        }
-                        #if !os(tvOS)
-                        Slider(value: $watchedPercentage, in: 50...100, step: 1)
-                        #endif
-                    }
-                }
-
-                #if os(iOS)
-                if #available(iOS 26.0, *) {
-                    Section("Reader") {
-                        Toggle("Liquid Glass Controls", isOn: $readerLiquidGlass)
-                            .tint(Color.gray)
-                        Text("Frosted glass buttons in the manga reader. Turn off for solid controls.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                #endif
-
-                if aniListAuth.isLoggedIn || malAuth.isLoggedIn {
-                    Section("Tracking") {
-                        if aniListAuth.isLoggedIn {
-                            Toggle("Track on AniList", isOn: $aniListTrackingEnabled)
-                                .tint(Color.gray)
-                        }
-                        if malAuth.isLoggedIn {
-                            Toggle("Track on MyAnimeList", isOn: $malTrackingEnabled)
-                                .tint(Color.gray)
-                        }
-                        if aniListAuth.isLoggedIn && malAuth.isLoggedIn {
-                            Toggle("Sync edits to both services", isOn: $dualSync)
-                                .tint(Color.gray)
-                        }
-                        Toggle("Never reduce progress", isOn: $skipReWatchTracking)
-                            .tint(Color.gray)
-                        Toggle("Prompt to rate after finishing", isOn: $rateOnFinish)
-                            .tint(Color.gray)
-                        Text("Automatically update your watch progress as you watch.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                
-                Section("Library") {
-                    NavigationLink {
-                        LibrarySettingsView()
-                    } label: {
-                        Label("List Order & Custom Lists", systemImage: "list.bullet.indent")
-                    }
-                }
-
-                Section {
-                    Toggle("Auto-track what you watch", isOn: $localAutoTrackEnabled)
-                        .tint(Color.gray)
-                    Picker("Score Format", selection: $localScoreFormatRaw) {
-                        Text("100 Point").tag(ScoreFormat.point100.rawValue)
-                        Text("10 Point (Decimal)").tag(ScoreFormat.point10Decimal.rawValue)
-                        Text("10 Point").tag(ScoreFormat.point10.rawValue)
-                        Text("5 Star").tag(ScoreFormat.point5.rawValue)
-                        Text("3 Point").tag(ScoreFormat.point3.rawValue)
-                    }
-                    Button(role: .destructive) {
-                        showClearLocalLibrary = true
-                    } label: {
-                        Label("Clear Local Library", systemImage: "trash")
-                    }
-                } header: {
-                    Text("Local Library")
-                } footer: {
-                    Text("Your on-device library works without signing in. Auto-track keeps its Watching list in sync with what you watch.")
-                }
-                .alert("Clear Local Library", isPresented: $showClearLocalLibrary) {
-                    Button("Clear", role: .destructive) { LocalLibraryManager.shared.clearAll() }
-                    Button("Cancel", role: .cancel) {}
-                } message: {
-                    Text("This permanently removes all on-device entries and collections. AniList/MyAnimeList lists are not affected.")
-                }
-
-                Section("Downloads") {
-                    Picker("Concurrent Downloads", selection: $maxConcurrentDownloads) {
-                        ForEach(1...5, id: \.self) { count in
-                            Text("\(count)").tag(count)
-                        }
-                    }
-                    Toggle("Background Downloads", isOn: $backgroundDownloadsEnabled)
-                        .tint(Color.gray)
-                }
-
-                Section("Matching") {
-                    ForEach(orderedLanguages, id: \.self) { lang in
-                        HStack {
-                            Image(systemName: "line.3.horizontal")
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-                            Text(lang.capitalized)
-                        }
-                    }
-                    .onMove { from, to in
-                        var langs = orderedLanguages
-                        langs.move(fromOffsets: from, toOffset: to)
-                        titlePriority = langs.joined(separator: ",")
-                    }
-                    Text("Drag to reorder title priority for display and matching.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                #if os(iOS)
-                .environment(\.editMode, .constant(.active))
-                #endif
-
-                #if os(iOS)
-                Section("Storage & Cache") {
-                    Button(role: .destructive) {
-                        guard !isClearing else { return }
-                        isClearing = true
-                        Task {
-                            await CacheManager.shared.clearEverything()
-                            imageCacheSize = 0
-                            websiteDataSize = 0
-                            tempFilesSize = 0
-                            continueWatchingSize = 0
-                            watchHistorySize = 0
-                            searchAliasSize = 0
-                            idMappingSize = 0
-                            episodeSortSize = 0
-                            totalUsage = 0
-                            isClearing = false
-                        }
-                    } label: {
-                        LabeledContent("Clear Everything") {
-                            if isClearing {
-                                ProgressView().scaleEffect(0.7)
-                            } else {
-                                Text(Self.formattedBytes(totalUsage))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    .foregroundStyle(.red)
-                    .disabled(isClearing)
-
-                    DisclosureGroup("Individual Resets") {
-                        Button {
-                            CacheManager.shared.clearImageCache()
-                            updateCacheSizes()
-                        } label: {
-                            LabeledContent("Reset Image Cache") {
-                                Text(Self.formattedBytes(imageCacheSize))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-
-                        Button {
-                            guard !isClearing else { return }
-                            isClearing = true
-                            Task {
-                                await CacheManager.shared.clearWebsiteData()
-                                totalUsage -= websiteDataSize
-                                websiteDataSize = 0
-                                isClearing = false
-                            }
-                        } label: {
-                            LabeledContent("Reset Website Data") {
-                                Text(Self.formattedBytes(websiteDataSize))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-
-                        Button {
-                            CacheManager.shared.clearTempFiles()
-                            updateCacheSizes()
-                        } label: {
-                            LabeledContent("Clear Temporary Files") {
-                                Text(Self.formattedBytes(tempFilesSize))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-
-                        Button {
-                            CacheManager.shared.clearSearchAliases()
-                            updateCacheSizes()
-                        } label: {
-                            LabeledContent("Reset Search Aliases") {
-                                Text(Self.formattedBytes(searchAliasSize))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-
-                        Button {
-                            CacheManager.shared.clearIDMappingCache()
-                            updateCacheSizes()
-                        } label: {
-                            LabeledContent("Reset ID Mapping Cache") {
-                                Text(Self.formattedBytes(idMappingSize))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-
-                        Button {
-                            CacheManager.shared.clearEpisodeSortPreferences()
-                            updateCacheSizes()
-                        } label: {
-                            LabeledContent("Reset Episode Sort Preferences") {
-                                Text(Self.formattedBytes(episodeSortSize))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-
-                        Button {
-                            showResetCWConfirmation = true
-                        } label: {
-                            LabeledContent("Reset Continue Watching") {
-                                Text(Self.formattedBytes(continueWatchingSize))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .foregroundStyle(.red)
-
-                        Button {
-                            showResetHistoryConfirmation = true
-                        } label: {
-                            LabeledContent("Reset Watch History") {
-                                Text(Self.formattedBytes(watchHistorySize))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .foregroundStyle(.red)
-                    }
-                    .font(.subheadline)
-                    .disabled(isClearing)
-
-                    Text("Website Data includes cookies and local storage from module scrapers. Watch Data includes continue watching and history. Search Aliases store remembered search results and stream picks per module.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Section("Diagnostics") {
-                    NavigationLink {
-                        SettingsViewLogger()
-                    } label: {
-                        Label("App Logs", systemImage: "terminal")
-                    }
-                }
-                #endif
-
-                Section("Notifications") {
-                    Toggle("Episode Reminders", isOn: $episodeReminders)
-                        .tint(Color.gray)
-                    Text("Get notified before a new episode airs.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Toggle("Airing Notifications", isOn: $airingNotifications)
-                        .tint(Color.gray)
-                    Text("Get notified when an anime you track starts airing.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Section {
-                    ForEach([LegalPage.imprint, .privacy, .contributors, .licenses], id: \.title) { page in
-                        NavigationLink {
-                            LegalWebView(page: page)
-                        } label: {
-                            Text(page.title)
-                        }
-                    }
-
-                    LabeledContent("Version") {
-                        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
-                        let build   = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
-                        Text("\(version) (\(build))")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-        }
-
-    @ViewBuilder
-    private var filteredSettingsList: some View {
-        Section("Search Results") {
-            if searchText.isEmpty {
-                Text("Start typing to search settings…")
-                    .foregroundStyle(.secondary)
-            } else {
-                let matches = settingsSearchResults
-                if matches.isEmpty {
-                    Text("No settings found for \"\(searchText)\"")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(matches, id: \.self) { match in
-                        Text(match)
-                            .font(.subheadline)
-                    }
-                }
-            }
-        }
-    }
-
-    /// Simple text-matching search across setting labels. Returns labels that contain
-    /// the search text (case-insensitive).
-    private var settingsSearchResults: [String] {
-        let q = searchText.lowercased()
-        var results: [String] = []
-        // Appearance
-        if "theme".contains(q) || "appearance".contains(q) || "dark".contains(q) || "light".contains(q) { results.append("Theme (Appearance)") }
-        if "accent".contains(q) || "color".contains(q) { results.append("Accent Color (Appearance)") }
-        if "motion".contains(q) || "animation".contains(q) { results.append("Reduce Motion (Appearance)") }
-        // Player
-        if "landscape".contains(q) { results.append("Force Landscape Mode (Player)") }
-        if "skip".contains(q) { results.append("Skip Duration (Player)") }
-        if "quality".contains(q) || "resolution".contains(q) || "video".contains(q) { results.append("Preferred Video Quality (Player)") }
-        if "pause".contains(q) || "interruption".contains(q) { results.append("Auto-Pause on Interruption (Player)") }
-        if "hold".contains(q) || "speed".contains(q) { results.append("Hold-to-Speed (Player)") }
-        if "auto next".contains(q) || "autoplay".contains(q) { results.append("Auto Next Episode (Player)") }
-        if "segment".contains(q) || "intro".contains(q) || "outro".contains(q) { results.append("Auto-Skip Segments (Player)") }
-        if "playback speed".contains(q) { results.append("Playback Speed (Player)") }
-        // Streaming
-                if "stream".contains(q) || "module".contains(q) { results.append("Auto-pick Last Stream (Streaming)") }
-        // Library
-        if "tracking".contains(q) || "anilist".contains(q) || "mal".contains(q) { results.append("Track on AniList/MAL (Library)") }
-        if "score".contains(q) || "rating".contains(q) { results.append("Score Format (Library)") }
-        // Downloads
-        if "download".contains(q) || "concurrent".contains(q) { results.append("Concurrent Downloads (Downloads)") }
-        if "background".contains(q) { results.append("Background Downloads (Downloads)") }
-        // Notifications
-        if "notification".contains(q) || "reminder".contains(q) || "airing".contains(q) { results.append("Episode Reminders / Airing Notifications") }
-        return results
-    }
-
-    // MARK: - Settings actions and computed properties
-
-    #if os(iOS)
-    private func updateCacheSizes() {
-        websiteDataSize = CacheManager.shared.websiteDataSize
-        tempFilesSize = CacheManager.shared.tempFilesSize
-        continueWatchingSize = CacheManager.shared.continueWatchingSize
-        watchHistorySize = CacheManager.shared.watchHistorySize
-        searchAliasSize = CacheManager.shared.searchAliasSize
-        idMappingSize = CacheManager.shared.idMappingSize
-        episodeSortSize = CacheManager.shared.episodeSortSize
-        // Image cache + total are computed asynchronously (Kingfisher disk size).
-        Task {
-            imageCacheSize = await CacheManager.shared.imageCacheSize
-            totalUsage = await CacheManager.shared.totalDiskUsage
-        }
-    }
-    #endif
-
-    private static func formattedBytes(_ bytes: Int) -> String {
-        guard bytes > 0 else { return "0 KB" }
-        if bytes >= 1_000_000 {
-            return String(format: "%.1f MB", Double(bytes) / 1_000_000)
-        } else {
-            return String(format: "%.0f KB", Double(bytes) / 1_000)
         }
     }
 }
@@ -870,9 +306,7 @@ struct SettingsViewLogger: View {
         }
         .searchable(text: $searchText, prompt: "Search logs")
         .navigationTitle("Logs")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
+        .inlineNavBar()
         .onAppear { loadEntries() }
         .toolbar {
             ToolbarItemGroup(placement: .automatic) {
@@ -1410,9 +844,7 @@ struct AppearanceSettingsPage: View {
             }
         }
         .navigationTitle("Appearance")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
+        .inlineNavBar()
     }
 
     @ViewBuilder
@@ -1516,9 +948,7 @@ struct PlaybackSettingsPage: View {
             }
         }
         .navigationTitle("Playback")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
+        .inlineNavBar()
     }
 }
 
@@ -1619,9 +1049,7 @@ struct PlayerGeneralSettingsPage: View {
             .padding(.vertical, 16)
         }
         .navigationTitle("General")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
+        .inlineNavBar()
     }
 }
 
@@ -1712,9 +1140,7 @@ struct QualitySettingsPage: View {
             .animation(.easeInOut(duration: 0.2), value: dataSavingEnabled)
         }
         .navigationTitle("Quality")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
+        .inlineNavBar()
     }
 }
 
@@ -1761,9 +1187,7 @@ struct GesturesSettingsPage: View {
             .padding(.vertical, 16)
         }
         .navigationTitle("Gestures")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
+        .inlineNavBar()
     }
 }
 
@@ -1810,9 +1234,7 @@ struct SkipSegmentsSettingsPage: View {
             .padding(.vertical, 16)
         }
         .navigationTitle("Skip Segments")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
+        .inlineNavBar()
     }
 }
 
@@ -1861,9 +1283,7 @@ struct NextEpisodeSettingsPage: View {
             .padding(.vertical, 16)
         }
         .navigationTitle("Next Episode")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
+        .inlineNavBar()
     }
 }
 
@@ -1909,9 +1329,7 @@ struct HoldSpeedSettingsPage: View {
             .animation(.easeInOut(duration: 0.2), value: holdSpeedEnabled)
         }
         .navigationTitle("Hold-Speed")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
+        .inlineNavBar()
     }
 }
 
@@ -1960,9 +1378,7 @@ struct AudioSettingsPage: View {
             .padding(.vertical, 16)
         }
         .navigationTitle("Audio")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
+        .inlineNavBar()
     }
 }
 
@@ -1993,9 +1409,7 @@ struct PiPSettingsPage: View {
             .padding(.vertical, 16)
         }
         .navigationTitle("Picture-in-Picture")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
+        .inlineNavBar()
     }
 }
 
@@ -2033,9 +1447,7 @@ struct StreamingSettingsPage: View {
             .padding(.vertical, 16)
         }
         .navigationTitle("Streaming")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
+        .inlineNavBar()
     }
 }
 
@@ -2064,9 +1476,7 @@ struct LibrarySettingsPage: View {
             .padding()
         }
         .navigationTitle("Library")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
+        .inlineNavBar()
     }
 
     // MARK: - Card Header
@@ -2195,9 +1605,7 @@ struct DownloadsSettingsPage: View {
             }
         }
         .navigationTitle("Downloads")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
+        .inlineNavBar()
     }
 }
 
@@ -2231,9 +1639,7 @@ struct NotificationsSettingsPage: View {
             .padding()
         }
         .navigationTitle("Notifications")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
+        .inlineNavBar()
         .task { await refreshStatus() }
     }
 
@@ -2504,9 +1910,7 @@ struct SearchSettingsPage: View {
             }
         }
         .navigationTitle("Search")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
+        .inlineNavBar()
     }
 }
 
@@ -2984,9 +2388,7 @@ struct ModuleStorePage: View {
             }
         }
         .background(Color.secondary.opacity(0.04))
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
+        .inlineNavBar()
         .navigationTitle("Module Store")
         .task { await loadStore() }
         .refreshable { await loadStore() }
@@ -3368,9 +2770,7 @@ struct AdvancedSettingsPage: View {
             .padding()
         }
         .navigationTitle("Advanced")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
+        .inlineNavBar()
         .task { await updateSizes() }
         .alert("Clear Image Cache?", isPresented: $showClearImage) {
             Button("Clear", role: .destructive) {
@@ -3584,9 +2984,7 @@ struct SubtitleSettingsPage: View {
             .padding()
         }
         .navigationTitle("Subtitles")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
+        .inlineNavBar()
         .onAppear {
             Task {
                 let trending = try? await AniListService.shared.browse(category: .trending, page: 1)
@@ -3841,75 +3239,21 @@ struct AboutSettingsPage: View {
             .padding()
         }
         .navigationTitle("About")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
+        .inlineNavBar()
     }
 
     // MARK: - Hero Card
 
     private var heroCard: some View {
         VStack(spacing: 14) {
-            // App icon tile — prefers the real bundled app icon (iOS / tvOS /
-            // Catalyst). Falls back to a polished SF Symbol on macOS or when
-            // the asset lookup fails. Tile uses the same black → blue → purple
-            // gradient as the splash so the two screens feel cohesive.
-            ZStack {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            stops: [
-                                .init(color: Color.black, location: 0.0),
-                                .init(color: Color(red: 0.10, green: 0.22, blue: 0.55), location: 0.5),
-                                .init(color: Color(red: 0.32, green: 0.10, blue: 0.55), location: 1.0)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 110, height: 110)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 22, style: .continuous)
-                            .stroke(
-                                LinearGradient(
-                                    colors: [Color.white.opacity(0.35), Color.white.opacity(0.0)],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                ),
-                                lineWidth: 1.5
-                            )
-                    )
-
-                Group {
-                    #if canImport(UIKit)
-                    // #92 — Prefer the bundled `app-logo` asset from the asset
-                    // catalog. `Image("app-logo")` resolves a named image from the
-                    // main bundle's catalog, but renders empty if the name is
-                    // unknown — so we probe with `UIImage(named: "app-logo")` first
-                    // (which returns `nil` for missing assets) and fall back to the
-                    // installed app icon, then the SF Symbol on macOS.
-                    if UIImage(named: "app-logo") != nil {
-                        Image("app-logo")
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 70, height: 70)
-                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    } else if let uiIcon = UIApplication.shared.icon {
-                        Image(uiImage: uiIcon)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 70, height: 70)
-                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    } else {
-                        aboutFallbackSymbol
-                    }
-                    #else
-                    aboutFallbackSymbol
-                    #endif
-                }
-            }
-            .shadow(color: Color(red: 0.18, green: 0.22, blue: 0.65).opacity(0.35),
-                    radius: 14, y: 8)
+            // #94 — Single clean app icon: just the bundled `app-logo` asset
+            // in a rounded rect. No gradient background, no extra frame, no
+            // SF-Symbol fallback wrapping — the image speaks for itself.
+            Image("app-logo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 80, height: 80)
+                .clipShape(RoundedRectangle(cornerRadius: 18))
 
             VStack(spacing: 4) {
                 Text("Shirox")
@@ -3934,16 +3278,6 @@ struct AboutSettingsPage: View {
         .frame(maxWidth: .infinity)
         .background(Color.secondary.opacity(0.08),
                     in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-    }
-
-    /// SF Symbol fallback used in `heroCard` when the bundled app icon is
-    /// unavailable (e.g. on pure macOS). Kept larger than the previous generic
-    /// glyph and tinted white over the gradient tile so it still reads as an
-    /// app-icon-style mark.
-    private var aboutFallbackSymbol: some View {
-        Image(systemName: "play.tv.fill")
-            .font(.system(size: 52, weight: .semibold))
-            .foregroundStyle(.white)
     }
 
     // MARK: - Legal Card
@@ -4175,9 +3509,7 @@ struct PerformanceModeSettingsPage: View {
             .padding()
         }
         .navigationTitle("Performance")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
+        .inlineNavBar()
     }
 }
 
@@ -4431,9 +3763,7 @@ struct LoggerSettingsPage: View {
             }
         }
         .navigationTitle("Logger")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
+        .inlineNavBar()
         .onAppear { reload() }
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {

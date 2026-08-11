@@ -15,6 +15,21 @@ final class SearchViewModel: ObservableObject {
     private var searchTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
 
+    // MARK: - In-memory result cache
+    //
+    // Avoids re-hitting the network when the user re-issues a recent query
+    // (e.g. tapping a history entry, toggling a filter back, or switching
+    // providers and returning). Keyed by query + filters + active source so a
+    // module search never collides with an AniList/MAL search. Entries expire
+    // after `cacheTTL` (2 min) so stale data doesn't linger.
+    private struct CacheEntry {
+        let moduleResults: [SearchItem]
+        let aniListResults: [Media]
+        let storedAt: Date
+    }
+    private var resultCache: [String: CacheEntry] = [:]
+    private let cacheTTL: TimeInterval = 120  // seconds
+
     init() {
         ProviderManager.shared.$orderedProviders
             .map { $0.first?.providerType }
@@ -35,6 +50,18 @@ final class SearchViewModel: ObservableObject {
         moduleResults = []
         aniListResults = []
         searchTask = Task {
+            // Cache hit short-circuits the network entirely. A fresh hit also
+            // suppresses the loading spinner so re-issued searches feel instant.
+            let key = cacheKey(query: q, usingModule: usingModule)
+            if let hit = resultCache[key],
+               Date().timeIntervalSince(hit.storedAt) <= cacheTTL,
+               !Task.isCancelled {
+                moduleResults = hit.moduleResults
+                aniListResults = hit.aniListResults
+                isLoading = false
+                return
+            }
+
             do {
                 if usingModule {
                     CloudflareBypassManager.shared.pendingVerificationURL = nil
@@ -62,8 +89,14 @@ final class SearchViewModel: ObservableObject {
                     if !Task.isCancelled {
                         var seen = Set<String>()
                         let deduped = res.filter { seen.insert($0.href).inserted }
-                        moduleResults = await NSFWContentFilter.shared.filter(deduped, keyword: q)
+                        let filtered = await NSFWContentFilter.shared.filter(deduped, keyword: q)
+                        moduleResults = filtered
                         aniListResults = []
+                        resultCache[key] = CacheEntry(
+                            moduleResults: filtered,
+                            aniListResults: [],
+                            storedAt: Date()
+                        )
                     }
                 } else {
                     // AniList path: use AniListService directly so we can pass filters.
@@ -76,8 +109,14 @@ final class SearchViewModel: ObservableObject {
                     }
                     if !Task.isCancelled {
                         var seen = Set<String>()
-                        aniListResults = res.filter { seen.insert($0.uniqueId).inserted }
+                        let deduped = res.filter { seen.insert($0.uniqueId).inserted }
+                        aniListResults = deduped
                         moduleResults = []
+                        resultCache[key] = CacheEntry(
+                            moduleResults: [],
+                            aniListResults: deduped,
+                            storedAt: Date()
+                        )
                     }
                 }
             } catch {
@@ -89,6 +128,20 @@ final class SearchViewModel: ObservableObject {
                 isLoading = false
             }
         }
+    }
+
+    /// Builds a cache key that uniquely identifies a search result set:
+    /// query + filters + active source (module id for module searches,
+    /// primary provider type for AniList/MAL searches). Provider/module
+    /// switches therefore never return a stale foreign-source cache entry.
+    private func cacheKey(query: String, usingModule: Bool) -> String {
+        var source: String
+        if usingModule {
+            source = "module:" + (ModuleManager.shared.activeModule?.id ?? "?")
+        } else {
+            source = "provider:" + (ProviderManager.shared.orderedProviders.first?.providerType.rawValue ?? "?")
+        }
+        return "\(source)|\(query.lowercased())|\(filters.effectiveSort)|\(filters.year ?? 0)|\(filters.season ?? "")|\(filters.format ?? "")|\(filters.status ?? "")|\(filters.genres.joined(separator: ","))|\(filters.studio ?? "")|\(filters.source ?? "")|\(filters.minEpisodes ?? 0)|\(filters.maxEpisodes ?? 0)"
     }
 
     /// Manga modules use the Luna contract (raw-object returns); everything

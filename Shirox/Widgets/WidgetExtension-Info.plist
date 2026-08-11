@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+		Template Info.plist for the ShiroxWidgets Widget Extension.
+
+		This file is NOT used by any target today — the project has no Widget
+		Extension target yet (see Shirox/Widgets/README.md for why we keep it
+		out of CI). It exists so that when a developer follows the README's
+		"Add a Widget Extension target" steps in Xcode, they can point the new
+		target's `INFOPLIST_FILE` build setting here instead of letting Xcode
+		generate a fresh one.
+
+		Keys:
+		  • CFBundleIdentifier / CFBundleExecutable / etc. — standard Xcode
+			build-variable placeholders, identical to what Xcode's "Widget
+			Extension" template emits.
+		  • NSExtension.NSExtensionPointIdentifier = com.apple.widgetkit-extension
+			— required by WidgetKit; without it the system won't load the
+			extension's widgets / ActivityConfiguration.
+		  • NSSupportsLiveActivities is intentionally NOT set here — Live
+			Activities are gated on the *app's* Info.plist (Shirox/Info.plist
+			already has NSSupportsLiveActivities = true), not the extension's.
+	-->
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Shirox Widgets</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.widgetkit-extension</string>
+	</dict>
+</dict>
+</plist>

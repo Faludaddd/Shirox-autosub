@@ -525,6 +525,20 @@ final class AniListService {
 
     // MARK: - Schedule cache (#92)
 
+    /// #93 — Public, fetch-free cache probe. Returns the cached schedule
+    /// entries filtered to the requested `[from, to]` window if the cache is
+    /// fresh AND (with tolerance) fully contains the requested window. Returns
+    /// `nil` otherwise. Used by `ScheduleView.load()` to skip a redundant
+    /// network call when the splash preload already populated the cache with
+    /// the same window.
+    ///
+    /// This is a thin public wrapper around `scheduleCacheLookup` so callers
+    /// outside the service can decide whether to fetch without accidentally
+    /// triggering one.
+    func cachedAiringSchedules(from: Int, to: Int) -> [AniListAiringScheduleItem]? {
+        scheduleCacheLookup(from: from, to: to)
+    }
+
     /// Returns the cached schedule entries filtered to the requested
     /// `[from, to]` window if the cache is fresh AND (with a small tolerance)
     /// fully contains the requested window. Returns `nil` otherwise (caller
@@ -587,80 +601,50 @@ final class AniListService {
     }
 
     func browse(category: BrowseCategory, page: Int) async throws -> [AniListMedia] {
+        // All four categories share the same field selection and perPage; only
+        // the `sort` (and, for `.seasonal`, the season/seasonYear filters)
+        // differ. Building the query from a single template avoids four
+        // near-identical ~15-line GraphQL string literals drifting out of sync.
+        let sort: String
+        var mediaArgs = ["type: ANIME", "isAdult: false"]
+        var varDecls = ["$page: Int"]
+        var variables: [String: Any] = ["page": page]
+
         switch category {
         case .trending:
-            let query = """
-            query ($page: Int) {
-              Page(page: $page, perPage: 20) {
-                media(type: ANIME, sort: TRENDING_DESC, isAdult: false) {
-                  id
-                  title { romaji english native }
-                  coverImage { large extraLarge }
-                  bannerImage
-                  averageScore
-                  genres
-                  description(asHtml: false)
-                }
-              }
-            }
-            """
-            return try await fetchPage(query: query, variables: ["page": page])
-
+            sort = "TRENDING_DESC"
         case .seasonal:
+            sort = "POPULARITY_DESC"
             let (season, year) = AniListSeason.current()
-            let query = """
-            query ($season: MediaSeason, $year: Int, $page: Int) {
-              Page(page: $page, perPage: 20) {
-                media(season: $season, seasonYear: $year, type: ANIME, sort: POPULARITY_DESC, isAdult: false) {
-                  id
-                  title { romaji english native }
-                  coverImage { large extraLarge }
-                  bannerImage
-                  averageScore
-                  genres
-                  description(asHtml: false)
-                }
-              }
-            }
-            """
-            return try await fetchPage(query: query, variables: ["season": season.rawValue, "year": year, "page": page])
-
+            mediaArgs.append(contentsOf: ["season: $season", "seasonYear: $year"])
+            varDecls.append(contentsOf: ["$season: MediaSeason", "$year: Int"])
+            variables["season"] = season.rawValue
+            variables["year"] = year
         case .popular:
-            let query = """
-            query ($page: Int) {
-              Page(page: $page, perPage: 20) {
-                media(type: ANIME, sort: POPULARITY_DESC, isAdult: false) {
-                  id
-                  title { romaji english native }
-                  coverImage { large extraLarge }
-                  bannerImage
-                  averageScore
-                  genres
-                  description(asHtml: false)
-                }
-              }
-            }
-            """
-            return try await fetchPage(query: query, variables: ["page": page])
-
+            sort = "POPULARITY_DESC"
         case .topRated:
-            let query = """
-            query ($page: Int) {
-              Page(page: $page, perPage: 20) {
-                media(type: ANIME, sort: SCORE_DESC, isAdult: false) {
-                  id
-                  title { romaji english native }
-                  coverImage { large extraLarge }
-                  bannerImage
-                  averageScore
-                  genres
-                  description(asHtml: false)
-                }
-              }
-            }
-            """
-            return try await fetchPage(query: query, variables: ["page": page])
+            sort = "SCORE_DESC"
         }
+        mediaArgs.append("sort: \(sort)")
+
+        let argList = mediaArgs.joined(separator: ", ")
+        let varDeclList = varDecls.joined(separator: ", ")
+        let query = """
+        query (\(varDeclList)) {
+          Page(page: $page, perPage: 20) {
+            media(\(argList)) {
+              id
+              title { romaji english native }
+              coverImage { large extraLarge }
+              bannerImage
+              averageScore
+              genres
+              description(asHtml: false)
+            }
+          }
+        }
+        """
+        return try await fetchPage(query: query, variables: variables)
     }
 
     func detail(id: Int) async throws -> AniListMedia {

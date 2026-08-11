@@ -124,6 +124,35 @@ struct UnifiedScheduleEntry: Identifiable, Hashable, Sendable {
         return "in \(mins)m"
     }
 
+    /// Full-granularity countdown including seconds (e.g. "in 3d 5h 12m 30s",
+    /// "in 2h 14m 45s", "in 8m 3s", "aired 2h 14m 5s ago"). Used by
+    /// `ScheduleDetailView` (#107 extension) where a 1-second `TimelineView`
+    /// keeps the display live. Past-tense variants include seconds too so the
+    /// detail view's big timer is always consistent in granularity.
+    var countdownDisplayWithSeconds: String {
+        let now = Int(Date().timeIntervalSince1970)
+        let diff = airingAt - now
+        if diff <= 0 {
+            let ago = -diff
+            let days = ago / 86400
+            let hours = (ago % 86400) / 3600
+            let mins = (ago % 3600) / 60
+            let secs = ago % 60
+            if days > 0 { return "aired \(days)d \(hours)h \(mins)m \(secs)s ago" }
+            if hours > 0 { return "aired \(hours)h \(mins)m \(secs)s ago" }
+            if mins > 0 { return "aired \(mins)m \(secs)s ago" }
+            return "aired \(secs)s ago"
+        }
+        let days = diff / 86400
+        let hours = (diff % 86400) / 3600
+        let mins = (diff % 3600) / 60
+        let secs = diff % 60
+        if days > 0 { return "in \(days)d \(hours)h \(mins)m \(secs)s" }
+        if hours > 0 { return "in \(hours)h \(mins)m \(secs)s" }
+        if mins > 0 { return "in \(mins)m \(secs)s" }
+        return "in \(secs)s"
+    }
+
     /// Absolute air date (e.g. "Apr 15, 2025 3:00 PM").
     var airDateDisplay: String {
         let date = Date(timeIntervalSince1970: TimeInterval(airingAt))

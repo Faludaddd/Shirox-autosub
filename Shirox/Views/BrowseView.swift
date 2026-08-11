@@ -46,6 +46,7 @@ struct BrowseView: View {
                                 AniListDetailView(mediaId: media.id, preloadedMedia: media)
                             } label: {
                                 AniListCardView(media: media)
+                                    .equatable()
                             }
                             .contentShape(Rectangle())
                             .buttonStyle(BrowseCardPressStyle())

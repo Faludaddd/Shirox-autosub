@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+		Entitlements for the main Shirox app target (Shirox_iOS).
+
+		This file is a TEMPLATE — no Xcode target references it yet. The
+		current pbxproj builds the iOS/macOS/tvOS/Catalyst targets without
+		any `CODE_SIGN_ENTITLEMENTS` build setting, and CI runs with
+		`CODE_SIGNING_ALLOWED=NO` so entitlements are not enforced there.
+		That keeps `buildipa.sh` working unchanged.
+
+		When a developer is ready to wire up the Widget Extension (which
+		needs a shared App Group so the app and extension can exchange
+		UserDefaults data), they should:
+
+		  1. Set `CODE_SIGN_ENTITLEMENTS = Shirox/Shirox.entitlements` on the
+		     Shirox_iOS target in Xcode (Build Settings → Signing →
+		     Code Signing Entitlements).
+		  2. Add the App Groups capability to the target in
+		     Signing & Capabilities (Xcode will edit this file in step).
+		  3. Make sure the App Group ID below matches
+		     `ShiroxWidgetConfig.appGroup` and the entry in
+		     `Shirox/Widgets/Widget.entitlements`.
+
+		Only the iOS app target needs the App Group today — tvOS and macOS
+		don't host widgets. macOS Catalyst could host widgets in 14+ but the
+		current Catalyst build (`buildcatalyst.sh`) is unsigned, so adding
+		entitlements there would break the DMG flow. Leave Catalyst alone
+		unless you've thought through signing.
+	-->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.shirox.app</string>
+	</array>
+</dict>
+</plist>

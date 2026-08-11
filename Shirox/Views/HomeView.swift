@@ -95,6 +95,7 @@ struct HomeView: View {
                                         gradientColors: [.green, .teal],
                                         imageURL: vm.seasonal.first?.coverImage.best
                                     )
+                                    .equatable()
                                 }
                                 .buttonStyle(HomePressStyle())
 
@@ -108,6 +109,7 @@ struct HomeView: View {
                                         gradientColors: [.red, .orange],
                                         imageURL: vm.trending.first?.coverImage.best
                                     )
+                                    .equatable()
                                 }
                                 .buttonStyle(HomePressStyle())
 
@@ -121,6 +123,7 @@ struct HomeView: View {
                                         gradientColors: [.pink, .purple],
                                         imageURL: vm.popular.first?.coverImage.best
                                     )
+                                    .equatable()
                                 }
                                 .buttonStyle(HomePressStyle())
 
@@ -134,6 +137,7 @@ struct HomeView: View {
                                         gradientColors: [.orange, .yellow],
                                         imageURL: vm.topRated.first?.coverImage.best
                                     )
+                                    .equatable()
                                 }
                                 .buttonStyle(HomePressStyle())
 
@@ -147,6 +151,7 @@ struct HomeView: View {
                                         gradientColors: [.gray, .black],
                                         imageURL: vm.recentlyCompleted.first?.coverImage.best
                                     )
+                                    .equatable()
                                 }
                                 .buttonStyle(HomePressStyle())
 
@@ -160,6 +165,7 @@ struct HomeView: View {
                                         gradientColors: [.indigo, .purple],
                                         imageURL: vm.upcoming.first?.coverImage.best
                                     )
+                                    .equatable()
                                 }
                                 .buttonStyle(HomePressStyle())
                             }
@@ -256,7 +262,13 @@ struct HomeView: View {
 
 private struct FeaturedCarousel: View {
     let items: [Media]
-    @State private var selectedTab = 1000
+    // `selectedTab` starts in the *middle* rotation of a `displayCount * 3`
+    // page window so the user can swipe freely in both directions. A bounded
+    // window (previously 2000) keeps the TabView cheap; an edge-reset in
+    // `onChange(of: selectedTab)` silently bounces the selection back to the
+    // middle rotation when the user swipes into the first/last rotation, so the
+    // carousel still *feels* infinite without materialising thousands of pages.
+    @State private var selectedTab = 0
     @State private var containerWidth: CGFloat = 0
     @State private var stretchAmount: CGFloat = 0
     @State private var hasInteracted = false
@@ -265,6 +277,11 @@ private struct FeaturedCarousel: View {
 
     private var realItems: [Media] { items.prefix(8).map { $0 } }
     private var displayCount: Int { realItems.count }
+
+    /// Three rotations of `displayCount` — enough headroom in both swipe
+    /// directions for the edge-reset to fire before the user ever sees a hard
+    /// stop. Falls back to a single rotation when there's only one item.
+    private var pageCount: Int { max(displayCount * 3, displayCount) }
 
     private var currentIndex: Int {
         guard displayCount > 0 else { return 0 }
@@ -310,10 +327,18 @@ private struct FeaturedCarousel: View {
 
                 // TabView: completely stable — fixed height, zero scroll dependency.
                 // Images live inside FeaturedCard so they move naturally with swipe gestures.
+                // The page count is `displayCount * 3` (bounded, was 2000) — see
+                // `pageCount` / the edge-reset in `onChange(of: selectedTab)` for how
+                // the infinite-wrap illusion is preserved with far fewer materialised pages.
                 TabView(selection: $selectedTab) {
-                    ForEach(0..<2000, id: \.self) { index in
+                    ForEach(0..<pageCount, id: \.self) { index in
                         if !displayItems.isEmpty {
+                            // `.equatable()` is applied directly to `FeaturedCard`
+                            // (which conforms to Equatable) so the wrapper can
+                            // short-circuit body re-evaluation; `.tag` is applied
+                            // *after* so TabView selection always propagates.
                             FeaturedCard(media: displayItems[index % displayCount], isWide: isIPad)
+                                .equatable()
                                 .allowsHitTesting(false)
                                 .tag(index)
                         }
@@ -434,18 +459,36 @@ private struct FeaturedCarousel: View {
         }
         .onAppear {
             if displayCount > 0 {
-                selectedTab = (1000 / displayCount) * displayCount
+                // Start in the middle rotation so the user can swipe in both
+                // directions before the edge-reset kicks in.
+                selectedTab = displayCount
             }
             // Defer enabling the swipe detector until the next runloop tick so
-            // the initial `selectedTab` assignment above (which can shift from
-            // 1000 to the nearest displayCount-multiple) isn't mistaken for a
-            // user swipe and instantly dismiss the hint.
+            // the initial `selectedTab` assignment above (which shifts from 0
+            // to `displayCount`) isn't mistaken for a user swipe and instantly
+            // dismiss the hint.
             DispatchQueue.main.async { didSetup = true }
         }
         .onChange(of: selectedTab) { _ in
             guard didSetup else { return }
             // First swipe dismisses the "Slide to browse" hint.
             if !hasInteracted { hasInteracted = true }
+            // Infinite-wrap edge reset: when the user swipes into the first or
+            // last rotation of the `displayCount * 3` window, silently jump
+            // back to the equivalent slot in the middle rotation. Dispatched
+            // async with animations disabled so the reset is invisible — the
+            // visual page (`selectedTab % displayCount`) is unchanged, so no
+            // content shifts. This is what lets a bounded TabView feel infinite.
+            guard displayCount > 1 else { return }
+            if selectedTab < displayCount || selectedTab >= displayCount * 2 {
+                let middleSlot = displayCount + (selectedTab % displayCount)
+                guard selectedTab != middleSlot else { return }
+                DispatchQueue.main.async {
+                    var transaction = Transaction()
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) { selectedTab = middleSlot }
+                }
+            }
         }
         #elseif !os(tvOS)
         MacFeaturedCarousel(items: realItems)
@@ -615,7 +658,7 @@ private struct PageIndicator: View {
 
 // MARK: - Featured Card (platform‑specific layout)
 
-private struct FeaturedCard: View {
+private struct FeaturedCard: View, Equatable {
     let media: Media
     var isWide: Bool = false
 
@@ -625,6 +668,14 @@ private struct FeaturedCard: View {
         #else
         return 16.0 / 9.0
         #endif
+    }
+
+    static func == (lhs: FeaturedCard, rhs: FeaturedCard) -> Bool {
+        // `Media.==` is keyed on `uniqueId`, so two cards render identically
+        // whenever they point at the same title + wide flag. Used by
+        // `.equatable()` in the carousel's ForEach to skip diffing the heavy
+        // image/gradient tree on every TabView re-evaluation.
+        lhs.media == rhs.media && lhs.isWide == rhs.isWide
     }
 
     var body: some View {
@@ -870,7 +921,7 @@ private struct HomePressStyle: ButtonStyle {
 // the title + item count anchored to the bottom. Tapping is handled by the
 // NavigationLink that wraps the card in the Home grid.
 
-private struct CategoryGridCard: View {
+private struct CategoryGridCard: View, Equatable {
     let title: String
     let count: Int
     let iconName: String
@@ -878,6 +929,16 @@ private struct CategoryGridCard: View {
     let imageURL: String?
 
     private static let tileHeight: CGFloat = 180
+
+    static func == (lhs: CategoryGridCard, rhs: CategoryGridCard) -> Bool {
+        // Cards are static config (title/count/icon/gradient/imageURL); when
+        // none of those change, the whole gradient+image stack can be skipped
+        // during a Home re-render (e.g. when `vm.trending` updates and the
+        // surrounding ScrollView re-evaluates).
+        lhs.title == rhs.title && lhs.count == rhs.count
+            && lhs.iconName == rhs.iconName && lhs.imageURL == rhs.imageURL
+            && lhs.gradientColors.count == rhs.gradientColors.count
+    }
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -1335,6 +1396,12 @@ struct ScheduleView: View {
     /// Fetches schedule entries from the source(s) selected by `mode`, starting at the
     /// beginning of today (not the current moment) so episodes that aired earlier today
     /// stay visible. Combined mode fetches both sources concurrently via `async let`.
+    ///
+    /// #93 — For the anime source, we first probe `AniListService`'s in-memory
+    /// cache (populated by the splash preload). If the cache has fresh data
+    /// covering this exact window we skip the network call entirely — so when
+    /// the preload completed during the 3.5s splash, `ScheduleView` renders
+    /// instantly with no spinner.
     private func load() async {
         isLoading = true
         loadError = nil
@@ -1353,8 +1420,13 @@ struct ScheduleView: View {
         do {
             switch mode {
             case .anime:
-                let items = try await AniListService.shared.airingSchedules(from: startTs, to: endTs)
-                fetched = items.map { UnifiedScheduleEntry(item: $0) }
+                // #93 — Cache hit from the splash preload? Skip the network.
+                if let cached = AniListService.shared.cachedAiringSchedules(from: startTs, to: endTs) {
+                    fetched = cached.map { UnifiedScheduleEntry(item: $0) }
+                } else {
+                    let items = try await AniListService.shared.airingSchedules(from: startTs, to: endTs)
+                    fetched = items.map { UnifiedScheduleEntry(item: $0) }
+                }
 
             case .western:
                 let items = try await WesternScheduleService.shared.fetchSchedule(dayCount: windowDays)
@@ -1365,8 +1437,9 @@ struct ScheduleView: View {
                 }
 
             case .combined:
-                // Fan out both fetches concurrently; await them together.
-                async let animeFetch   = try await AniListService.shared.airingSchedules(from: startTs, to: endTs)
+                // Fan out both fetches concurrently; await them together. The
+                // anime branch still honours the #93 cache probe.
+                async let animeFetch = try await fetchAnimeCachedOrFresh(from: startTs, to: endTs)
                 async let westernFetch = try await WesternScheduleService.shared.fetchSchedule(dayCount: windowDays)
                 let (animeItems, westernItems) = try await (animeFetch, westernFetch)
                 fetched = animeItems.map { UnifiedScheduleEntry(item: $0) }
@@ -1395,6 +1468,17 @@ struct ScheduleView: View {
         } catch {
             loadError = error.localizedDescription
         }
+    }
+
+    /// #93 — Helper used by the `.combined` branch of `load()`. Returns the
+    /// cached schedule entries for the window if the splash preload already
+    /// populated them, otherwise fetches fresh. Kept as a separate function
+    /// so it can be wrapped in `async let` alongside the Western fetch.
+    private func fetchAnimeCachedOrFresh(from: Int, to: Int) async throws -> [AniListAiringScheduleItem] {
+        if let cached = AniListService.shared.cachedAiringSchedules(from: from, to: to) {
+            return cached
+        }
+        return try await AniListService.shared.airingSchedules(from: from, to: to)
     }
 
     // MARK: - Day bucketing & calendar grid (timezone-aware)
@@ -1997,12 +2081,15 @@ struct ScheduleDetailView: View {
 
     // MARK: - Countdown Card
 
-    /// Prominent countdown display. `TimelineView` re-evaluates `entry.countdownDisplay`
-    /// every 30s so the timer stays live without a manual refresh. The label switches
-    /// between "Airs In" (future) and "Aired" (past) to match the countdown's tense.
+    /// Prominent countdown display. `TimelineView` re-evaluates
+    /// `entry.countdownDisplayWithSeconds` every 1s so the timer stays live
+    /// down to the second — the detail view is the one place we want full
+    /// granularity (days / hours / minutes / seconds). The label switches
+    /// between "Airs In" (future) and "Aired" (past) to match the countdown's
+    /// tense.
     private var countdownCard: some View {
-        TimelineView(.periodic(from: Date(), by: 30)) { _ in
-            let display = entry.countdownDisplay
+        TimelineView(.periodic(from: Date(), by: 1)) { _ in
+            let display = entry.countdownDisplayWithSeconds
             let isPast = display.hasPrefix("aired")
             VStack(alignment: .leading, spacing: 6) {
                 Text(isPast ? "Aired" : "Airs In")
@@ -2011,10 +2098,10 @@ struct ScheduleDetailView: View {
                     .textCase(.uppercase)
 
                 Text(display)
-                    .font(.system(size: 36, weight: .heavy, design: .rounded))
+                    .font(.system(size: 32, weight: .heavy, design: .rounded))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.6)
+                    .minimumScaleFactor(0.5)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -2407,8 +2494,16 @@ private struct NotificationRow: View {
         let ts = notification.createdAt
         guard ts > 0 else { return "" }
         let date = Date(timeIntervalSince1970: TimeInterval(ts))
+        // Reuse a single shared formatter — constructing one per row per render
+        // is wasteful in a long notifications list.
+        return Self.relativeFormatter.localizedString(for: date, relativeTo: Date())
+    }
+
+    /// Shared formatter (thread-safe once initialised). Formatter creation is
+    /// comparatively expensive, so a single lazy static serves the whole list.
+    private static let relativeFormatter: RelativeDateTimeFormatter = {
         let f = RelativeDateTimeFormatter()
         f.unitsStyle = .short
-        return f.localizedString(for: date, relativeTo: Date())
-    }
+        return f
+    }()
 }

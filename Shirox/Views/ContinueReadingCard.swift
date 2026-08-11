@@ -27,7 +27,7 @@ struct ContinueReadingSection: View {
             .padding(.horizontal, 16)
 
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
+                LazyHStack(spacing: 12) {
                     ForEach(items) { item in
                         Button { open(item) } label: {
                             ContinueReadingCardDisplay(

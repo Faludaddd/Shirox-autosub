@@ -262,19 +262,34 @@ struct ShiroxApp: App {
                     ToastContainerView()
                 }
                 .task {
-                    // Preload Schedule + Notifications in the background during the
-                    // splash. We do NOT await these — the splash dismissal timer is
-                    // the only thing that decides when the splash hides, so a slow
-                    // network never blocks app entry. The fetched data is cached by
-                    // each service and surfaces in the Home tab once it's ready.
+                    // #93 — Preload Schedule + Notifications in the background
+                    // during the splash. The fetches stay in `Task.detached`
+                    // (a slow network never blocks app entry), but the splash
+                    // window is now 3.5s so the preload has a much better
+                    // chance of completing before the home tab appears. The
+                    // schedule fetch uses the SAME window `ScheduleView` will
+                    // request (start-of-today → +windowDays) so the result
+                    // lands in `AniListService`'s in-memory cache and
+                    // `ScheduleView.load()` can read it back without a second
+                    // network call.
                     Task.detached(priority: .userInitiated) {
-                        async let schedule = try? AniListService.shared.airingToday()
+                        // Match ScheduleView's fetch window exactly so the
+                        // cached entries cover every day the schedule tab will
+                        // render. `windowDays` defaults to 7.
+                        let windowDays = UserDefaults.standard.object(forKey: "scheduleWindowDays") as? Int ?? 7
+                        let clamped = [7, 14, 21, 30].contains(windowDays) ? windowDays : 7
+                        let cal = Calendar.current
+                        let startOfToday = cal.startOfDay(for: Date())
+                        let from = Int(startOfToday.timeIntervalSince1970)
+                        let to = from + clamped * 86_400
+                        async let schedule = try? AniListService.shared.airingSchedules(from: from, to: to)
                         async let notifications = try? AniListSocialService.shared.fetchNotifications()
                         _ = await (schedule, notifications)
                     }
-                    // Extended splash window — gives the preload a head start so the
-                    // Home tab is more likely to be populated when it appears.
-                    try? await Task.sleep(nanoseconds: 2_500_000_000)
+                    // #93 — Extended splash window (3.5s) gives the preload a
+                    // head start so the Home tab is more likely to be
+                    // populated when it appears.
+                    try? await Task.sleep(nanoseconds: 3_500_000_000)
                     withAnimation(.easeInOut(duration: 0.4)) { showSplash = false }
                 }
                 .onChange(of: scenePhase) { phase in
