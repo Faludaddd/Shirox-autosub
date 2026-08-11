@@ -97,7 +97,7 @@ struct HomeView: View {
             .navigationTitle("")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackgroundHidden()
+            .modifier(TransparentNavBarModifier())
             #endif
             .toolbar {
                 // Schedule icon — matches the Notifications bell styling exactly

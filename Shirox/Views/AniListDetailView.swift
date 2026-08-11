@@ -118,7 +118,7 @@ struct AniListDetailView: View {
         #if os(iOS)
         .ignoresSafeArea(edges: .top)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackgroundHidden()
+        .modifier(TransparentNavBarModifier())
         #endif
         .navigationTitle(vm.media?.title.displayTitle ?? ""))
     }

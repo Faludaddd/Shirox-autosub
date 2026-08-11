@@ -137,6 +137,14 @@ extension Color {
     static var glowIntensity: Double {
         UserDefaults.standard.object(forKey: "glowIntensity") as? Double ?? 0.5
     }
+
+    static var glowEnabled: Bool {
+        UserDefaults.standard.object(forKey: "glowEnabled") as? Bool ?? true
+    }
+
+    static var dataSavingMode: Bool {
+        UserDefaults.standard.bool(forKey: "dataSavingMode")
+    }
 }
 
 @main
@@ -188,6 +196,7 @@ struct ShiroxApp: App {
         PendingWriteQueue.shared.register(sink: LibraryWriteSink())
         LocalLibraryManager.shared.syncFromContinueWatching()
         HostBlocklist.shared.loadIfNeeded()
+        EpisodeNotificationManager.shared.registerDelegate()
     }
 
     var body: some Scene {

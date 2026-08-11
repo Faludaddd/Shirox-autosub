@@ -603,6 +603,26 @@
 		F5A6B7C8D9E10000000000A3 /* AnimatedSplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5A6B7C8D9E10000000000A1 /* AnimatedSplashView.swift */; };
 		F5A6B7C8D9E10000000000A4 /* AnimatedSplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5A6B7C8D9E10000000000A1 /* AnimatedSplashView.swift */; };
 		F5A6B7C8D9E10000000000A5 /* AnimatedSplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5A6B7C8D9E10000000000A1 /* AnimatedSplashView.swift */; };
+		5DBA399346D44632AFA516CA /* EpisodeNotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08ACB6FE07C044C1B7F17A79 /* EpisodeNotificationManager.swift */; };
+		9FA5C9CD2EC5426A8BB78E75 /* EpisodeNotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08ACB6FE07C044C1B7F17A79 /* EpisodeNotificationManager.swift */; };
+		05C7C0912C494B45B42E5CEA /* EpisodeNotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08ACB6FE07C044C1B7F17A79 /* EpisodeNotificationManager.swift */; };
+		E773D105F15D4C35841EAF17 /* EpisodeNotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08ACB6FE07C044C1B7F17A79 /* EpisodeNotificationManager.swift */; };
+		765B06A87D874A1092B2124E /* WesternScheduleService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EBB2ADA20A14B00AF5D265F /* WesternScheduleService.swift */; };
+		95C25DAC86AF4BA0B0FEAEB4 /* WesternScheduleService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EBB2ADA20A14B00AF5D265F /* WesternScheduleService.swift */; };
+		25ED5FE0B99B41AFB7502073 /* WesternScheduleService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EBB2ADA20A14B00AF5D265F /* WesternScheduleService.swift */; };
+		56B1E902977343B29817FB44 /* WesternScheduleService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EBB2ADA20A14B00AF5D265F /* WesternScheduleService.swift */; };
+		F58FADB80A5F4E56A917A770 /* UnifiedScheduleEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE6B60FF705A43CDBF491F0D /* UnifiedScheduleEntry.swift */; };
+		120D5A334EC34F5A911BA904 /* UnifiedScheduleEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE6B60FF705A43CDBF491F0D /* UnifiedScheduleEntry.swift */; };
+		B14FB924B9C2413BA3ABCF04 /* UnifiedScheduleEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE6B60FF705A43CDBF491F0D /* UnifiedScheduleEntry.swift */; };
+		700DD5E4768C45EA97E32DF5 /* UnifiedScheduleEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE6B60FF705A43CDBF491F0D /* UnifiedScheduleEntry.swift */; };
+		F86C8674D3574D5FADFA3C2C /* TransparentNavBarModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7FE0F3B7E784465BCA91A4F /* TransparentNavBarModifier.swift */; };
+		0D4809DF63374C11B0FBC113 /* TransparentNavBarModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7FE0F3B7E784465BCA91A4F /* TransparentNavBarModifier.swift */; };
+		C4D8EB22420F4C6DA18AA61B /* TransparentNavBarModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7FE0F3B7E784465BCA91A4F /* TransparentNavBarModifier.swift */; };
+		11121E24D9F540198A8C76C8 /* TransparentNavBarModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7FE0F3B7E784465BCA91A4F /* TransparentNavBarModifier.swift */; };
+		1BF06D1D30CA434BB3033861 /* AnimatedBackgroundView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74DB2191FE9C4172B00F311B /* AnimatedBackgroundView.swift */; };
+		359E4924BABB4F17B4F25E1D /* AnimatedBackgroundView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74DB2191FE9C4172B00F311B /* AnimatedBackgroundView.swift */; };
+		801AB5C786144C769FF83A65 /* AnimatedBackgroundView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74DB2191FE9C4172B00F311B /* AnimatedBackgroundView.swift */; };
+		D409CEEF2A95420D88025E03 /* AnimatedBackgroundView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74DB2191FE9C4172B00F311B /* AnimatedBackgroundView.swift */; };
 
 /* End PBXBuildFile section */
 
@@ -844,6 +864,11 @@
 		F6AB4FB215071F688F19B394 /* JellyfinConnectView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JellyfinConnectView.swift; sourceTree = "<group>"; };
 		FB32994B31FB72D2DAA8327A /* NSFWContentFilter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NSFWContentFilter.swift; sourceTree = "<group>"; };
 		FF4C00BAA407FF400B069044 /* JellyfinEntryView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JellyfinEntryView.swift; sourceTree = "<group>"; };		F5A6B7C8D9E10000000000A1 /* AnimatedSplashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimatedSplashView.swift; sourceTree = "<group>"; };
+		08ACB6FE07C044C1B7F17A79 /* EpisodeNotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpisodeNotificationManager.swift; sourceTree = "<group>"; };
+		2EBB2ADA20A14B00AF5D265F /* WesternScheduleService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WesternScheduleService.swift; sourceTree = "<group>"; };
+		EE6B60FF705A43CDBF491F0D /* UnifiedScheduleEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnifiedScheduleEntry.swift; sourceTree = "<group>"; };
+		A7FE0F3B7E784465BCA91A4F /* TransparentNavBarModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransparentNavBarModifier.swift; sourceTree = "<group>"; };
+		74DB2191FE9C4172B00F311B /* AnimatedBackgroundView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimatedBackgroundView.swift; sourceTree = "<group>"; };
 
 /* End PBXFileReference section */
 
@@ -931,6 +956,7 @@
 				AAB2881F54EC6780744D288A /* MangaMatch.swift */,
 				4A5A6BA34DDCEF8AFDF2E059 /* PendingWrite.swift */,
 				172B561567C6F7EEECFD31D4 /* MangaDownloadItem.swift */,
+				EE6B60FF705A43CDBF491F0D /* UnifiedScheduleEntry.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -1011,6 +1037,8 @@
 				A62D2F08E475CE2C530B479E /* ProfileCacheStore.swift */,
 				502A361F951FADB9DF23CCD0 /* MangaDownloadManager.swift */,
 				4071A0ACA228C759CA67D5A0 /* QuickActions.swift */,
+				08ACB6FE07C044C1B7F17A79 /* EpisodeNotificationManager.swift */,
+				2EBB2ADA20A14B00AF5D265F /* WesternScheduleService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -1113,6 +1141,8 @@
 				1279E4D62FCA397700C9BA56 /* View+AdaptiveSheet.swift */,
 				BC268A065BC5B9DB56250D4B /* WatchOrderSection.swift */,
 				35CD557D45FF0C6287F6783D /* View+GlassChrome.swift */,
+				A7FE0F3B7E784465BCA91A4F /* TransparentNavBarModifier.swift */,
+				74DB2191FE9C4172B00F311B /* AnimatedBackgroundView.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -1468,6 +1498,11 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
 				7E6DF30054A1D49BC766BE2C /* QuickActionTests.swift in Sources */,
 				A2E73FF64F5BF85131459E21 /* AniListMangaMappingTests.swift in Sources */,
 				57CE3FD2616FFDF1BF15BBA4 /* AnimeModulePreferenceTests.swift in Sources */,
+				E773D105F15D4C35841EAF17 /* EpisodeNotificationManager.swift in Sources */,
+				56B1E902977343B29817FB44 /* WesternScheduleService.swift in Sources */,
+				700DD5E4768C45EA97E32DF5 /* UnifiedScheduleEntry.swift in Sources */,
+				11121E24D9F540198A8C76C8 /* TransparentNavBarModifier.swift in Sources */,
+				D409CEEF2A95420D88025E03 /* AnimatedBackgroundView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1658,6 +1693,11 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
 				C25829F60F06F007037D7B33 /* MangaDownloadManager.swift in Sources */,
 				E5D5B685A50F1A5217A365A4 /* QuickActions.swift in Sources */,
 				81956D3CC3143A3C1EBD6C0D /* AniListMangaDetailView.swift in Sources */,
+				05C7C0912C494B45B42E5CEA /* EpisodeNotificationManager.swift in Sources */,
+				25ED5FE0B99B41AFB7502073 /* WesternScheduleService.swift in Sources */,
+				B14FB924B9C2413BA3ABCF04 /* UnifiedScheduleEntry.swift in Sources */,
+				C4D8EB22420F4C6DA18AA61B /* TransparentNavBarModifier.swift in Sources */,
+				801AB5C786144C769FF83A65 /* AnimatedBackgroundView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1847,6 +1887,11 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
 				E872C30AE18F74304055FF76 /* MangaDownloadManager.swift in Sources */,
 				29AEA9ECF2AA67DA60ACDF3D /* QuickActions.swift in Sources */,
 				0A068DEF85EA1222AA997713 /* AniListMangaDetailView.swift in Sources */,
+				9FA5C9CD2EC5426A8BB78E75 /* EpisodeNotificationManager.swift in Sources */,
+				95C25DAC86AF4BA0B0FEAEB4 /* WesternScheduleService.swift in Sources */,
+				120D5A334EC34F5A911BA904 /* UnifiedScheduleEntry.swift in Sources */,
+				0D4809DF63374C11B0FBC113 /* TransparentNavBarModifier.swift in Sources */,
+				359E4924BABB4F17B4F25E1D /* AnimatedBackgroundView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2036,6 +2081,11 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
 				A8965890C2900C21FC367D26 /* MangaDownloadManager.swift in Sources */,
 				269BF42A2BD9270EB60582E7 /* QuickActions.swift in Sources */,
 				11B06136CDF5130E68376E06 /* AniListMangaDetailView.swift in Sources */,
+				5DBA399346D44632AFA516CA /* EpisodeNotificationManager.swift in Sources */,
+				765B06A87D874A1092B2124E /* WesternScheduleService.swift in Sources */,
+				F58FADB80A5F4E56A917A770 /* UnifiedScheduleEntry.swift in Sources */,
+				F86C8674D3574D5FADFA3C2C /* TransparentNavBarModifier.swift in Sources */,
+				1BF06D1D30CA434BB3033861 /* AnimatedBackgroundView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
