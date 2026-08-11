@@ -255,9 +255,9 @@ struct ShiroxApp: App {
                     // network never blocks app entry. The fetched data is cached by
                     // each service and surfaces in the Home tab once it's ready.
                     Task.detached(priority: .userInitiated) {
-                        async let schedule: Void = AniListService.shared.airingToday()
-                        async let notifications: Void = AniListSocialService.shared.fetchNotifications()
-                        _ = try? await (schedule, notifications)
+                        async let schedule = try? AniListService.shared.airingToday()
+                        async let notifications = try? AniListSocialService.shared.fetchNotifications()
+                        _ = await (schedule, notifications)
                     }
                     // Extended splash window — gives the preload a head start so the
                     // Home tab is more likely to be populated when it appears.
