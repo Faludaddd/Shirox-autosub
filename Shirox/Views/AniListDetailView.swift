@@ -385,7 +385,8 @@ struct AniListDetailView: View {
                         handleLibraryEdit(media: media, status: status, progress: progress, score: score, alsoUpdateMAL: shouldSyncMAL)
                     },
                     onDelete: existingEntry != nil ? {
-                        let entryId = existingEntry!.id
+                        guard let entry = existingEntry else { return }
+                        let entryId = entry.id
                         let provider = activeProvider
                         existingEntry = nil
                         Task { try? await provider.deleteEntry(entryId: entryId) }
@@ -464,7 +465,8 @@ struct AniListDetailView: View {
                         Task { try? await AniListProvider.shared.updateEntry(mediaId: aniId, status: status, progress: progress, score: score) }
                     },
                     onDelete: existingAniListCrossEntry != nil ? {
-                        let entryId = existingAniListCrossEntry!.id
+                        guard let entry = existingAniListCrossEntry else { return }
+                        let entryId = entry.id
                         existingAniListCrossEntry = nil
                         Task { try? await AniListProvider.shared.deleteEntry(entryId: entryId) }
                     } : nil

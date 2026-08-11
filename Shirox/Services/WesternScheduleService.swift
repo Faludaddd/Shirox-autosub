@@ -82,20 +82,29 @@ actor WesternScheduleService {
         var seen = Set<Int>()
         let deduped = raw.filter { seen.insert($0.id).inserted }
 
+        // Drop entries without a usable show reference. The `/schedule` endpoint embeds
+        // `show` at the top level, while `/schedule/web` nests it under `_embedded.show`;
+        // a few entries on either endpoint may omit the show entirely.
+        let withShow = deduped.filter { $0.show != nil }
+
         // Drop anime (Japanese + animation genre).
-        let nonAnime = deduped.filter { !Self.isAnime($0.show) }
+        let nonAnime = withShow.filter { ep in
+            guard let show = ep.show else { return false }
+            return !Self.isAnime(show)
+        }
 
         // Drop daily shows — those that air ≥4 times per week (normalized to the fetched window).
         let showCounts = Self.countByShowId(nonAnime)
         let weeklyThreshold = 4
         let filtered = nonAnime.filter { ep in
-            let count = showCounts[ep.show.id] ?? 0
+            guard let show = ep.show else { return false }
+            let count = showCounts[show.id] ?? 0
             // Normalize the observed count to a 7-day week.
             let weeklyRate = (count * 7) / max(clampedDays, 1)
             return weeklyRate < weeklyThreshold
         }
 
-        let entries = filtered.map { Self.makeEntry(from: $0) }
+        let entries = filtered.compactMap { Self.makeEntry(from: $0) }
         // Sort by air time (entries without a timestamp sink to the end).
         return entries.sorted { lhs, rhs in
             (lhs.airTimestamp ?? Int.max) < (rhs.airTimestamp ?? Int.max)
@@ -169,7 +178,8 @@ actor WesternScheduleService {
     private static func countByShowId(_ episodes: [TVMazeScheduleEpisode]) -> [Int: Int] {
         var counts: [Int: Int] = [:]
         for ep in episodes {
-            counts[ep.show.id, default: 0] += 1
+            guard let show = ep.show else { continue }
+            counts[show.id, default: 0] += 1
         }
         return counts
     }
@@ -192,22 +202,24 @@ actor WesternScheduleService {
     }
 
     /// Converts a decoded TVMaze episode into a `WesternScheduleEntry`.
-    private static func makeEntry(from ep: TVMazeScheduleEpisode) -> WesternScheduleEntry {
-        let cover = ep.show.image?.original
-            ?? ep.show.image?.medium
+    /// Returns `nil` for episodes without a usable `show` reference.
+    private static func makeEntry(from ep: TVMazeScheduleEpisode) -> WesternScheduleEntry? {
+        guard let show = ep.show else { return nil }
+        let cover = show.image?.original
+            ?? show.image?.medium
             ?? ep.image?.original
             ?? ep.image?.medium
         return WesternScheduleEntry(
             id: ep.id,
-            showId: ep.show.id,
-            showName: ep.show.name,
-            season: ep.season,
-            episode: ep.number,
+            showId: show.id,
+            showName: show.name,
+            season: ep.season ?? 0,
+            episode: ep.number ?? 0,
             airTimestamp: parseTimestamp(ep.airstamp),
             coverImage: cover,
-            language: ep.show.language,
-            genres: ep.show.genres,
-            isStreamingRelease: ep.show.webChannel != nil
+            language: show.language,
+            genres: show.genres,
+            isStreamingRelease: show.webChannel != nil
         )
     }
 }
@@ -217,20 +229,67 @@ actor WesternScheduleService {
 private struct TVMazeScheduleEpisode: Decodable {
     let id: Int
     let name: String?
-    let season: Int
-    let number: Int
+    // TVMaze occasionally omits `season`/`number` for irregular entries — keep them optional.
+    let season: Int?
+    let number: Int?
     let airstamp: String?
     let image: Image?
-    let show: Show
+    /// Top-level `show` (present on `/schedule`). Absent on `/schedule/web`, where the
+    /// show is nested under `_embedded.show`. Optional so we can decode both shapes and
+    /// then skip any entries that have no show at all.
+    let show: Show?
+    let _embedded: Embedded?
+
+    /// `/schedule/web` nests the show object here instead of at the top level.
+    struct Embedded: Decodable {
+        let show: Show?
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, season, number, airstamp, image, show, _embedded
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try c.decode(Int.self, forKey: .id)
+        self.name = try c.decodeIfPresent(String.self, forKey: .name)
+        self.season = try c.decodeIfPresent(Int.self, forKey: .season)
+        self.number = try c.decodeIfPresent(Int.self, forKey: .number)
+        self.airstamp = try c.decodeIfPresent(String.self, forKey: .airstamp)
+        self.image = try c.decodeIfPresent(Image.self, forKey: .image)
+        // Prefer the top-level `show` (broadcast schedule); fall back to `_embedded.show`
+        // (web/streaming schedule). Both are optional — entries without any show are dropped
+        // upstream by `WesternScheduleService`.
+        let topLevelShow = try c.decodeIfPresent(Show.self, forKey: .show)
+        let embeddedShow = try c.decodeIfPresent(Embedded.self, forKey: ._embedded)?.show
+        self.show = topLevelShow ?? embeddedShow
+        self._embedded = nil // not retained; consumed above
+    }
 
     struct Show: Decodable {
         let id: Int
         let name: String
         let language: String?
+        // `genres` is sometimes missing on partial show payloads — default to empty.
         let genres: [String]
         let image: Image?
         let network: Network?
         let webChannel: Network?
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            self.id = try c.decode(Int.self, forKey: .id)
+            self.name = try c.decode(String.self, forKey: .name)
+            self.language = try c.decodeIfPresent(String.self, forKey: .language)
+            self.genres = (try? c.decodeIfPresent([String].self, forKey: .genres)) ?? []
+            self.image = try c.decodeIfPresent(Image.self, forKey: .image)
+            self.network = try c.decodeIfPresent(Network.self, forKey: .network)
+            self.webChannel = try c.decodeIfPresent(Network.self, forKey: .webChannel)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case id, name, language, genres, image, network, webChannel
+        }
     }
 
     struct Image: Decodable {

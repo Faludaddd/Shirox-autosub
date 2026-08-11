@@ -41,6 +41,131 @@ struct HomeView: View {
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 24) {
+                            // ────────────────────────────────────────────────────────
+                            // 1. HERO — Full-bleed featured carousel.
+                            //    The ONLY hero element on the page; everything below it
+                            //    is supporting content (grid + continue watching).
+                            // ────────────────────────────────────────────────────────
+                            if !vm.trending.isEmpty {
+                                FeaturedCarousel(items: vm.trending)
+                            }
+
+                            // ────────────────────────────────────────────────────────
+                            // 2. CATEGORY GRID — replaces the old vertical scroll of
+                            //    AnimeSections. Six large tappable tiles, two columns.
+                            //    Tapping any tile pushes BrowseView with that category.
+                            // ────────────────────────────────────────────────────────
+                            Text("Browse Categories")
+                                .font(.title3.weight(.bold))
+                                .padding(.horizontal, 16)
+
+                            LazyVGrid(
+                                columns: [
+                                    GridItem(.flexible(), spacing: 12),
+                                    GridItem(.flexible(), spacing: 12)
+                                ],
+                                spacing: 12
+                            ) {
+                                NavigationLink {
+                                    BrowseView(category: .seasonal)
+                                } label: {
+                                    CategoryGridCard(
+                                        title: "This Season",
+                                        count: vm.seasonal.count,
+                                        iconName: "calendar.badge.clock",
+                                        gradientColors: [.green, .teal],
+                                        imageURL: vm.seasonal.first?.coverImage.best
+                                    )
+                                }
+                                .buttonStyle(HomePressStyle())
+
+                                NavigationLink {
+                                    BrowseView(category: .trending)
+                                } label: {
+                                    CategoryGridCard(
+                                        title: "Trending",
+                                        count: vm.trending.count,
+                                        iconName: "flame.fill",
+                                        gradientColors: [.red, .orange],
+                                        imageURL: vm.trending.first?.coverImage.best
+                                    )
+                                }
+                                .buttonStyle(HomePressStyle())
+
+                                NavigationLink {
+                                    BrowseView(category: .popular)
+                                } label: {
+                                    CategoryGridCard(
+                                        title: "Popular",
+                                        count: vm.popular.count,
+                                        iconName: "star.fill",
+                                        gradientColors: [.pink, .purple],
+                                        imageURL: vm.popular.first?.coverImage.best
+                                    )
+                                }
+                                .buttonStyle(HomePressStyle())
+
+                                NavigationLink {
+                                    BrowseView(category: .topRated)
+                                } label: {
+                                    CategoryGridCard(
+                                        title: "Top Rated",
+                                        count: vm.topRated.count,
+                                        iconName: "trophy.fill",
+                                        gradientColors: [.amber, .yellow],
+                                        imageURL: vm.topRated.first?.coverImage.best
+                                    )
+                                }
+                                .buttonStyle(HomePressStyle())
+
+                                NavigationLink {
+                                    BrowseView(category: .popular)
+                                } label: {
+                                    CategoryGridCard(
+                                        title: "Recently Completed",
+                                        count: vm.recentlyCompleted.count,
+                                        iconName: "checkmark.seal.fill",
+                                        gradientColors: [.gray, .black],
+                                        imageURL: vm.recentlyCompleted.first?.coverImage.best
+                                    )
+                                }
+                                .buttonStyle(HomePressStyle())
+
+                                NavigationLink {
+                                    BrowseView(category: .trending)
+                                } label: {
+                                    CategoryGridCard(
+                                        title: "Upcoming",
+                                        count: vm.upcoming.count,
+                                        iconName: "clock.arrow.circlepath",
+                                        gradientColors: [.indigo, .purple],
+                                        imageURL: vm.upcoming.first?.coverImage.best
+                                    )
+                                }
+                                .buttonStyle(HomePressStyle())
+                            }
+                            .padding(.horizontal, 16)
+
+                            // "See All" link — deep-links into the default Browse tab.
+                            HStack {
+                                Spacer()
+                                NavigationLink {
+                                    BrowseView(category: .trending)
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Text("See All")
+                                        Image(systemName: "arrow.right")
+                                    }
+                                    .font(.subheadline.weight(.semibold))
+                                }
+                            }
+                            .padding(.horizontal, 16)
+
+                            // ────────────────────────────────────────────────────────
+                            // 3. CONTINUE WATCHING — horizontal strip BELOW the grid
+                            //    (was previously above the carousel). Kept iOS-only as
+                            //    before; on tvOS/macOS these resume cards don't render.
+                            // ────────────────────────────────────────────────────────
                             #if os(iOS)
                             if !continueWatching.items.isEmpty {
                                 ContinueWatchingSection(items: continueWatching.items, navTarget: $cwNavTarget)
@@ -49,35 +174,9 @@ struct HomeView: View {
                                 ContinueReadingSection(items: mangaProgress.items, readerContext: $readerContext)
                             }
                             #endif
-                            if !vm.trending.isEmpty {
-                                FeaturedCarousel(items: vm.trending)
-                            }
-                            Text("Discover")
-                                .font(.title3.weight(.bold))
-                                .padding(.horizontal, 16)
-                            if !vm.trending.isEmpty {
-                                AnimeSection(title: "Trending Now",     items: vm.trending, category: .trending)
-                            }
-                            if !vm.seasonal.isEmpty {
-                                AnimeSection(title: "This Season",      items: vm.seasonal, category: .seasonal)
-                            }
-                            Text("Browse")
-                                .font(.title3.weight(.bold))
-                                .padding(.horizontal, 16)
-                            if !vm.popular.isEmpty {
-                                AnimeSection(title: "All-Time Popular", items: vm.popular,  category: .popular)
-                            }
-                            if !vm.topRated.isEmpty {
-                                AnimeSection(title: "Top Rated",        items: vm.topRated, category: .topRated)
-                            }
-                            if !vm.recentlyCompleted.isEmpty {
-                                AnimeSection(title: "Recently Completed", items: vm.recentlyCompleted, category: .popular)
-                            }
-                            if !vm.upcoming.isEmpty {
-                                AnimeSection(title: "Upcoming",         items: vm.upcoming,    category: .trending)
-                            }
+
+                            Spacer().frame(height: 28)
                         }
-                        Spacer().frame(height: 28)
                     }
                     .refreshable {
                         await withTaskGroup(of: Void.self) { group in
@@ -711,6 +810,100 @@ private struct HomePressStyle: ButtonStyle {
     }
 }
 
+// MARK: - Category Grid Card
+//
+// Large tappable tile used in the Home "Spotlight + Grid" layout. Each tile is
+// 160pt tall, shows a representative image from its category, layered with a
+// category-specific gradient + a dark legibility gradient, an icon badge, and
+// the title + item count anchored to the bottom. Tapping is handled by the
+// NavigationLink that wraps the card in the Home grid.
+
+private struct CategoryGridCard: View {
+    let title: String
+    let count: Int
+    let iconName: String
+    let gradientColors: [Color]
+    let imageURL: String?
+
+    private static let tileHeight: CGFloat = 160
+
+    var body: some View {
+        ZStack(alignment: .bottomLeading) {
+            // Base layer: representative cover image if available, otherwise the
+            // category gradient fills the whole tile so the card never looks
+            // empty while images are still loading (or for offline categories).
+            if let url = imageURL, !url.isEmpty {
+                CachedAsyncImage(urlString: url)
+                    .aspectRatio(contentMode: .fill)
+                    .frame(height: Self.tileHeight)
+                    .frame(maxWidth: .infinity)
+                    .clipped()
+            } else {
+                LinearGradient(
+                    colors: gradientColors,
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .frame(height: Self.tileHeight)
+                .frame(maxWidth: .infinity)
+            }
+
+            // Brand-tinted gradient wash — ties the image to the category color
+            // even once the cover has loaded.
+            LinearGradient(
+                colors: [
+                    gradientColors.first?.opacity(0.35) ?? .clear,
+                    gradientColors.last?.opacity(0.65) ?? .clear
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .frame(height: Self.tileHeight)
+            .frame(maxWidth: .infinity)
+            .blendMode(.overlay)
+
+            // Bottom-up dark gradient for text legibility over any image.
+            LinearGradient(
+                colors: [
+                    .black.opacity(0.05),
+                    .black.opacity(0.55),
+                    .black.opacity(0.8)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: Self.tileHeight)
+            .frame(maxWidth: .infinity)
+
+            // Foreground content: icon badge (top) + title & count (bottom).
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Image(systemName: iconName)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 38, height: 38)
+                        .background(.ultraThinMaterial, in: Circle())
+                    Spacer()
+                }
+                Spacer()
+                Text(title)
+                    .font(.headline.weight(.bold))
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.8)
+                Text("\(count) titles")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.85))
+            }
+            .padding(14)
+        }
+        .frame(height: Self.tileHeight)
+        .frame(maxWidth: .infinity)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+}
+
 // MARK: - Schedule Settings (persisted)
 
 /// Persisted schedule preferences, read by `ScheduleView` (defaults) and edited by
@@ -771,8 +964,12 @@ struct ScheduleView: View {
     @State private var mode:   ScheduleMode = ScheduleSettings.defaultMode
     @State private var useUTC: Bool         = ScheduleSettings.defaultUseUTC
 
-    // Day strip selection (index into `buildBuckets()`).
-    @State private var selectedDayIndex: Int = 0
+    // Calendar navigation. `weekStartDate` is the Sunday of the currently displayed
+    // week; `selectedDate` is the day whose episodes are shown below the grid. Both
+    // are start-of-day dates in the active calendar (local or UTC) so they line up
+    // with the day buckets produced by `buildBuckets()`.
+    @State private var weekStartDate: Date = ScheduleView.startOfWeek(for: Date(), utc: ScheduleSettings.defaultUseUTC)
+    @State private var selectedDate: Date = ScheduleView.calendarFor(utc: ScheduleSettings.defaultUseUTC).startOfDay(for: Date())
 
     // Pending episode-notification schedule ids — drives the bell's on/off state.
     @State private var scheduledIds: Set<Int> = []
@@ -831,7 +1028,7 @@ struct ScheduleView: View {
         .refreshable { await load() }
         .onChange(of: mode) { _ in Task { await load() } }
         .onChange(of: windowDays) { _ in Task { await load() } }
-        .onChange(of: useUTC) { _ in selectedDayIndex = 0 }
+        .onChange(of: useUTC) { _ in resetCalendarToToday() }
     }
 
     // MARK: - Content
@@ -839,10 +1036,13 @@ struct ScheduleView: View {
     @ViewBuilder
     private var scheduleContent: some View {
         let buckets = buildBuckets()
-        let safeIndex = min(max(selectedDayIndex, 0), max(buckets.count - 1, 0))
+        // Map each day's start-of-day date → episode count, for the calendar badges.
+        let countByDay = Dictionary(uniqueKeysWithValues: buckets.map { ($0.date, $0.entries.count) })
+        let weekDays = currentWeekDays()
+        let selectedBucket = buckets.first(where: { calendar.isDate($0.date, inSameDayAs: selectedDate) })
 
         VStack(spacing: 0) {
-            // Controls
+            // Controls — content mode + timezone (kept from the previous layout).
             VStack(spacing: 10) {
                 Picker("Content", selection: $mode) {
                     ForEach(ScheduleMode.allCases, id: \.self) { m in
@@ -861,24 +1061,80 @@ struct ScheduleView: View {
             .padding(.top, 6)
             .padding(.bottom, 8)
 
-            // Day strip with item counts
-            if !buckets.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(buckets.indices, id: \.self) { index in
-                            dayStripTab(bucket: buckets[index], index: index, isSelected: index == safeIndex)
+            // Month / week header (e.g. "August 2026", or "Jul – Aug 2026" if spanning).
+            Text(monthYearHeader)
+                .font(.headline)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.bottom, 8)
+
+            // Week navigation arrows flanking the weekday header + day grid.
+            HStack(spacing: 6) {
+                Button {
+                    shiftWeek(by: -7)
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 14, weight: .semibold))
+                        .frame(width: 30, height: 30)
+                        .background(Circle().fill(Color.secondary.opacity(0.1)))
+                        .foregroundStyle(.primary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Previous week")
+
+                VStack(spacing: 4) {
+                    // Weekday labels (Sun–Sat).
+                    HStack(spacing: 3) {
+                        ForEach(weekdayLabels, id: \.self) { label in
+                            Text(label)
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity)
+                                .lineLimit(1)
                         }
                     }
-                    .padding(.horizontal, 16)
+                    // Day cells — date number + episode-count badge.
+                    HStack(spacing: 3) {
+                        ForEach(weekDays, id: \.self) { day in
+                            dayCell(
+                                date: day,
+                                count: countByDay[day] ?? 0,
+                                isSelected: calendar.isDate(day, inSameDayAs: selectedDate),
+                                isToday: calendar.isDateInToday(day)
+                            )
+                        }
+                    }
                 }
-                .padding(.bottom, 8)
-            }
+                .frame(maxWidth: .infinity)
 
-            // Selected day entries
-            if safeIndex < buckets.count {
-                ScrollView {
+                Button {
+                    shiftWeek(by: 7)
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .frame(width: 30, height: 30)
+                        .background(Circle().fill(Color.secondary.opacity(0.1)))
+                        .foregroundStyle(.primary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Next week")
+            }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 12)
+
+            // Selected day's episodes.
+            ScrollView {
+                if let bucket = selectedBucket, !bucket.entries.isEmpty {
                     LazyVStack(spacing: 12) {
-                        ForEach(buckets[safeIndex].entries) { entry in
+                        HStack {
+                            Text(bucket.shortTitle)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text("\(bucket.entries.count) episode\(bucket.entries.count == 1 ? "" : "s")")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(.secondary)
+                        }
+                        ForEach(bucket.entries) { entry in
                             ScheduleCard(
                                 entry: entry,
                                 useUTC: useUTC,
@@ -893,42 +1149,81 @@ struct ScheduleView: View {
                     .padding(.horizontal, 16)
                     .padding(.top, 4)
                     .padding(.bottom, 24)
+                } else {
+                    VStack(spacing: 12) {
+                        Image(systemName: "calendar.badge.exclamationmark")
+                            .font(.system(size: 36))
+                            .foregroundStyle(.secondary)
+                        Text("No episodes airing this day")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 48)
+                    .padding(.bottom, 24)
                 }
             }
         }
     }
 
     @ViewBuilder
-    private func dayStripTab(bucket: ScheduleDayBucket, index: Int, isSelected: Bool) -> some View {
+    private func dayCell(date: Date, count: Int, isSelected: Bool, isToday: Bool) -> some View {
         Button {
             withAnimation(.easeOut(duration: 0.18)) {
-                selectedDayIndex = index
+                selectedDate = date
             }
         } label: {
-            VStack(spacing: 2) {
-                Text(bucket.shortTitle)
-                    .font(.caption.weight(.semibold))
-                    .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
-                Text("\(bucket.entries.count)")
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: true, vertical: false)
+            VStack(spacing: 4) {
+                Text("\(calendar.component(.day, from: date))")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+
+                if count > 0 {
+                    Text("\(count)")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1)
+                        .background(
+                            Capsule().fill(Color.secondary.opacity(0.18))
+                        )
+                        .fixedSize()
+                } else {
+                    Circle()
+                        .fill(Color.secondary.opacity(0.3))
+                        .frame(width: 4, height: 4)
+                }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity)
+            .frame(height: 54)
             .background(
-                isSelected ? Color.primary.opacity(0.12) : Color.secondary.opacity(0.08),
-                in: Capsule()
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(isSelected ? Color.primary.opacity(0.12) : Color.secondary.opacity(0.08))
             )
             .overlay(
-                Capsule().strokeBorder(
-                    isSelected ? Color.primary.opacity(0.35) : .clear,
-                    lineWidth: 1
-                )
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(
+                        isSelected ? Color.primary.opacity(0.35) :
+                        (isToday ? Color.primary.opacity(0.3) : Color.clear),
+                        lineWidth: 1
+                    )
             )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabelForDay(date, count: count))
+    }
+
+    private func accessibilityLabelForDay(_ date: Date, count: Int) -> String {
+        let cal = calendar
+        let f = DateFormatter()
+        f.locale = cal.locale ?? Locale.current
+        f.timeZone = cal.timeZone
+        f.dateFormat = "EEEE, MMMM d"
+        let base = f.string(from: date)
+        if count > 0 {
+            return "\(base), \(count) episode\(count == 1 ? "" : "s")"
+        }
+        return "\(base), no episodes"
     }
 
     private var scheduleLoadingView: some View {
@@ -970,8 +1265,12 @@ struct ScheduleView: View {
         loadError = nil
         defer { isLoading = false }
 
-        let calendar = Calendar.current
-        let startOfToday = calendar.startOfDay(for: Date())
+        // Fetch window is always anchored to local-midnight today (independent of the
+        // display timezone toggle) so the same set of episodes is fetched regardless of
+        // whether times are shown in Local or UTC. Named `fetchCalendar` to avoid
+        // shadowing the `calendar` computed property below.
+        let fetchCalendar = Calendar.current
+        let startOfToday = fetchCalendar.startOfDay(for: Date())
         let startTs = Int(startOfToday.timeIntervalSince1970)
         let endTs = startTs + max(windowDays, 1) * 86_400
 
@@ -1006,8 +1305,8 @@ struct ScheduleView: View {
             fetched = fetched.filter { $0.airingAt >= startTs }
             entries = fetched.sorted { $0.airingAt < $1.airingAt }
 
-            // Reset to the first (earliest) day after every reload.
-            selectedDayIndex = 0
+            // Reset the calendar to today after every reload.
+            resetCalendarToToday()
 
             // Refresh the pending-notification set so the bells reflect current state.
             scheduledIds = await EpisodeNotificationManager.shared.scheduledScheduleIds()
@@ -1016,17 +1315,44 @@ struct ScheduleView: View {
         }
     }
 
-    // MARK: - Day bucketing (timezone-aware)
+    // MARK: - Day bucketing & calendar grid (timezone-aware)
 
-    /// Groups entries into day buckets using either the local calendar or a UTC calendar,
-    /// depending on the timezone toggle. This bypasses `ScheduleDayBucket.build` (which is
-    /// hard-wired to `Calendar.current`) so the day boundaries match the displayed times.
+    /// Active calendar — local or UTC, with Sunday (`firstWeekday = 1`) as the first day
+    /// so the 7-column grid always starts on Sunday. The local branch keeps using
+    /// `Calendar.current` (preserving the previous bucketing behaviour); only the UTC
+    /// branch forces a Gregorian calendar with a UTC timezone.
+    private var calendar: Calendar {
+        Self.calendarFor(utc: useUTC)
+    }
+
+    private static func calendarFor(utc: Bool) -> Calendar {
+        var cal: Calendar
+        if utc {
+            cal = Calendar(identifier: .gregorian)
+            cal.timeZone = TimeZone(identifier: "UTC") ?? .current
+        } else {
+            cal = Calendar.current
+        }
+        cal.firstWeekday = 1
+        return cal
+    }
+
+    /// Sunday of the week containing `date`, in the active calendar.
+    private static func startOfWeek(for date: Date, utc: Bool) -> Date {
+        let cal = calendarFor(utc: utc)
+        return cal.dateInterval(of: .weekOfYear, for: date)?.start ?? date
+    }
+
+    /// Groups entries into day buckets using the active calendar (local or UTC). This
+    /// bypasses `ScheduleDayBucket.build` (which is hard-wired to `Calendar.current`) so
+    /// the day boundaries match the displayed times. The bucket keys are start-of-day
+    /// `Date`s, which line up 1:1 with the dates produced by `currentWeekDays()`.
     private func buildBuckets() -> [ScheduleDayBucket] {
-        let calendar = useUTC ? Self.utcCalendar : Calendar.current
+        let cal = calendar
         var grouped: [Date: [UnifiedScheduleEntry]] = [:]
         for entry in entries {
             let airDate = Date(timeIntervalSince1970: TimeInterval(entry.airingAt))
-            let dayStart = calendar.startOfDay(for: airDate)
+            let dayStart = cal.startOfDay(for: airDate)
             grouped[dayStart, default: []].append(entry)
         }
         return grouped.keys.sorted().map { day in
@@ -1036,10 +1362,72 @@ struct ScheduleView: View {
         }
     }
 
-    private static var utcCalendar: Calendar {
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = TimeZone(identifier: "UTC") ?? .current
-        return cal
+    /// The seven days of the currently displayed week (Sunday → Saturday).
+    private func currentWeekDays() -> [Date] {
+        let cal = calendar
+        return (0..<7).map { offset in
+            cal.date(byAdding: .day, value: offset, to: weekStartDate) ?? weekStartDate
+        }
+    }
+
+    /// Short weekday symbols (Sun, Mon, …, Sat) for the active calendar's locale.
+    private var weekdayLabels: [String] {
+        Array(calendar.shortWeekdaySymbols.prefix(7))
+    }
+
+    /// Month/year header for the displayed week. Shows a single "August 2026" when the
+    /// whole week is in one month, "Jul – Aug 2026" when it spans two months in a year,
+    /// or "December 2025 – January 2026" when it spans a year boundary.
+    private var monthYearHeader: String {
+        let days = currentWeekDays()
+        let cal = calendar
+        let firstDay = days.first ?? weekStartDate
+        let lastDay = days.last ?? weekStartDate
+        let firstMonth = cal.component(.month, from: firstDay)
+        let lastMonth = cal.component(.month, from: lastDay)
+        let firstYear = cal.component(.year, from: firstDay)
+        let lastYear = cal.component(.year, from: lastDay)
+
+        let f = DateFormatter()
+        f.locale = cal.locale ?? Locale.current
+        f.timeZone = cal.timeZone
+
+        if firstYear == lastYear && firstMonth == lastMonth {
+            f.dateFormat = "MMMM yyyy"
+            return f.string(from: firstDay)
+        } else if firstYear == lastYear {
+            f.dateFormat = "MMMM"
+            let m1 = f.string(from: firstDay)
+            let m2 = f.string(from: lastDay)
+            f.dateFormat = "yyyy"
+            let yr = f.string(from: lastDay)
+            return "\(m1) – \(m2) \(yr)"
+        } else {
+            f.dateFormat = "MMMM yyyy"
+            return "\(f.string(from: firstDay)) – \(f.string(from: lastDay))"
+        }
+    }
+
+    /// Shifts the displayed week (and the selection) by `days` (±7). The selection
+    /// moves with the week so a day in the new week stays highlighted.
+    private func shiftWeek(by days: Int) {
+        let cal = calendar
+        withAnimation(.easeOut(duration: 0.2)) {
+            weekStartDate = cal.date(byAdding: .day, value: days, to: weekStartDate) ?? weekStartDate
+            selectedDate = cal.date(byAdding: .day, value: days, to: selectedDate) ?? selectedDate
+        }
+    }
+
+    /// Snaps the calendar back to today — used after a reload and after a timezone
+    /// toggle so the user lands on the current day in the new calendar.
+    private func resetCalendarToToday() {
+        let cal = calendar
+        let today = cal.startOfDay(for: Date())
+        let weekStart = Self.startOfWeek(for: Date(), utc: useUTC)
+        withAnimation(.easeOut(duration: 0.2)) {
+            selectedDate = today
+            weekStartDate = weekStart
+        }
     }
 
     // MARK: - Bell (notifications)
@@ -1425,10 +1813,7 @@ private struct NotificationRow: View {
     let notification: AniListNotification
     var body: some View {
         HStack(spacing: 12) {
-            ZStack {
-                Circle().fill(Color.secondary.opacity(0.1)).frame(width: 36, height: 36)
-                Image(systemName: iconName).font(.system(size: 14)).foregroundStyle(.secondary)
-            }
+            iconView
             VStack(alignment: .leading, spacing: 2) {
                 Text(description).font(.subheadline).lineLimit(2)
                 Text(timestamp).font(.caption2).foregroundStyle(.secondary)
@@ -1436,6 +1821,105 @@ private struct NotificationRow: View {
             Spacer()
         }
         .padding(.vertical, 4)
+    }
+
+    // MARK: - Icon (cover image / avatar / fallback placeholder)
+
+    /// Renders the notification's leading thumbnail. Prefers the media cover
+    /// image (for airing + media* notifications), then the user's avatar (for
+    /// follow/activity/thread notifications), and finally a plain SF Symbol
+    /// badge. Each image variant still overlays a small SF Symbol so the
+    /// notification type is identifiable at a glance even when the image
+    /// hasn't loaded yet or the URL is nil.
+    @ViewBuilder
+    private var iconView: some View {
+        if let coverURL = coverImageURL, !coverURL.isEmpty {
+            ZStack(alignment: .bottomTrailing) {
+                CachedAsyncImage(urlString: coverURL)
+                    .frame(width: 30, height: 42)
+                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                Image(systemName: iconName)
+                    .font(.system(size: 7, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 15, height: 15)
+                    .background(Circle().fill(iconColor))
+                    .overlay(Circle().strokeBorder(Color.white.opacity(0.85), lineWidth: 1))
+                    .offset(x: 3, y: 3)
+            }
+            .frame(width: 34, height: 46)
+        } else if let avatarURL = avatarURL, !avatarURL.isEmpty {
+            ZStack(alignment: .bottomTrailing) {
+                CachedAsyncImage(urlString: avatarURL)
+                    .frame(width: 36, height: 36)
+                    .clipShape(Circle())
+                Image(systemName: iconName)
+                    .font(.system(size: 7, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 15, height: 15)
+                    .background(Circle().fill(iconColor))
+                    .overlay(Circle().strokeBorder(Color.white.opacity(0.85), lineWidth: 1))
+                    .offset(x: 3, y: 3)
+            }
+            .frame(width: 40, height: 40)
+        } else {
+            ZStack {
+                Circle().fill(Color.secondary.opacity(0.1)).frame(width: 36, height: 36)
+                Image(systemName: iconName).font(.system(size: 14)).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    /// Best available cover image URL for notifications that carry a media
+    /// object (airing + media addition/data-change/merge). Returns nil for
+    /// notification types without one so the avatar / placeholder paths can
+    /// take over.
+    private var coverImageURL: String? {
+        switch notification {
+        case .airing(let n):
+            return n.media?.coverImage?.best
+        case .mediaAddition(let n), .mediaDataChange(let n), .mediaMerge(let n):
+            return n.media?.coverImage?.best
+        default:
+            return nil
+        }
+    }
+
+    /// Avatar URL for user-driven notifications (follows, activity, threads).
+    /// These notifications have no media object, so we show the actor's avatar
+    /// as the thumbnail instead.
+    private var avatarURL: String? {
+        switch notification {
+        case .following(let n):
+            return n.user?.avatar?.large
+        case .activityMessage(let n), .activityReply(let n), .activityReplySubscribed(let n),
+             .activityMention(let n), .activityLike(let n), .activityReplyLike(let n):
+            return n.user?.avatar?.large
+        case .threadCommentMention(let n), .threadCommentReply(let n),
+             .threadCommentSubscribed(let n), .threadCommentLike(let n), .threadLike(let n):
+            return n.user?.avatar?.large
+        default:
+            return nil
+        }
+    }
+
+    /// Per-type tint for the small badge overlay so a glance is enough to tell
+    /// a follow (green) from an activity like (pink) from an airing (blue).
+    private var iconColor: Color {
+        switch notification {
+        case .airing:                                return .blue
+        case .following:                             return .green
+        case .activityMessage:                       return .purple
+        case .activityReply, .activityReplySubscribed,
+             .activityMention:                       return .orange
+        case .activityLike, .activityReplyLike:      return .pink
+        case .threadCommentMention, .threadCommentReply,
+             .threadCommentSubscribed, .threadCommentLike,
+             .threadLike:                            return .yellow
+        case .mediaAddition, .mediaDataChange,
+             .mediaMerge:                            return .gray
+        case .mediaDeletion:                         return .red
+        case .unknown:                               return .gray
+        }
     }
 
     private var iconName: String {
