@@ -3506,9 +3506,6 @@ struct LandscapeSubtitlePreview: View {
             .foregroundStyle(.white)
         }
         .statusBarHidden()
-        #if os(iOS)
-        if #available(iOS 16, *) { /* persistentSystemOverlays not available on iOS 15 */ }
-        #endif
         .onAppear {
             // Borrow the player presenter's orientation-lock machinery so the
             // preview rotates into landscape exactly like real playback does.
