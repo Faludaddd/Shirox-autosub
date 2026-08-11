@@ -338,6 +338,8 @@ struct MangaDetailView: View {
                             Text(module.sourceName)
                                 .font(.caption2).fontWeight(.semibold)
                                 .foregroundStyle(.primary)
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
                         }
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(Color.primary.opacity(0.1), in: Capsule())
@@ -353,6 +355,8 @@ struct MangaDetailView: View {
                                     .padding(.horizontal, 8).padding(.vertical, 3)
                                     .background(Color.primary.opacity(0.1), in: Capsule())
                                     .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
+                                    .lineLimit(1)
+                                    .fixedSize(horizontal: true, vertical: false)
                             }
                             if let status = enrich.statusDisplay {
                                 Text(status)
@@ -361,6 +365,8 @@ struct MangaDetailView: View {
                                     .padding(.horizontal, 8).padding(.vertical, 3)
                                     .background(Color.primary.opacity(0.1), in: Capsule())
                                     .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
+                                    .lineLimit(1)
+                                    .fixedSize(horizontal: true, vertical: false)
                             }
                         }
                     }
@@ -371,6 +377,8 @@ struct MangaDetailView: View {
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(Color.primary.opacity(0.1), in: Capsule())
                         .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
                 Spacer()
             }
@@ -538,11 +546,14 @@ struct MangaDetailView: View {
                 HStack(spacing: 8) {
                     Text("Chapters")
                         .font(.title3.weight(.bold))
+                        .lineLimit(1)
                     Text("\(visibleChapters.count)")
                         .font(.caption.weight(.bold))
                         .foregroundStyle(platformBackground)
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(Color.primary, in: Capsule())
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
                 Spacer()
 

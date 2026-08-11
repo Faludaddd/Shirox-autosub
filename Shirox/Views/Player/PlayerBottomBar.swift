@@ -105,6 +105,8 @@ struct PlayerBottomBar: View {
                     .font(.system(size: isPad ? 18 : 15, weight: .medium))
                 Text("\(skipLongAmount)s")
                     .font(isPad ? .body.weight(.semibold) : .subheadline.weight(.semibold))
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
             }
             .foregroundStyle(.white)
             .padding(.horizontal, isPad ? 20 : 14)

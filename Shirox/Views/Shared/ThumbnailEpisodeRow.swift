@@ -96,6 +96,8 @@ struct ThumbnailEpisodeRow: View {
                         Text("Episode \(number)")
                             .font(.callout.weight(.semibold))
                             .foregroundStyle(.primary)
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
 
                         if let badge = Self.fillerBadge(for: fillerType) {
                             Text(badge.label)
@@ -104,6 +106,8 @@ struct ThumbnailEpisodeRow: View {
                                 .padding(.horizontal, 6).padding(.vertical, 2)
                                 .background(badge.tint.opacity(0.15), in: Capsule())
                                 .overlay(Capsule().strokeBorder(badge.tint.opacity(0.35), lineWidth: 0.5))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
                         }
                     }
 
@@ -118,6 +122,8 @@ struct ThumbnailEpisodeRow: View {
                         Text(dateText)
                             .font(.caption2)
                             .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
                     }
                 }
 

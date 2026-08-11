@@ -265,6 +265,7 @@ private struct ModuleSectionHeader: View {
                 .frame(width: 16, height: 16)
                 .clipShape(RoundedRectangle(cornerRadius: 4))
             Text(name)
+                .lineLimit(1)
         }
     }
 }
@@ -293,6 +294,8 @@ private struct MediaGroupRow: View {
                 Text("\(count) \(unit)\(count == 1 ? "" : "s")")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
             }
         }
         .padding(.vertical, 2)
@@ -328,11 +331,15 @@ private struct DownloadProgressRow: View {
                         Text("\(Int(item.progress * 100))%")
                             .font(.system(size: 10, weight: .bold, design: .monospaced))
                             .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
                     }
                 case .pending:
                     Text("Waiting…")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                 case .failed:
                     HStack {
                         Text(item.error ?? "Download failed")
@@ -396,9 +403,13 @@ private struct MangaDownloadProgressRow: View {
                         Text("\(Int(item.progress * 100))%")
                             .font(.system(size: 10, weight: .bold, design: .monospaced))
                             .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
                     }
                 case .pending:
                     Text("Waiting…").font(.caption2).foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                 case .failed:
                     HStack {
                         Text(item.error ?? "Download failed").font(.caption2).foregroundStyle(.red).lineLimit(2)

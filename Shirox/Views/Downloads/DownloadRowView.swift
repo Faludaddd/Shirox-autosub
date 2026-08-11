@@ -35,6 +35,8 @@ struct DownloadRowView: View {
                         Text("\(Int(item.progress * 100))%")
                             .font(.system(size: 10, weight: .bold, design: .monospaced))
                             .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
                     }
                 } else if item.state == .failed {
                     Text(item.error ?? "Download failed")
@@ -45,6 +47,8 @@ struct DownloadRowView: View {
                     HStack(spacing: 4) {
                         Image(systemName: item.isHLS ? "folder.fill" : "play.circle.fill")
                         Text(item.isHLS ? "Local HLS" : "MP4 Video")
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
                     }
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.green.opacity(0.8))

@@ -511,6 +511,7 @@ struct DetailView: View {
                     .font(.system(size: 13, weight: .bold))
                 Text(label)
                     .font(.system(size: 15, weight: .bold))
+                    .lineLimit(1)
             }
             .frame(maxWidth: .infinity)
             .frame(height: 48)
@@ -899,6 +900,8 @@ struct DetailView: View {
                             Text(module.sourceName)
                                 .font(.caption2).fontWeight(.semibold)
                                 .foregroundStyle(.primary)
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
                         } else {
                             CachedAsyncImage(urlString: "https://anilist.co/img/icons/apple-touch-icon.png", base64String: nil)
                                 .frame(width: 14, height: 14)
@@ -906,6 +909,8 @@ struct DetailView: View {
                             Text("AniList")
                                 .font(.caption2).fontWeight(.semibold)
                                 .foregroundStyle(.primary)
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
                         }
                     }
                     .padding(.horizontal, 8).padding(.vertical, 3)
@@ -921,6 +926,8 @@ struct DetailView: View {
                                 .padding(.horizontal, 8).padding(.vertical, 3)
                                 .background(Color.primary.opacity(0.1), in: Capsule())
                                 .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
                         }
                     }
                 }
@@ -1188,6 +1195,7 @@ struct DetailView: View {
                 HStack(spacing: 8) {
                     Text("Episodes")
                         .font(.title3.weight(.bold))
+                        .lineLimit(1)
                     #if os(iOS)
                     if !isSelectionMode {
                         Text("\(detail.episodes.count)")
@@ -1195,6 +1203,8 @@ struct DetailView: View {
                             .foregroundStyle(platformBackground)
                             .padding(.horizontal, 8).padding(.vertical, 3)
                             .background(Color.primary, in: Capsule())
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
                     }
                     #else
                     Text("\(detail.episodes.count)")
@@ -1202,6 +1212,8 @@ struct DetailView: View {
                         .foregroundStyle(platformBackground)
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(Color.primary, in: Capsule())
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                     #endif
                 }
                 Spacer()
@@ -1284,6 +1296,8 @@ struct DetailView: View {
                                 let end = min((selectedRangeIndex + 1) * 100, visibleEpisodes.count)
                                 Text("\(start)-\(end)")
                                     .font(.subheadline.weight(.medium))
+                                    .lineLimit(1)
+                                    .fixedSize(horizontal: true, vertical: false)
                                 Image(systemName: "chevron.down")
                                     .font(.caption)
                             }
@@ -1323,6 +1337,8 @@ struct DetailView: View {
                                     .font(.subheadline)
                                 Text("Season \(selectedSeason + 1)")
                                     .font(.subheadline.weight(.medium))
+                                    .lineLimit(1)
+                                    .fixedSize(horizontal: true, vertical: false)
                                 Image(systemName: "chevron.down")
                                     .font(.caption)
                             }
@@ -1563,11 +1579,14 @@ struct DetailView: View {
             HStack(alignment: .center) {
                 HStack(spacing: 8) {
                     Text("Downloaded Episodes").font(.title3.weight(.bold))
+                        .lineLimit(1)
                     Text("\(completed.count)")
                         .font(.caption.weight(.bold))
                         .foregroundStyle(platformBackground)
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(Color.primary, in: Capsule())
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
                 Spacer()
 

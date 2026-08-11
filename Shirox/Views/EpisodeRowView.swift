@@ -67,6 +67,7 @@ struct EpisodeRowView: View {
                     Text("Episode \(episode.displayNumber)")
                         .font(.callout.weight(.medium))
                         .foregroundStyle(.primary)
+                        .lineLimit(1)
 
                     Spacer()
 

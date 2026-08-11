@@ -729,6 +729,8 @@ struct AniListCardView: View {
                     Label("\(score)%", systemImage: "star.fill")
                         .font(.caption2.weight(.bold))
                         .foregroundStyle(.yellow)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(.black.opacity(0.55), in: Capsule())

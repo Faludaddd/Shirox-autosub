@@ -916,6 +916,8 @@ private struct LibraryRowView: View {
                             }
                             scoreFormat.scoreText(for: entry.displayScore(in: scoreFormat))
                                 .font(.caption2.weight(.bold))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
                         }
                         .foregroundStyle(.yellow)
                         .padding(.horizontal, 5)
@@ -944,6 +946,8 @@ private struct LibraryRowView: View {
                                 .font(.system(size: 9))
                             Text("\(avg)%")
                                 .font(.caption2.weight(.semibold))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
                         }
                         .foregroundStyle(.blue)
                     }
@@ -955,6 +959,8 @@ private struct LibraryRowView: View {
                             }
                             scoreFormat.scoreText(for: entry.displayScore(in: scoreFormat))
                                 .font(.caption2.weight(.semibold))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
                         }
                         .foregroundStyle(.yellow)
                     }
@@ -962,6 +968,8 @@ private struct LibraryRowView: View {
                         Text(Date(timeIntervalSince1970: TimeInterval(ts)).formatted(.relative(presentation: .named)))
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
                     }
                 }
 
@@ -973,6 +981,8 @@ private struct LibraryRowView: View {
                                 .padding(.horizontal, 7)
                                 .padding(.vertical, 2)
                                 .background(Color.secondary.opacity(0.15), in: Capsule())
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
                         }
                     }
                 }

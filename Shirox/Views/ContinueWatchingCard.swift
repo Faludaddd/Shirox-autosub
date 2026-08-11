@@ -399,16 +399,22 @@ struct ContinueWatchingCardDisplay: View {
                                 .font(.system(size: 8, weight: .bold))
                             Text(episodeLabelText(item: item, prefix: nil))
                                 .font(.caption2.weight(.medium))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
                         } else if isCaughtUp {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 10, weight: .bold))
                             Text(episodeLabelText(item: item, prefix: "Caught up"))
                                 .font(.caption2.weight(.bold))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
                         } else {
                             Image(systemName: "arrow.right.circle.fill")
                                 .font(.system(size: 10, weight: .bold))
                             Text(episodeLabelText(item: item, prefix: "Up Next"))
                                 .font(.caption2.weight(.bold))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
                         }
                     }
                     .foregroundStyle(.white.opacity(0.9))

@@ -159,6 +159,7 @@ struct HomeView: View {
                                 .buttonStyle(HomePressStyle())
                             }
                             .padding(.horizontal, 16)
+                            .animation(.easeInOut(duration: 0.3), value: vm.trending)
 
                             Spacer().frame(height: 28)
                         }
@@ -471,6 +472,8 @@ private struct MacFeaturedCarousel: View {
                                         Label("\(score)%", systemImage: "star.fill")
                                             .font(.caption.weight(.semibold))
                                             .foregroundStyle(.yellow)
+                                            .lineLimit(1)
+                                            .fixedSize(horizontal: true, vertical: false)
                                     }
                                     if let genres = media.genres, !genres.isEmpty {
                                         ForEach(genres.prefix(2), id: \.self) { genre in
@@ -480,6 +483,8 @@ private struct MacFeaturedCarousel: View {
                                                 .padding(.horizontal, 7)
                                                 .padding(.vertical, 3)
                                                 .background(Color.white.opacity(0.15), in: Capsule())
+                                                .lineLimit(1)
+                                                .fixedSize(horizontal: true, vertical: false)
                                         }
                                     }
                                 }
@@ -490,6 +495,7 @@ private struct MacFeaturedCarousel: View {
                                     HStack(spacing: 6) {
                                         Image(systemName: "play.fill").font(.footnote.weight(.semibold))
                                         Text("Watch").fontWeight(.semibold)
+                                            .lineLimit(1)
                                     }
                                     .foregroundStyle(platformBackground)
                                     .frame(width: 110, height: 36)
@@ -743,6 +749,7 @@ private struct AnimeSection: View {
                     HStack(spacing: 3) {
                         Text("See all")
                             .font(.subheadline.weight(.semibold))
+                            .lineLimit(1)
                         Image(systemName: "chevron.right")
                             .font(.caption.weight(.semibold))
                     }
@@ -788,10 +795,18 @@ private struct CarouselStretchKey: PreferenceKey {
 
 private struct HomePressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
+        // Adds a subtle accent-tinted glow while the card is pressed so the
+        // "Selected category grid cards" feel responsive — gated by the user's
+        // global Glow preference (Settings → Appearance → Glow).
+        let glowOn: Bool = configuration.isPressed && Color.glowEnabled
+        return configuration.label
             .scaleEffect(configuration.isPressed ? 0.94 : 1.0)
             .opacity(configuration.isPressed ? 0.88 : 1.0)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .shadow(
+                color: glowOn ? Color.appAccent.opacity(Color.glowIntensity * 0.6) : .clear,
+                radius: glowOn ? CGFloat(15 * Color.glowIntensity) : 0
+            )
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: configuration.isPressed)
     }
 }
 
@@ -820,7 +835,6 @@ private struct CategoryGridCard: View {
             if let url = imageURL, !url.isEmpty {
                 CachedAsyncImage(urlString: url)
                     .aspectRatio(contentMode: .fill)
-                    .blur(radius: 6, opaque: true)
                     .frame(height: Self.tileHeight)
                     .frame(maxWidth: .infinity)
                     .clipped()
@@ -1185,6 +1199,12 @@ struct ScheduleView: View {
                         (isToday ? Color.primary.opacity(0.3) : Color.clear),
                         lineWidth: 1
                     )
+            )
+            .shadow(
+                color: isSelected && Color.glowEnabled
+                    ? Color.primary.opacity(Color.glowIntensity * 0.5) : .clear,
+                radius: isSelected && Color.glowEnabled
+                    ? CGFloat(12 * Color.glowIntensity) : 0
             )
         }
         .buttonStyle(.plain)

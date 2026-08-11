@@ -69,9 +69,13 @@ struct PlayerProgressSlider: View {
             HStack {
                 Text(displayTime.playerTimeString)
                     .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
                 Spacer()
                 Text(duration.playerTimeString)
                     .foregroundStyle(.white.opacity(0.6))
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
             }
             .font(.caption2)
             .monospacedDigit()

@@ -91,6 +91,8 @@ struct JellyfinContinueCard: View {
                             .font(.system(size: isInProgress ? 8 : 10, weight: .bold))
                         Text(episodeLabel)
                             .font(.caption2.weight(isInProgress ? .medium : .bold))
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
                     }
                     .foregroundStyle(.white.opacity(0.9))
                     .padding(.horizontal, 8)

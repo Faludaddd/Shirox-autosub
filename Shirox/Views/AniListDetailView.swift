@@ -120,7 +120,7 @@ struct AniListDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .modifier(TransparentNavBarModifier())
         #endif
-        .navigationTitle(vm.media?.title.displayTitle ?? ""))
+        .navigationTitle(""))
     }
 
     #if os(iOS)
@@ -764,6 +764,7 @@ struct AniListDetailView: View {
                     .font(.system(size: 13, weight: .bold))
                 Text(label)
                     .font(.system(size: 15, weight: .bold))
+                    .lineLimit(1)
             }
             .frame(maxWidth: .infinity)
             .frame(height: 46)
@@ -924,6 +925,8 @@ struct AniListDetailView: View {
                                 Text("\(score)%")
                                     .font(.caption2.weight(.bold))
                                     .foregroundStyle(.primary)
+                                    .lineLimit(1)
+                                    .fixedSize(horizontal: true, vertical: false)
                             }
                             .padding(.horizontal, 8).padding(.vertical, 3)
                             .background(Color.primary.opacity(0.1), in: Capsule())
@@ -937,6 +940,8 @@ struct AniListDetailView: View {
                                 .padding(.horizontal, 8).padding(.vertical, 3)
                                 .background(Color.primary.opacity(0.1), in: Capsule())
                                 .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
                         }
 
                         if let year = media.seasonYear {
@@ -946,6 +951,8 @@ struct AniListDetailView: View {
                                 .padding(.horizontal, 8).padding(.vertical, 3)
                                 .background(Color.primary.opacity(0.1), in: Capsule())
                                 .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
                         }
                     }
                 }
@@ -998,6 +1005,7 @@ struct AniListDetailView: View {
                     HStack(spacing: 8) {
                         Text("Episodes")
                             .font(.title3.weight(.bold))
+                            .lineLimit(1)
                         #if os(iOS)
                         if !isSelectionMode {
                             Text("\(totalEpisodes)")
@@ -1005,6 +1013,8 @@ struct AniListDetailView: View {
                                 .foregroundStyle(platformBackground)
                                 .padding(.horizontal, 8).padding(.vertical, 3)
                                 .background(Color.primary, in: Capsule())
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
                         }
                         #else
                         Text("\(totalEpisodes)")
@@ -1012,6 +1022,8 @@ struct AniListDetailView: View {
                             .foregroundStyle(platformBackground)
                             .padding(.horizontal, 8).padding(.vertical, 3)
                             .background(Color.primary, in: Capsule())
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
                         #endif
                     }
                 }
@@ -1096,6 +1108,8 @@ struct AniListDetailView: View {
                             let end = min((selectedRangeIndex + 1) * 100, totalEpisodes)
                             Text("\(start)-\(end)")
                                 .font(.subheadline.weight(.medium))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
                             Image(systemName: "chevron.down")
                                 .font(.caption)
                         }
@@ -1706,6 +1720,8 @@ struct AniListMatchingSearchView: View {
                                         Label("\(score)%", systemImage: "star.fill")
                                             .font(.caption)
                                             .foregroundStyle(.yellow)
+                                            .lineLimit(1)
+                                            .fixedSize(horizontal: true, vertical: false)
                                     }
                                     
                                     if let genres = media.genres?.prefix(2) {

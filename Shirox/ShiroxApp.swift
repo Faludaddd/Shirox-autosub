@@ -147,6 +147,39 @@ extension Color {
     }
 }
 
+// MARK: - Glowing Toggle Style
+//
+// The global `.tint(Color.gray)` in `ShiroxApp` overrides the default green tint
+// for `Toggle`, but it also strips the toggle of any glow halo. This custom
+// `ToggleStyle` re-introduces a soft gray glow on the capsule when the toggle is
+// ON, gated by `Color.glowEnabled` and scaled by `Color.glowIntensity` so the
+// effect respects the user's Glow preference in Settings.
+
+struct GlowingToggleStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack {
+            configuration.label
+            Spacer()
+            ZStack {
+                Capsule()
+                    .fill(configuration.isOn ? Color.gray : Color.gray.opacity(0.3))
+                    .frame(width: 51, height: 31)
+                    .shadow(
+                        color: configuration.isOn && Color.glowEnabled
+                            ? Color.gray.opacity(Color.glowIntensity) : .clear,
+                        radius: configuration.isOn && Color.glowEnabled ? CGFloat(15 * Color.glowIntensity) : 0
+                    )
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: 27, height: 27)
+                    .offset(x: configuration.isOn ? 10 : -10)
+            }
+            .animation(.easeInOut(duration: 0.2), value: configuration.isOn)
+            .onTapGesture { configuration.isOn.toggle() }
+        }
+    }
+}
+
 @main
 struct ShiroxApp: App {
 #if os(iOS)
@@ -203,7 +236,8 @@ struct ShiroxApp: App {
         WindowGroup {
             RootTabView()
                 .environmentObject(moduleManager)
-                .tint(Color.gray)
+                .tint(accentColor)
+                .toggleStyle(GlowingToggleStyle())
                 .preferredColorScheme(colorScheme)
                 .overlay {
                     if showSplash {
@@ -409,6 +443,7 @@ private struct RootTabView: View {
                 .tint(.appAccent)
             }
         }
+        .animation(.easeInOut(duration: 0.2), value: selectedTab)
         .onOpenURL { url in
             guard url.scheme == "shirox" else { return }
             AniListAuthManager.shared.handleCallback(url: url)

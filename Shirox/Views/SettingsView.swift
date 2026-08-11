@@ -1666,6 +1666,7 @@ struct QualitySettingsPage: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color.green.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
                     .padding(.horizontal, 16)
+                    .transition(.opacity)
                 }
                 PlaybackSettingsCard(title: "Streaming Quality") {
                     Text("Preferred Video Quality")
@@ -1705,6 +1706,7 @@ struct QualitySettingsPage: View {
                 }
             }
             .padding(.vertical, 16)
+            .animation(.easeInOut(duration: 0.2), value: dataSavingEnabled)
         }
         .navigationTitle("Quality")
         #if os(iOS)
@@ -1878,26 +1880,30 @@ struct HoldSpeedSettingsPage: View {
                     Toggle("Enable", isOn: $holdSpeedEnabled)
                         .tint(Color.gray)
                     if holdSpeedEnabled {
-                        Divider()
-                        HStack {
-                            Text("Sensitivity")
-                            Spacer()
-                            Text("\(Int(holdSpeedSensitivity * 100))%")
-                                .foregroundStyle(.secondary)
-                                .monospacedDigit()
-                        }
-                        Slider(value: $holdSpeedSensitivity, in: 0.1...1.0, step: 0.1)
-                            .tint(Color.gray)
-                        Picker("Speed Multiplier", selection: $holdSpeedMultiplier) {
-                            ForEach(multipliers, id: \.self) { mult in
-                                Text(doubleLabel(mult)).tag(mult)
+                        Group {
+                            Divider()
+                            HStack {
+                                Text("Sensitivity")
+                                Spacer()
+                                Text("\(Int(holdSpeedSensitivity * 100))%")
+                                    .foregroundStyle(.secondary)
+                                    .monospacedDigit()
                             }
+                            Slider(value: $holdSpeedSensitivity, in: 0.1...1.0, step: 0.1)
+                                .tint(Color.gray)
+                            Picker("Speed Multiplier", selection: $holdSpeedMultiplier) {
+                                ForEach(multipliers, id: \.self) { mult in
+                                    Text(doubleLabel(mult)).tag(mult)
+                                }
+                            }
+                            .tint(Color.gray)
                         }
-                        .tint(Color.gray)
+                        .transition(.opacity)
                     }
                 }
             }
             .padding(.vertical, 16)
+            .animation(.easeInOut(duration: 0.2), value: holdSpeedEnabled)
         }
         .navigationTitle("Hold-Speed")
         #if os(iOS)
@@ -2332,12 +2338,6 @@ struct NotificationsSettingsPage: View {
             }
             .tint(.appAccent)
 
-            Picker("Preview", selection: .constant(0)) {
-                Text(leadTime.displayName).tag(0)
-            }
-            .tint(.appAccent)
-            .disabled(true)
-
             Text("How far before airtime the notification fires.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -2569,10 +2569,10 @@ struct SourcesSettingsPage: View {
         let glowColor: Color = isLoggedIn ? .green : .red
         // When `Color.glowEnabled` is off the glow is fully suppressed (opacity
         // 0 + radius 0). When on, the intensity (0.0–1.0) drives BOTH the
-        // shadow radius (`12 * intensity`) and its opacity (`intensity * 1.0`)
+        // shadow radius (`20 * intensity`) and its opacity (`intensity * 1.0`)
         // so the slider visibly grows and brightens the halo around the icon.
         let glowOpacity: Double = Color.glowEnabled ? Color.glowIntensity * 1.0 : 0
-        let glowRadius: CGFloat = Color.glowEnabled ? CGFloat(12 * Color.glowIntensity) : 0
+        let glowRadius: CGFloat = Color.glowEnabled ? CGFloat(20 * Color.glowIntensity) : 0
 
         CachedAsyncImage(urlString: provider.iconURL)
             .frame(width: 34, height: 34)
@@ -2706,6 +2706,7 @@ struct ModulesSettingsPage: View {
                         Spacer()
                     }
                     .padding(.vertical, 2)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
@@ -2763,9 +2764,25 @@ struct ModuleStorePage: View {
 
     private let storeURL = "https://modulesbypaul.dev"
     private let columns: [GridItem] = [
-        GridItem(.flexible(), spacing: 14),
-        GridItem(.flexible(), spacing: 14)
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
     ]
+
+    /// Modules shown in the "🔥 Popular" section (first 3 when enough exist).
+    private var popularModules: [StoreModuleItem] {
+        Array(filteredModules.prefix(3))
+    }
+
+    /// Modules shown in the "✨ Recommended" section (everything after Popular).
+    private var recommendedModules: [StoreModuleItem] {
+        Array(filteredModules.dropFirst(3))
+    }
+
+    /// Whether we have enough modules to justify splitting into two sections.
+    private var shouldSplitIntoSections: Bool {
+        filteredModules.count >= 6
+    }
 
     var body: some View {
         ScrollView {
@@ -2799,8 +2816,8 @@ struct ModuleStorePage: View {
                 .padding(.top, 12)
 
                 if isLoading {
-                    LazyVGrid(columns: columns, spacing: 14) {
-                        ForEach(0..<6, id: \.self) { _ in
+                    LazyVGrid(columns: columns, spacing: 12) {
+                        ForEach(0..<9, id: \.self) { _ in
                             StoreModuleSkeletonTile()
                         }
                     }
@@ -2843,16 +2860,57 @@ struct ModuleStorePage: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 40)
-                } else {
-                    LazyVGrid(columns: columns, spacing: 14) {
-                        ForEach(filteredModules) { mod in
-                            StoreModuleTile(mod: mod, isInstalled: isModuleInstalled(mod), isInstalling: isInstalling) {
-                                installModule(mod)
+                } else if shouldSplitIntoSections {
+                    // 🔥 Popular section
+                    if !popularModules.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("🔥 Popular")
+                                .font(.subheadline.weight(.bold))
+                                .padding(.horizontal, 14)
+                            LazyVGrid(columns: columns, spacing: 12) {
+                                ForEach(popularModules) { mod in
+                                    StoreModuleTile(mod: mod, isInstalled: isModuleInstalled(mod), isInstalling: isInstalling) {
+                                        installModule(mod)
+                                    }
+                                }
                             }
+                            .padding(.horizontal, 14)
                         }
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 24)
+                    // ✨ Recommended section
+                    if !recommendedModules.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("✨ Recommended")
+                                .font(.subheadline.weight(.bold))
+                                .padding(.horizontal, 14)
+                                .padding(.top, 4)
+                            LazyVGrid(columns: columns, spacing: 12) {
+                                ForEach(recommendedModules) { mod in
+                                    StoreModuleTile(mod: mod, isInstalled: isModuleInstalled(mod), isInstalling: isInstalling) {
+                                        installModule(mod)
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.bottom, 24)
+                        }
+                    }
+                } else {
+                    // All Modules (fewer than 6 modules)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("All Modules")
+                            .font(.subheadline.weight(.bold))
+                            .padding(.horizontal, 14)
+                        LazyVGrid(columns: columns, spacing: 12) {
+                            ForEach(filteredModules) { mod in
+                                StoreModuleTile(mod: mod, isInstalled: isModuleInstalled(mod), isInstalling: isInstalling) {
+                                    installModule(mod)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.bottom, 24)
+                    }
                 }
             }
         }
@@ -3026,8 +3084,8 @@ private struct StoreModuleTile: View {
     let onInstall: () -> Void
 
     var body: some View {
-        VStack(spacing: 8) {
-            // Icon at top, centered, 56x56
+        VStack(spacing: 6) {
+            // Compact icon at top, centered, 40x40
             Group {
                 if let iconUrl = mod.iconUrl, let url = URL(string: iconUrl) {
                     AsyncImage(url: url) { phase in
@@ -3036,14 +3094,14 @@ private struct StoreModuleTile: View {
                     }
                 } else { fallbackIcon }
             }
-            .frame(width: 56, height: 56)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 14))
+            .frame(width: 40, height: 40)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
             .padding(.top, 2)
 
             // Name below, bold, 2-line limit, centered
             Text(mod.name)
-                .font(.subheadline.weight(.bold))
+                .font(.caption.weight(.semibold))
                 .lineLimit(2)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity, alignment: .center)
@@ -3052,29 +3110,31 @@ private struct StoreModuleTile: View {
             // Author caption
             if let author = mod.author, !author.isEmpty {
                 Text(author)
-                    .font(.caption2)
+                    .font(.system(size: 9))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
 
-            Spacer(minLength: 4)
+            Spacer(minLength: 2)
 
             // Install button at bottom
             if isInstalled {
                 Label("Installed", systemImage: "checkmark.circle.fill")
-                    .font(.caption.weight(.semibold))
+                    .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.green)
+                    .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 3)
             } else if isInstalling {
                 ProgressView()
-                    .scaleEffect(0.75)
+                    .scaleEffect(0.65)
                     .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 3)
             } else {
                 Button(action: onInstall) {
                     Text("Install")
-                        .font(.caption.weight(.semibold))
+                        .font(.system(size: 10, weight: .semibold))
+                        .lineLimit(1)
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
@@ -3082,46 +3142,46 @@ private struct StoreModuleTile: View {
                 .tint(.appAccent)
             }
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, minHeight: 196, alignment: .top)
-        .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(10)
+        .frame(maxWidth: .infinity, minHeight: 156, alignment: .top)
+        .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(Color.secondary.opacity(0.08), lineWidth: 1)
         )
     }
 
     private var fallbackIcon: some View {
         Image(systemName: "puzzlepiece.extension")
-            .font(.system(size: 24))
+            .font(.system(size: 18))
             .foregroundStyle(.secondary)
-            .frame(width: 56, height: 56)
+            .frame(width: 40, height: 40)
     }
 }
 
 private struct StoreModuleSkeletonTile: View {
     var body: some View {
-        VStack(spacing: 8) {
-            RoundedRectangle(cornerRadius: 14)
+        VStack(spacing: 6) {
+            RoundedRectangle(cornerRadius: 10)
                 .fill(Color.secondary.opacity(0.15))
-                .frame(width: 56, height: 56)
+                .frame(width: 40, height: 40)
                 .padding(.top, 2)
-            RoundedRectangle(cornerRadius: 6)
+            RoundedRectangle(cornerRadius: 5)
                 .fill(Color.secondary.opacity(0.15))
-                .frame(height: 14)
+                .frame(height: 12)
             RoundedRectangle(cornerRadius: 4)
                 .fill(Color.secondary.opacity(0.12))
-                .frame(width: 70, height: 10)
-            Spacer(minLength: 4)
-            RoundedRectangle(cornerRadius: 8)
+                .frame(width: 54, height: 9)
+            Spacer(minLength: 2)
+            RoundedRectangle(cornerRadius: 7)
                 .fill(Color.secondary.opacity(0.15))
-                .frame(height: 26)
+                .frame(height: 22)
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, minHeight: 196, alignment: .top)
-        .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(10)
+        .frame(maxWidth: .infinity, minHeight: 156, alignment: .top)
+        .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(Color.secondary.opacity(0.08), lineWidth: 1)
         )
         .redacted(reason: .placeholder)
@@ -3794,6 +3854,12 @@ struct TrackersSettingsPage: View {
                 .frame(width: 48, height: 48)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+                .shadow(
+                    color: isConnected && Color.glowEnabled
+                        ? Color.green.opacity(Color.glowIntensity) : .clear,
+                    radius: isConnected && Color.glowEnabled
+                        ? CGFloat(15 * Color.glowIntensity) : 0
+                )
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
@@ -3930,6 +3996,11 @@ struct BackupRestoreSettingsPage: View {
                     }
                     .buttonStyle(.bordered)
                     .tint(.appAccent)
+                    .shadow(
+                        color: Color.glowEnabled
+                            ? Color.appAccent.opacity(Color.glowIntensity * 0.5) : .clear,
+                        radius: Color.glowEnabled ? CGFloat(12 * Color.glowIntensity) : 0
+                    )
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding()
