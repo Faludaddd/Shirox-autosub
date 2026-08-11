@@ -219,6 +219,14 @@ final class MALAuthManager: NSObject, ObservableObject {
         avatarURL = nil
         userId = nil
         PendingWriteQueue.shared.discardWrites(for: .mal)
+
+        // Clear all user-scoped caches so the next signed-in account starts fresh
+        // and no Continue Watching / Library data from this account leaks across sessions.
+        // (syncWithMAL()/syncWithAniList() are guarded on isLoggedIn / a valid userId,
+        // so they cannot repopulate after this point.)
+        ContinueWatchingManager.shared.clearAll()
+        LocalLibraryManager.shared.clearAll()
+        LibraryCacheStore.shared.clearAll()
     }
 
     func authorizedRequest(url: URL, method: String = "GET") async throws -> URLRequest {

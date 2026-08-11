@@ -176,6 +176,13 @@ import Combine
         UserDefaults.standard.set(Self.currentDataVersion, forKey: Keys.dataVersion)
     }
 
+    /// Clears all Continue Watching items and watched history on sign-out.
+    /// Mirrors `resetAllData()` — exposed under the `clearAll()` name so callers
+    /// (e.g. `AniListAuthManager.logout()` / `MALAuthManager.logout()`) read intent clearly.
+    func clearAll() {
+        resetAllData()
+    }
+
     /// Syncs local Continue Watching with AniList's "Watching" list.
     func syncWithAniList() async {
         guard let userId = AniListAuthManager.shared.userId else { return }

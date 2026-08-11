@@ -86,6 +86,14 @@ struct AnimatedSplashView: View {
             .opacity(isVisible ? 1 : 0)
         }
         .ignoresSafeArea()
+        // #109 — Smooth dismissal transition applied directly on the splash
+        // view itself. Combines a fade with a subtle scale-up (1.0 → 1.05) so
+        // the splash appears to gently "lift" away rather than just blinking
+        // out. Mirrors the matching `.transition(...)` on the
+        // `AnimatedSplashView()` call site in `ShiroxApp` so the dismissal
+        // animation is consistent regardless of which modifier wins the view
+        // tree's transition resolution.
+        .transition(.opacity.combined(with: .scale(scale: 1.05)))
         .onAppear {
             DispatchQueue.main.async {
                 withAnimation(.easeOut(duration: 0.6)) { isVisible = true }

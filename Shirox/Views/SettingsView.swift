@@ -4,6 +4,7 @@ import UserNotifications
 import UniformTypeIdentifiers
 #if canImport(UIKit)
 import UIKit
+import AVKit
 #endif
 
 // MARK: - Inline nav bar helper
@@ -1087,9 +1088,12 @@ struct QualitySettingsPage: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Data Saving is On")
                                 .font(.subheadline.weight(.semibold))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
                             Text("Streamed quality is capped at 480p to reduce mobile data usage.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                         Spacer()
                     }
@@ -1113,7 +1117,9 @@ struct QualitySettingsPage: View {
                                         .font(.title3)
                                     Text(option.label)
                                         .font(.body.weight(.semibold))
-                                    Spacer()
+                                        .lineLimit(1)
+                                        .fixedSize(horizontal: true, vertical: false)
+                                    Spacer(minLength: 0)
                                     if preferredVideoQuality == option.value {
                                         Image(systemName: "checkmark.circle.fill")
                                             .foregroundStyle(Color.appAccent)
@@ -1134,6 +1140,8 @@ struct QualitySettingsPage: View {
                     Divider()
                     Toggle("Data Saving", isOn: $dataSavingEnabled)
                         .tint(Color.gray)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
             }
             .padding(.vertical, 16)
@@ -2969,10 +2977,29 @@ struct SubtitleSettingsPage: View {
     @AppStorage("subtitleBackgroundEnabled") private var subtitleBackgroundEnabled: Bool = false
     @AppStorage("subtitleFontSize") private var subtitleFontSize: Double = 30
     @AppStorage("subtitleBoldText") private var subtitleBoldText: Bool = false
+
+    // #114 — Expanded subtitle customization. These are persisted alongside
+    // the original keys so existing installs keep their settings; the new
+    // keys default to no-op values (1.0x spacing, full opacity, no delay…)
+    // so the visual result is unchanged until the user opts in.
+    @AppStorage("subtitleFontDesign") private var subtitleFontDesign: String = "default"
+    @AppStorage("subtitleTextOpacity") private var subtitleTextOpacity: Double = 1.0
+    @AppStorage("subtitleLineSpacing") private var subtitleLineSpacing: Double = 1.0
+    @AppStorage("subtitleMaxWidth") private var subtitleMaxWidth: Double = 90
+    @AppStorage("subtitleDelaySeconds") private var subtitleDelaySeconds: Double = 0
+    @AppStorage("subtitleShadowOffset") private var subtitleShadowOffset: Double = 2
+
     @State private var previewImageURL: String?
+    @State private var showLandscapePreview = false
 
     private let textColorOptions = ["white", "yellow", "black", "cyan", "pink", "green"]
     private let strokeColorOptions = ["none", "black", "white", "gray"]
+    private let fontDesignOptions: [(label: String, value: String)] = [
+        ("Default", "default"),
+        ("Rounded", "rounded"),
+        ("Serif", "serif"),
+        ("Monospaced", "monospaced")
+    ]
 
     var body: some View {
         ScrollView {
@@ -2980,6 +3007,10 @@ struct SubtitleSettingsPage: View {
                 quickPresetsCard
                 livePreviewCard
                 appearanceControlsCard
+                typographyCard
+                timingCard
+                effectsCard
+                testInLandscapeButton
             }
             .padding()
         }
@@ -2993,6 +3024,11 @@ struct SubtitleSettingsPage: View {
                 }
             }
         }
+        #if os(iOS)
+        .fullScreenCover(isPresented: $showLandscapePreview) {
+            LandscapeSubtitlePreview()
+        }
+        #endif
     }
 
     // MARK: - Quick Presets Card
@@ -3183,6 +3219,163 @@ struct SubtitleSettingsPage: View {
         .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
+    // MARK: - Typography Card (#114)
+
+    private var typographyCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Label("Typography", systemImage: "textformat.size")
+                .font(.headline)
+
+            Picker("Font Design", selection: $subtitleFontDesign) {
+                ForEach(fontDesignOptions, id: \.value) { option in
+                    Text(option.label).tag(option.value)
+                }
+            }
+            .tint(.appAccent)
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("Line Spacing")
+                    Spacer()
+                    Text(String(format: "%.2fx", subtitleLineSpacing))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+                Slider(value: $subtitleLineSpacing, in: 0.8...2.0, step: 0.05)
+                    .tint(.appAccent)
+                Text("Multiplier applied between caption lines. 1.0 = default, 2.0 = double-spaced.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("Max Width")
+                    Spacer()
+                    Text("\(Int(subtitleMaxWidth))%")
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+                Slider(value: $subtitleMaxWidth, in: 50...100, step: 1)
+                    .tint(.appAccent)
+                Text("Maximum width of the caption block, as a percentage of the screen width.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    // MARK: - Timing Card (#114)
+
+    private var timingCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Label("Timing", systemImage: "clock")
+                .font(.headline)
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("Subtitle Delay")
+                    Spacer()
+                    Text(String(format: "%+.1fs", subtitleDelaySeconds))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+                Slider(value: $subtitleDelaySeconds, in: -5...5, step: 0.1)
+                    .tint(.appAccent)
+                Text("Negative values show subtitles earlier, positive values later.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        subtitleDelaySeconds = 0
+                    }
+                } label: {
+                    Label("Reset to 0s", systemImage: "arrow.counterclockwise")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .tint(.appAccent)
+                .disabled(subtitleDelaySeconds == 0)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    // MARK: - Effects Card (#114)
+
+    private var effectsCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Label("Effects", systemImage: "sparkles")
+                .font(.headline)
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("Text Opacity")
+                    Spacer()
+                    Text("\(Int((subtitleTextOpacity * 100).rounded()))%")
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+                Slider(value: $subtitleTextOpacity, in: 0.5...1.0, step: 0.05)
+                    .tint(.appAccent)
+                Text("Dims the entire caption. Useful for non-intrusive subtitles over bright scenes.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("Shadow Offset")
+                    Spacer()
+                    Text(String(format: "%.1fpt", subtitleShadowOffset))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+                Slider(value: $subtitleShadowOffset, in: 0...10, step: 0.5)
+                    .tint(.appAccent)
+                Text("Drop-shadow distance behind the caption. 0 disables the shadow.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    // MARK: - Test in Landscape Button (#114)
+
+    private var testInLandscapeButton: some View {
+        #if os(iOS)
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                showLandscapePreview = true
+            } label: {
+                Label("Test in Landscape", systemImage: "rectangle.landscape.rotate")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.appAccent)
+
+            Text("Opens a fullscreen, landscape-only preview that renders the caption at its true playback size — no scaling.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+        }
+        #else
+        EmptyView()
+        #endif
+    }
+
     // MARK: - Color Helpers
 
     private func color(fromName name: String) -> Color {
@@ -3219,6 +3412,190 @@ private extension View {
         }
     }
 }
+
+// MARK: - Landscape Subtitle Preview (#114)
+
+#if os(iOS)
+/// Fullscreen, landscape-only preview that renders the configured subtitle
+/// style at its true playback size.
+///
+/// The inline "Live Preview" card in `SubtitleSettingsPage` scales the caption
+/// down by 50% so it fits inside a 180pt-tall card — that's enough to check
+/// color/stroke choices, but it hides the real on-screen proportions. This
+/// view borrows `PlayerPresenter`'s orientation-lock machinery to rotate the
+/// device into landscape exactly like real playback, then draws the caption
+/// with no scaling so the user can judge readability at the genuine size.
+struct LandscapeSubtitlePreview: View {
+    @AppStorage("subtitleTextColor") private var subtitleTextColor: String = "white"
+    @AppStorage("subtitleStrokeColor") private var subtitleStrokeColor: String = "black"
+    @AppStorage("subtitleStrokeWidth") private var subtitleStrokeWidth: Double = 1.0
+    @AppStorage("subtitleBackgroundEnabled") private var subtitleBackgroundEnabled: Bool = false
+    @AppStorage("subtitleFontSize") private var subtitleFontSize: Double = 30
+    @AppStorage("subtitleBoldText") private var subtitleBoldText: Bool = false
+    @AppStorage("subtitleFontDesign") private var subtitleFontDesign: String = "default"
+    @AppStorage("subtitleTextOpacity") private var subtitleTextOpacity: Double = 1.0
+    @AppStorage("subtitleLineSpacing") private var subtitleLineSpacing: Double = 1.0
+    @AppStorage("subtitleMaxWidth") private var subtitleMaxWidth: Double = 90
+    @AppStorage("subtitleShadowOffset") private var subtitleShadowOffset: Double = 2
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var hasAppliedLandscapeLock = false
+
+    var body: some View {
+        GeometryReader { proxy in
+            let captionMaxWidth = proxy.size.width * (subtitleMaxWidth / 100.0)
+            let bottomInset = max(proxy.size.height * 0.08, 48)
+            ZStack(alignment: .top) {
+                // Faux video frame — a dark gradient stands in for a paused
+                // film frame so the caption has context but isn't competing
+                // with bright imagery.
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.04, green: 0.04, blue: 0.06),
+                        Color(red: 0.10, green: 0.09, blue: 0.13)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+
+                VStack(spacing: 0) {
+                    // Top bar with Done button — always reachable so the user
+                    // is never trapped in the preview.
+                    HStack {
+                        Label("Landscape Preview", systemImage: "rectangle.landscape.rotate")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white.opacity(0.85))
+                        Spacer()
+                        Button {
+                            dismiss()
+                        } label: {
+                            Text("Done")
+                                .font(.headline)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 18)
+                                .padding(.vertical, 8)
+                                .background(.ultraThinMaterial, in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 10)
+
+                    Spacer()
+
+                    // Caption rendered at TRUE font size (no scaling). All of
+                    // the user-selected style settings (color, stroke,
+                    // background, weight, design, opacity, line spacing,
+                    // shadow) are applied so the preview matches playback 1:1.
+                    captionText
+                        .frame(maxWidth: captionMaxWidth)
+                        .padding(.bottom, bottomInset)
+                }
+
+                // Subtle helper text just above the caption so the user
+                // understands what they're looking at.
+                VStack {
+                    Spacer()
+                    Text("Caption shown at actual playback size")
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.4))
+                        .padding(.bottom, bottomInset + 76)
+                }
+            }
+            .foregroundStyle(.white)
+        }
+        .statusBarHidden()
+        .persistentSystemOverlays(.hidden)
+        .onAppear {
+            // Borrow the player presenter's orientation-lock machinery so the
+            // preview rotates into landscape exactly like real playback does.
+            // The lock is also consulted by the AppDelegate's
+            // `supportedInterfaceOrientationsFor:` so iOS will allow the
+            // rotation.
+            #if !targetEnvironment(macCatalyst)
+            PlayerPresenter.shared.updateOrientationLock(.landscape, shouldRotate: true)
+            hasAppliedLandscapeLock = true
+            #endif
+        }
+        .onDisappear {
+            // Always restore portrait on dismiss, even if onAppear failed —
+            // leaving the app stuck in landscape after closing the preview
+            // would be a regression.
+            #if !targetEnvironment(macCatalyst)
+            if hasAppliedLandscapeLock {
+                PlayerPresenter.shared.updateOrientationLock(.portrait, shouldRotate: true)
+            }
+            #endif
+        }
+    }
+
+    // MARK: - Caption
+
+    private var captionText: some View {
+        let resolvedStrokeWidth: Double = (subtitleStrokeColor == "none") ? 0 : subtitleStrokeWidth
+        // SwiftUI's `Text.lineSpacing(_:)` adds extra *points* between lines,
+        // not a multiplier. Convert the user-facing 1.0–2.0 multiplier to an
+        // additive point value scaled by font size so 1.0 = default spacing
+        // and 2.0 = roughly double.
+        let lineSpacingPoints = CGFloat((subtitleLineSpacing - 1.0) * subtitleFontSize * 0.5)
+        return Text("The journey of a thousand miles begins with a single step.")
+            .font(.system(size: CGFloat(subtitleFontSize),
+                          weight: subtitleBoldText ? .bold : .regular,
+                          design: resolvedFontDesign))
+            .foregroundStyle(resolvedTextColor.opacity(subtitleTextOpacity))
+            .multilineTextAlignment(.center)
+            .lineSpacing(lineSpacingPoints)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(
+                Group {
+                    if subtitleBackgroundEnabled {
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(Color.black.opacity(0.6))
+                    } else {
+                        Color.clear
+                    }
+                }
+            )
+            .applySubtitleStroke(color: color(fromName: subtitleStrokeColor),
+                                 width: resolvedStrokeWidth)
+            .shadow(color: .black.opacity(subtitleShadowOffset > 0 ? 0.85 : 0),
+                    radius: max(CGFloat(subtitleShadowOffset), 0),
+                    x: 0,
+                    y: max(CGFloat(subtitleShadowOffset) / 2.0, 0))
+    }
+
+    // MARK: - Resolved values
+
+    private var resolvedFontDesign: Font.Design {
+        switch subtitleFontDesign.lowercased() {
+        case "rounded":    return .rounded
+        case "serif":      return .serif
+        case "monospaced": return .monospaced
+        default:           return .default
+        }
+    }
+
+    private var resolvedTextColor: Color {
+        color(fromName: subtitleTextColor)
+    }
+
+    private func color(fromName name: String) -> Color {
+        switch name.lowercased() {
+        case "white":  return .white
+        case "black":  return .black
+        case "yellow": return .yellow
+        case "cyan":   return .cyan
+        case "pink":   return .pink
+        case "green":  return .green
+        case "gray":   return .gray
+        case "none":   return .clear
+        default:       return .white
+        }
+    }
+}
+#endif
 
 // MARK: - About Settings Page
 

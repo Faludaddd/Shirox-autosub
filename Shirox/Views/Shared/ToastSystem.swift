@@ -130,18 +130,18 @@ struct ToastContainerView: View {
 /// relative to `total`) are scaled down and nudged up to create the layered,
 /// "liquid glass" stack visual.
 ///
-/// #89 — Interactions (top toast only):
-/// - Tap: fires the optional action (if any) and dismisses.
-/// - Swipe down > 50pt: dismisses immediately.
+/// #89 — Interactions (driven entirely by a single `DragGesture` attached to
+/// the OUTERMOST view of the card, never to an inner element):
 /// - Swipe left > 100pt: dismisses immediately.
+/// - Swipe down > 50pt: dismisses immediately.
 /// - Swipe left > 15pt (but < 100pt): reveals an inline "X" dismiss button
 ///   on the trailing edge. The toast itself stays COMPLETELY STATIC during
-///   the drag — no visual offset is applied. The X button appears via a
-///   `.scale.combined(with: .opacity)` transition (driven by an `if
-///   revealDismiss { ... }` branch in the HStack, NOT an `.opacity()` modifier
-///   on an always-present button). When the drag ends without crossing the
-///   dismiss threshold, `revealDismiss` flips back to `false` and the X hides
-///   again with the same spring.
+///   the drag — no `.offset()` is ever applied in response to drag values.
+///   The X button appears via a `.scale.combined(with: .opacity)` transition
+///   (driven by an `if revealDismiss { ... }` branch in the HStack, NOT an
+///   `.opacity()` modifier on an always-present button). When the drag ends
+///   without crossing the dismiss threshold, `revealDismiss` flips back to
+///   `false` and the X hides again with the same spring.
 struct ToastView: View {
     let toast: ToastData
     let stackIndex: Int
@@ -183,15 +183,12 @@ struct ToastView: View {
 
             Spacer(minLength: 8)
 
-            // #89 — Inline "X" dismiss button. ONLY the top (interactive)
-            // toast can ever reveal it; older stacked toasts keep it hidden.
-            // The button is conditionally inserted into the HStack via
-            // `if revealDismiss { ... }` so its appearance/disappearance is
-            // animated by SwiftUI's standard transition machinery (not by an
-            // always-present-but-invisible button toggling its opacity).
-            if isTop && revealDismiss {
+            // #89 — Inline "X" dismiss button. Conditionally inserted into the
+            // HStack via `if revealDismiss { ... }` so its appearance/disappearance
+            // is animated by SwiftUI's standard transition machinery. The toast
+            // itself NEVER moves — only this button appears/disappears.
+            if revealDismiss {
                 Button {
-                    Haptics.light()
                     ToastManager.shared.dismiss(toast.id)
                 } label: {
                     Image(systemName: "xmark.circle.fill")
@@ -219,57 +216,39 @@ struct ToastView: View {
         .scaleEffect(isTop ? 1.0 : 0.95)
         .offset(y: isTop ? 0 : CGFloat((total - 1 - stackIndex)) * -6)
         .opacity(isTop ? 1.0 : 0.8)
-        // #89 — Tap fires the optional action (if any) and dismisses.
-        // Disabled when the X is revealed so the user can tap the X without
-        // the whole-card tap gesture stealing the event.
         .contentShape(Rectangle())
-        .onTapGesture {
-            guard !revealDismiss else { return }
-            if let action = toast.action {
-                action()
-            }
-            ToastManager.shared.dismiss(toast.id)
-        }
-        // #89 — Swipe-to-reveal-X + swipe-to-dismiss. The gesture inspects
-        // translation during the drag ONLY to toggle `revealDismiss` (which
-        // controls the conditional X button) — it NEVER applies an offset to
-        // the toast itself, so the toast stays COMPLETELY STATIC. At gesture
-        // END we decide whether the swipe was big enough to commit to
-        // dismissal, and (if not) reset `revealDismiss` so the X hides again
-        // with a spring.
+        // #89 — Re-enable hit testing on this individual toast so taps /
+        // swipes / the X button all work, even though the parent container
+        // has `.allowsHitTesting(false)`. MUST be present so the gesture below
+        // can receive touches at all.
+        .allowsHitTesting(true)
+        // #89 — Single DragGesture attached to the OUTERMOST view of the toast
+        // card (NOT inside the HStack). The gesture inspects translation during
+        // the drag ONLY to toggle `revealDismiss` (which controls the
+        // conditional X button) — it NEVER applies an offset to the toast
+        // itself, so the toast stays COMPLETELY STATIC. At gesture END we
+        // decide whether the swipe was big enough to commit to dismissal, and
+        // (if not) reset `revealDismiss` so the X hides again with a spring.
+        // No `.onTapGesture` is attached anywhere — it would compete with the
+        // DragGesture's minimumDistance: 15 detection and break the reveal.
         .gesture(
             DragGesture(minimumDistance: 15)
                 .onChanged { value in
-                    guard isTop else { return }
-                    // Only reveal on leftward swipe — don't move the toast.
-                    // The spring animation makes the X pop in/out smoothly.
                     withAnimation(.spring(response: 0.3)) {
                         revealDismiss = value.translation.width < -15
                     }
                 }
                 .onEnded { value in
-                    guard isTop else { return }
                     if value.translation.width < -100 {
-                        // Left-swipe past threshold commits to dismissal.
-                        Haptics.light()
                         ToastManager.shared.dismiss(toast.id)
                     } else if value.translation.height > 50 {
-                        // Downward swipe past threshold commits to dismissal.
-                        Haptics.light()
                         ToastManager.shared.dismiss(toast.id)
                     } else {
-                        // Drag ended without crossing a dismiss threshold —
-                        // hide the X again. The toast never moved, so no
-                        // snap-back animation is needed on the toast itself.
                         withAnimation(.spring(response: 0.3)) {
                             revealDismiss = false
                         }
                     }
                 }
         )
-        // #89 — Re-enable hit testing on this individual toast so taps /
-        // swipes / the X button all work, even though the parent container
-        // has `.allowsHitTesting(false)`.
-        .allowsHitTesting(true)
     }
 }

@@ -722,30 +722,25 @@ private struct FeaturedCard: View, Equatable {
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                // iPhone: landscape fanart with horizontal parallax.
-                // #110 — Previously this used the default `.poster` type
-                // (portrait 2:3), but the carousel card on iPhone is roughly
-                // square (0.55 * screen height tall, full width wide). A
-                // portrait image `.scaledToFill`-ing a square card gets
-                // cropped hard on the top/bottom, which read as "shortened".
-                // Switching to `.fanart` (landscape banner) matches the iPad
-                // branch and lets the image fill the full card edge-to-edge
-                // with only the sides lightly cropped for parallax headroom.
-                GeometryReader { geo in
-                    let pageOffset = geo.frame(in: .global).minX
-                    let buffer: CGFloat = 100
-                    TVDBPosterImage(media: media, type: .fanart)
-                        // The frame sets the image's render size to the full
-                        // card height (geo.size.height == carousel imageHeight)
-                        // plus the horizontal parallax buffer. CachedAsyncImage
-                        // already applies `.scaledToFill().clipped()` so the
-                        // image fills this frame completely — no fit/fill
-                        // ambiguity, no whitespace gutters.
-                        .frame(width: geo.size.width + buffer, height: geo.size.height)
-                        .offset(x: -(buffer / 2) - pageOffset * 0.25)
-                        .clipped()
-                }
-                .clipped()
+                // iPhone: banner / cover image fills the ENTIRE card area.
+                // #110 — Previously this used `TVDBPosterImage(media:type:.fanart)`
+                // which performs an async TVDB lookup that can fail (returning
+                // nothing), leaving the card empty or cropped to whatever
+                // fallback the TVDB layer could find. Switching to
+                // `CachedAsyncImage` with the banner URL directly (falling
+                // back to the cover image's extraLarge / large variants) means
+                // the image always renders from the AniList-provided URL
+                // without the extra TVDB round-trip.
+                //
+                // The `.frame(maxWidth: .infinity, maxHeight: .infinity)` makes
+                // the image fill the full card area edge-to-edge — no
+                // `.aspectRatio`, no parallax buffer, no height constraint.
+                // `CachedAsyncImage` already applies `.scaledToFill()` so the
+                // image fills this frame completely (cropping only what
+                // overflows), and `.clipped()` keeps the overflow contained.
+                CachedAsyncImage(urlString: media.bannerImage ?? media.coverImage.extraLarge ?? media.coverImage.large ?? "")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
             }
             #else
             // macOS: banner background + poster overlay

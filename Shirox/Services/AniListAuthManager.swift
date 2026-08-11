@@ -139,6 +139,14 @@ final class AniListAuthManager: NSObject, ObservableObject {
         UserDefaults.standard.removeObject(forKey: "anilist_score_format")
         UserDefaults.standard.removeObject(forKey: "anilist_user_id")
         PendingWriteQueue.shared.discardWrites(for: .anilist)
+
+        // Clear all user-scoped caches so the next signed-in account starts fresh
+        // and no Continue Watching / Library data from this account leaks across sessions.
+        // (syncWithAniList()/syncWithMAL() are guarded on a valid userId / isLoggedIn,
+        // so they cannot repopulate after this point.)
+        ContinueWatchingManager.shared.clearAll()
+        LocalLibraryManager.shared.clearAll()
+        LibraryCacheStore.shared.clearAll()
     }
 
     // MARK: - Viewer

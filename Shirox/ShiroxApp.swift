@@ -195,6 +195,13 @@ struct ShiroxApp: App {
     @AppStorage("appearanceMode") private var appearanceMode = "system"
     @AppStorage("accentColorHex") private var accentColorHex = ""
     @State private var showSplash = true
+    /// #109 — Drives the subtle entrance fade on `RootTabView` once the splash
+    /// finishes. Held as separate state (rather than deriving it from
+    /// `!showSplash`) so the fade-in can be triggered explicitly inside the
+    /// splash-dismiss `withAnimation` block — that way the splash fades out
+    /// AND the root view fades in over the same 0.5s window without one
+    /// animation needing to wait for the other.
+    @State private var rootVisible = false
 
     /// Resolves the appearance mode to a ColorScheme (nil = follow system).
     private var colorScheme: ColorScheme? {
@@ -252,10 +259,24 @@ struct ShiroxApp: App {
                 // Bumping `.id(...)` discards the old view tree and rebuilds it
                 // fresh with the new accent color / color scheme applied.
                 .id("\(accentColorHex)-\(appearanceMode)")
+                // #109 — Subtle entrance fade on the root view once the splash
+                // finishes. `rootVisible` flips from `false` → `true` in its
+                // own `withAnimation(.easeInOut(duration: 0.3))` block (see the
+                // splash-dismiss task below) so the root fades in over 0.3s
+                // while the splash simultaneously fades out + scales up over
+                // 0.5s. The fade is intentionally shorter than the splash
+                // dismissal so the root is fully visible BEFORE the splash
+                // overlay finishes lifting away — that hides any flash of
+                // empty content during the hand-off.
+                .opacity(rootVisible ? 1 : 0)
                 .overlay {
                     if showSplash {
                         AnimatedSplashView()
-                            .transition(.opacity)
+                            // #109 — Smoother dismissal: combine the opacity
+                            // fade with a subtle scale-up (1.0 → 1.05) so the
+                            // splash appears to gently "lift" away rather than
+                            // just blinking out.
+                            .transition(.opacity.combined(with: .scale(scale: 1.05)))
                     }
                 }
                 .overlay {
@@ -290,7 +311,23 @@ struct ShiroxApp: App {
                     // head start so the Home tab is more likely to be
                     // populated when it appears.
                     try? await Task.sleep(nanoseconds: 3_500_000_000)
-                    withAnimation(.easeInOut(duration: 0.4)) { showSplash = false }
+                    // #109 — Smooth splash dismissal (0.5s) + root entrance
+                    // fade (0.3s). Two separate `withAnimation` blocks so each
+                    // state change picks up its own duration: the splash
+                    // overlay fades out AND scales up to 1.05 (driven by its
+                    // `.transition(.opacity.combined(with: .scale(scale: 1.05)))`)
+                    // over 0.5s, while the root view simultaneously fades in
+                    // from 0 → 1 over a shorter 0.3s window. Running them in
+                    // parallel (rather than sequentially) keeps the total
+                    // transition at 0.5s and lets the root become fully
+                    // visible BEFORE the splash finishes lifting away, hiding
+                    // any flash of empty content during the hand-off.
+                    withAnimation(.easeInOut(duration: 0.5)) {
+                        showSplash = false
+                    }
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        rootVisible = true
+                    }
                 }
                 .onChange(of: scenePhase) { phase in
                     if phase == .active { Task { await PendingWriteQueue.shared.flush() } }
