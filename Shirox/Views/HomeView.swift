@@ -1355,7 +1355,7 @@ struct ScheduleView: View {
             VStack(spacing: 4) {
                 Text("\(calendar.component(.day, from: date))")
                     .font(.subheadline.weight(.bold))
-                    .foregroundStyle(isInMonth ? .primary : .secondary.opacity(0.45))
+                    .foregroundStyle(isInMonth ? Color.primary : Color.secondary.opacity(0.45))
 
                 if count > 0 {
                     Text("\(count)")
