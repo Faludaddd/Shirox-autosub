@@ -25,6 +25,7 @@ import SwiftUI
 // ──────────────────────────────────────────────────────────────────────────
 
 #if os(iOS)
+@available(iOS 16.2, *)
 
 // MARK: - ActivityAttributes
 
