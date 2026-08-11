@@ -634,10 +634,6 @@
                 77C010496C1B48E08ACD3FEB /* CustomRefreshControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B960C6896464EEC9886FA2B /* CustomRefreshControl.swift */; };
                 4ECDE91B709E40C4B7131936 /* CustomRefreshControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B960C6896464EEC9886FA2B /* CustomRefreshControl.swift */; };
                 D13549A1608449AF9EBDE353 /* CustomRefreshControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B960C6896464EEC9886FA2B /* CustomRefreshControl.swift */; };
-                FF10007807354462A612291F /* EpisodeLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4441431CB14045019570E6C1 /* EpisodeLiveActivity.swift */; };
-                FE6D196A89444236BC13E845 /* EpisodeLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4441431CB14045019570E6C1 /* EpisodeLiveActivity.swift */; };
-                D165699EECFB46908554C092 /* EpisodeLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4441431CB14045019570E6C1 /* EpisodeLiveActivity.swift */; };
-                6D6E0F0D35E84201A7477300 /* EpisodeLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4441431CB14045019570E6C1 /* EpisodeLiveActivity.swift */; };
 
 /* End PBXBuildFile section */
 
@@ -886,7 +882,6 @@
                 1ED5C58C75D046CCB3CEEE12 /* ToastSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToastSystem.swift; sourceTree = "<group>"; };
                 CB9A6134C59C4A32B8003889 /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
                 7B960C6896464EEC9886FA2B /* CustomRefreshControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomRefreshControl.swift; sourceTree = "<group>"; };
-                4441431CB14045019570E6C1 /* EpisodeLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpisodeLiveActivity.swift; sourceTree = "<group>"; };
 
 /* End PBXFileReference section */
 
@@ -1164,7 +1159,6 @@
                                 1ED5C58C75D046CCB3CEEE12 /* ToastSystem.swift */,
                                 CB9A6134C59C4A32B8003889 /* Haptics.swift */,
                                 7B960C6896464EEC9886FA2B /* CustomRefreshControl.swift */,
-                                4441431CB14045019570E6C1 /* EpisodeLiveActivity.swift */,
                         );
                         path = Shared;
                         sourceTree = "<group>";
@@ -1526,7 +1520,6 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 895B393387144BA2B7146905 /* ToastSystem.swift in Sources */,
                                 57BF5714069E486B97AA8FBF /* Haptics.swift in Sources */,
                                 D13549A1608449AF9EBDE353 /* CustomRefreshControl.swift in Sources */,
-                                6D6E0F0D35E84201A7477300 /* EpisodeLiveActivity.swift in Sources */,
                         );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -1723,7 +1716,6 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 F600445A08244B5095556D9D /* ToastSystem.swift in Sources */,
                                 7F79015A0ABA4261AA83F778 /* Haptics.swift in Sources */,
                                 4ECDE91B709E40C4B7131936 /* CustomRefreshControl.swift in Sources */,
-                                D165699EECFB46908554C092 /* EpisodeLiveActivity.swift in Sources */,
                         );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -1921,7 +1913,6 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 EA699B91BC6B4BCF8B325D40 /* ToastSystem.swift in Sources */,
                                 A059508F65B7400595DF13C4 /* Haptics.swift in Sources */,
                                 77C010496C1B48E08ACD3FEB /* CustomRefreshControl.swift in Sources */,
-                                FE6D196A89444236BC13E845 /* EpisodeLiveActivity.swift in Sources */,
                         );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -2119,7 +2110,6 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 05EE7CC248EF4889882F5264 /* ToastSystem.swift in Sources */,
                                 FB3055616FBE4A399FAA8A5D /* Haptics.swift in Sources */,
                                 32DA168EE48448DE9CB5FBB2 /* CustomRefreshControl.swift in Sources */,
-                                FF10007807354462A612291F /* EpisodeLiveActivity.swift in Sources */,
                         );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
