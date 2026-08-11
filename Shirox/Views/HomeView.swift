@@ -10,6 +10,11 @@ struct HomeView: View {
     @State private var readerContext: ReaderContext?
     /// Controls navigation to the notifications page via NavigationLink.
     @State private var navigateToNotifications = false
+    /// Drives the custom pull-to-refresh overlay (#98). Toggled at the start/end
+    /// of the `.refreshable` task so `CustomRefreshControl` can spin while the
+    /// reload is in flight. The system `.refreshable` spinner still drives the
+    /// gesture; this just adds a branded overlay on top.
+    @State private var isRefreshing = false
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -165,6 +170,12 @@ struct HomeView: View {
                         }
                     }
                     .refreshable {
+                        // #96 — Light haptic when the user pulls to refresh.
+                        Haptics.light()
+                        // #98 — toggle the custom refresh overlay while the reload is in
+                        // flight. `defer` guarantees the overlay clears even if a task throws.
+                        isRefreshing = true
+                        defer { isRefreshing = false }
                         await withTaskGroup(of: Void.self) { group in
                             group.addTask { await vm.reload() }
                             group.addTask {
@@ -176,6 +187,23 @@ struct HomeView: View {
                         }
                     }
                     .coordinateSpace(name: "homeScroll")
+                    // #98 — overlay the custom branded refresh control at the top of the
+                    // scroll view. Applied OUTSIDE `.ignoresSafeArea` so the overlay lands
+                    // below the status bar / notch, not under it. The control is only
+                    // rendered while `isRefreshing` is true, so the resting state is clean.
+                    .overlay(alignment: .top) {
+                        if isRefreshing {
+                            CustomRefreshControl(isRefreshing: $isRefreshing)
+                                .padding(.vertical, 6)
+                                .padding(.horizontal, 16)
+                                .frame(maxWidth: .infinity)
+                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .padding(.horizontal, 80)
+                                .transition(.opacity.combined(with: .move(edge: .top)))
+                                .zIndex(100)
+                        }
+                    }
+                    .animation(.easeInOut(duration: 0.25), value: isRefreshing)
                     .ignoresSafeArea(edges: .top)
                 }
             }
@@ -828,7 +856,7 @@ private struct HomePressStyle: ButtonStyle {
             .opacity(configuration.isPressed ? 0.88 : 1.0)
             .shadow(
                 color: glowOn ? Color.appAccent.opacity(Color.glowIntensity * 0.6) : .clear,
-                radius: glowOn ? CGFloat(15 * Color.glowIntensity) : 0
+                radius: glowOn ? CGFloat(21 * Color.glowIntensity) : 0
             )
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: configuration.isPressed)
     }
@@ -1200,7 +1228,7 @@ struct ScheduleView: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
                         .background(
-                            Capsule().fill(Color.accentColor)
+                            Capsule().fill(Color.red)
                         )
                         .fixedSize()
                 } else {
@@ -1228,7 +1256,7 @@ struct ScheduleView: View {
                 color: isSelected && Color.glowEnabled
                     ? Color.primary.opacity(Color.glowIntensity * 0.5) : .clear,
                 radius: isSelected && Color.glowEnabled
-                    ? CGFloat(12 * Color.glowIntensity) : 0
+                    ? CGFloat(17 * Color.glowIntensity) : 0
             )
         }
         .buttonStyle(.plain)
@@ -1526,6 +1554,8 @@ struct ScheduleView: View {
                     status: status,
                     progress: 0
                 )
+                // #96 — Success haptic when the entry lands in the user's library.
+                Haptics.success()
                 ToastManager.shared.show(
                     title: "Library",
                     message: "Added to \(status.displayName)",
@@ -1705,21 +1735,79 @@ private struct ScheduleCard: View {
         .overlay(
             RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5)
         )
-        .contextMenu {
-            Button {
-                onAddToPlanning()
-            } label: {
-                Label("Add to Planning", systemImage: "calendar.badge.plus")
+        .modifier(ScheduleCardContextMenu(
+            entry: entry,
+            onAddToPlanning: onAddToPlanning,
+            onAddToWatching: onAddToWatching,
+            onViewDetails: onViewDetails
+        ))
+    }
+}
+
+// MARK: - Schedule Card Context Menu (with long-press preview)
+
+/// Context-menu modifier for `ScheduleCard`.
+///
+/// On iOS 16+ / macOS 13+ / tvOS 17+, attaches a larger preview (poster + title +
+/// episode badge) that SwiftUI shows above the menu when the user long-presses the
+/// card. On older OSes (e.g. iOS 15) the `preview` parameter isn't available, so we
+/// fall back to the default system preview.
+private struct ScheduleCardContextMenu: ViewModifier {
+    let entry: UnifiedScheduleEntry
+    let onAddToPlanning: () -> Void
+    let onAddToWatching: () -> Void
+    let onViewDetails: () -> Void
+
+    @ViewBuilder private var menuItems: some View {
+        Button {
+            onAddToPlanning()
+        } label: {
+            Label("Add to Planning", systemImage: "calendar.badge.plus")
+        }
+        Button {
+            onAddToWatching()
+        } label: {
+            Label("Add to Watching", systemImage: "play.circle")
+        }
+        Button {
+            onViewDetails()
+        } label: {
+            Label("View Details", systemImage: "info.circle")
+        }
+    }
+
+    /// Larger preview shown above the context menu — poster, title, and episode badge.
+    @ViewBuilder private var previewContent: some View {
+        VStack(spacing: 12) {
+            CachedAsyncImage(urlString: entry.coverImage ?? "")
+                .frame(width: 200, height: 300)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+
+            Text(entry.title)
+                .font(.headline)
+                .multilineTextAlignment(.center)
+                .lineLimit(3)
+                .frame(maxWidth: 220)
+
+            Text(entry.episodeBadge)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+        }
+        .padding()
+    }
+
+    func body(content: Content) -> some View {
+        if #available(iOS 16, macOS 13, tvOS 17, *) {
+            content.contextMenu {
+                menuItems
+            } preview: {
+                previewContent
             }
-            Button {
-                onAddToWatching()
-            } label: {
-                Label("Add to Watching", systemImage: "play.circle")
-            }
-            Button {
-                onViewDetails()
-            } label: {
-                Label("View Details", systemImage: "info.circle")
+        } else {
+            // iOS 15 / older: no `preview` parameter — default preview is used.
+            content.contextMenu {
+                menuItems
             }
         }
     }

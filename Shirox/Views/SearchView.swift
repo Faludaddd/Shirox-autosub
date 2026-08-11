@@ -114,6 +114,8 @@ struct SearchView: View {
         }
         .adaptiveSheet(isPresented: $showSources) {
             SourcesPickerSheet()
+                // #100 — Liquid-glass backdrop for the modal sheet.
+                .background(.ultraThinMaterial)
         }
         .adaptiveSheet(isPresented: $showFilters) {
             // #91 — pass the last-applied result count + hasSearched so the sheet
@@ -125,6 +127,8 @@ struct SearchView: View {
             ) {
                 if !vm.query.isEmpty { vm.search(usingModule: usingModule) }
             }
+            // #100 — Liquid-glass backdrop for the modal sheet.
+            .background(.ultraThinMaterial)
         }
         #if os(iOS)
         .background(
@@ -1027,7 +1031,7 @@ struct SourcesPickerSheet: View {
     private func sourceIcon(type: ProviderType, isConnected: Bool) -> some View {
         let glowColor: Color = isConnected ? .green : .red
         let glowOpacity: Double = Color.glowEnabled ? Color.glowIntensity * 1.0 : 0
-        let glowRadius: CGFloat = Color.glowEnabled ? CGFloat(20 * Color.glowIntensity) : 0
+        let glowRadius: CGFloat = Color.glowEnabled ? CGFloat(28 * Color.glowIntensity) : 0
 
         CachedAsyncImage(urlString: type.iconURL)
             .frame(width: 38, height: 38)

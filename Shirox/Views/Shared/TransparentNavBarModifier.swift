@@ -54,6 +54,37 @@ struct NavBarAppearanceConfigurator: UIViewRepresentable {
     }
 }
 
+// MARK: - ScrollAwareNavBarModifier
+
+/// Navigation-bar modifier that fades the bar background and inline title in/out
+/// based on scroll position.
+///
+/// - When `isScrolled` is `false` (content at the top of the scroll view), the bar
+///   is fully transparent with no title — content scrolls underneath it.
+/// - When `isScrolled` is `true` (user has scrolled past the header), the standard
+///   bar materializes and the inline title appears, so the user keeps context.
+///
+/// On iOS 16+ this uses the native `.toolbarBackground(_:for:)` API. On iOS 15 the
+/// transparent appearance is applied via `NavBarAppearanceConfigurator` (the bar
+/// can't be selectively re-materialized without heavy appearance-proxy juggling, so
+/// we keep it transparent and only toggle the title).
+struct ScrollAwareNavBarModifier: ViewModifier {
+    let isScrolled: Bool
+    let title: String
+
+    func body(content: Content) -> some View {
+        if #available(iOS 16, *) {
+            content
+                .toolbarBackground(isScrolled ? .visible : .hidden, for: .navigationBar)
+                .navigationTitle(isScrolled ? title : "")
+        } else {
+            content
+                .background(NavBarAppearanceConfigurator())
+                .navigationTitle(isScrolled ? title : "")
+        }
+    }
+}
+
 // MARK: - View Extension
 
 extension View {

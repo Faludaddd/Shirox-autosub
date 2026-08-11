@@ -41,6 +41,14 @@ struct AniListDetailView: View {
     @State private var selectedTab = 0
     @State private var sequelMediaId: Int? = nil
     @State private var watchOrder: [TVDBMappingService.AniraMediaEntry] = []
+    /// Tracks whether the detail scroll view has scrolled past the hero header.
+    /// Drives the nav-bar background/title fade (see `ScrollAwareNavBarModifier`).
+    @State private var isScrolled = false
+    /// Drives the subtle "zoom-in" entrance animation when the detail view is
+    /// pushed. True `matchedGeometryEffect` across a `NavigationView` push isn't
+    /// supported, so we approximate the hero/shared-element feel with a
+    /// scale+opacity transition on appear.
+    @State private var hasAppeared = false
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -118,9 +126,14 @@ struct AniListDetailView: View {
         #if os(iOS)
         .ignoresSafeArea(edges: .top)
         .navigationBarTitleDisplayMode(.inline)
-        .modifier(TransparentNavBarModifier())
+        .modifier(ScrollAwareNavBarModifier(
+            isScrolled: isScrolled,
+            title: vm.media?.title.displayTitle ?? ""
+        ))
+        #else
+        .navigationTitle("")
         #endif
-        .navigationTitle(""))
+        )
     }
 
     #if os(iOS)
@@ -227,6 +240,18 @@ struct AniListDetailView: View {
 
     var body: some View {
         navContent
+        // Hero/shared-element approximation: a scale+opacity zoom-in when the
+        // detail view is pushed. True `matchedGeometryEffect` can't span a
+        // `NavigationView` push, so this gives a lightweight "zoom" feel instead.
+        .transition(.scale.combined(with: .opacity))
+        .scaleEffect(hasAppeared ? 1.0 : 0.96)
+        .opacity(hasAppeared ? 1.0 : 0.0)
+        .onAppear {
+            guard !hasAppeared else { return }
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                hasAppeared = true
+            }
+        }
         .task(id: mediaId) {
             watchOrder = await TVDBMappingService.shared.fetchWatchOrder(id: mediaId)
         }
@@ -721,8 +746,28 @@ struct AniListDetailView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            // Invisible scroll-offset probe: reports the VStack's top edge in the
+            // "heroScroll" coordinate space so we can fade the nav bar in/out once
+            // the user scrolls past the hero header (~200pt).
+            .background(
+                GeometryReader { proxy in
+                    Color.clear
+                        .preference(
+                            key: DetailScrollOffsetKey.self,
+                            value: proxy.frame(in: .named("heroScroll")).minY
+                        )
+                }
+            )
         }
         .coordinateSpace(name: "heroScroll")
+        .onPreferenceChange(DetailScrollOffsetKey.self) { offset in
+            let threshold: CGFloat = 200
+            let scrolled = offset < -threshold
+            guard scrolled != isScrolled else { return }
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isScrolled = scrolled
+            }
+        }
         .frame(maxWidth: .infinity)
     }
 
@@ -1790,5 +1835,17 @@ struct AniListMatchingSearchView: View {
             }
             isLoading = false
         }
+    }
+}
+
+// MARK: - Detail Scroll Offset PreferenceKey
+
+/// PreferenceKey used by `AniListDetailView` to track the scroll offset of its
+/// content within the `"heroScroll"` coordinate space. Drives the nav-bar
+/// background/title fade (see `ScrollAwareNavBarModifier`).
+private struct DetailScrollOffsetKey: PreferenceKey {
+    nonisolated(unsafe) static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }

@@ -2271,7 +2271,7 @@ struct NotificationsSettingsPage: View {
                 color: (anyEnabled && Color.glowEnabled)
                     ? Color.green.opacity(Color.glowIntensity * 0.6) : .clear,
                 radius: (anyEnabled && Color.glowEnabled)
-                    ? CGFloat(10 * Color.glowIntensity) : 0
+                    ? CGFloat(14 * Color.glowIntensity) : 0
             )
 
             VStack(spacing: 4) {
@@ -2587,7 +2587,7 @@ struct SourcesSettingsPage: View {
         // shadow radius (`20 * intensity`) and its opacity (`intensity * 1.0`)
         // so the slider visibly grows and brightens the halo around the icon.
         let glowOpacity: Double = Color.glowEnabled ? Color.glowIntensity * 1.0 : 0
-        let glowRadius: CGFloat = Color.glowEnabled ? CGFloat(20 * Color.glowIntensity) : 0
+        let glowRadius: CGFloat = Color.glowEnabled ? CGFloat(28 * Color.glowIntensity) : 0
 
         CachedAsyncImage(urlString: provider.iconURL)
             .frame(width: 34, height: 34)
@@ -2648,7 +2648,7 @@ struct ModulesSettingsPage: View {
                                 ? Color.appAccent.opacity(Color.glowIntensity * 0.8)
                                 : .clear,
                             radius: (moduleManager.activeModule?.id == module.id && Color.glowEnabled)
-                                ? CGFloat(10 * Color.glowIntensity)
+                                ? CGFloat(14 * Color.glowIntensity)
                                 : 0
                         )
                     }
@@ -4022,7 +4022,7 @@ struct TrackersSettingsPage: View {
                     color: isConnected && Color.glowEnabled
                         ? Color.green.opacity(Color.glowIntensity) : .clear,
                     radius: isConnected && Color.glowEnabled
-                        ? CGFloat(15 * Color.glowIntensity) : 0
+                        ? CGFloat(21 * Color.glowIntensity) : 0
                 )
 
             VStack(alignment: .leading, spacing: 4) {
@@ -4163,7 +4163,7 @@ struct BackupRestoreSettingsPage: View {
                     .shadow(
                         color: Color.glowEnabled
                             ? Color.appAccent.opacity(Color.glowIntensity * 0.5) : .clear,
-                        radius: Color.glowEnabled ? CGFloat(12 * Color.glowIntensity) : 0
+                        radius: Color.glowEnabled ? CGFloat(17 * Color.glowIntensity) : 0
                     )
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -4203,6 +4203,9 @@ struct BackupRestoreSettingsPage: View {
         .sheet(isPresented: $showShareSheet) {
             if let url = backupFileURL {
                 ShareSheet(items: [url])
+                    // #100 — Frosted-glass backdrop so the sheet picks up the
+                    // content underneath instead of sitting on a flat card.
+                    .background(.ultraThinMaterial)
             }
         }
         #endif

@@ -167,7 +167,7 @@ struct GlowingToggleStyle: ToggleStyle {
                     .shadow(
                         color: configuration.isOn && Color.glowEnabled
                             ? Color.gray.opacity(Color.glowIntensity) : .clear,
-                        radius: configuration.isOn && Color.glowEnabled ? CGFloat(15 * Color.glowIntensity) : 0
+                        radius: configuration.isOn && Color.glowEnabled ? CGFloat(21 * Color.glowIntensity) : 0
                     )
                 Circle()
                     .fill(Color.white)
@@ -175,7 +175,10 @@ struct GlowingToggleStyle: ToggleStyle {
                     .offset(x: configuration.isOn ? 10 : -10)
             }
             .animation(.easeInOut(duration: 0.2), value: configuration.isOn)
-            .onTapGesture { configuration.isOn.toggle() }
+            .onTapGesture {
+                configuration.isOn.toggle()
+                Haptics.light()
+            }
         }
     }
 }
@@ -239,6 +242,16 @@ struct ShiroxApp: App {
                 .tint(accentColor)
                 .toggleStyle(GlowingToggleStyle())
                 .preferredColorScheme(colorScheme)
+                // #17 — Force the entire RootTabView subtree to re-render when
+                // the user changes the accent color or appearance mode in
+                // Settings. `@AppStorage` already re-evaluates `ShiroxApp.body`,
+                // but cached `.tint` / `.preferredColorScheme` values inside
+                // already-displayed subviews (especially `RootTabView`, which
+                // is a separate struct and doesn't directly observe these
+                // `@AppStorage` keys) don't always pick up the new values.
+                // Bumping `.id(...)` discards the old view tree and rebuilds it
+                // fresh with the new accent color / color scheme applied.
+                .id("\(accentColorHex)-\(appearanceMode)")
                 .overlay {
                     if showSplash {
                         AnimatedSplashView()
@@ -435,6 +448,7 @@ private struct RootTabView: View {
                 .tabViewStyle(.sidebarAdaptable)
                 .tint(.appAccent)
                 .animation(.easeInOut(duration: 0.25), value: selectedTab)
+                .glassTabBarBackground()
                 #endif
             } else {
                 TabView(selection: $selectedTab) {
@@ -463,9 +477,12 @@ private struct RootTabView: View {
                 }
                 .tint(.appAccent)
                 .animation(.easeInOut(duration: 0.25), value: selectedTab)
+                .glassTabBarBackground()
             }
         }
         .animation(.easeInOut(duration: 0.25), value: selectedTab)
+        // #96 — Selection haptic whenever the user switches tabs.
+        .onChange(of: selectedTab) { _ in Haptics.selection() }
         .onOpenURL { url in
             guard url.scheme == "shirox" else { return }
             AniListAuthManager.shared.handleCallback(url: url)

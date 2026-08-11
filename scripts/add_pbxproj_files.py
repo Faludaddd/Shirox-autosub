@@ -29,6 +29,16 @@ FILES_TO_ADD = [
     ("Shirox/Views/Shared/TransparentNavBarModifier.swift", "Shared"),
     ("Shirox/Views/Shared/AnimatedBackgroundView.swift",   "Shared"),
     ("Shirox/Views/Shared/ToastSystem.swift",              "Shared"),
+    ("Shirox/Views/Shared/Haptics.swift",                  "Shared"),
+    # #98 — custom pull-to-refresh overlay used by HomeView.
+    ("Shirox/Views/Shared/CustomRefreshControl.swift",     "Shared"),
+    # #102 — ActivityKit attributes + manager for the Episode Live Activity.
+    #        The file body is wrapped in `#if os(iOS) ... #endif` so adding
+    #        it to the macOS / tvOS targets is safe (empty translation unit
+    #        there). ActivityKit APIs are additionally guarded with
+    #        `@available(iOS 16.1, *)` to keep the iOS 15 deployment target
+    #        building cleanly.
+    ("Shirox/Views/Shared/EpisodeLiveActivity.swift",      "Shared"),
 ]
 
 # Sources build phase IDs for each target (looked up from pbxproj).

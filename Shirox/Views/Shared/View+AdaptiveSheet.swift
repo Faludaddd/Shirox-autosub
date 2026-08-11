@@ -79,6 +79,26 @@ extension View {
             self
         }
     }
+
+    /// #99 — Applies an `.ultraThinMaterial` (liquid glass) background to the
+    /// tab bar so it picks up the content scrolling underneath. The
+    /// `.toolbarBackground(_:for:)` API is iOS 16+ / macOS 13+ only, so this is
+    /// a no-op on iOS 15. tvOS has no tab bar background API to tweak here, so
+    /// it's skipped there too.
+    @ViewBuilder
+    func glassTabBarBackground() -> some View {
+        #if !os(tvOS)
+        if #available(iOS 16, macOS 13, *) {
+            self
+                .toolbarBackground(.ultraThinMaterial, for: .tabBar)
+                .toolbarBackground(.visible, for: .tabBar)
+        } else {
+            self
+        }
+        #else
+        self
+        #endif
+    }
 }
 
 extension View {
