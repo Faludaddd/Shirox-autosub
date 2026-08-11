@@ -2569,10 +2569,10 @@ struct SourcesSettingsPage: View {
         let glowColor: Color = isLoggedIn ? .green : .red
         // When `Color.glowEnabled` is off the glow is fully suppressed (opacity
         // 0 + radius 0). When on, the intensity (0.0–1.0) drives BOTH the
-        // shadow radius (`6 * intensity`) and its opacity (`intensity * 0.6`)
+        // shadow radius (`12 * intensity`) and its opacity (`intensity * 1.0`)
         // so the slider visibly grows and brightens the halo around the icon.
-        let glowOpacity: Double = Color.glowEnabled ? Color.glowIntensity * 0.6 : 0
-        let glowRadius: CGFloat = Color.glowEnabled ? CGFloat(6 * Color.glowIntensity) : 0
+        let glowOpacity: Double = Color.glowEnabled ? Color.glowIntensity * 1.0 : 0
+        let glowRadius: CGFloat = Color.glowEnabled ? CGFloat(12 * Color.glowIntensity) : 0
 
         CachedAsyncImage(urlString: provider.iconURL)
             .frame(width: 34, height: 34)
@@ -2583,7 +2583,7 @@ struct SourcesSettingsPage: View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(glowColor.opacity(Color.glowEnabled ? 0.85 : 0.25), lineWidth: 1.5)
+                    .strokeBorder(glowColor.opacity(Color.glowEnabled ? 0.85 : 0.5), lineWidth: 1.5)
             )
             .shadow(color: glowColor.opacity(glowOpacity),
                     radius: glowRadius, x: 0, y: 0)
@@ -2628,6 +2628,14 @@ struct ModulesSettingsPage: View {
                         }
                         .contentShape(Rectangle())
                         .onTapGesture { moduleManager.selectModule(module) }
+                        .shadow(
+                            color: (moduleManager.activeModule?.id == module.id && Color.glowEnabled)
+                                ? Color.appAccent.opacity(Color.glowIntensity * 0.8)
+                                : .clear,
+                            radius: (moduleManager.activeModule?.id == module.id && Color.glowEnabled)
+                                ? CGFloat(10 * Color.glowIntensity)
+                                : 0
+                        )
                     }
                     .onDelete { indices in
                         for i in indices { moduleManager.removeModule(moduleManager.modules[i]) }

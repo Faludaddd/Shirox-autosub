@@ -12,7 +12,7 @@ struct ContinueReadingSection: View {
     @State private var loadingHref: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 5) {
                     Text("Continue Reading")

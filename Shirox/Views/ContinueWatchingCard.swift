@@ -50,7 +50,7 @@ struct ContinueWatchingSection: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 5) {
                     Text("Continue Watching")

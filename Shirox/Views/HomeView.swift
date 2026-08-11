@@ -51,7 +51,21 @@ struct HomeView: View {
                             }
 
                             // ────────────────────────────────────────────────────────
-                            // 2. CATEGORY GRID — replaces the old vertical scroll of
+                            // 2. CONTINUE WATCHING / READING — horizontal strips
+                            //    directly under the hero carousel. Kept iOS-only; on
+                            //    tvOS/macOS these resume cards don't render.
+                            // ────────────────────────────────────────────────────────
+                            #if os(iOS)
+                            if !continueWatching.items.isEmpty {
+                                ContinueWatchingSection(items: continueWatching.items, navTarget: $cwNavTarget)
+                            }
+                            if !mangaProgress.items.isEmpty {
+                                ContinueReadingSection(items: mangaProgress.items, readerContext: $readerContext)
+                            }
+                            #endif
+
+                            // ────────────────────────────────────────────────────────
+                            // 3. CATEGORY GRID — replaces the old vertical scroll of
                             //    AnimeSections. Six large tappable tiles, two columns.
                             //    Tapping any tile pushes BrowseView with that category.
                             // ────────────────────────────────────────────────────────
@@ -145,35 +159,6 @@ struct HomeView: View {
                                 .buttonStyle(HomePressStyle())
                             }
                             .padding(.horizontal, 16)
-
-                            // "See All" link — deep-links into the default Browse tab.
-                            HStack {
-                                Spacer()
-                                NavigationLink {
-                                    BrowseView(category: .trending)
-                                } label: {
-                                    HStack(spacing: 4) {
-                                        Text("See All")
-                                        Image(systemName: "arrow.right")
-                                    }
-                                    .font(.subheadline.weight(.semibold))
-                                }
-                            }
-                            .padding(.horizontal, 16)
-
-                            // ────────────────────────────────────────────────────────
-                            // 3. CONTINUE WATCHING — horizontal strip BELOW the grid
-                            //    (was previously above the carousel). Kept iOS-only as
-                            //    before; on tvOS/macOS these resume cards don't render.
-                            // ────────────────────────────────────────────────────────
-                            #if os(iOS)
-                            if !continueWatching.items.isEmpty {
-                                ContinueWatchingSection(items: continueWatching.items, navTarget: $cwNavTarget)
-                            }
-                            if !mangaProgress.items.isEmpty {
-                                ContinueReadingSection(items: mangaProgress.items, readerContext: $readerContext)
-                            }
-                            #endif
 
                             Spacer().frame(height: 28)
                         }
@@ -271,7 +256,7 @@ private struct FeaturedCarousel: View {
         let effectiveWidth = containerWidth > 0 ? containerWidth : UIScreen.main.bounds.width
         let imageHeight: CGFloat = isIPad
             ? effectiveWidth * (9.0 / 16.0)
-            : UIScreen.main.bounds.height * 0.6
+            : UIScreen.main.bounds.height * 0.55
 
         let displayItems = realItems
         let currentMedia = displayItems.isEmpty ? items[0] : displayItems[currentIndex]
@@ -825,7 +810,7 @@ private struct CategoryGridCard: View {
     let gradientColors: [Color]
     let imageURL: String?
 
-    private static let tileHeight: CGFloat = 160
+    private static let tileHeight: CGFloat = 180
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -835,6 +820,7 @@ private struct CategoryGridCard: View {
             if let url = imageURL, !url.isEmpty {
                 CachedAsyncImage(urlString: url)
                     .aspectRatio(contentMode: .fill)
+                    .blur(radius: 6, opaque: true)
                     .frame(height: Self.tileHeight)
                     .frame(maxWidth: .infinity)
                     .clipped()
@@ -875,25 +861,29 @@ private struct CategoryGridCard: View {
             .frame(height: Self.tileHeight)
             .frame(maxWidth: .infinity)
 
-            // Foreground content: icon badge (top) + title & count (bottom).
+            // Foreground content: icon badge (top-left) + count capsule
+            // (top-right) + title (bottom).
             VStack(alignment: .leading, spacing: 6) {
-                HStack {
+                HStack(alignment: .top) {
                     Image(systemName: iconName)
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(.white)
                         .frame(width: 38, height: 38)
                         .background(.ultraThinMaterial, in: Circle())
                     Spacer()
+                    Text("\(count)")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(.ultraThinMaterial, in: Capsule())
                 }
                 Spacer()
                 Text(title)
-                    .font(.headline.weight(.bold))
+                    .font(.title3.weight(.bold))
                     .foregroundStyle(.white)
                     .lineLimit(2)
                     .minimumScaleFactor(0.8)
-                Text("\(count) titles")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.white.opacity(0.85))
             }
             .padding(14)
         }
@@ -947,22 +937,24 @@ enum ScheduleSettings {
 
 /// Schedule page — opened via the calendar icon in HomeView's toolbar.
 ///
-/// Shows anime (AniList) and/or Western TV (TVMaze) episode schedules grouped by day,
-/// with controls for content source (Anime / Western / Combined), timezone (Local / UTC),
-/// and a look-ahead window (set in `ScheduleSettingsPage`). Each entry shows a card with
-/// poster, badges, countdown, air-time capsule, and a notification bell.
+/// Shows anime (AniList) and/or Western TV (TVMaze) episode schedules grouped by day.
+/// Content source (Anime / Western / Combined), timezone (Local / UTC), and the
+/// look-ahead window are all configured in `ScheduleSettingsPage` (gear icon) and
+/// read live from `@AppStorage` here — the schedule tab itself has no pickers for
+/// them, so it always reflects whatever the user picked in Settings. Each entry
+/// shows a card with poster, badges, countdown, air-time capsule, and a
+/// notification bell.
 struct ScheduleView: View {
     @State private var entries: [UnifiedScheduleEntry] = []
     @State private var isLoading = false
     @State private var loadError: String?
 
-    // User-facing controls. `mode` and `useUTC` are seeded from persisted defaults on first
-    // appearance; the user can override them via the segmented pickers without changing the
-    // default. `windowDays` is bound to `@AppStorage` so changes from `ScheduleSettingsPage`
-    // propagate live.
+    // All three preferences are bound to the persisted defaults edited in
+    // `ScheduleSettingsPage` — changes there propagate live into the schedule
+    // tab via `@AppStorage`. There are no segmented pickers in the tab itself.
     @AppStorage("scheduleWindowDays")    private var windowDays: Int = 7
-    @State private var mode:   ScheduleMode = ScheduleSettings.defaultMode
-    @State private var useUTC: Bool         = ScheduleSettings.defaultUseUTC
+    @AppStorage("scheduleDefaultMode")   private var mode:   ScheduleMode = .anime
+    @AppStorage("scheduleDefaultUseUTC") private var useUTC: Bool         = false
 
     // Calendar navigation. `weekStartDate` is the Sunday of the currently displayed
     // week; `selectedDate` is the day whose episodes are shown below the grid. Both
@@ -1042,29 +1034,14 @@ struct ScheduleView: View {
         let selectedBucket = buckets.first(where: { calendar.isDate($0.date, inSameDayAs: selectedDate) })
 
         VStack(spacing: 0) {
-            // Controls — content mode + timezone (kept from the previous layout).
-            VStack(spacing: 10) {
-                Picker("Content", selection: $mode) {
-                    ForEach(ScheduleMode.allCases, id: \.self) { m in
-                        Text(m.displayName).tag(m)
-                    }
-                }
-                .pickerStyle(.segmented)
-
-                Picker("Timezone", selection: $useUTC) {
-                    Text("Local").tag(false)
-                    Text("UTC").tag(true)
-                }
-                .pickerStyle(.segmented)
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 6)
-            .padding(.bottom, 8)
-
-            // Month / week header (e.g. "August 2026", or "Jul – Aug 2026" if spanning).
+            // Month / week header — always a single month/year (e.g. "August 2026")
+            // driven by the selected date, never a "Jul – Aug" range. See
+            // `monthYearHeader` for the fallback when the selection is outside
+            // the visible week.
             Text(monthYearHeader)
                 .font(.headline)
                 .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.top, 6)
                 .padding(.bottom, 8)
 
             // Week navigation arrows flanking the weekday header + day grid.
@@ -1173,35 +1150,36 @@ struct ScheduleView: View {
                 selectedDate = date
             }
         } label: {
-            VStack(spacing: 4) {
+            VStack(spacing: 5) {
                 Text("\(calendar.component(.day, from: date))")
-                    .font(.subheadline.weight(.semibold))
+                    .font(.body.weight(.bold))
                     .foregroundStyle(.primary)
 
                 if count > 0 {
                     Text("\(count)")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 1)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
                         .background(
-                            Capsule().fill(Color.secondary.opacity(0.18))
+                            Capsule().fill(Color.accentColor)
                         )
                         .fixedSize()
                 } else {
                     Circle()
                         .fill(Color.secondary.opacity(0.3))
-                        .frame(width: 4, height: 4)
+                        .frame(width: 5, height: 5)
                 }
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 54)
+            .frame(minWidth: 48)
+            .frame(height: 64)
             .background(
-                RoundedRectangle(cornerRadius: 10)
+                RoundedRectangle(cornerRadius: 12)
                     .fill(isSelected ? Color.primary.opacity(0.12) : Color.secondary.opacity(0.08))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 10)
+                RoundedRectangle(cornerRadius: 12)
                     .strokeBorder(
                         isSelected ? Color.primary.opacity(0.35) :
                         (isToday ? Color.primary.opacity(0.3) : Color.clear),
@@ -1375,37 +1353,33 @@ struct ScheduleView: View {
         Array(calendar.shortWeekdaySymbols.prefix(7))
     }
 
-    /// Month/year header for the displayed week. Shows a single "August 2026" when the
-    /// whole week is in one month, "Jul – Aug 2026" when it spans two months in a year,
-    /// or "December 2025 – January 2026" when it spans a year boundary.
+    /// Month/year header — always a single "August 2026" string, driven by the
+    /// selected date's month. Previously this showed a "Jul – Aug 2026" range
+    /// when the visible week spanned two months, which was confusing when the
+    /// selected day lived in only one of them. Now we always show the month of
+    /// the selected date. If the selection somehow falls outside the visible
+    /// week (e.g. on first appearance before `resetCalendarToToday()` snaps it
+    /// back), we fall back to the middle day of the visible week (Wednesday) so
+    /// the header still shows a single, stable label.
     private var monthYearHeader: String {
         let days = currentWeekDays()
         let cal = calendar
-        let firstDay = days.first ?? weekStartDate
-        let lastDay = days.last ?? weekStartDate
-        let firstMonth = cal.component(.month, from: firstDay)
-        let lastMonth = cal.component(.month, from: lastDay)
-        let firstYear = cal.component(.year, from: firstDay)
-        let lastYear = cal.component(.year, from: lastDay)
+
+        let referenceDay: Date
+        if days.contains(where: { cal.isDate($0, inSameDayAs: selectedDate) }) {
+            referenceDay = selectedDate
+        } else if days.indices.contains(3) {
+            // Wednesday — the middle day of a Sunday-first week.
+            referenceDay = days[3]
+        } else {
+            referenceDay = days.first ?? weekStartDate
+        }
 
         let f = DateFormatter()
         f.locale = cal.locale ?? Locale.current
         f.timeZone = cal.timeZone
-
-        if firstYear == lastYear && firstMonth == lastMonth {
-            f.dateFormat = "MMMM yyyy"
-            return f.string(from: firstDay)
-        } else if firstYear == lastYear {
-            f.dateFormat = "MMMM"
-            let m1 = f.string(from: firstDay)
-            let m2 = f.string(from: lastDay)
-            f.dateFormat = "yyyy"
-            let yr = f.string(from: lastDay)
-            return "\(m1) – \(m2) \(yr)"
-        } else {
-            f.dateFormat = "MMMM yyyy"
-            return "\(f.string(from: firstDay)) – \(f.string(from: lastDay))"
-        }
+        f.dateFormat = "MMMM yyyy"
+        return f.string(from: referenceDay)
     }
 
     /// Shifts the displayed week (and the selection) by `days` (±7). The selection
