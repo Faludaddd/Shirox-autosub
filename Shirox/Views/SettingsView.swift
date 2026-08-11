@@ -1554,13 +1554,7 @@ private struct SettingsChip<T: Hashable>: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
                 .background(
-                    Group {
-                        if selection == value {
-                            Color.appAccent.opacity(0.18)
-                        } else {
-                            Color.secondary.opacity(0.08)
-                        }
-                    },
+                    selection == value ? Color.appAccent.opacity(0.18) : Color.secondary.opacity(0.08),
                     in: RoundedRectangle(cornerRadius: 10)
                 )
                 .foregroundStyle(selection == value ? Color.appAccent : Color.primary)
@@ -1697,13 +1691,7 @@ struct QualitySettingsPage: View {
                                 .padding(.horizontal, 14)
                                 .frame(maxWidth: .infinity)
                                 .background(
-                                    Group {
-                                        if preferredVideoQuality == option.value {
-                                            Color.appAccent.opacity(0.16)
-                                        } else {
-                                            Color.secondary.opacity(0.08)
-                                        }
-                                    },
+                                    (preferredVideoQuality == option.value ? Color.appAccent.opacity(0.16) : Color.secondary.opacity(0.08)),
                                     in: RoundedRectangle(cornerRadius: 12)
                                 )
                                 .foregroundStyle(preferredVideoQuality == option.value ? Color.appAccent : Color.primary)

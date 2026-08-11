@@ -829,9 +829,9 @@ struct ScheduleView: View {
         }
         .task { await load() }
         .refreshable { await load() }
-        .onChange(of: mode) { _, _ in Task { await load() } }
-        .onChange(of: windowDays) { _, _ in Task { await load() } }
-        .onChange(of: useUTC) { _, _ in selectedDayIndex = 0 }
+        .onChange(of: mode) { _ inTask { await load() } }
+        .onChange(of: windowDays) { _ inTask { await load() } }
+        .onChange(of: useUTC) { _ inselectedDayIndex = 0 }
     }
 
     // MARK: - Content
