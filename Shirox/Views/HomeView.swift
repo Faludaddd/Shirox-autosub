@@ -339,7 +339,7 @@ private struct FeaturedCarousel: View {
         let effectiveWidth = containerWidth > 0 ? containerWidth : UIScreen.main.bounds.width
         let imageHeight: CGFloat = isIPad
             ? effectiveWidth * (9.0 / 16.0)
-            : UIScreen.main.bounds.height * 0.77
+            : UIScreen.main.bounds.height - 140
 
         let displayItems = realItems
         let currentMedia = displayItems.isEmpty ? items[0] : displayItems[currentIndex]
@@ -744,39 +744,14 @@ private struct FeaturedCard: View, Equatable {
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                let bannerURL = media.bannerImage
-                let coverURL = media.coverImage.extraLarge ?? media.coverImage.large ?? ""
-                ZStack {
-                    if let banner = bannerURL, let url = URL(string: banner) {
-                        AsyncImage(url: url) { phase in
-                            if case .success(let img) = phase {
-                                img.resizable().scaledToFill()
-                            } else {
-                                Color.secondary.opacity(0.15)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .clipped()
-                    } else if !coverURL.isEmpty, let url = URL(string: coverURL) {
-                        AsyncImage(url: url) { phase in
-                            if case .success(let img) = phase {
-                                img.resizable().scaledToFill()
-                            } else {
-                                Color.secondary.opacity(0.15)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .clipped()
-                    } else {
-                        Color.secondary.opacity(0.15)
-                    }
-                    LinearGradient(
-                        colors: [.clear, .black.opacity(0.3), .black.opacity(0.85)],
-                        startPoint: .top, endPoint: .bottom
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                GeometryReader { geo in
+                    let pageOffset = geo.frame(in: .global).minX
+                    let buffer: CGFloat = 100
+                    TVDBPosterImage(media: media)
+                        .frame(width: geo.size.width + buffer, height: geo.size.height)
+                        .offset(x: -(buffer / 2) - pageOffset * 0.25)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
             }
             #else
             // macOS: banner background + poster overlay
@@ -1238,13 +1213,9 @@ struct ScheduleView: View {
 
         ScrollView {
             VStack(spacing: 0) {
-                // ─── DATE SELECTOR (changes per range) ──────────────────
                 switch windowDays {
-                case 7:   dateSelector7Days(buckets: buckets, countByDay: countByDay)
-                case 14:  dateSelector2Weeks(buckets: buckets, countByDay: countByDay)
-                case 21:  dateSelector3Weeks(buckets: buckets, countByDay: countByDay)
                 case 30:  dateSelector1Month(buckets: buckets, countByDay: countByDay)
-                default:  dateSelector7Days(buckets: buckets, countByDay: countByDay)
+                default:  dateSelectorWeeks(buckets: buckets, countByDay: countByDay, dayCount: windowDays)
                 }
 
                 // ─── ANIME CARDS (identical for all ranges) ─────────────
@@ -1263,25 +1234,19 @@ struct ScheduleView: View {
                                 .foregroundStyle(.secondary)
                         }
                         ForEach(bucket.entries) { entry in
-                            NavigationLink {
-                                ScheduleDetailView(
-                                    entry: entry,
-                                    useUTC: useUTC,
-                                    isNotificationOn: scheduledIds.contains(entry.id),
-                                    onToggleNotification: { toggleNotification(for: entry) }
-                                )
-                            } label: {
-                                ScheduleCard(
-                                    entry: entry,
-                                    useUTC: useUTC,
-                                    isNotificationOn: scheduledIds.contains(entry.id),
-                                    onToggleNotification: { toggleNotification(for: entry) },
-                                    onAddToPlanning:     { addToLibrary(entry, status: .planning) },
-                                    onAddToWatching:     { addToLibrary(entry, status: .current) },
-                                    onViewDetails:       { detailEntry = entry }
-                                )
+                            ScheduleCard(
+                                entry: entry,
+                                useUTC: useUTC,
+                                isNotificationOn: scheduledIds.contains(entry.id),
+                                onToggleNotification: { toggleNotification(for: entry) },
+                                onAddToPlanning:     { addToLibrary(entry, status: .planning) },
+                                onAddToWatching:     { addToLibrary(entry, status: .current) },
+                                onViewDetails:       { detailEntry = entry }
+                            )
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                detailEntry = entry
                             }
-                            .buttonStyle(.plain)
                         }
                     }
                     .padding(.horizontal, 16)
@@ -1304,16 +1269,10 @@ struct ScheduleView: View {
         }
     }
 
-    // MARK: - 7 Days Date Selector (Issue #1)
-    //
-    // Horizontal scroll of 7 day-pills. Each pill shows the weekday abbreviation
-    // + day number + episode count badge. Distinct from the other ranges because
-    // it's a single-row horizontal strip (no grid, no month header).
-
     @ViewBuilder
-    private func dateSelector7Days(buckets: [ScheduleDayBucket], countByDay: [Date: Int]) -> some View {
+    private func dateSelectorWeeks(buckets: [ScheduleDayBucket], countByDay: [Date: Int], dayCount: Int) -> some View {
         let today = calendar.startOfDay(for: Date())
-        let days = (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: today) }
+        let days = (0..<dayCount).compactMap { calendar.date(byAdding: .day, value: $0, to: today) }
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
@@ -1374,140 +1333,7 @@ struct ScheduleView: View {
         }
     }
 
-    // MARK: - 2 Weeks Date Selector (Issue #1)
-    //
-    // Two-row grid: Week 1 on top, Week 2 on bottom. Each row is a 7-column
-    // strip of compact day cells. Distinct from 7 Days because it's a grid
-    // (not a single scrollable strip) and clearly communicates "two weeks" via
-    // the row separation and week labels.
-
-    @ViewBuilder
-    private func dateSelector2Weeks(buckets: [ScheduleDayBucket], countByDay: [Date: Int]) -> some View {
-        let today = calendar.startOfDay(for: Date())
-        let week1 = (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: today) }
-        let week2 = (7..<14).compactMap { calendar.date(byAdding: .day, value: $0, to: today) }
-        VStack(spacing: 10) {
-            weekRow(label: "Week 1", days: week1, countByDay: countByDay)
-            weekRow(label: "Week 2", days: week2, countByDay: countByDay)
-        }
-        .padding(.horizontal, 12)
-        .padding(.top, 8)
-        .padding(.bottom, 4)
-    }
-
-    @ViewBuilder
-    private func weekRow(label: String, days: [Date], countByDay: [Date: Int]) -> some View {
-        VStack(spacing: 6) {
-            HStack {
-                Text(label)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Spacer()
-            }
-            HStack(spacing: 4) {
-                ForEach(days, id: \.self) { day in
-                    let count = countByDay[day] ?? 0
-                    let isSelected = calendar.isDate(day, inSameDayAs: selectedDate)
-                    let isToday = calendar.isDateInToday(day)
-                    Button {
-                        withAnimation(.easeOut(duration: 0.18)) {
-                            selectedDate = day
-                        }
-                    } label: {
-                        VStack(spacing: 3) {
-                            Text(weekdayShort(for: day))
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(isSelected ? .white : .secondary)
-                            Text("\(calendar.component(.day, from: day))")
-                                .font(.subheadline.weight(.bold))
-                                .foregroundStyle(isSelected ? .white : .primary)
-                            if count > 0 {
-                                Text("\(count)")
-                                    .font(.system(size: 8, weight: .bold))
-                                    .foregroundStyle(isSelected ? .white : .red)
-                            } else {
-                                Color.clear.frame(height: 10)
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 56)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(isSelected ? Color.appAccent : Color.secondary.opacity(0.08))
-                        )
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-    }
-
-    // MARK: - 3 Weeks Date Selector (Issue #1)
-    //
-    // Unique compact-list layout: each day is a single horizontal row showing
-    // date + episode count, grouped into 3 collapsible-feeling sections.
-    // Distinct from 7 Days (pills) and 2 Weeks (grid) — it's a vertical list
-    // optimized for scanning 21 days without clutter.
-
-    @ViewBuilder
-    private func dateSelector3Weeks(buckets: [ScheduleDayBucket], countByDay: [Date: Int]) -> some View {
-        let today = calendar.startOfDay(for: Date())
-        let allDays = (0..<21).compactMap { calendar.date(byAdding: .day, value: $0, to: today) }
-        VStack(spacing: 6) {
-            ForEach(0..<3, id: \.self) { weekIdx in
-                let weekStart = weekIdx * 7
-                let weekDays = Array(allDays[weekStart..<weekStart + 7])
-                HStack(spacing: 3) {
-                    Text("W\(weekIdx + 1)")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 18)
-                    ForEach(weekDays, id: \.self) { day in
-                        let count = countByDay[day] ?? 0
-                        let isSelected = calendar.isDate(day, inSameDayAs: selectedDate)
-                        let isToday = calendar.isDateInToday(day)
-                        Button {
-                            withAnimation(.easeOut(duration: 0.18)) {
-                                selectedDate = day
-                            }
-                        } label: {
-                            VStack(spacing: 1) {
-                                Text(weekdayShort(for: day))
-                                    .font(.system(size: 8, weight: .semibold))
-                                    .foregroundStyle(isSelected ? .white : .secondary)
-                                Text("\(calendar.component(.day, from: day))")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundStyle(isSelected ? .white : .primary)
-                                if count > 0 {
-                                    Text("\(count)")
-                                        .font(.system(size: 8, weight: .bold))
-                                        .foregroundStyle(isSelected ? .white : .red)
-                                } else {
-                                    Color.clear.frame(height: 10)
-                                }
-                            }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 44)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(isSelected ? Color.appAccent : Color.secondary.opacity(0.06))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .strokeBorder(isToday && !isSelected ? Color.red.opacity(0.35) : Color.clear, lineWidth: 1)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.top, 6)
-        .padding(.bottom, 4)
-    }
-
-    // MARK: - 1 Month Date Selector (Issue #1, #3)
+    // MARK: - 1 Month Date Selector
     //
     // Issue #3 — Shows ONLY the current calendar month. No prev/next
     // navigation buttons, no month swiping, no trailing/leading days from
@@ -1664,348 +1490,6 @@ struct ScheduleView: View {
         return days
     }
 
-    // MARK: - 1 Week & 2 Week Layout (Requirement #8.1, #8.2)
-    //
-    // Large vertical day cards — one card per day. Each card shows the day
-    // name, date, and the anime airing that day (poster + title + episode +
-    // countdown). 2 Week uses the EXACT same layout, just with 14 days in
-    // the continuous scroll — no layout change between weeks.
-
-    @ViewBuilder
-    private func weekCardLayout(buckets: [ScheduleDayBucket], dayCount: Int) -> some View {
-        ScrollView {
-            VStack(spacing: 14) {
-                // Range header
-                Text(dayCount == 7 ? "Next 7 Days" : "Next 14 Days")
-                    .font(.title3.weight(.bold))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
-
-                ForEach(buckets) { bucket in
-                    weekDayCard(bucket: bucket)
-                }
-
-                if buckets.isEmpty {
-                    VStack(spacing: 12) {
-                        Image(systemName: "calendar.badge.exclamationmark")
-                            .font(.system(size: 36))
-                            .foregroundStyle(.secondary)
-                        Text("No episodes in the next \(dayCount) days")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 48)
-                }
-                Spacer().frame(height: 28)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func weekDayCard(bucket: ScheduleDayBucket) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Day header — "Monday, Aug 12" + episode count badge
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(bucket.shortTitle)
-                        .font(.title3.weight(.bold))
-                    Text(bucket.title)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                if !bucket.entries.isEmpty {
-                    Text("\(bucket.entries.count)")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Capsule().fill(Color.red))
-                }
-            }
-
-            if bucket.entries.isEmpty {
-                Text("No episodes airing")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 8)
-            } else {
-                // Episode list within this day
-                ForEach(bucket.entries) { entry in
-                    NavigationLink {
-                        ScheduleDetailView(
-                            entry: entry,
-                            useUTC: useUTC,
-                            isNotificationOn: scheduledIds.contains(entry.id),
-                            onToggleNotification: { toggleNotification(for: entry) }
-                        )
-                    } label: {
-                        ScheduleCard(
-                            entry: entry,
-                            useUTC: useUTC,
-                            isNotificationOn: scheduledIds.contains(entry.id),
-                            onToggleNotification: { toggleNotification(for: entry) },
-                            onAddToPlanning:     { addToLibrary(entry, status: .planning) },
-                            onAddToWatching:     { addToLibrary(entry, status: .current) },
-                            onViewDetails:       { detailEntry = entry }
-                        )
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.secondary.opacity(0.06))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.secondary.opacity(0.1), lineWidth: 1)
-        )
-        .padding(.horizontal, 16)
-    }
-
-    // MARK: - 3 Week Layout (Requirement #8.3)
-    //
-    // Unique layout: week-sectioned list. Three collapsible week sections
-    // (Week 1 / Week 2 / Week 3), each containing that week's days as
-    // compact rows. Handles more data without becoming too long — the user
-    // can scan week-by-week and each section is visually distinct from the
-    // 1/2-week day-card layout.
-
-    @ViewBuilder
-    private func threeWeekGroupedLayout(buckets: [ScheduleDayBucket]) -> some View {
-        let weekGroups = splitBucketsIntoWeeks(buckets: buckets, weekCount: 3)
-        ScrollView {
-            VStack(spacing: 20) {
-                Text("Next 3 Weeks")
-                    .font(.title3.weight(.bold))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
-
-                ForEach(Array(weekGroups.enumerated()), id: \.offset) { idx, weekBuckets in
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Image(systemName: "calendar")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(Color.appAccent)
-                            Text("Week \(idx + 1)")
-                                .font(.headline)
-                            Spacer()
-                            Text("\(weekBuckets.reduce(0) { $0 + $1.entries.count }) episodes")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.horizontal, 16)
-
-                        ForEach(weekBuckets) { bucket in
-                            compactDayRow(bucket: bucket)
-                        }
-                    }
-                }
-
-                if buckets.isEmpty {
-                    VStack(spacing: 12) {
-                        Image(systemName: "calendar.badge.exclamationmark")
-                            .font(.system(size: 36))
-                            .foregroundStyle(.secondary)
-                        Text("No episodes in the next 21 days")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 48)
-                }
-                Spacer().frame(height: 28)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func compactDayRow(bucket: ScheduleDayBucket) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(bucket.shortTitle)
-                    .font(.subheadline.weight(.semibold))
-                Spacer()
-                if !bucket.entries.isEmpty {
-                    Text("\(bucket.entries.count) episode\(bucket.entries.count == 1 ? "" : "s")")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 6)
-
-            if !bucket.entries.isEmpty {
-                // Horizontal strip of posters for this day
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        ForEach(bucket.entries) { entry in
-                            NavigationLink {
-                                ScheduleDetailView(
-                                    entry: entry,
-                                    useUTC: useUTC,
-                                    isNotificationOn: scheduledIds.contains(entry.id),
-                                    onToggleNotification: { toggleNotification(for: entry) }
-                                )
-                            } label: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    if let cover = entry.coverImage, let url = URL(string: cover) {
-                                        AsyncImage(url: url) { phase in
-                                            if case .success(let img) = phase {
-                                                img.resizable().scaledToFill()
-                                            } else {
-                                                RoundedRectangle(cornerRadius: 8)
-                                                    .fill(Color.secondary.opacity(0.2))
-                                            }
-                                        }
-                                        .frame(width: 80, height: 120)
-                                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    } else {
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .fill(Color.secondary.opacity(0.2))
-                                            .frame(width: 80, height: 120)
-                                    }
-                                    Text(entry.title)
-                                        .font(.caption2.weight(.medium))
-                                        .lineLimit(2)
-                                        .frame(width: 80, alignment: .leading)
-                                    Text(entry.episodeBadge)
-                                        .font(.system(size: 10, weight: .semibold))
-                                        .foregroundStyle(Color.appAccent)
-                                }
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 8)
-                }
-            }
-        }
-        .background(Color.secondary.opacity(0.04), in: RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 12)
-    }
-
-    // MARK: - 1 Month Layout (Requirement #8.4)
-    //
-    // Compact anime schedule view — NO calendar grid. Each day with episodes
-    // is a single-row entry showing date + count + top 3 titles. Days with no
-    // episodes are skipped entirely to reduce empty space. Feels like a
-    // schedule, not a calendar app.
-
-    @ViewBuilder
-    private func monthCompactScheduleLayout(buckets: [ScheduleDayBucket]) -> some View {
-        let daysWithEpisodes = buckets.filter { !$0.entries.isEmpty }
-        ScrollView {
-            VStack(spacing: 8) {
-                Text("Next 30 Days")
-                    .font(.title3.weight(.bold))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
-                    .padding(.bottom, 4)
-
-                if daysWithEpisodes.isEmpty {
-                    VStack(spacing: 12) {
-                        Image(systemName: "calendar.badge.exclamationmark")
-                            .font(.system(size: 36))
-                            .foregroundStyle(.secondary)
-                        Text("No episodes in the next 30 days")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 48)
-                } else {
-                    ForEach(daysWithEpisodes) { bucket in
-                        monthScheduleRow(bucket: bucket)
-                    }
-                }
-                Spacer().frame(height: 28)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func monthScheduleRow(bucket: ScheduleDayBucket) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .top, spacing: 12) {
-                // Date column — compact
-                VStack(spacing: 2) {
-                    Text(bucket.shortTitle)
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(Color.appAccent)
-                    Text("\(calendar.component(.day, from: bucket.date))")
-                        .font(.title2.weight(.bold))
-                }
-                .frame(width: 48)
-
-                // Titles column
-                VStack(alignment: .leading, spacing: 4) {
-                    ForEach(bucket.entries.prefix(3)) { entry in
-                        HStack(spacing: 6) {
-                            Circle()
-                                .fill(Color.red.opacity(0.6))
-                                .frame(width: 6, height: 6)
-                            Text(entry.title)
-                                .font(.caption)
-                                .lineLimit(1)
-                            Spacer()
-                            Text(entry.episodeBadge)
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    if bucket.entries.count > 3 {
-                        Text("+\(bucket.entries.count - 3) more")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-            .padding(12)
-            .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.secondary.opacity(0.06))
-            )
-        }
-        .padding(.horizontal, 16)
-    }
-
-    // MARK: - Week splitting helper (for 3-week layout)
-
-    /// Splits the day buckets into `weekCount` contiguous week groups.
-    private func splitBucketsIntoWeeks(buckets: [ScheduleDayBucket], weekCount: Int) -> [[ScheduleDayBucket]] {
-        guard !buckets.isEmpty else { return Array(repeating: [], count: weekCount) }
-        let perWeek = max(1, buckets.count / weekCount)
-        var groups: [[ScheduleDayBucket]] = []
-        var idx = 0
-        for _ in 0..<weekCount {
-            let end = min(idx + perWeek, buckets.count)
-            if idx < end {
-                groups.append(Array(buckets[idx..<end]))
-                idx = end
-            } else {
-                groups.append([])
-            }
-        }
-        // Append any remainder to the last non-empty group.
-        if idx < buckets.count {
-            if groups.last?.isEmpty == true {
-                groups[groups.count - 1] = Array(buckets[idx...])
-            } else {
-                groups[groups.count - 1].append(contentsOf: buckets[idx...])
-            }
-        }
-        return groups
-    }
 
     @ViewBuilder
     private func dayCell(date: Date, count: Int, isSelected: Bool, isToday: Bool, isInMonth: Bool) -> some View {
