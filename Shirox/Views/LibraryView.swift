@@ -520,7 +520,7 @@ struct LibraryView: View {
         }
         Divider()
         Button(role: .destructive) {
-            Task { await vm.delete(entry) }
+            Task { await vm.delete(entry: entry) }
         } label: {
             Label("Remove from Library", systemImage: "trash")
         }
