@@ -1326,29 +1326,11 @@ struct ScheduleView: View {
                                 Text("\(dayNum)")
                                     .font(.title3.weight(.bold))
                                     .foregroundStyle(isSelected ? .white : .primary)
-                                if hasEpisodes {
-                                    Circle()
-                                        .fill(Color.red)
-                                        .frame(width: 5, height: 5)
-                                } else if isToday {
-                                    Circle()
-                                        .fill(Color.red.opacity(0.5))
-                                        .frame(width: 5, height: 5)
-                                } else {
-                                    Spacer().frame(height: 5)
-                                }
                             }
                             .frame(width: 58, height: 72)
                             .background(
                                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                                     .fill(isSelected ? Color.scheduleSelectedPill : Color.secondary.opacity(0.15))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .strokeBorder(
-                                        isToday && !isSelected ? Color.red.opacity(0.4) : Color.clear,
-                                        lineWidth: 1.5
-                                    )
                             )
                         }
                         .buttonStyle(.plain)
@@ -1426,32 +1408,13 @@ struct ScheduleView: View {
                                 Text("\(dayNum)")
                                     .font(.subheadline.weight(.bold))
                                     .foregroundStyle(.primary)
-                                if count > 0 {
-                                    Circle()
-                                        .fill(Color.red)
-                                        .frame(width: 5, height: 5)
-                                } else if isToday {
-                                    Circle()
-                                        .fill(Color.red.opacity(0.5))
-                                        .frame(width: 5, height: 5)
-                                } else {
-                                    Spacer().frame(height: 5)
-                                }
                             }
                             .frame(maxWidth: .infinity)
                             .aspectRatio(1, contentMode: .fit)
                             .frame(minHeight: 48)
                             .background(
                                 RoundedRectangle(cornerRadius: 10)
-                                    .fill(isSelected ? Color.primary.opacity(0.12) : Color.secondary.opacity(0.15))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .strokeBorder(
-                                        isSelected ? Color.primary.opacity(0.35) :
-                                        (isToday ? Color.primary.opacity(0.3) : Color.clear),
-                                        lineWidth: 1
-                                    )
+                                    .fill(isSelected ? Color.scheduleSelectedPill : Color.secondary.opacity(0.15))
                             )
                         }
                         .buttonStyle(.plain)
