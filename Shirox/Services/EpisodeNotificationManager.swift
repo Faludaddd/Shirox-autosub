@@ -115,16 +115,23 @@ final class EpisodeNotificationManager: NSObject, ObservableObject {
     /// - Returns: `true` if the notification was scheduled, `false` if it was skipped (e.g. fire time
     ///   already in the past) or failed.
     @discardableResult
+    enum ScheduleResult {
+        case success
+        case alreadyAired
+        case phoneNotificationsDisabled
+        case permissionDenied
+        case failed(String)
+    }
+
     func schedule(scheduleId: Int,
                   mediaId: Int,
                   title: String,
                   episode: Int,
-                  airingAt: Int) async -> Bool {
+                  airingAt: Int) async -> ScheduleResult {
         guard UserDefaults.standard.object(forKey: "phoneNotificationsEnabled") as? Bool ?? true else {
-            return false
+            return .phoneNotificationsDisabled
         }
         let lead = leadTime
-        let airingDate = Date(timeIntervalSince1970: TimeInterval(airingAt))
         var fireTimestamp = TimeInterval(airingAt) - TimeInterval(lead.seconds)
 
         if fireTimestamp <= Date().timeIntervalSince1970 {
@@ -133,8 +140,7 @@ final class EpisodeNotificationManager: NSObject, ObservableObject {
 
         let fireDate = Date(timeIntervalSince1970: fireTimestamp)
         guard fireDate > Date() else {
-            Logger.shared.log("[EpisodeNotification] Skipping schedule \(scheduleId): airing time is in the past", type: "Debug")
-            return false
+            return .alreadyAired
         }
 
         let content = UNMutableNotificationContent()
@@ -172,14 +178,9 @@ final class EpisodeNotificationManager: NSObject, ObservableObject {
 
         do {
             try await UNUserNotificationCenter.current().add(request)
-            Logger.shared.log(
-                "[EpisodeNotification] Scheduled \(EpisodeNotificationManager.notificationID(for: scheduleId)) — \(title) EP\(episode) at \(fireDate)",
-                type: "Debug"
-            )
-            return true
+            return .success
         } catch {
-            Logger.shared.log("[EpisodeNotification] Failed to schedule \(scheduleId): \(error)", type: "Error")
-            return false
+            return .failed(error.localizedDescription)
         }
     }
 

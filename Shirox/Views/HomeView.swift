@@ -1795,17 +1795,16 @@ struct ScheduleView: View {
                 )
                 return
             }
-            // For Western entries there's no AniList media id; pass 0 so a tap won't try to
-            // deep-link into a non-existent detail page. The notification still fires normally.
             let mediaId = entry.aniListMediaId ?? 0
-            let success = await EpisodeNotificationManager.shared.schedule(
+            let result = await EpisodeNotificationManager.shared.schedule(
                 scheduleId: entry.id,
                 mediaId: mediaId,
                 title: entry.title,
                 episode: entry.episode,
                 airingAt: entry.airingAt
             )
-            if success {
+            switch result {
+            case .success:
                 scheduledIds.insert(entry.id)
                 ToastManager.shared.show(
                     title: "Schedule",
@@ -1813,10 +1812,31 @@ struct ScheduleView: View {
                     icon: "checkmark.circle.fill",
                     iconColor: .green
                 )
-            } else {
+            case .alreadyAired:
                 ToastManager.shared.show(
                     title: "Schedule",
-                    message: "Could not schedule — episode may have already aired",
+                    message: "This episode has already aired",
+                    icon: "exclamationmark.triangle.fill",
+                    iconColor: .orange
+                )
+            case .phoneNotificationsDisabled:
+                ToastManager.shared.show(
+                    title: "Schedule",
+                    message: "Phone notifications are disabled in Settings",
+                    icon: "exclamationmark.triangle.fill",
+                    iconColor: .orange
+                )
+            case .permissionDenied:
+                ToastManager.shared.show(
+                    title: "Schedule",
+                    message: "Notification permission was denied",
+                    icon: "exclamationmark.triangle.fill",
+                    iconColor: .orange
+                )
+            case .failed(let error):
+                ToastManager.shared.show(
+                    title: "Schedule",
+                    message: "Failed: \(error)",
                     icon: "exclamationmark.triangle.fill",
                     iconColor: .orange
                 )
