@@ -482,6 +482,34 @@ struct MangaDetailView: View {
     // would clutter the grid.
     @ViewBuilder
     private func statisticsSection(media: Media) -> some View {
+        let items = statisticsItems(for: media)
+        if !items.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Statistics")
+                    .font(.title3.weight(.bold))
+                    .padding(.horizontal, 16)
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                    ForEach(items, id: \.0) { item in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(item.0)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(item.1)
+                                .font(.subheadline.weight(.medium))
+                        }
+                        .padding(12)
+                        .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
+        }
+    }
+
+    /// #131 — Builds the (label, value) pairs for the Statistics grid from
+    /// the AniList enrichment. Extracted as a pure function so the
+    /// `@ViewBuilder`-decorated `statisticsSection` stays branch-light.
+    private func statisticsItems(for media: Media) -> [(String, String)] {
         var items: [(String, String)] = []
         if let type = media.type, !type.isEmpty {
             items.append(("Type", type.replacingOccurrences(of: "_", with: " ").capitalized))
@@ -518,26 +546,7 @@ struct MangaDetailView: View {
         if let studio = media.mainStudioName, !studio.isEmpty {
             items.append(("Studio", studio))
         }
-        guard !items.isEmpty else { return }
-        return VStack(alignment: .leading, spacing: 12) {
-            Text("Statistics")
-                .font(.title3.weight(.bold))
-                .padding(.horizontal, 16)
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                ForEach(items, id: \.0) { item in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(item.0)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text(item.1)
-                            .font(.subheadline.weight(.medium))
-                    }
-                    .padding(12)
-                    .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
-                }
-            }
-            .padding(.horizontal, 16)
-        }
+        return items
     }
 
     // MARK: - Read button (DetailView's watchButton style)
