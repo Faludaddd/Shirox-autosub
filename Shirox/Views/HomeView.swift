@@ -1247,9 +1247,6 @@ struct ScheduleView: View {
                                 .foregroundStyle(.secondary)
                             Spacer()
                             HStack(spacing: 4) {
-                                Circle()
-                                    .fill(Color.red)
-                                    .frame(width: 7, height: 7)
                                 Text("\(bucket.entries.count) episode\(bucket.entries.count == 1 ? "" : "s")")
                                     .font(.subheadline.weight(.bold))
                                     .foregroundStyle(Color.red)
