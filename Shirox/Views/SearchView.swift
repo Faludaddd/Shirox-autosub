@@ -517,12 +517,38 @@ struct SearchFilterSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var localFilters: AniListService.SearchFilters = .empty
     @State private var maxEpisodesText: String = ""
+    @State private var maxDurationText: String = ""
+    @State private var maxScoreText: String = ""
+    @State private var minScoreText: String = ""
+    @State private var tagInputText: String = ""
+    @State private var excludeTagInputText: String = ""
     @FocusState private var maxEpisodesFocused: Bool
 
+    // #132 — Expanded genre list. AniList's full genre enum has 19 values;
+    // we surface all of them so power users can build precise queries.
     private let availableGenres: [String] = [
-        "Action", "Adventure", "Comedy", "Drama", "Fantasy", "Horror",
-        "Mystery", "Psychological", "Romance", "Sci-Fi", "Slice of Life",
-        "Sports", "Supernatural", "Thriller", "Mecha", "Music"
+        "Action", "Adventure", "Comedy", "Drama", "Ecchi", "Fantasy",
+        "Horror", "Mahou Shoujo", "Mecha", "Music", "Mystery",
+        "Psychological", "Romance", "Sci-Fi", "Slice of Life", "Sports",
+        "Supernatural", "Thriller"
+    ]
+
+    // #132 — Common AniList tags (a tiny subset of the ~2,000-tag taxonomy,
+    // hand-picked for being widely-used and useful as filter seeds). The
+    // user can also type arbitrary tag names via the tag input field.
+    private let commonTags: [String] = [
+        "Isekai", "School", "Shounen", "Shoujo", "Seinen", "Josei",
+        "Harem", "Reverse Harem", "Time Travel", "Reincarnation",
+        "Overpowered Protagonist", "Crossover", "Original Work",
+        "Board Games", "Card Battle", "Virtual World", "Cyberpunk",
+        "Post-Apocalyptic", "Zombie", "Vampire", "Demon", "Ghost",
+        "Samurai", "Ninja", "Military", "Police", "Detective",
+        "Cooking", "Medical", "Teacher", "Otaku Culture", "IDOL",
+        "Band", "Music Band", "Female Protagonist", "Male Protagonist",
+        "Ensemble Cast", "Tragedy", "Coming of Age", "Found Family",
+        "Revenge", "Conspiracy", "Survival", "War", "Tournament",
+        "Training", "Martial Arts", "Boxing", "Tennis", "Basketball",
+        "Football", "Baseball", "Volleyball", "Swimming", "Track and Field"
     ]
 
     private let seasons: [(String, String)] = [
@@ -537,14 +563,24 @@ struct SearchFilterSheet: View {
 
     private let statuses: [(String, String)] = [
         ("Any", ""), ("Finished", "FINISHED"), ("Releasing", "RELEASING"),
-        ("Upcoming", "NOT_YET_RELEASED"), ("Cancelled", "CANCELLED")
+        ("Upcoming", "NOT_YET_RELEASED"), ("Cancelled", "CANCELLED"), ("Hiatus", "HIATUS")
     ]
 
     // AniList `MediaSource` enum values — what the anime was adapted from.
     private let sources: [(String, String)] = [
         ("Any", ""), ("Manga", "MANGA"), ("Light Novel", "LIGHT_NOVEL"),
         ("Original", "ORIGINAL"), ("Anime", "ANIME"), ("Visual Novel", "VISUAL_NOVEL"),
-        ("Video Game", "VIDEO_GAME"), ("Novel", "NOVEL"), ("Other", "OTHER")
+        ("Video Game", "VIDEO_GAME"), ("Novel", "NOVEL"), ("Other", "OTHER"),
+        ("Doujinshi", "DOUJINSHI"), ("Comic", "COMIC"), ("Game", "GAME"),
+        ("Live Action", "LIVE_ACTION"), ("Multimedia Project", "MULTIMEDIA_PROJECT"),
+        ("Picture Book", "PICTURE_BOOK"), ("Web Novel", "WEB_NOVEL")
+    ]
+
+    // #132 — Country of origin (AniList CountryCode enum). The most common
+    // anime-producing countries; "Any" omits the arg entirely.
+    private let countries: [(String, String)] = [
+        ("Any", ""), ("Japan", "JP"), ("South Korea", "KR"),
+        ("China", "CN"), ("Taiwan", "TW"), ("United States", "US")
     ]
 
     // Sort option values are the BASE MediaSort enum (no _DESC suffix). The
@@ -554,8 +590,10 @@ struct SearchFilterSheet: View {
         ("Best Match", "SEARCH_MATCH"),
         ("Popularity", "POPULARITY"),
         ("Top Rated", "SCORE"),
-        ("Newest", "START_DATE"),
-        ("Most Favorites", "FAVOURITES")
+        ("Release Date", "START_DATE"),
+        ("Most Favorites", "FAVOURITES"),
+        ("Title", "TITLE_ROMAJI"),
+        ("Recently Updated", "UPDATED_AT")
     ]
 
     private var yearOptions: [Int] {
@@ -729,6 +767,175 @@ struct SearchFilterSheet: View {
                             .font(.caption)
                     }
                 }
+
+                // MARK: Exclude Genres (#132)
+                Section {
+                    excludeGenresChips
+                } header: {
+                    sectionHeader("Exclude Genres", icon: "hand.thumbsdown")
+                } footer: {
+                    if !localFilters.excludeGenres.isEmpty {
+                        Text("\(localFilters.excludeGenres.count) excluded")
+                            .font(.caption)
+                    }
+                }
+
+                // MARK: Tags (#132)
+                Section {
+                    tagsEditor(
+                        title: "Tags",
+                        inputText: $tagInputText,
+                        tags: localFilters.tags,
+                        onAdd: { tag in
+                            let cleaned = tag.trimmingCharacters(in: .whitespacesAndNewlines)
+                            guard !cleaned.isEmpty, !localFilters.tags.contains(cleaned) else { return }
+                            localFilters.tags.append(cleaned)
+                        },
+                        onRemove: { tag in
+                            localFilters.tags.removeAll { $0 == tag }
+                        }
+                    )
+                    commonTagsGrid
+                } header: {
+                    sectionHeader("Tags", icon: "number")
+                } footer: {
+                    Text("AniList tags are fine-grained themes (e.g. Isekai, School, Vampire). Tap a common tag to add it, or type your own.")
+                        .font(.caption)
+                }
+
+                // MARK: Exclude Tags (#132)
+                Section {
+                    tagsEditor(
+                        title: "Excluded Tags",
+                        inputText: $excludeTagInputText,
+                        tags: localFilters.excludeTags,
+                        onAdd: { tag in
+                            let cleaned = tag.trimmingCharacters(in: .whitespacesAndNewlines)
+                            guard !cleaned.isEmpty, !localFilters.excludeTags.contains(cleaned) else { return }
+                            localFilters.excludeTags.append(cleaned)
+                        },
+                        onRemove: { tag in
+                            localFilters.excludeTags.removeAll { $0 == tag }
+                        }
+                    )
+                } header: {
+                    sectionHeader("Exclude Tags", icon: "hand.thumbsdown.fill")
+                } footer: {
+                    Text("Hide results matching any of these tags.")
+                        .font(.caption)
+                }
+
+                // MARK: Score Range (#132)
+                Section {
+                    HStack {
+                        Text("Min Score")
+                        Spacer()
+                        TextField("0", text: $minScoreText)
+                            #if os(iOS)
+                            .keyboardType(.numberPad)
+                            #endif
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 70)
+                            .onChangeOf(minScoreText) { newValue in
+                                let trimmed = newValue.filter(\.isNumber)
+                                if trimmed != newValue { minScoreText = trimmed }
+                                localFilters.minScore = Int(trimmed)
+                            }
+                        Text("/ 100")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack {
+                        Text("Max Score")
+                        Spacer()
+                        TextField("100", text: $maxScoreText)
+                            #if os(iOS)
+                            .keyboardType(.numberPad)
+                            #endif
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 70)
+                            .onChangeOf(maxScoreText) { newValue in
+                                let trimmed = newValue.filter(\.isNumber)
+                                if trimmed != newValue { maxScoreText = trimmed }
+                                localFilters.maxScore = Int(trimmed)
+                            }
+                        Text("/ 100")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    sectionHeader("Score Range", icon: "star.fill")
+                } footer: {
+                    Text("Filter by AniList's 0–100 average score. Leave blank for no limit.")
+                        .font(.caption)
+                }
+
+                // MARK: Country (#132)
+                Section {
+                    Picker("Country", selection: Binding(
+                        get: { localFilters.countryOfOrigin ?? "" },
+                        set: { localFilters.countryOfOrigin = $0.isEmpty ? nil : $0 }
+                    )) {
+                        ForEach(countries, id: \.1) { c in
+                            Text(c.0).tag(c.1)
+                        }
+                    }
+                    .tint(.appAccent)
+                } header: {
+                    sectionHeader("Country of Origin", icon: "globe")
+                }
+
+                // MARK: Duration (#132)
+                Section {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("Min Duration")
+                            Spacer()
+                            Text(localFilters.minDuration.map { "\($0) min+" } ?? "Any")
+                                .foregroundStyle(.secondary)
+                                .font(.callout.monospacedDigit())
+                        }
+                        Slider(value: Binding(
+                            get: { Double(localFilters.minDuration ?? 0) },
+                            set: { localFilters.minDuration = $0 == 0 ? nil : Int($0) }
+                        ), in: 0...180, step: 5)
+                        .tint(.appAccent)
+                    }
+                    HStack {
+                        Text("Max Duration")
+                        Spacer()
+                        TextField("Any", text: $maxDurationText)
+                            #if os(iOS)
+                            .keyboardType(.numberPad)
+                            #endif
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 80)
+                            .onChangeOf(maxDurationText) { newValue in
+                                let trimmed = newValue.filter(\.isNumber)
+                                if trimmed != newValue { maxDurationText = trimmed }
+                                localFilters.maxDuration = Int(trimmed)
+                            }
+                        Text("min")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    sectionHeader("Episode Duration", icon: "clock")
+                } footer: {
+                    Text("Filter by episode length in minutes. Use 0 / blank for no limit.")
+                        .font(.caption)
+                }
+
+                // MARK: Additional Toggles (#132)
+                Section {
+                    Toggle("Only Show Titles With Episodes", isOn: $localFilters.onlyHasEpisodes)
+                        .tint(.appAccent)
+                } header: {
+                    sectionHeader("Other", icon: "slider.horizontal.3")
+                } footer: {
+                    Text("Hides announcement/TBA titles that don't have an episode count yet.")
+                        .font(.caption)
+                }
             }
             .navigationTitle("Filters")
             #if os(iOS)
@@ -754,6 +961,9 @@ struct SearchFilterSheet: View {
         .onAppear {
             localFilters = filters
             maxEpisodesText = localFilters.maxEpisodes.map { String($0) } ?? ""
+            maxDurationText = localFilters.maxDuration.map { String($0) } ?? ""
+            minScoreText = localFilters.minScore.map { String($0) } ?? ""
+            maxScoreText = localFilters.maxScore.map { String($0) } ?? ""
         }
         #if os(iOS)
         .adaptivePresentationDetents([.large])
@@ -776,22 +986,50 @@ struct SearchFilterSheet: View {
     // Chip-style multi-select: filled accent capsule when selected, plain outline
     // otherwise. Uses an adaptive LazyVGrid so chips wrap naturally on any width.
     private var genresChips: some View {
+        chipGrid(
+            items: availableGenres,
+            selected: localFilters.genres,
+            onTap: { genre in
+                if localFilters.genres.contains(genre) {
+                    localFilters.genres.removeAll { $0 == genre }
+                } else {
+                    localFilters.genres.append(genre)
+                }
+            }
+        )
+    }
+
+    // #132 — Exclude-genres chips. Same visual treatment as `genresChips` but
+    // tinted red so the user can tell at a glance which set they're editing.
+    private var excludeGenresChips: some View {
+        chipGrid(
+            items: availableGenres,
+            selected: localFilters.excludeGenres,
+            tint: .red,
+            onTap: { genre in
+                if localFilters.excludeGenres.contains(genre) {
+                    localFilters.excludeGenres.removeAll { $0 == genre }
+                } else {
+                    localFilters.excludeGenres.append(genre)
+                }
+            }
+        )
+    }
+
+    /// Reusable chip grid used by both include and exclude genre sections.
+    /// `tint` controls the selected-state accent (default `.appAccent`, red for
+    /// excludes) so the two sections are visually distinct.
+    private func chipGrid(items: [String], selected: [String], tint: Color = Color.appAccent, onTap: @escaping (String) -> Void) -> some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 8)], spacing: 8) {
-            ForEach(availableGenres, id: \.self) { genre in
-                let isSelected = localFilters.genres.contains(genre)
-                Button {
-                    if isSelected {
-                        localFilters.genres.removeAll { $0 == genre }
-                    } else {
-                        localFilters.genres.append(genre)
-                    }
-                } label: {
+            ForEach(items, id: \.self) { item in
+                let isSelected = selected.contains(item)
+                Button { onTap(item) } label: {
                     HStack(spacing: 4) {
                         if isSelected {
                             Image(systemName: "checkmark")
                                 .font(.system(size: 11, weight: .bold))
                         }
-                        Text(genre)
+                        Text(item)
                             .lineLimit(1)
                     }
                     .font(.callout.weight(isSelected ? .semibold : .regular))
@@ -799,11 +1037,111 @@ struct SearchFilterSheet: View {
                     .padding(.vertical, 8)
                     .padding(.horizontal, 10)
                     .background(
-                        Capsule().fill(isSelected ? Color.appAccent.opacity(0.15) : Color.secondary.opacity(0.1))
+                        Capsule().fill(isSelected ? tint.opacity(0.15) : Color.secondary.opacity(0.1))
                     )
                     .overlay(
                         Capsule().strokeBorder(
-                            isSelected ? Color.appAccent.opacity(0.6) : Color.secondary.opacity(0.2),
+                            isSelected ? tint.opacity(0.6) : Color.secondary.opacity(0.2),
+                            lineWidth: 1
+                        )
+                    )
+                    .foregroundStyle(isSelected ? tint : .primary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.vertical, 6)
+    }
+
+    // #132 — Tags editor. A text field to type a new tag (committed on
+    // return), plus a horizontal wrap of the currently-selected tags with
+    // tap-to-remove. Mirrors the input UX of email "To:" fields.
+    @ViewBuilder
+    private func tagsEditor(title: String, inputText: Binding<String>, tags: [String], onAdd: @escaping (String) -> Void, onRemove: @escaping (String) -> Void) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: "plus.circle")
+                    .foregroundStyle(.secondary)
+                TextField("Add \(title.lowercased())…", text: inputText)
+                    #if os(iOS)
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled()
+                    .submitLabel(.done)
+                    #endif
+                    .onSubmit {
+                        onAdd(inputText.wrappedValue)
+                        inputText.wrappedValue = ""
+                    }
+                if !inputText.wrappedValue.isEmpty {
+                    Button {
+                        onAdd(inputText.wrappedValue)
+                        inputText.wrappedValue = ""
+                    } label: {
+                        Image(systemName: "arrow.right.circle.fill")
+                            .foregroundStyle(Color.appAccent)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            if !tags.isEmpty {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 80), spacing: 6)], spacing: 6) {
+                    ForEach(tags, id: \.self) { tag in
+                        Button { onRemove(tag) } label: {
+                            HStack(spacing: 4) {
+                                Text(tag)
+                                    .lineLimit(1)
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 9, weight: .bold))
+                            }
+                            .font(.caption.weight(.medium))
+                            .padding(.vertical, 5)
+                            .padding(.horizontal, 8)
+                            .background(Capsule().fill(Color.appAccent.opacity(0.15)))
+                            .overlay(Capsule().strokeBorder(Color.appAccent.opacity(0.5), lineWidth: 1))
+                            .foregroundStyle(Color.appAccent)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    // #132 — Common tags quick-pick grid. Tapping a common tag adds it to
+    // the selected tags (or removes it if already selected). Smaller chip
+    // size than the genre grid since there are more of them.
+    private var commonTagsGrid: some View {
+        let selected = Set(localFilters.tags)
+        return LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 6)], spacing: 6) {
+            ForEach(commonTags, id: \.self) { tag in
+                let isSelected = selected.contains(tag)
+                Button {
+                    if isSelected {
+                        localFilters.tags.removeAll { $0 == tag }
+                    } else {
+                        localFilters.tags.append(tag)
+                    }
+                } label: {
+                    HStack(spacing: 3) {
+                        if isSelected {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 9, weight: .bold))
+                        }
+                        Text(tag)
+                            .lineLimit(1)
+                            .font(.system(size: 11))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                    .padding(.horizontal, 8)
+                    .background(
+                        Capsule().fill(isSelected ? Color.appAccent.opacity(0.15) : Color.secondary.opacity(0.08))
+                    )
+                    .overlay(
+                        Capsule().strokeBorder(
+                            isSelected ? Color.appAccent.opacity(0.5) : Color.secondary.opacity(0.15),
                             lineWidth: 1
                         )
                     )
@@ -812,7 +1150,7 @@ struct SearchFilterSheet: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(.vertical, 6)
+        .padding(.top, 4)
     }
 
     // MARK: - Bottom Bar (Reset All + Results preview)
@@ -823,6 +1161,11 @@ struct SearchFilterSheet: View {
                 Button {
                     localFilters = .empty
                     maxEpisodesText = ""
+                    maxDurationText = ""
+                    minScoreText = ""
+                    maxScoreText = ""
+                    tagInputText = ""
+                    excludeTagInputText = ""
                 } label: {
                     Label("Reset All", systemImage: "arrow.counterclockwise")
                         .font(.subheadline.weight(.semibold))
@@ -872,6 +1215,11 @@ struct SearchFilterSheet: View {
 // via `ProviderManager.shared.selectProvider`. Connected sources get the same
 // green glow used on the Sources settings page; unconnected sources expose a
 // "Connect" button that pushes `SourcesSettingsPage`.
+//
+// #132 — Scoped to AniList only. MAL and other providers are hidden from this
+// picker until they're actually ready (the search/filter pipeline is AniList-
+// only; surfacing MAL here would let the user pick a source the search VM can't
+// query). The full provider list is still available in Settings → Sources.
 
 struct SourcesPickerSheet: View {
     @Environment(\.dismiss) private var dismiss
@@ -882,15 +1230,26 @@ struct SourcesPickerSheet: View {
         providerManager.orderedProviders.first?.providerType
     }
 
+    /// #132 — Only AniList is surfaced in the Search picker. When other
+    /// providers are ready for search, add them to this list.
+    private var searchableProviders: [ProviderType] { [.anilist] }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 14) {
                     headerCard
-                    ForEach(Array(providerManager.orderedProviders.enumerated()),
-                            id: \.offset) { _, provider in
-                        sourceCard(provider)
+                    ForEach(searchableProviders, id: \.self) { type in
+                        if let provider = providerManager.orderedProviders.first(where: { $0.providerType == type }) {
+                            sourceCard(provider)
+                        } else {
+                            // Provider isn't registered in ProviderManager —
+                            // render a stub card so the user still sees the
+                            // option and can connect it.
+                            stubCard(for: type)
+                        }
                     }
+                    comingSoonCard
                     footerCard
                 }
                 .padding(20)
@@ -919,6 +1278,94 @@ struct SourcesPickerSheet: View {
                 ) { EmptyView() }
             )
         }
+    }
+
+    // MARK: - Stub Card (#132)
+    // Rendered for providers that are searchable in principle but not
+    // currently registered in ProviderManager. Visually identical to a
+    // real source card so the user has a consistent connect affordance.
+    @ViewBuilder
+    private func stubCard(for type: ProviderType) -> some View {
+        let isActive = activeProviderType == type
+        Button {
+            providerManager.selectProvider(type)
+            dismiss()
+        } label: {
+            HStack(spacing: 14) {
+                sourceIcon(type: type, isConnected: false)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Text(type.displayName)
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(.primary)
+                        if isActive {
+                            Text("ACTIVE")
+                                .font(.system(size: 10, weight: .bold))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.appAccent.opacity(0.15), in: Capsule())
+                                .foregroundStyle(Color.appAccent)
+                        }
+                    }
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(Color.secondary.opacity(0.6))
+                            .frame(width: 7, height: 7)
+                        Text("Not connected")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Spacer(minLength: 8)
+                Button {
+                    pushSettings = true
+                } label: {
+                    Text("Connect")
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(Color.appAccent.opacity(0.15), in: Capsule())
+                        .foregroundStyle(Color.appAccent)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(cardBackground)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(
+                        isActive ? Color.appAccent.opacity(0.55) : Color.secondary.opacity(0.15),
+                        lineWidth: isActive ? 2 : 1
+                    )
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Coming Soon Card (#132)
+    // Explains why only AniList is shown. Keeps the user informed that
+    // other providers exist but aren't ready for search yet.
+    private var comingSoonCard: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "hourglass.circle")
+                .font(.system(size: 22))
+                .foregroundStyle(.secondary)
+            Text("More sources coming soon")
+                .font(.caption.weight(.semibold))
+            Text("MyAnimeList and other providers will appear here once search and filters support them. For now, AniList powers all search, filters, and library sync.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 12)
+        }
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity)
+        .background(cardBackground.opacity(0.6), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     // MARK: - Header

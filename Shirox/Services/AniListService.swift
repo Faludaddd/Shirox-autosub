@@ -84,6 +84,23 @@ final class AniListService {
         var maxEpisodes: Int? = nil            // Inclusive upper bound on episode count (AniList's `episodes_lesser` is strict <).
         var sortDescending: Bool = true        // Toggles the _DESC suffix on sort. SEARCH_MATCH ignores it.
 
+        // #132 — Additional rich filters. All optional so existing stored
+        // filters (and `SearchFilters()`) keep working.
+        var minScore: Int? = nil               // Average score lower bound (0–100). AniList `averageScore_greater`.
+        var maxScore: Int? = nil               // Average score upper bound (0–100). AniList `averageScore_lesser`.
+        var tags: [String] = []                // AniList tag names (e.g. "Isekai", "School"). Sent via `tags` arg.
+        var excludeGenres: [String] = []       // Genres to exclude. AniList `genres_exclude`.
+        var excludeTags: [String] = []         // Tags to exclude. AniList `tags_exclude`.
+        var countryOfOrigin: String? = nil     // "JP", "KR", "CN" etc. AniList `countryOfOrigin`.
+        var minDuration: Int? = nil            // Episode duration lower bound (minutes). AniList `duration_greater`.
+        var maxDuration: Int? = nil            // Episode duration upper bound (minutes). AniList `duration_lesser`.
+        var startDateAfter: String? = nil      // "YYYYMMDD" — only titles that started on/after this date.
+        var startDateBefore: String? = nil     // "YYYYMMDD" — only titles that started on/before this date.
+        var endDateAfter: String? = nil        // "YYYYMMDD" — only titles that ended on/after this date.
+        var endDateBefore: String? = nil       // "YYYYMMDD" — only titles that ended on/before this date.
+        var onlyHasEpisodes: Bool = false       // When true, requires `episodes` > 0 (filters out TBA/announcement titles).
+        var hideAdult: Bool = true              // Hardcoded true in the query regardless, but exposed so the sheet can show the lock state.
+
         static let defaultSort = "SEARCH_MATCH"
         static let empty = SearchFilters()
         var isEmpty: Bool {
@@ -93,6 +110,13 @@ final class AniListService {
                 && (source?.isEmpty ?? true)
                 && minEpisodes == nil && maxEpisodes == nil
                 && sortDescending == true
+                && minScore == nil && maxScore == nil
+                && tags.isEmpty && excludeGenres.isEmpty && excludeTags.isEmpty
+                && (countryOfOrigin?.isEmpty ?? true)
+                && minDuration == nil && maxDuration == nil
+                && startDateAfter == nil && startDateBefore == nil
+                && endDateAfter == nil && endDateBefore == nil
+                && !onlyHasEpisodes
         }
 
         /// Effective `[MediaSort]` value to send to AniList, derived from `sort`
@@ -120,6 +144,20 @@ final class AniListService {
         if let minEp = filters.minEpisodes, minEp > 0 { variables["episodes_greater"] = minEp - 1 }
         if let maxEp = filters.maxEpisodes, maxEp > 0 { variables["episodes_lesser"] = maxEp + 1 }
 
+        // #132 — New rich filters wired to AniList query args.
+        if let minScore = filters.minScore, minScore > 0 { variables["averageScore_greater"] = minScore - 1 }
+        if let maxScore = filters.maxScore, maxScore > 0 { variables["averageScore_lesser"] = maxScore + 1 }
+        if !filters.tags.isEmpty { variables["tags"] = filters.tags }
+        if !filters.excludeGenres.isEmpty { variables["genres_exclude"] = filters.excludeGenres }
+        if !filters.excludeTags.isEmpty { variables["tags_exclude"] = filters.excludeTags }
+        if let country = filters.countryOfOrigin, !country.isEmpty { variables["countryOfOrigin"] = country }
+        if let minDur = filters.minDuration, minDur > 0 { variables["duration_greater"] = minDur - 1 }
+        if let maxDur = filters.maxDuration, maxDur > 0 { variables["duration_lesser"] = maxDur + 1 }
+        if let startDateAfter = filters.startDateAfter, !startDateAfter.isEmpty { variables["startDate_greater"] = startDateAfter }
+        if let startDateBefore = filters.startDateBefore, !startDateBefore.isEmpty { variables["startDate_lesser"] = startDateBefore }
+        if let endDateAfter = filters.endDateAfter, !endDateAfter.isEmpty { variables["endDate_greater"] = endDateAfter }
+        if let endDateBefore = filters.endDateBefore, !endDateBefore.isEmpty { variables["endDate_lesser"] = endDateBefore }
+
         // isAdult is hardcoded to false — adult content is never included in search results.
         var mediaArgs = ["search: $search", "type: ANIME", "sort: $sort", "isAdult: false"]
         if filters.year != nil { mediaArgs.append("seasonYear: $seasonYear") }
@@ -130,6 +168,19 @@ final class AniListService {
         if filters.source != nil { mediaArgs.append("source: $source") }
         if filters.minEpisodes != nil { mediaArgs.append("episodes_greater: $episodes_greater") }
         if filters.maxEpisodes != nil { mediaArgs.append("episodes_lesser: $episodes_lesser") }
+        // #132 — new arg wiring.
+        if filters.minScore != nil { mediaArgs.append("averageScore_greater: $averageScore_greater") }
+        if filters.maxScore != nil { mediaArgs.append("averageScore_lesser: $averageScore_lesser") }
+        if !filters.tags.isEmpty { mediaArgs.append("tags: $tags") }
+        if !filters.excludeGenres.isEmpty { mediaArgs.append("genres_exclude: $genres_exclude") }
+        if !filters.excludeTags.isEmpty { mediaArgs.append("tags_exclude: $tags_exclude") }
+        if filters.countryOfOrigin != nil { mediaArgs.append("countryOfOrigin: $countryOfOrigin") }
+        if filters.minDuration != nil { mediaArgs.append("duration_greater: $duration_greater") }
+        if filters.maxDuration != nil { mediaArgs.append("duration_lesser: $duration_lesser") }
+        if filters.startDateAfter != nil { mediaArgs.append("startDate_greater: $startDate_greater") }
+        if filters.startDateBefore != nil { mediaArgs.append("startDate_lesser: $startDate_lesser") }
+        if filters.endDateAfter != nil { mediaArgs.append("endDate_greater: $endDate_greater") }
+        if filters.endDateBefore != nil { mediaArgs.append("endDate_lesser: $endDate_lesser") }
 
         let argList = mediaArgs.joined(separator: ", ")
         var varDecls = ["$search: String", "$sort: [MediaSort]"]
@@ -141,6 +192,19 @@ final class AniListService {
         if filters.source != nil { varDecls.append("$source: MediaSource") }
         if filters.minEpisodes != nil { varDecls.append("$episodes_greater: Int") }
         if filters.maxEpisodes != nil { varDecls.append("$episodes_lesser: Int") }
+        // #132 — new var declarations.
+        if filters.minScore != nil { varDecls.append("$averageScore_greater: Int") }
+        if filters.maxScore != nil { varDecls.append("$averageScore_lesser: Int") }
+        if !filters.tags.isEmpty { varDecls.append("$tags: [String]") }
+        if !filters.excludeGenres.isEmpty { varDecls.append("$genres_exclude: [String]") }
+        if !filters.excludeTags.isEmpty { varDecls.append("$tags_exclude: [String]") }
+        if filters.countryOfOrigin != nil { varDecls.append("$countryOfOrigin: CountryCode") }
+        if filters.minDuration != nil { varDecls.append("$duration_greater: Int") }
+        if filters.maxDuration != nil { varDecls.append("$duration_lesser: Int") }
+        if filters.startDateAfter != nil { varDecls.append("$startDate_greater: FuzzyDateInt") }
+        if filters.startDateBefore != nil { varDecls.append("$startDate_lesser: FuzzyDateInt") }
+        if filters.endDateAfter != nil { varDecls.append("$endDate_greater: FuzzyDateInt") }
+        if filters.endDateBefore != nil { varDecls.append("$endDate_lesser: FuzzyDateInt") }
         let varDeclList = varDecls.joined(separator: ", ")
 
         let query = """
@@ -160,13 +224,22 @@ final class AniListService {
               season
               seasonYear
               source
+              startDate { year month day }
+              endDate { year month day }
+              duration
               nextAiringEpisode { episode airingAt timeUntilAiring }
               studios { edges { isMain node { id name } } }
             }
           }
         }
         """
-        let results = try await fetchPage(query: query, variables: variables)
+        var results = try await fetchPage(query: query, variables: variables)
+
+        // #132 — `onlyHasEpisodes` is a client-side filter (AniList has no
+        // "episodes is not null" arg). Drops titles with no episode count.
+        if filters.onlyHasEpisodes {
+            results = results.filter { ($0.episodes ?? 0) > 0 }
+        }
 
         // AniList's Media query has no studio-name argument, so studio filtering
         // is done client-side against the studios already fetched above.
