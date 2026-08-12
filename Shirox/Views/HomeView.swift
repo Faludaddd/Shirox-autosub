@@ -1156,62 +1156,60 @@ struct ScheduleView: View {
     @State private var detailEntry: UnifiedScheduleEntry?
 
     var body: some View {
-        Group {
-            if isLoading && entries.isEmpty {
-                scheduleLoadingView
-            } else if let loadError = loadError, entries.isEmpty {
-                ContentUnavailableView(
-                    "Couldn't Load",
-                    systemImage: "wifi.slash",
-                    description: Text(loadError)
-                )
-                .toolbar {
-                    ToolbarItem(placement: .primaryAction) {
-                        Button("Retry") { Task { await load() } }
+        NavigationStack {
+            Group {
+                if isLoading && entries.isEmpty {
+                    scheduleLoadingView
+                } else if let loadError = loadError, entries.isEmpty {
+                    ContentUnavailableView(
+                        "Couldn't Load",
+                        systemImage: "wifi.slash",
+                        description: Text(loadError)
+                    )
+                    .toolbar {
+                        ToolbarItem(placement: .primaryAction) {
+                            Button("Retry") { Task { await load() } }
+                        }
+                    }
+                } else if entries.isEmpty {
+                    ContentUnavailableView(
+                        "Nothing Airing",
+                        systemImage: "calendar.badge.exclamationmark",
+                        description: Text("No episodes in the next \(windowDays) day\(windowDays == 1 ? "" : "s") for this mode.")
+                    )
+                } else {
+                    scheduleContent
+                }
+            }
+            .navigationTitle("Schedule")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    NavigationLink {
+                        ScheduleSettingsPage()
+                    } label: {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(.primary)
                     }
                 }
-            } else if entries.isEmpty {
-                ContentUnavailableView(
-                    "Nothing Airing",
-                    systemImage: "calendar.badge.exclamationmark",
-                    description: Text("No episodes in the next \(windowDays) day\(windowDays == 1 ? "" : "s") for this mode.")
+            }
+            .navigationDestinationCompat(item: $detailEntry) { entry in
+                ScheduleDetailView(
+                    entry: entry,
+                    useUTC: useUTC,
+                    isNotificationOn: scheduledIds.contains(entry.id),
+                    onToggleNotification: { toggleNotification(for: entry) }
                 )
-            } else {
-                scheduleContent
             }
+            .task { await load() }
+            .refreshable { await load() }
+            .onChange(of: mode) { _ in Task { await load() } }
+            .onChange(of: windowDays) { _ in Task { await load() } }
+            .onChange(of: useUTC) { _ in resetCalendarToToday() }
         }
-        .navigationTitle("Schedule")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                NavigationLink {
-                    ScheduleSettingsPage()
-                } label: {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.primary)
-                }
-            }
-        }
-        // Hidden NavigationLink that performs the push when `detailEntry` is set
-        // (used by the context-menu "View Details" action — context menus can't
-        // host a NavigationLink themselves). Card taps use a direct NavigationLink
-        // below; both land on `ScheduleDetailView` (#107).
-        .navigationDestinationCompat(item: $detailEntry) { entry in
-            ScheduleDetailView(
-                entry: entry,
-                useUTC: useUTC,
-                isNotificationOn: scheduledIds.contains(entry.id),
-                onToggleNotification: { toggleNotification(for: entry) }
-            )
-        }
-        .task { await load() }
-        .refreshable { await load() }
-        .onChange(of: mode) { _ in Task { await load() } }
-        .onChange(of: windowDays) { _ in Task { await load() } }
-        .onChange(of: useUTC) { _ in resetCalendarToToday() }
     }
 
     // MARK: - Content
@@ -1258,8 +1256,13 @@ struct ScheduleView: View {
                             .background(Capsule().fill(Color.red.opacity(0.12)))
                         }
                         ForEach(bucket.entries) { entry in
-                            Button {
-                                detailEntry = entry
+                            NavigationLink {
+                                ScheduleDetailView(
+                                    entry: entry,
+                                    useUTC: useUTC,
+                                    isNotificationOn: scheduledIds.contains(entry.id),
+                                    onToggleNotification: { toggleNotification(for: entry) }
+                                )
                             } label: {
                                 ScheduleCard(
                                     entry: entry,
@@ -1333,7 +1336,7 @@ struct ScheduleView: View {
                             .frame(width: 58, height: 72)
                             .background(
                                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .fill(isSelected ? Color.appAccent : Color(.systemGray6))
+                                    .fill(isSelected ? Color.appAccent : Color.gray.opacity(0.15))
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -1434,7 +1437,7 @@ struct ScheduleView: View {
                             .frame(minHeight: 48)
                             .background(
                                 RoundedRectangle(cornerRadius: 10)
-                                    .fill(isSelected ? Color.primary.opacity(0.12) : Color(.systemGray6))
+                                    .fill(isSelected ? Color.primary.opacity(0.12) : Color.gray.opacity(0.15))
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10)
