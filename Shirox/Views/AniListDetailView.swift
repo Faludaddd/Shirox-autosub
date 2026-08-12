@@ -1049,20 +1049,7 @@ struct AniListDetailView: View {
     /// hide it.
     @ViewBuilder
     private func statisticsSection(media: Media) -> some View {
-        let items: [(String, String, String)] = [
-            ("Type", media.type ?? "Anime", "rectangle.stack"),
-            ("Format", media.format ?? "—", "film"),
-            ("Status", media.statusDisplay ?? "—", "circle.fill"),
-            ("Episodes", media.episodes.map { String($0) } ?? "—", "number"),
-            ("Rating", media.averageScore.map { "\($0)%" } ?? "—", "star.fill"),
-            ("Popularity", media.popularity.map { String($0) } ?? "—", "person.3.fill"),
-            ("Season", [media.season?.capitalized, media.seasonYear.map { String($0) }].compactMap { $0 }.joined(separator: " "), "calendar"),
-            ("Duration", media.duration.map { "\($0) min" } ?? "—", "clock"),
-            ("Studio", media.mainStudioName ?? "—", "building.2.fill"),
-            ("Source", media.sourceDisplay ?? "—", "books.vertical.fill"),
-            ("Premiered", media.airDateRange ?? "—", "sparkles"),
-            ("Country", media.countryOfOrigin ?? "—", "globe")
-        ].filter { !$0.1.isEmpty && $0.1 != "—" }
+        let items = statisticsItems(for: media)
         return VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 8) {
                 Image(systemName: "chart.bar.fill")
@@ -1074,38 +1061,61 @@ struct AniListDetailView: View {
             .padding(.horizontal, 16)
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
                 ForEach(items, id: \.0) { item in
-                    HStack(spacing: 10) {
-                        Image(systemName: item.2)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Color.appAccent)
-                            .frame(width: 24, height: 24)
-                            .background(Color.appAccent.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(item.0)
-                                .font(.caption2.weight(.medium))
-                                .foregroundStyle(.secondary)
-                                .textCase(.uppercase)
-                            Text(item.1)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(.primary)
-                                .lineLimit(2)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        Spacer(minLength: 0)
-                    }
-                    .padding(12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(Color.secondary.opacity(0.05))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(Color.secondary.opacity(0.06), lineWidth: 0.5)
-                    )
+                    statisticCard(label: item.0, value: item.1, icon: item.2)
                 }
             }
             .padding(.horizontal, 16)
         }
+    }
+
+    private func statisticsItems(for media: Media) -> [(String, String, String)] {
+        var items: [(String, String, String)] = []
+        items.append(("Type", media.type ?? "Anime", "rectangle.stack"))
+        if let f = media.format, !f.isEmpty { items.append(("Format", f, "film")) }
+        if let s = media.statusDisplay { items.append(("Status", s, "circle.fill")) }
+        if let ep = media.episodes { items.append(("Episodes", "\(ep)", "number")) }
+        if let score = media.averageScore { items.append(("Rating", "\(score)%", "star.fill")) }
+        if let pop = media.popularity { items.append(("Popularity", "\(pop)", "person.3.fill")) }
+        let seasonStr = [media.season?.capitalized, media.seasonYear.map { String($0) }].compactMap { $0 }.joined(separator: " ")
+        if !seasonStr.isEmpty { items.append(("Season", seasonStr, "calendar")) }
+        if let dur = media.duration { items.append(("Duration", "\(dur) min", "clock")) }
+        if let studio = media.mainStudioName, !studio.isEmpty { items.append(("Studio", studio, "building.2.fill")) }
+        if let source = media.sourceDisplay { items.append(("Source", source, "books.vertical.fill")) }
+        if let aired = media.airDateRange, !aired.isEmpty { items.append(("Premiered", aired, "sparkles")) }
+        if let country = media.countryOfOrigin, !country.isEmpty { items.append(("Country", country, "globe")) }
+        return items
+    }
+
+    @ViewBuilder
+    private func statisticCard(label: String, value: String, icon: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Color.appAccent)
+                .frame(width: 24, height: 24)
+                .background(Color.appAccent.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+                Text(value)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.secondary.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color.secondary.opacity(0.06), lineWidth: 0.5)
+        )
     }
 
     // MARK: - Episodes
