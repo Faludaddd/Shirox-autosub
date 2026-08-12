@@ -133,9 +133,6 @@ struct NotificationsView: View {
                 }
             }
             .listStyle(.plain)
-            #if os(iOS)
-            .scrollContentBackground(.hidden)
-            #endif
             .refreshable { await vm.loadNotifications() }
         }
     }

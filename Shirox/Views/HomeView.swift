@@ -1312,16 +1312,18 @@ struct ScheduleView: View {
                         let isSelected = calendar.isDate(day, inSameDayAs: selectedDate)
                         let isToday = calendar.isDateInToday(day)
                         let hasEpisodes = count > 0
+                        let dayNum = calendar.component(.day, from: day)
+                        let dayLabel = weekdayShort(for: day)
                         Button {
                             withAnimation(.easeOut(duration: 0.18)) {
                                 selectedDate = day
                             }
                         } label: {
                             VStack(spacing: 6) {
-                                Text(weekdayShort(for: day))
+                                Text(dayLabel)
                                     .font(.caption2.weight(.semibold))
                                     .foregroundStyle(isSelected ? .white : .secondary)
-                                Text("\(calendar.component(.day, from: day))")
+                                Text("\(dayNum)")
                                     .font(.title3.weight(.bold))
                                     .foregroundStyle(isSelected ? .white : .primary)
                                 if hasEpisodes {
@@ -1414,13 +1416,14 @@ struct ScheduleView: View {
                         let count = countByDay[day] ?? 0
                         let isSelected = calendar.isDate(day, inSameDayAs: selectedDate)
                         let isToday = calendar.isDateInToday(day)
+                        let dayNum = calendar.component(.day, from: day)
                         Button {
                             withAnimation(.easeOut(duration: 0.18)) {
                                 selectedDate = day
                             }
                         } label: {
                             VStack(spacing: 4) {
-                                Text("\(calendar.component(.day, from: day))")
+                                Text("\(dayNum)")
                                     .font(.subheadline.weight(.bold))
                                     .foregroundStyle(.primary)
                                 if count > 0 {
