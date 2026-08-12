@@ -122,6 +122,13 @@ struct NotificationsView: View {
                             }
                         }
                         .padding(.horizontal, 12)
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                vm.removeNotification(notif)
+                            } label: {
+                                Label("Close", systemImage: "xmark")
+                            }
+                        }
                     }
                 }
                 .padding(.vertical, 10)

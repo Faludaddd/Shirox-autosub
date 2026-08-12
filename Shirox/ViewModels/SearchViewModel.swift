@@ -41,7 +41,7 @@ final class SearchViewModel: ObservableObject {
 
     func search(usingModule: Bool) {
         let q = query.trimmingCharacters(in: .whitespaces)
-        guard !q.isEmpty else { clearResults(); return }
+        if q.isEmpty && filters.isEmpty { clearResults(); return }
         searchTask?.cancel()
         isUsingModule = usingModule
         hasSearched = true

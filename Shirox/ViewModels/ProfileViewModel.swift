@@ -160,6 +160,11 @@ final class ProfileViewModel: ObservableObject {
         }
     }
 
+    func removeNotification(_ notif: ProviderNotification) {
+        allNotifications.removeAll { $0.id == notif.id }
+        notifications.removeAll { $0.id == notif.id }
+    }
+
     func loadSocial(userId: Int, type: SocialType, loadMore: Bool = false) async {
         isLoadingSocial = true
         defer { isLoadingSocial = false }

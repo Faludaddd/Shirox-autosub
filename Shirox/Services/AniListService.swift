@@ -136,7 +136,9 @@ final class AniListService {
     }
 
     func search(keyword: String, filters: SearchFilters = SearchFilters()) async throws -> [AniListMedia] {
-        var variables: [String: Any] = ["search": keyword, "sort": [filters.effectiveSort]]
+        let effectiveKeyword = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
+        var variables: [String: Any] = ["sort": [effectiveKeyword.isEmpty && filters.sort == "SEARCH_MATCH" ? "POPULARITY_DESC" : filters.effectiveSort]]
+        if !effectiveKeyword.isEmpty { variables["search"] = effectiveKeyword }
         if let year = filters.year { variables["seasonYear"] = year }
         if let season = filters.season, !season.isEmpty { variables["season"] = season }
         if let format = filters.format, !format.isEmpty { variables["format"] = format }
@@ -170,7 +172,8 @@ final class AniListService {
         if let endDateBefore = filters.endDateBefore, !endDateBefore.isEmpty { variables["endDate_lesser"] = endDateBefore }
 
         // isAdult is hardcoded to false — adult content is never included in search results.
-        var mediaArgs = ["search: $search", "type: ANIME", "sort: $sort", "isAdult: false"]
+        var mediaArgs = ["type: ANIME", "sort: $sort", "isAdult: false"]
+        if !effectiveKeyword.isEmpty { mediaArgs.append("search: $search") }
         if filters.year != nil { mediaArgs.append("seasonYear: $seasonYear") }
         if filters.season != nil { mediaArgs.append("season: $season") }
         if filters.format != nil { mediaArgs.append("format: $format") }
@@ -196,7 +199,8 @@ final class AniListService {
         if filters.endDateBefore != nil { mediaArgs.append("endDate_lesser: $endDate_lesser") }
 
         let argList = mediaArgs.joined(separator: ", ")
-        var varDecls = ["$search: String", "$sort: [MediaSort]"]
+        var varDecls = ["$sort: [MediaSort]"]
+        if !effectiveKeyword.isEmpty { varDecls.append("$search: String") }
         if filters.year != nil { varDecls.append("$seasonYear: Int") }
         if filters.season != nil { varDecls.append("$season: MediaSeason") }
         if filters.format != nil { varDecls.append("$format: MediaFormat") }

@@ -133,7 +133,7 @@ struct SearchView: View {
                 currentResultCount: vm.resultCount,
                 hasSearched: vm.hasSearched
             ) {
-                if !vm.query.isEmpty { vm.search(usingModule: usingModule) }
+                vm.search(usingModule: usingModule)
             }
             // #100 — Liquid-glass backdrop for the modal sheet.
             .background(.ultraThinMaterial)
@@ -532,8 +532,7 @@ struct SearchFilterSheet: View {
     @State private var minScoreText: String = ""
     @State private var minChaptersText: String = ""
     @State private var maxChaptersText: String = ""
-    // Issue #6 — Tags-related state removed (tagInputText, excludeTagInputText).
-    @FocusState private var maxEpisodesFocused: Bool
+    @FocusState private var filterFieldFocused: Bool
 
     // #132 — Expanded genre list. AniList's full genre enum has 19 values;
     // we surface all of them so power users can build precise queries.
@@ -719,7 +718,7 @@ struct SearchFilterSheet: View {
                             #endif
                             .multilineTextAlignment(.trailing)
                             .frame(width: 80)
-                            .focused($maxEpisodesFocused)
+                            .focused($filterFieldFocused)
                             .onChangeOf(maxEpisodesText) { newValue in
                                 // Strip anything that isn't a digit so the field can't
                                 // ever hold invalid input (and Int() can't fail).
@@ -879,6 +878,7 @@ struct SearchFilterSheet: View {
                             #endif
                             .multilineTextAlignment(.trailing)
                             .frame(width: 80)
+                            .focused($filterFieldFocused)
                             .onChangeOf(maxDurationText) { newValue in
                                 let trimmed = newValue.filter(\.isNumber)
                                 if trimmed != newValue { maxDurationText = trimmed }
@@ -906,6 +906,7 @@ struct SearchFilterSheet: View {
                             #endif
                             .multilineTextAlignment(.trailing)
                             .frame(width: 80)
+                            .focused($filterFieldFocused)
                             .onChangeOf(minChaptersText) { newValue in
                                 let trimmed = newValue.filter(\.isNumber)
                                 if trimmed != newValue { minChaptersText = trimmed }
@@ -921,6 +922,7 @@ struct SearchFilterSheet: View {
                             #endif
                             .multilineTextAlignment(.trailing)
                             .frame(width: 80)
+                            .focused($filterFieldFocused)
                             .onChangeOf(maxChaptersText) { newValue in
                                 let trimmed = newValue.filter(\.isNumber)
                                 if trimmed != newValue { maxChaptersText = trimmed }
@@ -959,7 +961,7 @@ struct SearchFilterSheet: View {
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
-                    Button("Done") { maxEpisodesFocused = false }
+                    Button("Done") { filterFieldFocused = false }
                 }
             }
             .safeAreaInset(edge: .bottom) {
