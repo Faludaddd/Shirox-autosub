@@ -112,9 +112,6 @@ final class EpisodeNotificationManager: NSObject, ObservableObject {
     ///   - title:      The show title shown as the notification title.
     ///   - episode:    The episode number.
     ///   - airingAt:   Unix timestamp (seconds) of the exact airing time.
-    /// - Returns: `true` if the notification was scheduled, `false` if it was skipped (e.g. fire time
-    ///   already in the past) or failed.
-    @discardableResult
     enum ScheduleResult {
         case success
         case alreadyAired
