@@ -1303,11 +1303,11 @@ struct ScheduleView: View {
     @ViewBuilder
     private func dateSelectorWeeks(buckets: [ScheduleDayBucket], countByDay: [Date: Int], dayCount: Int) -> some View {
         let today = calendar.startOfDay(for: Date())
-        let days = (0..<dayCount).compactMap { calendar.date(byAdding: .day, value: $0, to: today) }
+        let days: [Date] = (0..<dayCount).compactMap { calendar.date(byAdding: .day, value: $0, to: today) }
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
-                    ForEach(days, id: \.self) { day in
+                    ForEach(days, id: \.self) { (day: Date) in
                         let count = countByDay[day] ?? 0
                         let isSelected = calendar.isDate(day, inSameDayAs: selectedDate)
                         let isToday = calendar.isDateInToday(day)
