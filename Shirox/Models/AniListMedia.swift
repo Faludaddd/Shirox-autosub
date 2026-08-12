@@ -9,8 +9,10 @@ struct AniListMedia: Identifiable, Codable {
     let description: String?
     let episodes: Int?
     let chapters: Int?        // manga total; nil for anime or ongoing manga
+    let volumes: Int?         // #131 — manga volume total; nil for anime
     let status: String?
     let averageScore: Int?
+    let popularity: Int?      // #131 — AniList popularity rank (user count)
     let genres: [String]?
     let season: String?
     let seasonYear: Int?
@@ -28,6 +30,7 @@ struct AniListMedia: Identifiable, Codable {
     let duration: Int?            // episode length in minutes
     let startDate: AniListFuzzyDate?
     let endDate: AniListFuzzyDate?
+    let countryOfOrigin: String?  // #131 — "JP", "KR", "CN" etc.
 
     var plainDescription: String? {
         guard let desc = description else { return nil }

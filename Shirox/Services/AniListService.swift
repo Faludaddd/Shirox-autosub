@@ -820,7 +820,12 @@ final class AniListService {
     }
 
     /// AniList detail for a MANGA id. Mirrors `detail(id:)` but queries the manga
-    /// media type (chapters instead of episodes, no airing) and includes relations.
+    /// media type (chapters/volumes instead of episodes, no airing) and includes
+    /// relations.
+    ///
+    /// #131 — Expanded field set so the manga detail page can render the same
+    /// Statistics grid the anime page does: Type, Format, Status, Popularity,
+    /// Chapters, Volumes, Score, Season, Start Date, Source, Studio/Publisher.
     func mangaDetail(id: Int) async throws -> AniListMedia {
         let query = """
         query ($id: Int) {
@@ -832,9 +837,19 @@ final class AniListService {
             bannerImage
             description(asHtml: false)
             chapters
+            volumes
             status
             averageScore
+            popularity
             genres
+            format
+            source
+            countryOfOrigin
+            season
+            seasonYear
+            startDate { year month day }
+            endDate { year month day }
+            studios { edges { isMain node { id name } } }
             relations {
               edges {
                 relationType

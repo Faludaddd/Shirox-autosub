@@ -20,6 +20,9 @@ struct MangaDetailView: View {
     @State private var newestFirst = false
     @State private var readerContext: ReaderContext?
     @State private var showMatchSheet = false
+    /// #131 — Mirrors AniListDetailView's gate so the manga Statistics grid
+    /// respects the same Appearance toggle ("Show Statistics on Detail Pages").
+    @AppStorage("showStatistics") private var showStatistics = true
 
     #if os(iOS)
     @ObservedObject private var mangaDownloads = MangaDownloadManager.shared
@@ -259,6 +262,15 @@ struct MangaDetailView: View {
                     if !synopsis.isEmpty {
                         synopsisSection(text: synopsis).padding(.top, 16)
                     }
+                    // #131 — Statistics grid mirroring AniListDetailView's
+                    // layout, adapted for manga's field set (Chapters/Volumes
+                    // instead of Episodes/Duration). Only rendered when the
+                    // AniList enrichment is present (module-only detail has
+                    // no statistics data) AND the user hasn't hidden
+                    // statistics via the Appearance toggle.
+                    if let enrich = vm.enrichment, showStatistics {
+                        statisticsSection(media: enrich).padding(.top, 8)
+                    }
                     #if os(iOS)
                     readButton(detail)
                         .padding(.horizontal, 16)
@@ -446,6 +458,85 @@ struct MangaDetailView: View {
                 }
                 .padding(.horizontal, 16)
             }
+        }
+    }
+
+    // MARK: - Statistics (#131)
+    //
+    // Mirrors AniListDetailView's statisticsSection layout (2-column LazyVGrid
+    // of label/value cards), adapted for manga's actual field set:
+    //   • Type (MANGA / NOVEL / ONE_SHOT)
+    //   • Format
+    //   • Status (Releasing / Finished / Hiatus / Cancelled / Upcoming)
+    //   • Popularity (AniList user count)
+    //   • Total Chapters
+    //   • Total Volumes
+    //   • Score (average 0–100)
+    //   • Season + Year
+    //   • Start Date (pre-formatted range from airDateRange)
+    //   • Source material (Manga / Light Novel / Original / etc.)
+    //   • Studio/Publisher (first credited studio)
+    //
+    // Only fields with a value are shown — AniList returns nil for unknown
+    // fields on ongoing or less-documented titles, and a "—" placeholder
+    // would clutter the grid.
+    @ViewBuilder
+    private func statisticsSection(media: Media) -> some View {
+        var items: [(String, String)] = []
+        if let type = media.type, !type.isEmpty {
+            items.append(("Type", type.replacingOccurrences(of: "_", with: " ").capitalized))
+        }
+        if let format = media.format, !format.isEmpty {
+            items.append(("Format", format.replacingOccurrences(of: "_", with: " ").capitalized))
+        }
+        if let status = media.statusDisplay {
+            items.append(("Status", status))
+        }
+        if let chapters = media.episodes {
+            items.append(("Chapters", "\(chapters)"))
+        }
+        if let volumes = media.volumes {
+            items.append(("Volumes", "\(volumes)"))
+        }
+        if let score = media.averageScore {
+            items.append(("Rating", "\(score)%"))
+        }
+        if let popularity = media.popularity, popularity > 0 {
+            items.append(("Popularity", "\(popularity)"))
+        }
+        let seasonStr = [media.season?.capitalized, media.seasonYear.map { String($0) }]
+            .compactMap { $0 }.joined(separator: " ")
+        if !seasonStr.isEmpty {
+            items.append(("Season", seasonStr))
+        }
+        if let airDate = media.airDateRange, !airDate.isEmpty {
+            items.append(("Premiered", airDate))
+        }
+        if let source = media.sourceDisplay {
+            items.append(("Source", source))
+        }
+        if let studio = media.mainStudioName, !studio.isEmpty {
+            items.append(("Studio", studio))
+        }
+        guard !items.isEmpty else { return }
+        return VStack(alignment: .leading, spacing: 12) {
+            Text("Statistics")
+                .font(.title3.weight(.bold))
+                .padding(.horizontal, 16)
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                ForEach(items, id: \.0) { item in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(item.0)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(item.1)
+                            .font(.subheadline.weight(.medium))
+                    }
+                    .padding(12)
+                    .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
+                }
+            }
+            .padding(.horizontal, 16)
         }
     }
 

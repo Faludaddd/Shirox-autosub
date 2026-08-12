@@ -50,6 +50,12 @@ struct Media: Identifiable, Codable, Equatable, Hashable, Sendable {
     let source: String?            // "MANGA", "LIGHT_NOVEL", "ORIGINAL", etc.
     let duration: Int?             // Episode length in minutes
     let airDateRange: String?      // Pre-formatted "Oct 2007 – Mar 2008"
+    // #131 — Manga-specific fields surfaced from AniList for the Statistics
+    // grid on the manga detail page. Defaults to nil so existing Media init
+    // call sites (which don't pass these) keep compiling unchanged.
+    var volumes: Int? = nil        // Manga volume total
+    var popularity: Int? = nil     // AniList popularity (user count)
+    var countryOfOrigin: String? = nil  // "JP", "KR", "CN" etc.
 
     var uniqueId: String { "\(provider.rawValue)-\(id)" }
 

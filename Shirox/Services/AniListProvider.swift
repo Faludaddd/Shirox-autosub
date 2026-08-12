@@ -171,6 +171,8 @@ final class AniListProvider: MediaProvider {
     /// Manga variant of `mapMedia`: AniList returns `chapters` (not `episodes`)
     /// for manga, so put the chapter total in the `episodes` slot the editor
     /// stepper and hero read, and force `type = "MANGA"` so `Media.isManga` holds.
+    /// #131 — Now also surfaces `volumes`, `popularity`, and `countryOfOrigin`
+    /// so the manga detail Statistics grid has the same field coverage as anime.
     func mapMangaMedia(_ m: AniListMedia) -> Media {
         Media(
             id: m.id,
@@ -193,7 +195,10 @@ final class AniListProvider: MediaProvider {
             studioNames: m.studios?.edges.filter { $0.isMain }.map { $0.node.name },
             source: m.source,
             duration: m.duration,
-            airDateRange: m.airDateRange
+            airDateRange: m.airDateRange,
+            volumes: m.volumes,
+            popularity: m.popularity,
+            countryOfOrigin: m.countryOfOrigin
         )
     }
 
