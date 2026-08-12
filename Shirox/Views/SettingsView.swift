@@ -1724,6 +1724,8 @@ struct NotificationsSettingsPage: View {
     @AppStorage("airingNotifications") private var airingNotifications = false
     @AppStorage("episodeNotificationLeadTime") private var leadTimeRaw =
         EpisodeNotificationManager.LeadTime.atAirtime.rawValue
+    @AppStorage("inAppToastsEnabled") private var inAppToastsEnabled = true
+    @AppStorage("phoneNotificationsEnabled") private var phoneNotificationsEnabled = true
 
     @State private var authStatus: UNAuthorizationStatus = .notDetermined
     @State private var pendingCount: Int = 0
@@ -1739,8 +1741,9 @@ struct NotificationsSettingsPage: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
+                inAppToastsCard
+                phoneNotificationsCard
                 statusCard
-                togglesCard
                 timingCard
                 manageCard
             }
@@ -1749,6 +1752,45 @@ struct NotificationsSettingsPage: View {
         .navigationTitle("Notifications")
         .inlineNavBar()
         .task { await refreshStatus() }
+    }
+
+    private var inAppToastsCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            cardHeader("In-App Toast Notifications", systemImage: "rectangle.stack.fill")
+            Toggle("Show In-App Toasts", isOn: $inAppToastsEnabled)
+            Text("Controls temporary messages that appear inside the app itself — toast banners, in-app alerts, and visual notifications. Does not affect device/lock-screen notifications.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.secondary.opacity(0.08),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private var phoneNotificationsCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            cardHeader("Phone Notifications", systemImage: "iphone")
+            Toggle("Enable Phone Notifications", isOn: $phoneNotificationsEnabled)
+            Text("Controls real system notifications that appear outside the app — Lock Screen, Notification Center, and banner alerts. Requires iOS notification permission.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Divider().opacity(0.4)
+            Toggle("Episode Reminders", isOn: $episodeReminders)
+                .disabled(!phoneNotificationsEnabled)
+            Toggle("Airing Notifications", isOn: $airingNotifications)
+                .disabled(!phoneNotificationsEnabled)
+            Text("Reminders fire before an episode airs. Requires an AniList account and a connected schedule.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.secondary.opacity(0.08),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     // MARK: - Status
@@ -1829,23 +1871,6 @@ struct NotificationsSettingsPage: View {
         .frame(maxWidth: .infinity)
         .background(Color.secondary.opacity(0.08),
                     in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-    }
-
-    // MARK: - Toggles
-
-    private var togglesCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            cardHeader("Types", systemImage: "checkmark.circle.fill")
-            Toggle("Episode Reminders", isOn: $episodeReminders)
-            Toggle("Airing Notifications", isOn: $airingNotifications)
-            Text("Reminders fire before an episode airs. Requires an AniList account and a connected schedule.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondary.opacity(0.08),
-                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     // MARK: - Timing

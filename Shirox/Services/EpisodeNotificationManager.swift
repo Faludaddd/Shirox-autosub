@@ -120,11 +120,13 @@ final class EpisodeNotificationManager: NSObject, ObservableObject {
                   title: String,
                   episode: Int,
                   airingAt: Int) async -> Bool {
+        guard UserDefaults.standard.object(forKey: "phoneNotificationsEnabled") as? Bool ?? true else {
+            return false
+        }
         let lead = leadTime
         let fireTimestamp = TimeInterval(airingAt) - TimeInterval(lead.seconds)
         let fireDate = Date(timeIntervalSince1970: fireTimestamp)
 
-        // Don't schedule a notification that would fire in the past.
         guard fireDate > Date() else {
             Logger.shared.log("[EpisodeNotification] Skipping schedule \(scheduleId): fire time is in the past", type: "Debug")
             return false

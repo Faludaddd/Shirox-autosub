@@ -36,7 +36,11 @@ final class ToastManager: ObservableObject {
     static let shared = ToastManager()
 
     @Published var toasts: [ToastData] = []
-    private var maxStacked = 3  // max visible at once
+    private var maxStacked = 3
+
+    var toastsEnabled: Bool {
+        UserDefaults.standard.object(forKey: "inAppToastsEnabled") as? Bool ?? true
+    }
 
     private init() {}
 
@@ -46,19 +50,18 @@ final class ToastManager: ObservableObject {
               iconColor: Color = .accentColor,
               duration: TimeInterval = 4.0,
               action: (() -> Void)? = nil) {
+        guard toastsEnabled else { return }
         let toast = ToastData(title: title, message: message, icon: icon,
                               iconColor: iconColor, duration: duration, action: action)
         DispatchQueue.main.async {
             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                 self.toasts.append(toast)
             }
-            // Trim to maxStacked — remove oldest
             if self.toasts.count > self.maxStacked {
                 withAnimation(.easeInOut(duration: 0.3)) {
                     self.toasts.removeFirst()
                 }
             }
-            // Auto-dismiss
             DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
                 self.dismiss(toast.id)
             }

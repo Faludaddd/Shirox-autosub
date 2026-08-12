@@ -339,7 +339,7 @@ private struct FeaturedCarousel: View {
         let effectiveWidth = containerWidth > 0 ? containerWidth : UIScreen.main.bounds.width
         let imageHeight: CGFloat = isIPad
             ? effectiveWidth * (9.0 / 16.0)
-            : UIScreen.main.bounds.height * 0.55
+            : UIScreen.main.bounds.height * 0.77
 
         let displayItems = realItems
         let currentMedia = displayItems.isEmpty ? items[0] : displayItems[currentIndex]
@@ -744,42 +744,39 @@ private struct FeaturedCard: View, Equatable {
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                // iPhone: banner / cover image fills the ENTIRE card area.
-                // Issue #4 — Fix image scaling/cropping bug. The previous
-                // implementation used `CachedAsyncImage` which always applies
-                // `.scaledToFill()` — this zooms into the image to fill the
-                // tall card frame, heavily cropping cover/poster images
-                // (which are portrait 2:3). The user sees a zoomed/cropped
-                // image instead of the full artwork.
-                //
-                // Fix: use SwiftUI's native `AsyncImage` with explicit
-                // `.scaledToFit()` when the image source is a cover/poster
-                // (portrait), and `.scaledToFill()` only when it's a true
-                // banner (landscape). This preserves the full artwork for
-                // cover images while still filling the frame for banners.
-                let imageURL = media.bannerImage ?? media.coverImage.extraLarge ?? media.coverImage.large ?? ""
-                let isBanner = media.bannerImage != nil
-                AsyncImage(url: URL(string: imageURL)) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFit()
-                    case .failure, .empty:
-                        // Fallback gradient while loading or if the URL fails
-                        LinearGradient(
-                            colors: [Color.secondary.opacity(0.3), Color.secondary.opacity(0.1)],
-                            startPoint: .top, endPoint: .bottom
-                        )
-                    @unknown default:
-                        LinearGradient(
-                            colors: [Color.secondary.opacity(0.3), Color.secondary.opacity(0.1)],
-                            startPoint: .top, endPoint: .bottom
-                        )
+                let bannerURL = media.bannerImage
+                let coverURL = media.coverImage.extraLarge ?? media.coverImage.large ?? ""
+                ZStack {
+                    if let banner = bannerURL, let url = URL(string: banner) {
+                        AsyncImage(url: url) { phase in
+                            if case .success(let img) = phase {
+                                img.resizable().scaledToFill()
+                            } else {
+                                Color.secondary.opacity(0.15)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .clipped()
+                    } else if !coverURL.isEmpty, let url = URL(string: coverURL) {
+                        AsyncImage(url: url) { phase in
+                            if case .success(let img) = phase {
+                                img.resizable().scaledToFill()
+                            } else {
+                                Color.secondary.opacity(0.15)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .clipped()
+                    } else {
+                        Color.secondary.opacity(0.15)
                     }
+                    LinearGradient(
+                        colors: [.clear, .black.opacity(0.3), .black.opacity(0.85)],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .clipped()
             }
             #else
             // macOS: banner background + poster overlay
@@ -1456,68 +1453,58 @@ struct ScheduleView: View {
     private func dateSelector3Weeks(buckets: [ScheduleDayBucket], countByDay: [Date: Int]) -> some View {
         let today = calendar.startOfDay(for: Date())
         let allDays = (0..<21).compactMap { calendar.date(byAdding: .day, value: $0, to: today) }
-        let week1 = Array(allDays[0..<7])
-        let week2 = Array(allDays[7..<14])
-        let week3 = Array(allDays[14..<21])
-        VStack(spacing: 8) {
-            threeWeekSection(label: "Week 1", days: week1, countByDay: countByDay)
-            threeWeekSection(label: "Week 2", days: week2, countByDay: countByDay)
-            threeWeekSection(label: "Week 3", days: week3, countByDay: countByDay)
+        VStack(spacing: 6) {
+            ForEach(0..<3, id: \.self) { weekIdx in
+                let weekStart = weekIdx * 7
+                let weekDays = Array(allDays[weekStart..<weekStart + 7])
+                HStack(spacing: 3) {
+                    Text("W\(weekIdx + 1)")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 18)
+                    ForEach(weekDays, id: \.self) { day in
+                        let count = countByDay[day] ?? 0
+                        let isSelected = calendar.isDate(day, inSameDayAs: selectedDate)
+                        let isToday = calendar.isDateInToday(day)
+                        Button {
+                            withAnimation(.easeOut(duration: 0.18)) {
+                                selectedDate = day
+                            }
+                        } label: {
+                            VStack(spacing: 1) {
+                                Text(weekdayShort(for: day))
+                                    .font(.system(size: 8, weight: .semibold))
+                                    .foregroundStyle(isSelected ? .white : .secondary)
+                                Text("\(calendar.component(.day, from: day))")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(isSelected ? .white : .primary)
+                                if count > 0 {
+                                    Text("\(count)")
+                                        .font(.system(size: 8, weight: .bold))
+                                        .foregroundStyle(isSelected ? .white : .red)
+                                } else {
+                                    Color.clear.frame(height: 10)
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(isSelected ? Color.appAccent : Color.secondary.opacity(0.06))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .strokeBorder(isToday && !isSelected ? Color.red.opacity(0.35) : Color.clear, lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
         }
         .padding(.horizontal, 12)
-        .padding(.top, 8)
+        .padding(.top, 6)
         .padding(.bottom, 4)
-    }
-
-    @ViewBuilder
-    private func threeWeekSection(label: String, days: [Date], countByDay: [Date: Int]) -> some View {
-        VStack(spacing: 4) {
-            HStack {
-                Text(label)
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(Color.appAccent)
-                Spacer()
-            }
-            .padding(.horizontal, 4)
-            ForEach(days, id: \.self) { day in
-                let count = countByDay[day] ?? 0
-                let isSelected = calendar.isDate(day, inSameDayAs: selectedDate)
-                let isToday = calendar.isDateInToday(day)
-                Button {
-                    withAnimation(.easeOut(duration: 0.18)) {
-                        selectedDate = day
-                    }
-                } label: {
-                    HStack(spacing: 10) {
-                        Text(weekdayShort(for: day))
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 32, alignment: .leading)
-                        Text("\(calendar.component(.day, from: day))")
-                            .font(.subheadline.weight(.bold))
-                            .foregroundStyle(isSelected ? .white : .primary)
-                        Spacer()
-                        if count > 0 {
-                            Text("\(count) episode\(count == 1 ? "" : "s")")
-                                .font(.caption2)
-                                .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
-                        }
-                        if isToday {
-                            Circle()
-                                .fill(Color.red)
-                                .frame(width: 6, height: 6)
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(isSelected ? Color.appAccent : Color.secondary.opacity(0.05))
-                    )
-                }
-                .buttonStyle(.plain)
-            }
-        }
     }
 
     // MARK: - 1 Month Date Selector (Issue #1, #3)
