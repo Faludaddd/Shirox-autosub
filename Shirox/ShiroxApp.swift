@@ -290,16 +290,13 @@ struct ShiroxApp: App {
                 .tint(accentColor)
                 .toggleStyle(GlowingToggleStyle())
                 .preferredColorScheme(colorScheme)
-                // #17 — Force the entire RootTabView subtree to re-render when
-                // the user changes the accent color or appearance mode in
-                // Settings. `@AppStorage` already re-evaluates `ShiroxApp.body`,
-                // but cached `.tint` / `.preferredColorScheme` values inside
-                // already-displayed subviews (especially `RootTabView`, which
-                // is a separate struct and doesn't directly observe these
-                // `@AppStorage` keys) don't always pick up the new values.
-                // Bumping `.id(...)` discards the old view tree and rebuilds it
-                // fresh with the new accent color / color scheme applied.
-                .id("\(accentColorHex)-\(appearanceMode)")
+                // Requirement #2 — Appearance changes must NOT reset navigation
+                // or rebuild the view tree. The previous `.id(...)` modifier
+                // (which bumped on accentColor/appearanceMode change) is removed
+                // so the user stays on the same screen/tab with scroll position
+                // and UI state preserved. SwiftUI's `.tint` and
+                // `.preferredColorScheme` propagate live to the existing view
+                // tree without needing a full rebuild.
                 .overlay {
                     ToastContainerView()
                 }
@@ -487,11 +484,16 @@ private struct RootTabView: View {
                         DownloadsView().transition(.opacity)
                     }
                     #endif
+                    // Requirement #3 — Bottom search bar is the ONLY search
+                    // entry point. AniList-only.
                     Tab(value: 3, role: .search) {
                         SearchView().transition(.opacity)
                     }
-                    Tab("Settings", systemImage: "gearshape.fill", value: 4) {
-                        SettingsView().transition(.opacity)
+                    // Requirement #6 — Schedule tab (where Settings used to sit
+                    // in the bottom bar). Settings is now in the Home toolbar
+                    // (right icon) per requirement #7.
+                    Tab("Schedule", systemImage: "calendar", value: 4) {
+                        ScheduleView().transition(.opacity)
                     }
                 }
                 .tabViewStyle(.sidebarAdaptable)
@@ -515,14 +517,15 @@ private struct RootTabView: View {
                         .tabItem { Label("Downloads", systemImage: "arrow.down.circle.fill") }
                         .tag(2)
                     #endif
-                    // #118 (revised) — Search tab removed from the bottom tab
-                    // bar. Search is now triggered by a dedicated icon in the
-                    // Home toolbar that reveals a frosted pill search bar
-                    // inline. The full SearchView is still reachable from
-                    // within that inline search when needed.
-                    SettingsView()
+                    // Requirement #3 — Bottom search bar (AniList-only).
+                    SearchView()
                         .transition(.opacity)
-                        .tabItem { Label("Settings", systemImage: "gearshape.fill") }
+                        .tabItem { Label("Search", systemImage: "magnifyingglass") }
+                        .tag(3)
+                    // Requirement #6 — Schedule tab (where Settings was).
+                    ScheduleView()
+                        .transition(.opacity)
+                        .tabItem { Label("Schedule", systemImage: "calendar") }
                         .tag(4)
                 }
                 .tint(.appAccent)

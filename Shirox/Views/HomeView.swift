@@ -19,110 +19,8 @@ struct HomeView: View {
     /// reload is in flight. The system `.refreshable` spinner still drives the
     /// gesture; this just adds a branded overlay on top.
     @State private var isRefreshing = false
-    // #118 (revised) — Search is now toggled by a dedicated icon in the top
-    // toolbar. When tapped, a frosted pill search bar slides in below the nav
-    // bar (centered, icon-height, elongated — not full-width). The search bar
-    // is NOT visible by default. This replaces both the old inline search pill
-    // that sat at the top of the scroll content AND the separate Search tab in
-    // the bottom tab bar.
-    @State private var showSearchBar = false
-    @State private var inlineSearchText = ""
-    @State private var navigateToSearch = false
-
-    /// #118 — Trending items filtered by the inline search text. Empty query
-    /// returns an empty array so the caller can branch on `query.isEmpty`
-    /// to decide whether to show results at all.
-    private var filteredTrending: [Media] {
-        let query = inlineSearchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !query.isEmpty else { return [] }
-        return vm.trending.filter { media in
-            let titles = [
-                media.title.english?.lowercased(),
-                media.title.romaji?.lowercased(),
-                media.title.native?.lowercased()
-            ].compactMap { $0 }
-            return titles.contains { $0.contains(query) }
-        }
-    }
-
-    /// #118 (revised) — Frosted pill search bar that appears below the nav bar
-    /// when the user taps the search icon in the toolbar. Centered on screen,
-    /// icon-height but elongated (a pill roughly icon-height, just wider — not
-    /// full-width). Frosted/translucent background matches the app's glass
-    /// material language. Hidden by default; only visible while `showSearchBar`
-    /// is true. Typing filters `vm.trending` inline (see `filteredTrending`)
-    /// and replaces the home content below with a single `AnimeSection` of
-    /// matches. Tapping the X or submitting an empty query hides the bar.
-    @ViewBuilder
-    private var frostedSearchBar: some View {
-        if showSearchBar {
-            HStack(spacing: 10) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.secondary)
-                TextField("Search trending titles", text: $inlineSearchText)
-                    .textFieldStyle(.plain)
-                    .font(.subheadline)
-                    .autocorrectionDisabled()
-                    .submitLabel(.search)
-                    .focused($searchFieldFocused)
-                if !inlineSearchText.isEmpty {
-                    Button {
-                        inlineSearchText = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 16))
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                }
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        showSearchBar = false
-                        inlineSearchText = ""
-                        searchFieldFocused = false
-                    }
-                } label: {
-                    Text("Cancel")
-                        .font(.subheadline)
-                        .foregroundStyle(Color.appAccent)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            // #118 (revised) — Frosted glass background. `.ultraThinMaterial`
-            // gives the translucent frosted look matching the app's glass
-            // language (toast system, sheets, tab bar).
-            .background(.ultraThinMaterial, in: Capsule())
-            .overlay(
-                Capsule()
-                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
-            )
-            // #118 (revised) — Centered on screen, not full-width. The pill is
-            // roughly icon-height (36pt) and elongated — wider than an icon but
-            // not stretching edge-to-edge.
-            .frame(maxWidth: 340)
-            .frame(maxHeight: 44)
-            .padding(.horizontal, 16)
-            .padding(.top, 4)
-            .transition(.move(edge: .top).combined(with: .opacity))
-        }
-    }
-
-    @FocusState private var searchFieldFocused: Bool
-    /// #120 — When ON, Home shows the Browse Categories section below the
-    /// carousel + continue watching/reading. When OFF, those browse sections
-    /// are hidden. #119 correction — defaults to `true` so the old/original
-    /// Home layout (with browse sections) is the app's default going forward,
-    /// not an alternate option.
-    @AppStorage("showBrowseCategories") private var showBrowseCategories = true
-    /// #120 correction — Switches the Browse Categories layout between the
-    /// 2-column grid of `CategoryGridCard` tiles (default, the "built"
-    /// layout) and the vertical stack of `AnimeSection` horizontal carousels.
-    /// When `showBrowseCategories` is OFF, this toggle has no effect (the
-    /// whole section is hidden).
-    @AppStorage("browseCategoriesGridLayout") private var browseCategoriesGridLayout = true
+    // Requirement #3 — Top search icon and inline search bar removed.
+    // The only search entry point is the bottom search tab (AniList-only).
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -154,36 +52,6 @@ struct HomeView: View {
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 24) {
-                            // ────────────────────────────────────────────────────────
-                            // #118 (revised) — The inline search pill that used to sit
-                            // here has been removed. Search is now triggered by a
-                            // dedicated icon in the toolbar that reveals a frosted
-                            // pill search bar as an overlay below the nav bar. See
-                            // `frostedSearchBar` and the toolbar below.
-                            // ────────────────────────────────────────────────────────
-
-                            // Branch on search: if the search bar is open and the
-                            // user has typed a query, show ONLY the filtered results
-                            // section (hide the carousel, continue watching, and
-                            // browse sections). Otherwise render the normal home
-                            // content.
-                            if showSearchBar && !inlineSearchText.trimmingCharacters(in: .whitespaces).isEmpty {
-                                if filteredTrending.isEmpty {
-                                    ContentUnavailableView(
-                                        "No Matches",
-                                        systemImage: "magnifyingglass",
-                                        description: Text("No trending titles match \"\(inlineSearchText)\".")
-                                    )
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 60)
-                                } else {
-                                    AnimeSection(
-                                        title: "Results",
-                                        items: filteredTrending,
-                                        category: .trending
-                                    )
-                                }
-                            } else {
                             // ────────────────────────────────────────────────────────
                             // 1. HERO — Full-bleed featured carousel.
                             //    The ONLY hero element on the page; everything below it
@@ -217,32 +85,12 @@ struct HomeView: View {
                             #endif
 
                             // ────────────────────────────────────────────────────────
-                            // 3. BROWSE SECTIONS — #119 correction: this is now the
-                            //    DEFAULT layout (showBrowseCategories defaults to true).
-                            //    #120 correction: two layouts are available, switched by
-                            //    `browseCategoriesGridLayout`:
-                            //      • Grid (default): 2-column CategoryGridCard tiles
-                            //        with cover images + gradient washes.
-                            //      • Carousels: vertical stack of AnimeSection
-                            //        horizontal carousels (This Season, Trending, …).
-                            //    Both are gated by `showBrowseCategories` — when OFF,
-                            //    the whole section is hidden.
+                            // 3. BROWSE CATEGORIES — always enabled (requirement #1).
+                            //    Grid layout is the single permanent layout.
                             // ────────────────────────────────────────────────────────
-                            if showBrowseCategories {
-                                if browseCategoriesGridLayout {
-                                    browseCategoriesGrid
-                                } else {
-                                    AnimeSection(title: "This Season", items: vm.seasonal, category: .seasonal)
-                                    AnimeSection(title: "Trending Now", items: vm.trending, category: .trending)
-                                    AnimeSection(title: "All-Time Popular", items: vm.popular, category: .popular)
-                                    AnimeSection(title: "Top Rated", items: vm.topRated, category: .topRated)
-                                    AnimeSection(title: "Recently Completed", items: vm.recentlyCompleted, category: .popular)
-                                    AnimeSection(title: "Upcoming", items: vm.upcoming, category: .trending)
-                                }
-                            }
+                            browseCategoriesGrid
 
                             Spacer().frame(height: 28)
-                            } // end of #118 inline-search else branch
                         }
                     }
                     .refreshable {
@@ -289,73 +137,30 @@ struct HomeView: View {
             .modifier(TransparentNavBarModifier())
             #endif
             .toolbar {
-                // #118 (revised) — Schedule icon (left side of the two-icon
-                // pair). Remains as-is.
-                ToolbarItem(placement: .primaryAction) {
-                    NavigationLink(destination: ScheduleView()) {
-                        Image(systemName: "calendar")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundStyle(.primary)
-                    }
-                }
-                // #118 (revised) — Dedicated search icon. Tapping reveals the
-                // frosted pill search bar below the nav bar (see `frostedSearchBar`).
-                // Not a persistent search affordance — just a toggle. The icon
-                // fills in (bold) while the search bar is open so the user can
-                // see at a glance that search is active.
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            showSearchBar.toggle()
-                            if !showSearchBar {
-                                inlineSearchText = ""
-                                searchFieldFocused = false
-                            }
-                        }
-                        if showSearchBar {
-                            // Focus the field after the bar appears so the
-                            // keyboard opens automatically — the user tapped
-                            // search, so they want to type.
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                                searchFieldFocused = true
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 18, weight: showSearchBar ? .bold : .medium))
-                            .foregroundStyle(.primary)
-                    }
-                }
-                // #118 (revised) — Notifications bell replaces the old Settings
-                // gear. Settings is still reachable via the bottom tab bar; the
-                // Home toolbar now exposes Schedule + Search + Notifications.
-                ToolbarItem(placement: .primaryAction) {
+                // Requirement #7 — Left icon = Notifications.
+                ToolbarItem(placement: .topBarLeading) {
                     NavigationLink(destination: NotificationsPage()) {
                         Image(systemName: "bell")
                             .font(.system(size: 18, weight: .medium))
                             .foregroundStyle(.primary)
                     }
                 }
-                ToolbarItem(placement: .primaryAction) {
+                // Requirement #7 — Right icon = Settings. No duplicate.
+                ToolbarItem(placement: .topBarTrailing) {
+                    NavigationLink(destination: SettingsView()) {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(.primary)
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
                     ProviderMenuButton()
                 }
             }
-            // #118 (revised) — Frosted search bar overlay. Sits below the nav
-            // bar, above the scroll content. Centered, pill-shaped, frosted
-            // glass. Only visible while `showSearchBar` is true.
-            .overlay(alignment: .top) {
-                frostedSearchBar
-                    .padding(.top, 44)
-            }
-            .animation(.easeInOut(duration: 0.2), value: showSearchBar)
             // Outside the ScrollView: the hidden NavigationLink that performs the push.
             .continueWatchingNavigation($cwNavTarget)
-            // #118 (revised) — The old `navigateToSearch` NavigationLink that
-            // pushed SearchView from the inline search pill has been removed.
-            // Search is now an inline filter on Home (toggled by the toolbar
-            // search icon) — the full SearchView is still reachable via its
-            // tab-bar entry on non-iOS platforms and via the search icon's
-            // inline results on iOS.
+            // Requirement #3 — Top search icon removed. The only search entry
+            // point is the bottom search tab (AniList-only).
             #if os(iOS)
             .fullScreenCover(item: $readerContext) { ctx in
                 MangaReaderView(context: ctx)
@@ -1391,133 +1196,203 @@ struct ScheduleView: View {
     @ViewBuilder
     private var scheduleContent: some View {
         let buckets = buildBuckets()
-        // Map each day's start-of-day date → episode count, for the calendar badges.
-        let countByDay = Dictionary(uniqueKeysWithValues: buckets.map { ($0.date, $0.entries.count) })
-        // #80 — All days needed to fill the 7-column month grid: every day in the
-        // displayed month plus leading/trailing days from adjacent months so the
-        // grid always starts on Sunday and ends on Saturday. Out-of-month days
-        // are styled grey by `dayCell`.
-        let monthDays = currentMonthGridDays()
-        let selectedBucket = buckets.first(where: { calendar.isDate($0.date, inSameDayAs: selectedDate) })
+        // Requirement #8 — Each time range has a DISTINCT layout.
+        //   • 7 days  (1 Week):  large vertical day cards, one per day.
+        //   • 14 days (2 Weeks): same 1-Week layout, continuous scroll into week 2.
+        //   • 21 days (3 Weeks): unique grouped layout (week-sectioned list).
+        //   • 30 days (1 Month): compact anime schedule view (no calendar grid).
+        switch windowDays {
+        case 7:   weekCardLayout(buckets: buckets, dayCount: 7)
+        case 14:  weekCardLayout(buckets: buckets, dayCount: 14)
+        case 21:  threeWeekGroupedLayout(buckets: buckets)
+        case 30:  monthCompactScheduleLayout(buckets: buckets)
+        default:  weekCardLayout(buckets: buckets, dayCount: 7)
+        }
+    }
 
-        // #80/107 — ONE outer ScrollView wraps the month header, weekday
-        // labels, month grid, AND the selected day's episode list together.
-        // Previously the episode list lived in its own nested ScrollView,
-        // which — when a 6-row month grid consumed most of the viewport —
-        // caused the bottom of the episode list to be cropped below the
-        // tab bar / safe area. Collapsing to a single scroll surface means
-        // the whole schedule scrolls as one block and the bottom is always
-        // reachable.
+    // MARK: - 1 Week & 2 Week Layout (Requirement #8.1, #8.2)
+    //
+    // Large vertical day cards — one card per day. Each card shows the day
+    // name, date, and the anime airing that day (poster + title + episode +
+    // countdown). 2 Week uses the EXACT same layout, just with 14 days in
+    // the continuous scroll — no layout change between weeks.
+
+    @ViewBuilder
+    private func weekCardLayout(buckets: [ScheduleDayBucket], dayCount: Int) -> some View {
         ScrollView {
-            VStack(spacing: 0) {
-                // Month header — always a single month/year (e.g. "August 2026")
-                // driven by `monthStart` (the first day of the displayed month).
-                // Prev/next arrows shift the calendar by one whole month (#80).
-                HStack(spacing: 6) {
-                    Button {
-                        shiftMonth(by: -1)
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 14, weight: .semibold))
-                            .frame(width: 30, height: 30)
-                            .background(Circle().fill(Color.secondary.opacity(0.1)))
-                            .foregroundStyle(.primary)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Previous month")
+            VStack(spacing: 14) {
+                // Range header
+                Text(dayCount == 7 ? "Next 7 Days" : "Next 14 Days")
+                    .font(.title3.weight(.bold))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
 
-                    Text(monthYearHeader)
-                        .font(.headline)
-                        .frame(maxWidth: .infinity, alignment: .center)
-
-                    Button {
-                        shiftMonth(by: 1)
-                    } label: {
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 14, weight: .semibold))
-                            .frame(width: 30, height: 30)
-                            .background(Circle().fill(Color.secondary.opacity(0.1)))
-                            .foregroundStyle(.primary)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Next month")
+                ForEach(buckets) { bucket in
+                    weekDayCard(bucket: bucket)
                 }
-                .padding(.horizontal, 12)
-                .padding(.top, 6)
-                .padding(.bottom, 8)
 
-                // Weekday labels (Sun–Sat) — single row above the 7-column grid.
-                HStack(spacing: 6) {
-                    ForEach(weekdayLabels, id: \.self) { label in
-                        Text(label)
-                            .font(.caption2.weight(.semibold))
+                if buckets.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "calendar.badge.exclamationmark")
+                            .font(.system(size: 36))
                             .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity)
-                            .lineLimit(1)
+                        Text("No episodes in the next \(dayCount) days")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 48)
                 }
-                .padding(.horizontal, 12)
-                .padding(.bottom, 6)
+                Spacer().frame(height: 28)
+            }
+        }
+    }
 
-                // Month grid — every day in the displayed month (plus leading/trailing
-                // days from adjacent months to fill the 7-column layout). Standard
-                // months fit in 4–6 rows of 7; cells are sized so 6 rows fit without
-                // scrolling on a typical phone. Each cell shows the date number, an
-                // episode-count badge (if > 0), a today marker, and a selection
-                // highlight. Tapping a leading/trailing day shifts the calendar to
-                // that month and selects the day.
-                //
-                // #80/107 — The grid is wrapped in a card-style background so it
-                // reads unambiguously as a calendar widget (not just a row of
-                // date pills). The rounded-rect card + weekday header + 7-column
-                // grid is the standard iOS calendar visual language.
-                LazyVGrid(
-                    columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7),
-                    spacing: 4
-                ) {
-                    ForEach(monthDays, id: \.self) { day in
-                        dayCell(
-                            date: day,
-                            count: countByDay[day] ?? 0,
-                            isSelected: calendar.isDate(day, inSameDayAs: selectedDate),
-                            isToday: calendar.isDateInToday(day),
-                            isInMonth: calendar.isDate(day, equalTo: monthStart, toGranularity: .month)
+    @ViewBuilder
+    private func weekDayCard(bucket: ScheduleDayBucket) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Day header — "Monday, Aug 12" + episode count badge
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(bucket.shortTitle)
+                        .font(.title3.weight(.bold))
+                    Text(bucket.title)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                if !bucket.entries.isEmpty {
+                    Text("\(bucket.entries.count)")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(Color.red))
+                }
+            }
+
+            if bucket.entries.isEmpty {
+                Text("No episodes airing")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 8)
+            } else {
+                // Episode list within this day
+                ForEach(bucket.entries) { entry in
+                    NavigationLink {
+                        ScheduleDetailView(
+                            entry: entry,
+                            useUTC: useUTC,
+                            isNotificationOn: scheduledIds.contains(entry.id),
+                            onToggleNotification: { toggleNotification(for: entry) }
+                        )
+                    } label: {
+                        ScheduleCard(
+                            entry: entry,
+                            useUTC: useUTC,
+                            isNotificationOn: scheduledIds.contains(entry.id),
+                            onToggleNotification: { toggleNotification(for: entry) },
+                            onAddToPlanning:     { addToLibrary(entry, status: .planning) },
+                            onAddToWatching:     { addToLibrary(entry, status: .current) },
+                            onViewDetails:       { detailEntry = entry }
                         )
                     }
+                    .buttonStyle(.plain)
                 }
-                .padding(12)
-                .background(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(Color.secondary.opacity(0.08))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(Color.secondary.opacity(0.1), lineWidth: 1)
-                )
-                .padding(.horizontal, 12)
-                .padding(.bottom, 12)
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.secondary.opacity(0.06))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.secondary.opacity(0.1), lineWidth: 1)
+        )
+        .padding(.horizontal, 16)
+    }
 
-                // Selected day's episodes. Lives DIRECTLY in the outer ScrollView
-                // (no nested ScrollView) so a tall month grid can't crop the list
-                // below it — the whole schedule scrolls as one block (#80/107).
-                if let bucket = selectedBucket, !bucket.entries.isEmpty {
-                    LazyVStack(spacing: 12) {
+    // MARK: - 3 Week Layout (Requirement #8.3)
+    //
+    // Unique layout: week-sectioned list. Three collapsible week sections
+    // (Week 1 / Week 2 / Week 3), each containing that week's days as
+    // compact rows. Handles more data without becoming too long — the user
+    // can scan week-by-week and each section is visually distinct from the
+    // 1/2-week day-card layout.
+
+    @ViewBuilder
+    private func threeWeekGroupedLayout(buckets: [ScheduleDayBucket]) -> some View {
+        let weekGroups = splitBucketsIntoWeeks(buckets: buckets, weekCount: 3)
+        ScrollView {
+            VStack(spacing: 20) {
+                Text("Next 3 Weeks")
+                    .font(.title3.weight(.bold))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+
+                ForEach(Array(weekGroups.enumerated()), id: \.offset) { idx, weekBuckets in
+                    VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Text(bucket.shortTitle)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(.secondary)
+                            Image(systemName: "calendar")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(Color.appAccent)
+                            Text("Week \(idx + 1)")
+                                .font(.headline)
                             Spacer()
-                            Text("\(bucket.entries.count) episode\(bucket.entries.count == 1 ? "" : "s")")
-                                .font(.caption.weight(.medium))
+                            Text("\(weekBuckets.reduce(0) { $0 + $1.entries.count }) episodes")
+                                .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
+                        .padding(.horizontal, 16)
+
+                        ForEach(weekBuckets) { bucket in
+                            compactDayRow(bucket: bucket)
+                        }
+                    }
+                }
+
+                if buckets.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "calendar.badge.exclamationmark")
+                            .font(.system(size: 36))
+                            .foregroundStyle(.secondary)
+                        Text("No episodes in the next 21 days")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 48)
+                }
+                Spacer().frame(height: 28)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func compactDayRow(bucket: ScheduleDayBucket) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(bucket.shortTitle)
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                if !bucket.entries.isEmpty {
+                    Text("\(bucket.entries.count) episode\(bucket.entries.count == 1 ? "" : "s")")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+
+            if !bucket.entries.isEmpty {
+                // Horizontal strip of posters for this day
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
                         ForEach(bucket.entries) { entry in
-                            // #107 — Tapping the card pushes `ScheduleDetailView`
-                            // (the purpose-built airing-countdown screen). The bell
-                            // button inside the card keeps working via nested-button
-                            // hit-testing (both use `.buttonStyle(.plain)`). The
-                            // "View Full Details" button inside the detail view is
-                            // what eventually pushes `AniListDetailView`.
                             NavigationLink {
                                 ScheduleDetailView(
                                     entry: entry,
@@ -1526,37 +1401,156 @@ struct ScheduleView: View {
                                     onToggleNotification: { toggleNotification(for: entry) }
                                 )
                             } label: {
-                                ScheduleCard(
-                                    entry: entry,
-                                    useUTC: useUTC,
-                                    isNotificationOn: scheduledIds.contains(entry.id),
-                                    onToggleNotification: { toggleNotification(for: entry) },
-                                    onAddToPlanning:     { addToLibrary(entry, status: .planning) },
-                                    onAddToWatching:     { addToLibrary(entry, status: .current) },
-                                    onViewDetails:       { detailEntry = entry }
-                                )
+                                VStack(alignment: .leading, spacing: 4) {
+                                    if let cover = entry.coverImage, let url = URL(string: cover) {
+                                        AsyncImage(url: url) { phase in
+                                            if case .success(let img) = phase {
+                                                img.resizable().scaledToFill()
+                                            } else {
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .fill(Color.secondary.opacity(0.2))
+                                            }
+                                        }
+                                        .frame(width: 80, height: 120)
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    } else {
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(Color.secondary.opacity(0.2))
+                                            .frame(width: 80, height: 120)
+                                    }
+                                    Text(entry.title)
+                                        .font(.caption2.weight(.medium))
+                                        .lineLimit(2)
+                                        .frame(width: 80, alignment: .leading)
+                                    Text(entry.episodeBadge)
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .foregroundStyle(Color.appAccent)
+                                }
                             }
                             .buttonStyle(.plain)
                         }
                     }
                     .padding(.horizontal, 16)
-                    .padding(.top, 4)
-                    .padding(.bottom, 24)
-                } else {
+                    .padding(.bottom, 8)
+                }
+            }
+        }
+        .background(Color.secondary.opacity(0.04), in: RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 12)
+    }
+
+    // MARK: - 1 Month Layout (Requirement #8.4)
+    //
+    // Compact anime schedule view — NO calendar grid. Each day with episodes
+    // is a single-row entry showing date + count + top 3 titles. Days with no
+    // episodes are skipped entirely to reduce empty space. Feels like a
+    // schedule, not a calendar app.
+
+    @ViewBuilder
+    private func monthCompactScheduleLayout(buckets: [ScheduleDayBucket]) -> some View {
+        let daysWithEpisodes = buckets.filter { !$0.entries.isEmpty }
+        ScrollView {
+            VStack(spacing: 8) {
+                Text("Next 30 Days")
+                    .font(.title3.weight(.bold))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                    .padding(.bottom, 4)
+
+                if daysWithEpisodes.isEmpty {
                     VStack(spacing: 12) {
                         Image(systemName: "calendar.badge.exclamationmark")
                             .font(.system(size: 36))
                             .foregroundStyle(.secondary)
-                        Text("No episodes airing this day")
+                        Text("No episodes in the next 30 days")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.top, 48)
-                    .padding(.bottom, 24)
+                } else {
+                    ForEach(daysWithEpisodes) { bucket in
+                        monthScheduleRow(bucket: bucket)
+                    }
                 }
+                Spacer().frame(height: 28)
             }
         }
+    }
+
+    @ViewBuilder
+    private func monthScheduleRow(bucket: ScheduleDayBucket) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top, spacing: 12) {
+                // Date column — compact
+                VStack(spacing: 2) {
+                    Text(bucket.shortTitle)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(Color.appAccent)
+                    Text("\(calendar.component(.day, from: bucket.date))")
+                        .font(.title2.weight(.bold))
+                }
+                .frame(width: 48)
+
+                // Titles column
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(bucket.entries.prefix(3)) { entry in
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(Color.red.opacity(0.6))
+                                .frame(width: 6, height: 6)
+                            Text(entry.title)
+                                .font(.caption)
+                                .lineLimit(1)
+                            Spacer()
+                            Text(entry.episodeBadge)
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    if bucket.entries.count > 3 {
+                        Text("+\(bucket.entries.count - 3) more")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.secondary.opacity(0.06))
+            )
+        }
+        .padding(.horizontal, 16)
+    }
+
+    // MARK: - Week splitting helper (for 3-week layout)
+
+    /// Splits the day buckets into `weekCount` contiguous week groups.
+    private func splitBucketsIntoWeeks(buckets: [ScheduleDayBucket], weekCount: Int) -> [[ScheduleDayBucket]] {
+        guard !buckets.isEmpty else { return Array(repeating: [], count: weekCount) }
+        let perWeek = max(1, buckets.count / weekCount)
+        var groups: [[ScheduleDayBucket]] = []
+        var idx = 0
+        for _ in 0..<weekCount {
+            let end = min(idx + perWeek, buckets.count)
+            if idx < end {
+                groups.append(Array(buckets[idx..<end]))
+                idx = end
+            } else {
+                groups.append([])
+            }
+        }
+        // Append any remainder to the last non-empty group.
+        if idx < buckets.count {
+            if groups.last?.isEmpty == true {
+                groups[groups.count - 1] = Array(buckets[idx...])
+            } else {
+                groups[groups.count - 1].append(contentsOf: buckets[idx...])
+            }
+        }
+        return groups
     }
 
     @ViewBuilder

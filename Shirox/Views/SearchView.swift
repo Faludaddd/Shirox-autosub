@@ -519,6 +519,8 @@ struct SearchFilterSheet: View {
     @State private var maxDurationText: String = ""
     @State private var maxScoreText: String = ""
     @State private var minScoreText: String = ""
+    @State private var minChaptersText: String = ""
+    @State private var maxChaptersText: String = ""
     @State private var tagInputText: String = ""
     @State private var excludeTagInputText: String = ""
     @FocusState private var maxEpisodesFocused: Bool
@@ -556,8 +558,8 @@ struct SearchFilterSheet: View {
     ]
 
     private let formats: [(String, String)] = [
-        ("Any", ""), ("TV", "TV"), ("Movie", "MOVIE"), ("OVA", "OVA"),
-        ("ONA", "ONA"), ("Special", "SPECIAL"), ("Music", "MUSIC")
+        ("Any", ""), ("TV", "TV"), ("TV Short", "TV_SHORT"), ("Movie", "MOVIE"),
+        ("OVA", "OVA"), ("ONA", "ONA"), ("Special", "SPECIAL"), ("Music", "MUSIC")
     ]
 
     private let statuses: [(String, String)] = [
@@ -925,6 +927,45 @@ struct SearchFilterSheet: View {
                         .font(.caption)
                 }
 
+                // MARK: Chapter Count Range (Requirement #4)
+                Section {
+                    HStack {
+                        Text("Min Chapters")
+                        Spacer()
+                        TextField("0", text: $minChaptersText)
+                            #if os(iOS)
+                            .keyboardType(.numberPad)
+                            #endif
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 80)
+                            .onChangeOf(minChaptersText) { newValue in
+                                let trimmed = newValue.filter(\.isNumber)
+                                if trimmed != newValue { minChaptersText = trimmed }
+                                localFilters.minChapters = Int(trimmed)
+                            }
+                    }
+                    HStack {
+                        Text("Max Chapters")
+                        Spacer()
+                        TextField("Any", text: $maxChaptersText)
+                            #if os(iOS)
+                            .keyboardType(.numberPad)
+                            #endif
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 80)
+                            .onChangeOf(maxChaptersText) { newValue in
+                                let trimmed = newValue.filter(\.isNumber)
+                                if trimmed != newValue { maxChaptersText = trimmed }
+                                localFilters.maxChapters = Int(trimmed)
+                            }
+                    }
+                } header: {
+                    sectionHeader("Chapter Count", icon: "book.closed")
+                } footer: {
+                    Text("Filter by total chapter count (primarily for manga search). Use 0 / blank for no limit.")
+                        .font(.caption)
+                }
+
                 // MARK: Additional Toggles (#132)
                 Section {
                     Toggle("Only Show Titles With Episodes", isOn: $localFilters.onlyHasEpisodes)
@@ -963,6 +1004,8 @@ struct SearchFilterSheet: View {
             maxDurationText = localFilters.maxDuration.map { String($0) } ?? ""
             minScoreText = localFilters.minScore.map { String($0) } ?? ""
             maxScoreText = localFilters.maxScore.map { String($0) } ?? ""
+            minChaptersText = localFilters.minChapters.map { String($0) } ?? ""
+            maxChaptersText = localFilters.maxChapters.map { String($0) } ?? ""
         }
         #if os(iOS)
         .adaptivePresentationDetents([.large])
@@ -1163,6 +1206,8 @@ struct SearchFilterSheet: View {
                     maxDurationText = ""
                     minScoreText = ""
                     maxScoreText = ""
+                    minChaptersText = ""
+                    maxChaptersText = ""
                     tagInputText = ""
                     excludeTagInputText = ""
                 } label: {

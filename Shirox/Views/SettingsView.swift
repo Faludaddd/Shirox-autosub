@@ -867,13 +867,7 @@ struct AppearanceSettingsPage: View {
     @AppStorage("reduceMotion") private var reduceMotion = false
     @AppStorage("glowEnabled") private var glowEnabled = true
     @AppStorage("glowIntensity") private var glowIntensity: Double = 0.5
-    /// #119 correction — Browse Categories defaults to ON so the old/original
-    /// Home layout (with browse sections) is the app's default.
-    @AppStorage("showBrowseCategories") private var showBrowseCategories = true
-    /// #120 correction — Switches Browse Categories between the grid layout
-    /// (CategoryGridCard tiles, default) and the horizontal carousels
-    /// (AnimeSection). Only effective when `showBrowseCategories` is ON.
-    @AppStorage("browseCategoriesGridLayout") private var browseCategoriesGridLayout = true
+    /// Requirement #1 — Browse Categories is always enabled; no toggle.
     /// #122 — Whether to render the Statistics grid on detail pages.
     @AppStorage("showStatistics") private var showStatistics = true
     // #118 (revised) — `inlineSearchOnHome` AppStorage removed. Search is now
@@ -928,18 +922,9 @@ struct AppearanceSettingsPage: View {
             Section("Motion") {
                 Toggle("Reduce Motion", isOn: $reduceMotion)
             }
-            Section("Home") {
-                Toggle("Show Browse Categories on Home", isOn: $showBrowseCategories)
-                // #120 correction — Layout switch for Browse Categories. When
-                // ON, the grid (CategoryGridCard tiles) is shown; when OFF,
-                // the horizontal carousels (AnimeSection) are shown. Only
-                // has an effect when "Show Browse Categories on Home" is ON.
-                Toggle("Browse Categories as Grid", isOn: $browseCategoriesGridLayout)
-            }
-            // #118 / #122 — Detail-page and Home-screen layout toggles.
-            // #118 (revised) — "Inline Search on Home" toggle removed: search
-            // is now always triggered by the toolbar icon and reveals a
-            // frosted pill bar. There's no longer an alternate mode to toggle.
+            // Requirement #1 — "Show Browse Categories on Home" toggle removed
+            // entirely. Browse Categories is always enabled by default.
+            // Requirement #122 — Detail-page statistics toggle.
             Section {
                 Toggle("Show Statistics on Detail Pages", isOn: $showStatistics)
             } header: {
@@ -978,8 +963,6 @@ struct AppearanceSettingsPage: View {
                     glowEnabled = true
                     glowIntensity = 0.5
                     showStatistics = true
-                    showBrowseCategories = true
-                    browseCategoriesGridLayout = true
                 }
                 .tint(.appAccent)
             }

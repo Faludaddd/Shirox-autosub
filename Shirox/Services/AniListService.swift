@@ -94,6 +94,11 @@ final class AniListService {
         var countryOfOrigin: String? = nil     // "JP", "KR", "CN" etc. AniList `countryOfOrigin`.
         var minDuration: Int? = nil            // Episode duration lower bound (minutes). AniList `duration_greater`.
         var maxDuration: Int? = nil            // Episode duration upper bound (minutes). AniList `duration_lesser`.
+        // Requirement #4 — Chapter count range (for manga search). AniList's
+        // `chapters_greater` / `chapters_lesser` are strict inequalities, same
+        // as episodes — we apply the same ±1 correction in the query builder.
+        var minChapters: Int? = nil
+        var maxChapters: Int? = nil
         var startDateAfter: String? = nil      // "YYYYMMDD" — only titles that started on/after this date.
         var startDateBefore: String? = nil     // "YYYYMMDD" — only titles that started on/before this date.
         var endDateAfter: String? = nil        // "YYYYMMDD" — only titles that ended on/after this date.
@@ -114,6 +119,7 @@ final class AniListService {
                 && tags.isEmpty && excludeGenres.isEmpty && excludeTags.isEmpty
                 && (countryOfOrigin?.isEmpty ?? true)
                 && minDuration == nil && maxDuration == nil
+                && minChapters == nil && maxChapters == nil
                 && startDateAfter == nil && startDateBefore == nil
                 && endDateAfter == nil && endDateBefore == nil
                 && !onlyHasEpisodes
@@ -153,6 +159,11 @@ final class AniListService {
         if let country = filters.countryOfOrigin, !country.isEmpty { variables["countryOfOrigin"] = country }
         if let minDur = filters.minDuration, minDur > 0 { variables["duration_greater"] = minDur - 1 }
         if let maxDur = filters.maxDuration, maxDur > 0 { variables["duration_lesser"] = maxDur + 1 }
+        // Requirement #4 — Chapter count range (for manga search). AniList's
+        // `chapters_greater` / `chapters_lesser` are strict inequalities, so
+        // apply the same ±1 inclusive correction as episodes.
+        if let minCh = filters.minChapters, minCh > 0 { variables["chapters_greater"] = minCh - 1 }
+        if let maxCh = filters.maxChapters, maxCh > 0 { variables["chapters_lesser"] = maxCh + 1 }
         if let startDateAfter = filters.startDateAfter, !startDateAfter.isEmpty { variables["startDate_greater"] = startDateAfter }
         if let startDateBefore = filters.startDateBefore, !startDateBefore.isEmpty { variables["startDate_lesser"] = startDateBefore }
         if let endDateAfter = filters.endDateAfter, !endDateAfter.isEmpty { variables["endDate_greater"] = endDateAfter }
@@ -177,6 +188,8 @@ final class AniListService {
         if filters.countryOfOrigin != nil { mediaArgs.append("countryOfOrigin: $countryOfOrigin") }
         if filters.minDuration != nil { mediaArgs.append("duration_greater: $duration_greater") }
         if filters.maxDuration != nil { mediaArgs.append("duration_lesser: $duration_lesser") }
+        if filters.minChapters != nil { mediaArgs.append("chapters_greater: $chapters_greater") }
+        if filters.maxChapters != nil { mediaArgs.append("chapters_lesser: $chapters_lesser") }
         if filters.startDateAfter != nil { mediaArgs.append("startDate_greater: $startDate_greater") }
         if filters.startDateBefore != nil { mediaArgs.append("startDate_lesser: $startDate_lesser") }
         if filters.endDateAfter != nil { mediaArgs.append("endDate_greater: $endDate_greater") }
@@ -201,6 +214,8 @@ final class AniListService {
         if filters.countryOfOrigin != nil { varDecls.append("$countryOfOrigin: CountryCode") }
         if filters.minDuration != nil { varDecls.append("$duration_greater: Int") }
         if filters.maxDuration != nil { varDecls.append("$duration_lesser: Int") }
+        if filters.minChapters != nil { varDecls.append("$chapters_greater: Int") }
+        if filters.maxChapters != nil { varDecls.append("$chapters_lesser: Int") }
         if filters.startDateAfter != nil { varDecls.append("$startDate_greater: FuzzyDateInt") }
         if filters.startDateBefore != nil { varDecls.append("$startDate_lesser: FuzzyDateInt") }
         if filters.endDateAfter != nil { varDecls.append("$endDate_greater: FuzzyDateInt") }
