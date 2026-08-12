@@ -303,9 +303,7 @@ struct HomeView: View {
             // is in "navigate" mode (i.e. `inlineSearchOnHome` is disabled).
             // Triggered by tapping the pill-shaped search affordance at the top
             // of Home.
-            .navigationDestination(isPresented: $navigateToSearch) {
-                SearchView()
-            }
+            .background(NavigationLink(isActive: $navigateToSearch) { SearchView() } label: { EmptyView().hidden() })
             #if os(iOS)
             .fullScreenCover(item: $readerContext) { ctx in
                 MangaReaderView(context: ctx)
