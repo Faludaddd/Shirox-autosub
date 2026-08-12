@@ -20,6 +20,21 @@ jobs:
      - name: Checkout repository
        uses: actions/checkout@v6
 
+     - name: Bump build version
+       run: |
+         # Auto-increment the build version on every CI run so each IPA
+         # has a unique, increasing version number. Uses the GitHub run
+         # number as the build version — it's monotonically increasing
+         # across all pushes to main, so every build is distinguishable.
+         BUILD_NUM="${{ github.run_number }}"
+         MARKETING_VER=$(date -u +'%Y.%-m.%-d')
+         echo "Setting CURRENT_PROJECT_VERSION=$BUILD_NUM and MARKETING_VERSION=$MARKETING_VER"
+         sed -i '' "s/CURRENT_PROJECT_VERSION = [0-9]*/CURRENT_PROJECT_VERSION = $BUILD_NUM/g" Shirox.xcodeproj/project.pbxproj
+         sed -i '' "s/MARKETING_VERSION = [0-9.]*/MARKETING_VERSION = $MARKETING_VER/g" Shirox.xcodeproj/project.pbxproj
+         echo "## Build Version" >> $GITHUB_STEP_SUMMARY
+         echo "**Marketing version:** $MARKETING_VER" >> $GITHUB_STEP_SUMMARY
+         echo "**Build number:** $BUILD_NUM (GitHub run #${{ github.run_number }})" >> $GITHUB_STEP_SUMMARY
+
      - name: Make build script executable
        run: chmod +x ./buildipa.sh
 
@@ -81,6 +96,13 @@ jobs:
    steps:
      - name: Checkout repository
        uses: actions/checkout@v6
+
+     - name: Bump build version
+       run: |
+         BUILD_NUM="${{ github.run_number }}"
+         MARKETING_VER=$(date -u +'%Y.%-m.%-d')
+         sed -i '' "s/CURRENT_PROJECT_VERSION = [0-9]*/CURRENT_PROJECT_VERSION = $BUILD_NUM/g" Shirox.xcodeproj/project.pbxproj
+         sed -i '' "s/MARKETING_VERSION = [0-9.]*/MARKETING_VERSION = $MARKETING_VER/g" Shirox.xcodeproj/project.pbxproj
 
      - name: Make build script executable
        run: chmod +x ./buildcatalyst.sh
