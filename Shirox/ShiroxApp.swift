@@ -143,7 +143,7 @@ extension Color {
         // sources, install buttons) so the GPU isn't paid for shadow passes
         // the user can't perceive under the perf-mode lens.
         if performanceModeEnabled { return false }
-        UserDefaults.standard.object(forKey: "glowEnabled") as? Bool ?? true
+        return UserDefaults.standard.object(forKey: "glowEnabled") as? Bool ?? true
     }
 
     static var dataSavingMode: Bool {
