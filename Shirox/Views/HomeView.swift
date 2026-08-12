@@ -1339,7 +1339,7 @@ struct ScheduleView: View {
                             .frame(width: 58, height: 72)
                             .background(
                                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .fill(isSelected ? Color.appAccent : Color.secondary.opacity(0.2))
+                                    .fill(isSelected ? Color.appAccent : Color(.secondarySystemBackground))
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -1440,7 +1440,7 @@ struct ScheduleView: View {
                             .frame(minHeight: 48)
                             .background(
                                 RoundedRectangle(cornerRadius: 10)
-                                    .fill(isSelected ? Color.primary.opacity(0.12) : Color.secondary.opacity(0.2))
+                                    .fill(isSelected ? Color.primary.opacity(0.12) : Color(.secondarySystemBackground))
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10)
@@ -1514,89 +1514,6 @@ struct ScheduleView: View {
     }
 
 
-    @ViewBuilder
-    private func dayCell(date: Date, count: Int, isSelected: Bool, isToday: Bool, isInMonth: Bool) -> some View {
-        Button {
-            // Tapping a leading/trailing day from an adjacent month shifts the
-            // calendar to that month and selects the tapped day (#80). Tapping
-            // an in-month day just selects it.
-            withAnimation(.easeOut(duration: 0.18)) {
-                if !isInMonth {
-                    let cal = calendar
-                    monthStart = cal.dateInterval(of: .month, for: date)?.start ?? monthStart
-                }
-                selectedDate = date
-            }
-        } label: {
-            VStack(spacing: 4) {
-                Text("\(calendar.component(.day, from: date))")
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(isInMonth ? Color.primary : Color.secondary.opacity(0.45))
-
-                if count > 0 {
-                    Text("\(count)")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 1)
-                        .background(
-                            Capsule().fill(Color.red)
-                        )
-                        .fixedSize()
-                        .opacity(isInMonth ? 1 : 0.5)
-                } else if isToday {
-                    // Today marker — a filled primary-colored dot under days
-                    // with no episodes. Only rendered for in-month days so the
-                    // marker reads as "today" rather than just a spacer.
-                    Circle()
-                        .fill(isInMonth ? Color.primary : Color.primary.opacity(0.4))
-                        .frame(width: 5, height: 5)
-                } else {
-                    Circle()
-                        .fill(Color.secondary.opacity(0.3))
-                        .frame(width: 5, height: 5)
-                        .opacity(isInMonth ? 1 : 0.35)
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .aspectRatio(1, contentMode: .fit)
-            .frame(minHeight: 48)
-            .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(isSelected ? Color.primary.opacity(0.12) : Color.secondary.opacity(0.06))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .strokeBorder(
-                        isSelected ? Color.primary.opacity(0.35) :
-                        (isToday && isInMonth ? Color.primary.opacity(0.3) : Color.clear),
-                        lineWidth: 1
-                    )
-            )
-            .shadow(
-                color: isSelected && Color.glowEnabled
-                    ? Color.primary.opacity(Color.glowIntensity * 0.5) : .clear,
-                radius: isSelected && Color.glowEnabled
-                    ? CGFloat(17 * Color.glowIntensity) : 0
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(accessibilityLabelForDay(date, count: count, isInMonth: isInMonth))
-    }
-
-    private func accessibilityLabelForDay(_ date: Date, count: Int, isInMonth: Bool) -> String {
-        let cal = calendar
-        let f = DateFormatter()
-        f.locale = cal.locale ?? Locale.current
-        f.timeZone = cal.timeZone
-        f.dateFormat = "EEEE, MMMM d"
-        let base = f.string(from: date)
-        let prefix = isInMonth ? "" : "Adjacent month — "
-        if count > 0 {
-            return "\(prefix)\(base), \(count) episode\(count == 1 ? "" : "s")"
-        }
-        return "\(prefix)\(base), no episodes"
-    }
 
     private var scheduleLoadingView: some View {
         VStack(spacing: 16) {

@@ -124,11 +124,16 @@ final class EpisodeNotificationManager: NSObject, ObservableObject {
             return false
         }
         let lead = leadTime
-        let fireTimestamp = TimeInterval(airingAt) - TimeInterval(lead.seconds)
-        let fireDate = Date(timeIntervalSince1970: fireTimestamp)
+        let airingDate = Date(timeIntervalSince1970: TimeInterval(airingAt))
+        var fireTimestamp = TimeInterval(airingAt) - TimeInterval(lead.seconds)
 
+        if fireTimestamp <= Date().timeIntervalSince1970 {
+            fireTimestamp = TimeInterval(airingAt)
+        }
+
+        let fireDate = Date(timeIntervalSince1970: fireTimestamp)
         guard fireDate > Date() else {
-            Logger.shared.log("[EpisodeNotification] Skipping schedule \(scheduleId): fire time is in the past", type: "Debug")
+            Logger.shared.log("[EpisodeNotification] Skipping schedule \(scheduleId): airing time is in the past", type: "Debug")
             return false
         }
 
