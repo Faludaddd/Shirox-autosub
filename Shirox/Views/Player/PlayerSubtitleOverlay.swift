@@ -102,8 +102,7 @@ struct PlayerSubtitleOverlay: View {
             // escapes under the notch / home indicator in landscape. The
             // padding is applied INSIDE the GeometryReader so it doesn't
             // affect the width calculation above.
-            .padding(.horizontal, max(8, proxy.safeAreaInsets.left))
-            .padding(.bottom, proxy.safeAreaInsets.bottom > 0 ? 0 : 0)
+            .padding(.horizontal, max(8, proxy.safeAreaInsets.leading))
         }
     }
 }
