@@ -871,7 +871,9 @@ struct AppearanceSettingsPage: View {
     @AppStorage("reduceMotion") private var reduceMotion = false
     @AppStorage("glowEnabled") private var glowEnabled = true
     @AppStorage("glowIntensity") private var glowIntensity: Double = 0.5
-    /// Requirement #1 — Browse Categories is always enabled; no toggle.
+    /// Issue #5 — Browse Categories layout toggle. OFF = carousels (default),
+    /// ON = grid tiles.
+    @AppStorage("browseCategoriesGridLayout") private var browseCategoriesGridLayout = false
     /// #122 — Whether to render the Statistics grid on detail pages.
     @AppStorage("showStatistics") private var showStatistics = true
     // #118 (revised) — `inlineSearchOnHome` AppStorage removed. Search is now
@@ -926,15 +928,14 @@ struct AppearanceSettingsPage: View {
             Section("Motion") {
                 Toggle("Reduce Motion", isOn: $reduceMotion)
             }
-            // Requirement #1 — "Show Browse Categories on Home" toggle removed
-            // entirely. Browse Categories is always enabled by default.
-            // Requirement #122 — Detail-page statistics toggle.
+            // Issue #5 — Browse Categories layout toggle + statistics toggle.
             Section {
+                Toggle("Browse Categories as Grid", isOn: $browseCategoriesGridLayout)
                 Toggle("Show Statistics on Detail Pages", isOn: $showStatistics)
             } header: {
                 Text("Layout")
             } footer: {
-                Text("Show Statistics renders the compact metadata grid on detail pages.")
+                Text("Browse Categories as Grid switches the Home browse section between horizontal carousels (default) and a 2-column tile grid. Show Statistics renders the compact metadata grid on detail pages.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

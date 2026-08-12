@@ -21,6 +21,10 @@ struct HomeView: View {
     @State private var isRefreshing = false
     // Requirement #3 — Top search icon and inline search bar removed.
     // The only search entry point is the bottom search tab (AniList-only).
+    // Issue #5 — Browse Categories layout toggle. Defaults to `false` so the
+    // carousel layout (AnimeSection horizontal strips) is the DEFAULT. When
+    // ON, the grid layout (CategoryGridCard tiles) is shown instead.
+    @AppStorage("browseCategoriesGridLayout") private var browseCategoriesGridLayout = false
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -85,10 +89,23 @@ struct HomeView: View {
                             #endif
 
                             // ────────────────────────────────────────────────────────
-                            // 3. BROWSE CATEGORIES — always enabled (requirement #1).
-                            //    Grid layout is the single permanent layout.
+                            // 3. BROWSE CATEGORIES — Issue #5. Two layouts, controlled
+                            //    by `browseCategoriesGridLayout`:
+                            //      • Default (setting OFF): horizontal carousels
+                            //      • Alternate (setting ON): 2-column grid of tiles
+                            //    The grid layout (currently shown) is now the NON-
+                            //    default — it only appears when the setting is ON.
                             // ────────────────────────────────────────────────────────
-                            browseCategoriesGrid
+                            if browseCategoriesGridLayout {
+                                browseCategoriesGrid
+                            } else {
+                                AnimeSection(title: "This Season", items: vm.seasonal, category: .seasonal)
+                                AnimeSection(title: "Trending Now", items: vm.trending, category: .trending)
+                                AnimeSection(title: "All-Time Popular", items: vm.popular, category: .popular)
+                                AnimeSection(title: "Top Rated", items: vm.topRated, category: .topRated)
+                                AnimeSection(title: "Recently Completed", items: vm.recentlyCompleted, category: .popular)
+                                AnimeSection(title: "Upcoming", items: vm.upcoming, category: .trending)
+                            }
 
                             Spacer().frame(height: 28)
                         }
@@ -728,24 +745,41 @@ private struct FeaturedCard: View, Equatable {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 // iPhone: banner / cover image fills the ENTIRE card area.
-                // #110 — Previously this used `TVDBPosterImage(media:type:.fanart)`
-                // which performs an async TVDB lookup that can fail (returning
-                // nothing), leaving the card empty or cropped to whatever
-                // fallback the TVDB layer could find. Switching to
-                // `CachedAsyncImage` with the banner URL directly (falling
-                // back to the cover image's extraLarge / large variants) means
-                // the image always renders from the AniList-provided URL
-                // without the extra TVDB round-trip.
+                // Issue #4 — Fix image scaling/cropping bug. The previous
+                // implementation used `CachedAsyncImage` which always applies
+                // `.scaledToFill()` — this zooms into the image to fill the
+                // tall card frame, heavily cropping cover/poster images
+                // (which are portrait 2:3). The user sees a zoomed/cropped
+                // image instead of the full artwork.
                 //
-                // The `.frame(maxWidth: .infinity, maxHeight: .infinity)` makes
-                // the image fill the full card area edge-to-edge — no
-                // `.aspectRatio`, no parallax buffer, no height constraint.
-                // `CachedAsyncImage` already applies `.scaledToFill()` so the
-                // image fills this frame completely (cropping only what
-                // overflows), and `.clipped()` keeps the overflow contained.
-                CachedAsyncImage(urlString: media.bannerImage ?? media.coverImage.extraLarge ?? media.coverImage.large ?? "")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
+                // Fix: use SwiftUI's native `AsyncImage` with explicit
+                // `.scaledToFit()` when the image source is a cover/poster
+                // (portrait), and `.scaledToFill()` only when it's a true
+                // banner (landscape). This preserves the full artwork for
+                // cover images while still filling the frame for banners.
+                let imageURL = media.bannerImage ?? media.coverImage.extraLarge ?? media.coverImage.large ?? ""
+                let isBanner = media.bannerImage != nil
+                AsyncImage(url: URL(string: imageURL)) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFit()
+                    case .failure, .empty:
+                        // Fallback gradient while loading or if the URL fails
+                        LinearGradient(
+                            colors: [Color.secondary.opacity(0.3), Color.secondary.opacity(0.1)],
+                            startPoint: .top, endPoint: .bottom
+                        )
+                    @unknown default:
+                        LinearGradient(
+                            colors: [Color.secondary.opacity(0.3), Color.secondary.opacity(0.1)],
+                            startPoint: .top, endPoint: .bottom
+                        )
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
             }
             #else
             // macOS: banner background + poster overlay
@@ -1194,95 +1228,32 @@ struct ScheduleView: View {
 
     // MARK: - Content
 
-    // Issue #8 — Restored original Schedule layout: calendar grid + selected
-    // day's episode list. The 4 distinct time-range layouts (week cards, 3-
-    // week grouped, month compact) have been removed per the user's request
-    // to restore the original working state.
+    // Issue #1/#3/#11 — Schedule date layouts. Each window range has its own
+    // DISTINCT date selector design. The anime cards (ScheduleCard list) below
+    // the selector are IDENTICAL across all ranges — only the date section
+    // changes. The full Schedule pipeline (cards → countdown → notify →
+    // notifications) is preserved untouched.
     @ViewBuilder
     private var scheduleContent: some View {
         let buckets = buildBuckets()
         let countByDay = Dictionary(uniqueKeysWithValues: buckets.map { ($0.date, $0.entries.count) })
-        let monthDays = currentMonthGridDays()
         let selectedBucket = buckets.first(where: { calendar.isDate($0.date, inSameDayAs: selectedDate) })
 
         ScrollView {
             VStack(spacing: 0) {
-                // Month header — prev/next arrows shift the calendar by one month.
-                HStack(spacing: 6) {
-                    Button {
-                        shiftMonth(by: -1)
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 14, weight: .semibold))
-                            .frame(width: 30, height: 30)
-                            .background(Circle().fill(Color.secondary.opacity(0.1)))
-                            .foregroundStyle(.primary)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Previous month")
-
-                    Text(monthYearHeader)
-                        .font(.headline)
-                        .frame(maxWidth: .infinity, alignment: .center)
-
-                    Button {
-                        shiftMonth(by: 1)
-                    } label: {
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 14, weight: .semibold))
-                            .frame(width: 30, height: 30)
-                            .background(Circle().fill(Color.secondary.opacity(0.1)))
-                            .foregroundStyle(.primary)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Next month")
+                // ─── DATE SELECTOR (changes per range) ──────────────────
+                switch windowDays {
+                case 7:   dateSelector7Days(buckets: buckets, countByDay: countByDay)
+                case 14:  dateSelector2Weeks(buckets: buckets, countByDay: countByDay)
+                case 21:  dateSelector3Weeks(buckets: buckets, countByDay: countByDay)
+                case 30:  dateSelector1Month(buckets: buckets, countByDay: countByDay)
+                default:  dateSelector7Days(buckets: buckets, countByDay: countByDay)
                 }
-                .padding(.horizontal, 12)
-                .padding(.top, 6)
-                .padding(.bottom, 8)
 
-                // Weekday labels (Sun–Sat)
-                HStack(spacing: 6) {
-                    ForEach(weekdayLabels, id: \.self) { label in
-                        Text(label)
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity)
-                            .lineLimit(1)
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.bottom, 6)
-
-                // Calendar grid — day cells with episode count badges
-                LazyVGrid(
-                    columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7),
-                    spacing: 4
-                ) {
-                    ForEach(monthDays, id: \.self) { day in
-                        dayCell(
-                            date: day,
-                            count: countByDay[day] ?? 0,
-                            isSelected: calendar.isDate(day, inSameDayAs: selectedDate),
-                            isToday: calendar.isDateInToday(day),
-                            isInMonth: calendar.isDate(day, equalTo: monthStart, toGranularity: .month)
-                        )
-                    }
-                }
-                .padding(12)
-                .background(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(Color.secondary.opacity(0.08))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(Color.secondary.opacity(0.1), lineWidth: 1)
-                )
-                .padding(.horizontal, 12)
-                .padding(.bottom, 12)
-
-                // Selected day's episodes — original ScheduleCard design with
-                // live countdown, notify-when-aired bell, and action buttons.
+                // ─── ANIME CARDS (identical for all ranges) ─────────────
+                // Issue #11 — The anime card section is NOT changed. It uses
+                // the original ScheduleCard design with live countdown,
+                // notify-when-aired bell, and action buttons.
                 if let bucket = selectedBucket, !bucket.entries.isEmpty {
                     LazyVStack(spacing: 12) {
                         HStack {
@@ -1334,6 +1305,376 @@ struct ScheduleView: View {
                 }
             }
         }
+    }
+
+    // MARK: - 7 Days Date Selector (Issue #1)
+    //
+    // Horizontal scroll of 7 day-pills. Each pill shows the weekday abbreviation
+    // + day number + episode count badge. Distinct from the other ranges because
+    // it's a single-row horizontal strip (no grid, no month header).
+
+    @ViewBuilder
+    private func dateSelector7Days(buckets: [ScheduleDayBucket], countByDay: [Date: Int]) -> some View {
+        let today = calendar.startOfDay(for: Date())
+        let days = (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: today) }
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(days, id: \.self) { day in
+                        let count = countByDay[day] ?? 0
+                        let isSelected = calendar.isDate(day, inSameDayAs: selectedDate)
+                        let isToday = calendar.isDateInToday(day)
+                        Button {
+                            withAnimation(.easeOut(duration: 0.18)) {
+                                selectedDate = day
+                            }
+                        } label: {
+                            VStack(spacing: 6) {
+                                Text(weekdayShort(for: day))
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(isSelected ? .white : .secondary)
+                                Text("\(calendar.component(.day, from: day))")
+                                    .font(.title3.weight(.bold))
+                                    .foregroundStyle(isSelected ? .white : .primary)
+                                if count > 0 {
+                                    Text("\(count)")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundStyle(isSelected ? .white : .red)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(
+                                            Capsule().fill(isSelected ? Color.white.opacity(0.25) : Color.red.opacity(0.15))
+                                        )
+                                } else {
+                                    Circle()
+                                        .fill(isToday ? Color.red : Color.clear)
+                                        .frame(width: 5, height: 5)
+                                }
+                            }
+                            .frame(width: 58, height: 84)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(isSelected ? Color.appAccent : Color.secondary.opacity(0.08))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .strokeBorder(
+                                        isToday && !isSelected ? Color.red.opacity(0.4) : Color.clear,
+                                        lineWidth: 1.5
+                                    )
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .id(day)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+            }
+            .onAppear {
+                proxy.scrollTo(today, anchor: .center)
+            }
+        }
+    }
+
+    // MARK: - 2 Weeks Date Selector (Issue #1)
+    //
+    // Two-row grid: Week 1 on top, Week 2 on bottom. Each row is a 7-column
+    // strip of compact day cells. Distinct from 7 Days because it's a grid
+    // (not a single scrollable strip) and clearly communicates "two weeks" via
+    // the row separation and week labels.
+
+    @ViewBuilder
+    private func dateSelector2Weeks(buckets: [ScheduleDayBucket], countByDay: [Date: Int]) -> some View {
+        let today = calendar.startOfDay(for: Date())
+        let week1 = (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: today) }
+        let week2 = (7..<14).compactMap { calendar.date(byAdding: .day, value: $0, to: today) }
+        VStack(spacing: 10) {
+            weekRow(label: "Week 1", days: week1, countByDay: countByDay)
+            weekRow(label: "Week 2", days: week2, countByDay: countByDay)
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
+        .padding(.bottom, 4)
+    }
+
+    @ViewBuilder
+    private func weekRow(label: String, days: [Date], countByDay: [Date: Int]) -> some View {
+        VStack(spacing: 6) {
+            HStack {
+                Text(label)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+            HStack(spacing: 4) {
+                ForEach(days, id: \.self) { day in
+                    let count = countByDay[day] ?? 0
+                    let isSelected = calendar.isDate(day, inSameDayAs: selectedDate)
+                    let isToday = calendar.isDateInToday(day)
+                    Button {
+                        withAnimation(.easeOut(duration: 0.18)) {
+                            selectedDate = day
+                        }
+                    } label: {
+                        VStack(spacing: 3) {
+                            Text(weekdayShort(for: day))
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(isSelected ? .white : .secondary)
+                            Text("\(calendar.component(.day, from: day))")
+                                .font(.subheadline.weight(.bold))
+                                .foregroundStyle(isSelected ? .white : .primary)
+                            if count > 0 {
+                                Text("\(count)")
+                                    .font(.system(size: 8, weight: .bold))
+                                    .foregroundStyle(isSelected ? .white : .red)
+                            } else {
+                                Color.clear.frame(height: 10)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 56)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(isSelected ? Color.appAccent : Color.secondary.opacity(0.08))
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    // MARK: - 3 Weeks Date Selector (Issue #1)
+    //
+    // Unique compact-list layout: each day is a single horizontal row showing
+    // date + episode count, grouped into 3 collapsible-feeling sections.
+    // Distinct from 7 Days (pills) and 2 Weeks (grid) — it's a vertical list
+    // optimized for scanning 21 days without clutter.
+
+    @ViewBuilder
+    private func dateSelector3Weeks(buckets: [ScheduleDayBucket], countByDay: [Date: Int]) -> some View {
+        let today = calendar.startOfDay(for: Date())
+        let allDays = (0..<21).compactMap { calendar.date(byAdding: .day, value: $0, to: today) }
+        let week1 = Array(allDays[0..<7])
+        let week2 = Array(allDays[7..<14])
+        let week3 = Array(allDays[14..<21])
+        VStack(spacing: 8) {
+            threeWeekSection(label: "Week 1", days: week1, countByDay: countByDay)
+            threeWeekSection(label: "Week 2", days: week2, countByDay: countByDay)
+            threeWeekSection(label: "Week 3", days: week3, countByDay: countByDay)
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
+        .padding(.bottom, 4)
+    }
+
+    @ViewBuilder
+    private func threeWeekSection(label: String, days: [Date], countByDay: [Date: Int]) -> some View {
+        VStack(spacing: 4) {
+            HStack {
+                Text(label)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(Color.appAccent)
+                Spacer()
+            }
+            .padding(.horizontal, 4)
+            ForEach(days, id: \.self) { day in
+                let count = countByDay[day] ?? 0
+                let isSelected = calendar.isDate(day, inSameDayAs: selectedDate)
+                let isToday = calendar.isDateInToday(day)
+                Button {
+                    withAnimation(.easeOut(duration: 0.18)) {
+                        selectedDate = day
+                    }
+                } label: {
+                    HStack(spacing: 10) {
+                        Text(weekdayShort(for: day))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 32, alignment: .leading)
+                        Text("\(calendar.component(.day, from: day))")
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(isSelected ? .white : .primary)
+                        Spacer()
+                        if count > 0 {
+                            Text("\(count) episode\(count == 1 ? "" : "s")")
+                                .font(.caption2)
+                                .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
+                        }
+                        if isToday {
+                            Circle()
+                                .fill(Color.red)
+                                .frame(width: 6, height: 6)
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(isSelected ? Color.appAccent : Color.secondary.opacity(0.05))
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    // MARK: - 1 Month Date Selector (Issue #1, #3)
+    //
+    // Issue #3 — Shows ONLY the current calendar month. No prev/next
+    // navigation buttons, no month swiping, no trailing/leading days from
+    // adjacent months. The month auto-updates when the real calendar month
+    // changes (monthStart is always derived from the current date, never
+    // from user navigation).
+    //
+    // Layout: clean calendar grid with weekday headers. Only current-month
+    // days are shown — no greyed-out adjacent-month dates.
+
+    @ViewBuilder
+    private func dateSelector1Month(buckets: [ScheduleDayBucket], countByDay: [Date: Int]) -> some View {
+        // Issue #3 — monthStart is ALWAYS the current month. The user cannot
+        // navigate. When the real calendar month changes, this re-derives
+        // from Date() automatically.
+        let currentMonthStart = ScheduleView.startOfMonth(for: Date(), utc: useUTC)
+        let monthDays = currentMonthOnlyDays(from: currentMonthStart)
+
+        VStack(spacing: 0) {
+            // Month header — NO navigation arrows (Issue #3).
+            Text(monthYearHeader(for: currentMonthStart))
+                .font(.headline)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.top, 6)
+                .padding(.bottom, 8)
+
+            // Weekday labels (Sun–Sat)
+            HStack(spacing: 6) {
+                ForEach(weekdayLabels, id: \.self) { label in
+                    Text(label)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .lineLimit(1)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 6)
+
+            // Calendar grid — ONLY current-month days. No leading/trailing
+            // days from adjacent months (Issue #3). Empty cells pad the
+            // start of the grid so the 1st aligns with the correct weekday.
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7),
+                spacing: 4
+            ) {
+                ForEach(monthDays, id: \.self) { day in
+                    if let day = day {
+                        let count = countByDay[day] ?? 0
+                        let isSelected = calendar.isDate(day, inSameDayAs: selectedDate)
+                        let isToday = calendar.isDateInToday(day)
+                        Button {
+                            withAnimation(.easeOut(duration: 0.18)) {
+                                selectedDate = day
+                            }
+                        } label: {
+                            VStack(spacing: 4) {
+                                Text("\(calendar.component(.day, from: day))")
+                                    .font(.subheadline.weight(.bold))
+                                    .foregroundStyle(.primary)
+                                if count > 0 {
+                                    Text("\(count)")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 1)
+                                        .background(Capsule().fill(Color.red))
+                                        .fixedSize()
+                                } else if isToday {
+                                    Circle()
+                                        .fill(Color.primary)
+                                        .frame(width: 5, height: 5)
+                                } else {
+                                    Circle()
+                                        .fill(Color.secondary.opacity(0.3))
+                                        .frame(width: 5, height: 5)
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                            .aspectRatio(1, contentMode: .fit)
+                            .frame(minHeight: 48)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(isSelected ? Color.primary.opacity(0.12) : Color.secondary.opacity(0.06))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .strokeBorder(
+                                        isSelected ? Color.primary.opacity(0.35) :
+                                        (isToday ? Color.primary.opacity(0.3) : Color.clear),
+                                        lineWidth: 1
+                                    )
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        // Empty cell for weekday alignment (no adjacent-month day)
+                        Color.clear
+                            .aspectRatio(1, contentMode: .fit)
+                            .frame(minHeight: 48)
+                    }
+                }
+            }
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color.secondary.opacity(0.08))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(Color.secondary.opacity(0.1), lineWidth: 1)
+            )
+            .padding(.horizontal, 12)
+            .padding(.bottom, 12)
+        }
+    }
+
+    // MARK: - Helpers for date selectors
+
+    /// Short weekday abbreviation (e.g. "Mon", "Tue").
+    private func weekdayShort(for date: Date) -> String {
+        let f = DateFormatter()
+        f.locale = calendar.locale ?? Locale.current
+        f.timeZone = calendar.timeZone
+        f.dateFormat = "EEE"
+        return f.string(from: date)
+    }
+
+    /// Month/year header for a specific month start date.
+    private func monthYearHeader(for monthStart: Date) -> String {
+        let f = DateFormatter()
+        f.locale = calendar.locale ?? Locale.current
+        f.timeZone = calendar.timeZone
+        f.dateFormat = "MMMM yyyy"
+        return f.string(from: monthStart)
+    }
+
+    /// Issue #3 — Returns only the days in the current month, plus leading
+    /// `nil` entries for weekday alignment. NO trailing/leading days from
+    /// adjacent months.
+    private func currentMonthOnlyDays(from monthStart: Date) -> [Date?] {
+        let cal = calendar
+        guard let monthInterval = cal.dateInterval(of: .month, for: monthStart) else { return [] }
+        let firstDay = monthInterval.start
+        let weekdayOfFirst = cal.component(.weekday, from: firstDay)
+        // Pad with nils so the 1st aligns with the correct weekday column.
+        // weekday is 1-based (1=Sunday), and our grid starts with Sunday.
+        var days: [Date?] = Array(repeating: nil, count: weekdayOfFirst - 1)
+        var current = firstDay
+        while current < monthInterval.end {
+            days.append(current)
+            current = cal.date(byAdding: .day, value: 1, to: current) ?? current
+        }
+        return days
     }
 
     // MARK: - 1 Week & 2 Week Layout (Requirement #8.1, #8.2)

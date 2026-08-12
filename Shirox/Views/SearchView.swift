@@ -219,7 +219,8 @@ struct SearchView: View {
                     .multilineTextAlignment(.center)
             }
             Toggle("Add subtitle file", isOn: $addSubtitleUpFront)
-                .toggleStyle(.switch)
+                // Issue #10 — Use the global Liquid Glass toggle (no explicit
+                // .toggleStyle needed — GlowingToggleStyle is applied globally).
                 .fixedSize()
                 .disabled(!needsVideoStep)   // locked once a video is staged; clear it to change
                 .onChangeOf(addSubtitleUpFront) { _ in clearStagedVideo() }
@@ -531,8 +532,7 @@ struct SearchFilterSheet: View {
     @State private var minScoreText: String = ""
     @State private var minChaptersText: String = ""
     @State private var maxChaptersText: String = ""
-    @State private var tagInputText: String = ""
-    @State private var excludeTagInputText: String = ""
+    // Issue #6 — Tags-related state removed (tagInputText, excludeTagInputText).
     @FocusState private var maxEpisodesFocused: Bool
 
     // #132 — Expanded genre list. AniList's full genre enum has 19 values;
@@ -545,22 +545,7 @@ struct SearchFilterSheet: View {
     ]
 
     // #132 — Common AniList tags (a tiny subset of the ~2,000-tag taxonomy,
-    // hand-picked for being widely-used and useful as filter seeds). The
-    // user can also type arbitrary tag names via the tag input field.
-    private let commonTags: [String] = [
-        "Isekai", "School", "Shounen", "Shoujo", "Seinen", "Josei",
-        "Harem", "Reverse Harem", "Time Travel", "Reincarnation",
-        "Overpowered Protagonist", "Crossover", "Original Work",
-        "Board Games", "Card Battle", "Virtual World", "Cyberpunk",
-        "Post-Apocalyptic", "Zombie", "Vampire", "Demon", "Ghost",
-        "Samurai", "Ninja", "Military", "Police", "Detective",
-        "Cooking", "Medical", "Teacher", "Otaku Culture", "IDOL",
-        "Band", "Music Band", "Female Protagonist", "Male Protagonist",
-        "Ensemble Cast", "Tragedy", "Coming of Age", "Found Family",
-        "Revenge", "Conspiracy", "Survival", "War", "Tournament",
-        "Training", "Martial Arts", "Boxing", "Tennis", "Basketball",
-        "Football", "Baseball", "Volleyball", "Swimming", "Track and Field"
-    ]
+    // Issue #6 — commonTags list removed (Tags filter completely removed).
 
     private let seasons: [(String, String)] = [
         ("Any", ""), ("Winter", "WINTER"), ("Spring", "SPRING"),
@@ -791,93 +776,66 @@ struct SearchFilterSheet: View {
                     }
                 }
 
-                // MARK: Tags (#132)
-                Section {
-                    tagsEditor(
-                        title: "Tags",
-                        inputText: $tagInputText,
-                        tags: localFilters.tags,
-                        onAdd: { tag in
-                            let cleaned = tag.trimmingCharacters(in: .whitespacesAndNewlines)
-                            guard !cleaned.isEmpty, !localFilters.tags.contains(cleaned) else { return }
-                            localFilters.tags.append(cleaned)
-                        },
-                        onRemove: { tag in
-                            localFilters.tags.removeAll { $0 == tag }
-                        }
-                    )
-                    commonTagsGrid
-                } header: {
-                    sectionHeader("Tags", icon: "number")
-                } footer: {
-                    Text("AniList tags are fine-grained themes (e.g. Isekai, School, Vampire). Tap a common tag to add it, or type your own.")
-                        .font(.caption)
-                }
+                // Issue #6 — Tags and Exclude Tags sections REMOVED completely.
+                // Tags filter has been entirely removed from the UI, state, and
+                // query. All other AniList filters remain available.
 
-                // MARK: Exclude Tags (#132)
+                // MARK: Score Range (Issue #8 — proper range slider)
                 Section {
-                    tagsEditor(
-                        title: "Excluded Tags",
-                        inputText: $excludeTagInputText,
-                        tags: localFilters.excludeTags,
-                        onAdd: { tag in
-                            let cleaned = tag.trimmingCharacters(in: .whitespacesAndNewlines)
-                            guard !cleaned.isEmpty, !localFilters.excludeTags.contains(cleaned) else { return }
-                            localFilters.excludeTags.append(cleaned)
-                        },
-                        onRemove: { tag in
-                            localFilters.excludeTags.removeAll { $0 == tag }
+                    // Issue #8 — Range slider for score. Uses two sliders
+                    // (min and max) since SwiftUI doesn't have a native
+                    // multi-thumb range slider on iOS 15. Both values are
+                    // clamped so min <= max.
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Min")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text("\(localFilters.minScore ?? 0)")
+                                .font(.subheadline.weight(.bold).monospacedDigit())
+                                .foregroundStyle(Color.appAccent)
                         }
-                    )
-                } header: {
-                    sectionHeader("Exclude Tags", icon: "hand.thumbsdown.fill")
-                } footer: {
-                    Text("Hide results matching any of these tags.")
-                        .font(.caption)
-                }
+                        Slider(
+                            value: Binding(
+                                get: { Double(localFilters.minScore ?? 0) },
+                                set: { newVal in
+                                    let clamped = min(Int(newVal), localFilters.maxScore ?? 100)
+                                    localFilters.minScore = clamped == 0 ? nil : clamped
+                                }
+                            ),
+                            in: 0...100,
+                            step: 5
+                        )
+                        .tint(Color.appAccent)
 
-                // MARK: Score Range (#132)
-                Section {
-                    HStack {
-                        Text("Min Score")
-                        Spacer()
-                        TextField("0", text: $minScoreText)
-                            #if os(iOS)
-                            .keyboardType(.numberPad)
-                            #endif
-                            .multilineTextAlignment(.trailing)
-                            .frame(width: 70)
-                            .onChangeOf(minScoreText) { newValue in
-                                let trimmed = newValue.filter(\.isNumber)
-                                if trimmed != newValue { minScoreText = trimmed }
-                                localFilters.minScore = Int(trimmed)
-                            }
-                        Text("/ 100")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        HStack {
+                            Text("Max")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text("\(localFilters.maxScore ?? 100)")
+                                .font(.subheadline.weight(.bold).monospacedDigit())
+                                .foregroundStyle(Color.appAccent)
+                        }
+                        Slider(
+                            value: Binding(
+                                get: { Double(localFilters.maxScore ?? 100) },
+                                set: { newVal in
+                                    let clamped = max(Int(newVal), localFilters.minScore ?? 0)
+                                    localFilters.maxScore = clamped >= 100 ? nil : clamped
+                                }
+                            ),
+                            in: 0...100,
+                            step: 5
+                        )
+                        .tint(Color.appAccent)
                     }
-                    HStack {
-                        Text("Max Score")
-                        Spacer()
-                        TextField("100", text: $maxScoreText)
-                            #if os(iOS)
-                            .keyboardType(.numberPad)
-                            #endif
-                            .multilineTextAlignment(.trailing)
-                            .frame(width: 70)
-                            .onChangeOf(maxScoreText) { newValue in
-                                let trimmed = newValue.filter(\.isNumber)
-                                if trimmed != newValue { maxScoreText = trimmed }
-                                localFilters.maxScore = Int(trimmed)
-                            }
-                        Text("/ 100")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                    .padding(.vertical, 4)
                 } header: {
                     sectionHeader("Score Range", icon: "star.fill")
                 } footer: {
-                    Text("Filter by AniList's 0–100 average score. Leave blank for no limit.")
+                    Text("Filter by AniList's 0–100 average score. Drag the sliders to set the minimum and maximum.")
                         .font(.caption)
                 }
 
@@ -1081,8 +1039,15 @@ struct SearchFilterSheet: View {
                             Image(systemName: "checkmark")
                                 .font(.system(size: 11, weight: .bold))
                         }
+                        // Issue #7 — Allow up to 2 lines + scale factor so
+                        // long genre names (e.g. "Supernatural", "Slice of
+                        // Life") display fully instead of truncating to
+                        // "supernatu…". The chip grid is adaptive so wider
+                        // chips wrap naturally.
                         Text(item)
-                            .lineLimit(1)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.7)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     .font(.callout.weight(isSelected ? .semibold : .regular))
                     .frame(maxWidth: .infinity)
@@ -1108,102 +1073,8 @@ struct SearchFilterSheet: View {
     // #132 — Tags editor. A text field to type a new tag (committed on
     // return), plus a horizontal wrap of the currently-selected tags with
     // tap-to-remove. Mirrors the input UX of email "To:" fields.
-    @ViewBuilder
-    private func tagsEditor(title: String, inputText: Binding<String>, tags: [String], onAdd: @escaping (String) -> Void, onRemove: @escaping (String) -> Void) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: "plus.circle")
-                    .foregroundStyle(.secondary)
-                TextField("Add \(title.lowercased())…", text: inputText)
-                    #if os(iOS)
-                    .textInputAutocapitalization(.words)
-                    .autocorrectionDisabled()
-                    .submitLabel(.done)
-                    #endif
-                    .onSubmit {
-                        onAdd(inputText.wrappedValue)
-                        inputText.wrappedValue = ""
-                    }
-                if !inputText.wrappedValue.isEmpty {
-                    Button {
-                        onAdd(inputText.wrappedValue)
-                        inputText.wrappedValue = ""
-                    } label: {
-                        Image(systemName: "arrow.right.circle.fill")
-                            .foregroundStyle(Color.appAccent)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            if !tags.isEmpty {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 80), spacing: 6)], spacing: 6) {
-                    ForEach(tags, id: \.self) { tag in
-                        Button { onRemove(tag) } label: {
-                            HStack(spacing: 4) {
-                                Text(tag)
-                                    .lineLimit(1)
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 9, weight: .bold))
-                            }
-                            .font(.caption.weight(.medium))
-                            .padding(.vertical, 5)
-                            .padding(.horizontal, 8)
-                            .background(Capsule().fill(Color.appAccent.opacity(0.15)))
-                            .overlay(Capsule().strokeBorder(Color.appAccent.opacity(0.5), lineWidth: 1))
-                            .foregroundStyle(Color.appAccent)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.vertical, 2)
-            }
-        }
-        .padding(.vertical, 4)
-    }
-
-    // #132 — Common tags quick-pick grid. Tapping a common tag adds it to
-    // the selected tags (or removes it if already selected). Smaller chip
-    // size than the genre grid since there are more of them.
-    private var commonTagsGrid: some View {
-        let selected = Set(localFilters.tags)
-        return LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 6)], spacing: 6) {
-            ForEach(commonTags, id: \.self) { tag in
-                let isSelected = selected.contains(tag)
-                Button {
-                    if isSelected {
-                        localFilters.tags.removeAll { $0 == tag }
-                    } else {
-                        localFilters.tags.append(tag)
-                    }
-                } label: {
-                    HStack(spacing: 3) {
-                        if isSelected {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 9, weight: .bold))
-                        }
-                        Text(tag)
-                            .lineLimit(1)
-                            .font(.system(size: 11))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 6)
-                    .padding(.horizontal, 8)
-                    .background(
-                        Capsule().fill(isSelected ? Color.appAccent.opacity(0.15) : Color.secondary.opacity(0.08))
-                    )
-                    .overlay(
-                        Capsule().strokeBorder(
-                            isSelected ? Color.appAccent.opacity(0.5) : Color.secondary.opacity(0.15),
-                            lineWidth: 1
-                        )
-                    )
-                    .foregroundStyle(isSelected ? Color.appAccent : .primary)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.top, 4)
-    }
+    // Issue #6 — tagsEditor and commonTagsGrid functions removed (Tags filter
+    // completely removed from the UI).
 
     // MARK: - Bottom Bar (Reset All + Results preview)
     private var bottomBar: some View {
@@ -1218,8 +1089,6 @@ struct SearchFilterSheet: View {
                     maxScoreText = ""
                     minChaptersText = ""
                     maxChaptersText = ""
-                    tagInputText = ""
-                    excludeTagInputText = ""
                 } label: {
                     Label("Reset All", systemImage: "arrow.counterclockwise")
                         .font(.subheadline.weight(.semibold))
