@@ -137,15 +137,16 @@ struct HomeView: View {
             .modifier(TransparentNavBarModifier())
             #endif
             .toolbar {
-                // Requirement #7 — Left icon = Notifications.
-                ToolbarItem(placement: .topBarLeading) {
+                // Issue #2 — Notifications and Settings are grouped together
+                // on the trailing side so they're visually adjacent. Both
+                // remain functional and accessible; no duplicates.
+                ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink(destination: NotificationsPage()) {
                         Image(systemName: "bell")
                             .font(.system(size: 18, weight: .medium))
                             .foregroundStyle(.primary)
                     }
                 }
-                // Requirement #7 — Right icon = Settings. No duplicate.
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink(destination: SettingsView()) {
                         Image(systemName: "gearshape")
@@ -1193,20 +1194,145 @@ struct ScheduleView: View {
 
     // MARK: - Content
 
+    // Issue #8 — Restored original Schedule layout: calendar grid + selected
+    // day's episode list. The 4 distinct time-range layouts (week cards, 3-
+    // week grouped, month compact) have been removed per the user's request
+    // to restore the original working state.
     @ViewBuilder
     private var scheduleContent: some View {
         let buckets = buildBuckets()
-        // Requirement #8 — Each time range has a DISTINCT layout.
-        //   • 7 days  (1 Week):  large vertical day cards, one per day.
-        //   • 14 days (2 Weeks): same 1-Week layout, continuous scroll into week 2.
-        //   • 21 days (3 Weeks): unique grouped layout (week-sectioned list).
-        //   • 30 days (1 Month): compact anime schedule view (no calendar grid).
-        switch windowDays {
-        case 7:   weekCardLayout(buckets: buckets, dayCount: 7)
-        case 14:  weekCardLayout(buckets: buckets, dayCount: 14)
-        case 21:  threeWeekGroupedLayout(buckets: buckets)
-        case 30:  monthCompactScheduleLayout(buckets: buckets)
-        default:  weekCardLayout(buckets: buckets, dayCount: 7)
+        let countByDay = Dictionary(uniqueKeysWithValues: buckets.map { ($0.date, $0.entries.count) })
+        let monthDays = currentMonthGridDays()
+        let selectedBucket = buckets.first(where: { calendar.isDate($0.date, inSameDayAs: selectedDate) })
+
+        ScrollView {
+            VStack(spacing: 0) {
+                // Month header — prev/next arrows shift the calendar by one month.
+                HStack(spacing: 6) {
+                    Button {
+                        shiftMonth(by: -1)
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 14, weight: .semibold))
+                            .frame(width: 30, height: 30)
+                            .background(Circle().fill(Color.secondary.opacity(0.1)))
+                            .foregroundStyle(.primary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Previous month")
+
+                    Text(monthYearHeader)
+                        .font(.headline)
+                        .frame(maxWidth: .infinity, alignment: .center)
+
+                    Button {
+                        shiftMonth(by: 1)
+                    } label: {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14, weight: .semibold))
+                            .frame(width: 30, height: 30)
+                            .background(Circle().fill(Color.secondary.opacity(0.1)))
+                            .foregroundStyle(.primary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Next month")
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 6)
+                .padding(.bottom, 8)
+
+                // Weekday labels (Sun–Sat)
+                HStack(spacing: 6) {
+                    ForEach(weekdayLabels, id: \.self) { label in
+                        Text(label)
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .lineLimit(1)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 6)
+
+                // Calendar grid — day cells with episode count badges
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7),
+                    spacing: 4
+                ) {
+                    ForEach(monthDays, id: \.self) { day in
+                        dayCell(
+                            date: day,
+                            count: countByDay[day] ?? 0,
+                            isSelected: calendar.isDate(day, inSameDayAs: selectedDate),
+                            isToday: calendar.isDateInToday(day),
+                            isInMonth: calendar.isDate(day, equalTo: monthStart, toGranularity: .month)
+                        )
+                    }
+                }
+                .padding(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Color.secondary.opacity(0.08))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(Color.secondary.opacity(0.1), lineWidth: 1)
+                )
+                .padding(.horizontal, 12)
+                .padding(.bottom, 12)
+
+                // Selected day's episodes — original ScheduleCard design with
+                // live countdown, notify-when-aired bell, and action buttons.
+                if let bucket = selectedBucket, !bucket.entries.isEmpty {
+                    LazyVStack(spacing: 12) {
+                        HStack {
+                            Text(bucket.shortTitle)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text("\(bucket.entries.count) episode\(bucket.entries.count == 1 ? "" : "s")")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(.secondary)
+                        }
+                        ForEach(bucket.entries) { entry in
+                            NavigationLink {
+                                ScheduleDetailView(
+                                    entry: entry,
+                                    useUTC: useUTC,
+                                    isNotificationOn: scheduledIds.contains(entry.id),
+                                    onToggleNotification: { toggleNotification(for: entry) }
+                                )
+                            } label: {
+                                ScheduleCard(
+                                    entry: entry,
+                                    useUTC: useUTC,
+                                    isNotificationOn: scheduledIds.contains(entry.id),
+                                    onToggleNotification: { toggleNotification(for: entry) },
+                                    onAddToPlanning:     { addToLibrary(entry, status: .planning) },
+                                    onAddToWatching:     { addToLibrary(entry, status: .current) },
+                                    onViewDetails:       { detailEntry = entry }
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
+                    .padding(.bottom, 24)
+                } else {
+                    VStack(spacing: 12) {
+                        Image(systemName: "calendar.badge.exclamationmark")
+                            .font(.system(size: 36))
+                            .foregroundStyle(.secondary)
+                        Text("No episodes airing this day")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 48)
+                    .padding(.bottom, 24)
+                }
+            }
         }
     }
 
@@ -2582,14 +2708,20 @@ struct NotificationsPage: View {
             } else if notifications.isEmpty {
                 ContentUnavailableView("No Notifications", systemImage: "bell.slash", description: Text("You're all caught up!"))
             } else {
-                List {
-                    ForEach(notifications, id: \.id) { notification in
-                        NotificationRow(notification: notification)
+                // Issue #6 — Redesigned Notifications layout. Uses a
+                // ScrollView + LazyVStack of card-style rows instead of a
+                // plain List, so the larger artwork and redesigned card
+                // layout can breathe with proper spacing and hierarchy.
+                ScrollView {
+                    LazyVStack(spacing: 12) {
+                        ForEach(notifications, id: \.id) { notification in
+                            NotificationRow(notification: notification)
+                        }
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                    .padding(.bottom, 24)
                 }
-                #if os(iOS)
-                .listStyle(.insetGrouped)
-                #endif
             }
         }
         .navigationTitle("Notifications")
@@ -2601,26 +2733,25 @@ struct NotificationsPage: View {
     }
 
     private var notifLoadingView: some View {
-        // #3 (revised) — Skeleton matches the new NotificationRow layout:
-        // a 50×70 rounded-rectangle poster placeholder on the left and
-        // three stacked text bars on the right (title / description /
-        // timestamp). 14pt spacing + 6pt vertical padding mirror the real
-        // row so the loading → loaded transition doesn't shift.
+        // Issue #6 — Skeleton matches the redesigned NotificationRow layout:
+        // a 75×105 rounded-rectangle poster placeholder on the left and
+        // three stacked text bars on the right.
         VStack(spacing: 12) {
             ForEach(0..<6, id: \.self) { _ in
-                HStack(alignment: .top, spacing: 14) {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                HStack(alignment: .top, spacing: 16) {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .fill(Color.secondary.opacity(0.15))
-                        .frame(width: 50, height: 70)
-                    VStack(alignment: .leading, spacing: 6) {
-                        RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.15)).frame(width: 90, height: 11)
-                        RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.15)).frame(height: 14)
-                        RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.15)).frame(width: 180, height: 10)
-                        RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.15)).frame(width: 50, height: 9)
+                        .frame(width: 75, height: 105)
+                    VStack(alignment: .leading, spacing: 8) {
+                        RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.15)).frame(width: 100, height: 12)
+                        RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.15)).frame(height: 16)
+                        RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.15)).frame(width: 200, height: 12)
+                        RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.15)).frame(width: 60, height: 10)
                     }
                     Spacer(minLength: 0)
                 }
-                .padding(.vertical, 6)
+                .padding(16)
+                .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             Spacer()
         }
@@ -2635,99 +2766,102 @@ struct NotificationsPage: View {
     }
 }
 
+// Issue #6 — Redesigned NotificationRow with 50% larger artwork (75×105,
+// up from 50×70) and a new card-style layout. The row is now a self-
+// contained rounded-rect card with:
+//   • Larger poster/avatar on the left (75×105 for covers, 75×75 for avatars)
+//   • Type badge overlay scaled up proportionally (28pt, up from 20pt)
+//   • Wider 16pt spacing between artwork and text
+//   • Clearer hierarchy: category label → description → timestamp
+//   • Card background + padding so each notification feels intentional
 private struct NotificationRow: View {
     let notification: AniListNotification
     var body: some View {
-        // #3 (revised) — Larger 50×70 poster on the left (matches Library
-        // poster dimensions) with a cleaner three-line layout on the right:
-        //   • Title (short category label, tinted with iconColor)
-        //   • Description (the full sentence — e.g. "Episode X of Y aired")
-        //   • Timestamp (relative, secondary)
-        // Wider 14pt spacing + extra vertical padding breathe the row out so
-        // the larger artwork doesn't feel cramped.
-        HStack(alignment: .top, spacing: 14) {
+        HStack(alignment: .top, spacing: 16) {
             iconView
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(iconColor)
-                    .lineLimit(1)
-                    .textCase(.uppercase)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Image(systemName: iconName)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(iconColor)
+                    Text(title)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(iconColor)
+                        .lineLimit(1)
+                        .textCase(.uppercase)
+                }
                 Text(description)
                     .font(.subheadline)
                     .foregroundStyle(.primary)
-                    .lineLimit(2)
+                    .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
                 if !timestamp.isEmpty {
                     Text(timestamp)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                        .padding(.top, 2)
                 }
             }
             Spacer(minLength: 0)
         }
-        .padding(.vertical, 6)
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.secondary.opacity(0.06))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.secondary.opacity(0.08), lineWidth: 1)
+        )
     }
 
     // MARK: - Icon (cover image / avatar / fallback placeholder)
-
-    /// Renders the notification's leading thumbnail. Prefers the media cover
-    /// image (for airing + media* notifications), then the user's avatar (for
-    /// follow/activity/thread notifications), and finally a plain SF Symbol
-    /// badge. Each image variant still overlays a small SF Symbol so the
-    /// notification type is identifiable at a glance even when the image
-    /// hasn't loaded yet or the URL is nil.
     //
-    /// #3 (revised) — Poster size bumped from 30×42 → 50×70 (cover) and
-    /// 36×36 → 50×50 (avatar) so the artwork reads at the same scale as
-    /// Library posters. The trailing badge is scaled up too (15 → 20pt)
-    /// so it stays legible against the larger image. The placeholder (no
-    /// image at all) is now a 50×70 rounded rectangle with a centred SF
-    /// Symbol, matching the cover-image footprint so every row aligns.
+    // Issue #6 — Artwork increased by 50%: covers 50×70 → 75×105, avatars
+    // 50×50 → 75×75. The type badge overlay scaled up proportionally
+    // (20→28pt). The placeholder uses the same 75×105 footprint.
+
     @ViewBuilder
     private var iconView: some View {
         if let coverURL = coverImageURL, !coverURL.isEmpty {
             ZStack(alignment: .bottomTrailing) {
                 CachedAsyncImage(urlString: coverURL)
-                    .frame(width: 50, height: 70)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .frame(width: 75, height: 105)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 Image(systemName: iconName)
-                    .font(.system(size: 9, weight: .bold))
+                    .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(.white)
-                    .frame(width: 20, height: 20)
+                    .frame(width: 28, height: 28)
                     .background(Circle().fill(iconColor))
-                    .overlay(Circle().strokeBorder(Color.white.opacity(0.85), lineWidth: 1.2))
-                    .offset(x: 4, y: 4)
+                    .overlay(Circle().strokeBorder(Color.white.opacity(0.85), lineWidth: 1.5))
+                    .offset(x: 6, y: 6)
             }
-            .frame(width: 54, height: 74)
+            .frame(width: 81, height: 111)
         } else if let avatarURL = avatarURL, !avatarURL.isEmpty {
             ZStack(alignment: .bottomTrailing) {
                 CachedAsyncImage(urlString: avatarURL)
-                    .frame(width: 50, height: 50)
+                    .frame(width: 75, height: 75)
                     .clipShape(Circle())
                 Image(systemName: iconName)
-                    .font(.system(size: 9, weight: .bold))
+                    .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(.white)
-                    .frame(width: 20, height: 20)
+                    .frame(width: 28, height: 28)
                     .background(Circle().fill(iconColor))
-                    .overlay(Circle().strokeBorder(Color.white.opacity(0.85), lineWidth: 1.2))
+                    .overlay(Circle().strokeBorder(Color.white.opacity(0.85), lineWidth: 1.5))
                     .offset(x: 4, y: 4)
             }
-            // Frame matches the cover-image width (54pt) so rows with avatars
-            // align with rows that have media posters, even though the avatar
-            // itself is a 50×50 circle.
-            .frame(width: 54, height: 54)
+            .frame(width: 81, height: 81)
         } else {
             ZStack {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(Color.secondary.opacity(0.12))
-                    .frame(width: 50, height: 70)
+                    .frame(width: 75, height: 105)
                 Image(systemName: iconName)
-                    .font(.system(size: 20))
+                    .font(.system(size: 28))
                     .foregroundStyle(.secondary)
             }
-            .frame(width: 54, height: 74)
+            .frame(width: 81, height: 111)
         }
     }
 

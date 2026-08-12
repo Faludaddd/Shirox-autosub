@@ -53,7 +53,12 @@ struct SearchView: View {
         Array(repeating: GridItem(.flexible(), spacing: 12), count: columnCount)
     }
 
-    private var usingModule: Bool { moduleManager.activeModule != nil }
+    private var usingModule: Bool {
+        // Issue #3 — Search always uses AniList directly. Even when a
+        // streaming module is active, search queries AniList (not the
+        // module). Modules are only used for streaming, not for search.
+        false
+    }
     private var primaryProvider: ProviderType { providerManager.orderedProviders.first?.providerType ?? .anilist }
 
     var body: some View {
@@ -160,12 +165,12 @@ struct SearchView: View {
             if vm.query.isEmpty && !history.queries.isEmpty {
                 historyView
             } else {
+                // Issue #3 — Search always uses AniList directly. Remove any
+                // indication that search is coming from an internal module.
                 emptyStateView(
-                    icon: usingModule ? "puzzlepiece.extension" : "magnifyingglass",
-                    title: usingModule ? "Search via Module" : "Search Anime",
-                    subtitle: usingModule
-                        ? "Searching \(moduleManager.activeModule?.sourceName ?? "")…"
-                        : "Find any anime via \(primaryProvider.displayName)"
+                    icon: "magnifyingglass",
+                    title: "Search Anime",
+                    subtitle: "Find any anime via AniList"
                 )
             }
         } else if vm.isLoading {
@@ -450,18 +455,20 @@ struct SearchView: View {
 
     // MARK: - Filter Button
     /// Filter icon with a tinted dot badge whenever any filter is active.
+    // Issue #4 — Icon size increased by 30% (20 → 26pt) for better
+    // visibility and tap target. Alignment and spacing maintained.
     private var filterButton: some View {
         Button {
             showFilters = true
         } label: {
             ZStack(alignment: .topTrailing) {
                 Image(systemName: "line.3.horizontal.decrease.circle")
-                    .font(.system(size: 20))
+                    .font(.system(size: 26))
                     .foregroundStyle(.primary)
                 if !vm.filters.isEmpty {
                     Circle()
                         .fill(.tint)
-                        .frame(width: 8, height: 8)
+                        .frame(width: 10, height: 10)
                         .offset(x: 2, y: -2)
                 }
             }

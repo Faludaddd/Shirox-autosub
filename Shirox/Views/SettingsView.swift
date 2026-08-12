@@ -43,45 +43,48 @@ struct SettingsView: View {
     @State private var pushedPage: SettingsPage? = nil
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if searchText.isEmpty {
-                    categoryList
-                } else {
-                    searchResultsList
-                }
+        // Issue #5 — SettingsView no longer wraps in its own NavigationStack.
+        // When pushed from HomeView's toolbar (the only entry point on iOS
+        // since Settings is not a bottom tab), the parent NavigationStack
+        // provides the navigation context. The previous nested NavigationStack
+        // caused duplicate back arrows and a black bar at the top.
+        Group {
+            if searchText.isEmpty {
+                categoryList
+            } else {
+                searchResultsList
             }
+        }
+        #if os(iOS)
+        .listStyle(.insetGrouped)
+        #endif
+        .navigationTitle("Settings")
+        .inlineNavBar()
+        .searchable(text: $searchText, prompt: "Search settings…")
+        .onChangeOf(searchText) { query in
+            searchResults = SettingsSearchIndex.search(query)
+        }
+        // #125 — Hidden NavigationLink that pushes the selected settings
+        // page. The binding flips to non-nil when a search result is tapped,
+        // and back to nil on pop. Works on iOS 15+ where
+        // `navigationDestination(item:)` isn't available.
+        .background(
+            NavigationLink(
+                destination: Group {
+                    if let page = pushedPage {
+                        settingsPageView(for: page)
+                    }
+                },
+                isActive: Binding(
+                    get: { pushedPage != nil },
+                    set: { active in if !active { pushedPage = nil } }
+                )
+            ) { EmptyView() }
+        )
+        .onAppear {
             #if os(iOS)
-            .listStyle(.insetGrouped)
+            PlayerPresenter.shared.resetToAppOrientation()
             #endif
-            .navigationTitle("Settings")
-            .inlineNavBar()
-            .searchable(text: $searchText, prompt: "Search settings…")
-            .onChangeOf(searchText) { query in
-                searchResults = SettingsSearchIndex.search(query)
-            }
-            // #125 — Hidden NavigationLink that pushes the selected settings
-            // page. The binding flips to non-nil when a search result is tapped,
-            // and back to nil on pop. Works on iOS 15+ where
-            // `navigationDestination(item:)` isn't available.
-            .background(
-                NavigationLink(
-                    destination: Group {
-                        if let page = pushedPage {
-                            settingsPageView(for: page)
-                        }
-                    },
-                    isActive: Binding(
-                        get: { pushedPage != nil },
-                        set: { active in if !active { pushedPage = nil } }
-                    )
-                ) { EmptyView() }
-            )
-            .onAppear {
-                #if os(iOS)
-                PlayerPresenter.shared.resetToAppOrientation()
-                #endif
-            }
         }
     }
 
