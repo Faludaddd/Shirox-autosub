@@ -19,6 +19,102 @@ struct HomeView: View {
     /// reload is in flight. The system `.refreshable` spinner still drives the
     /// gesture; this just adds a branded overlay on top.
     @State private var isRefreshing = false
+    // #118 — Inline search on Home. When `inlineSearchOnHome` is enabled in
+    // Settings → Appearance → Layout, a search bar renders at the top of Home
+    // and filters the trending items inline (instead of pushing SearchView).
+    // When disabled (default), the bar acts as a tappable button that pushes
+    // SearchView — keeping the existing "search is a separate tab" flow intact.
+    @AppStorage("inlineSearchOnHome") private var inlineSearchOnHome = false
+    @State private var inlineSearchText = ""
+    @State private var navigateToSearch = false
+
+    /// #118 — Trending items filtered by the inline search text. Empty query
+    /// returns an empty array so the caller can branch on `query.isEmpty`
+    /// to decide whether to show results at all.
+    private var filteredTrending: [Media] {
+        let query = inlineSearchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !query.isEmpty else { return [] }
+        return vm.trending.filter { media in
+            let titles = [
+                media.title.english?.lowercased(),
+                media.title.romaji?.lowercased(),
+                media.title.native?.lowercased()
+            ].compactMap { $0 }
+            return titles.contains { $0.contains(query) }
+        }
+    }
+
+    /// #118 — Search affordance at the top of Home. Behavior is driven by the
+    /// `inlineSearchOnHome` AppStorage toggle:
+    /// - **Enabled:** renders a real `TextField` with a magnifying-glass icon
+    ///   and a clear button. Editing the text filters `vm.trending` inline
+    ///   (see `filteredTrending`) and replaces the home content below with a
+    ///   single `AnimeSection` of matches.
+    /// - **Disabled (default):** renders the same visual pill but as a
+    ///   `Button` that pushes `SearchView` (via `navigateToSearch` + the
+    ///   `.navigationDestination` modifier on the NavigationStack) so the
+    ///   existing "search tab" flow is preserved.
+    @ViewBuilder
+    private var inlineSearchBar: some View {
+        if inlineSearchOnHome {
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.secondary)
+                TextField("Search trending titles", text: $inlineSearchText)
+                    .textFieldStyle(.plain)
+                    .font(.subheadline)
+                    .autocorrectionDisabled()
+                    .submitLabel(.search)
+                if !inlineSearchText.isEmpty {
+                    Button {
+                        inlineSearchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+            )
+            .padding(.horizontal, 16)
+        } else {
+            Button {
+                navigateToSearch = true
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Text("Search")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+                )
+                .padding(.horizontal, 16)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+    /// #120 — When OFF, Home shows only the carousel + continue watching /
+    /// reading. When ON, the browse AnimeSections (This Season, Trending Now,
+    /// …) also render below. Driven from Settings → Appearance →
+    /// "Show Browse Categories on Home".
+    @AppStorage("showBrowseCategories") private var showBrowseCategories = false
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -50,6 +146,37 @@ struct HomeView: View {
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 24) {
+                            // ────────────────────────────────────────────────────────
+                            // #118 — Inline search affordance at the top of Home. When
+                            // `inlineSearchOnHome` is enabled, this is a live TextField
+                            // that filters the trending items below (replacing the rest
+                            // of the home content while a query is active). When disabled,
+                            // it renders as a tappable "Search" pill that pushes
+                            // SearchView — preserving the previous "search tab" flow.
+                            // ────────────────────────────────────────────────────────
+                            inlineSearchBar
+
+                            // Branch on inline search: if the user has typed a query,
+                            // show ONLY the filtered results section (hide the carousel,
+                            // continue watching, and browse sections). Otherwise render
+                            // the normal home content below the search bar.
+                            if inlineSearchOnHome && !inlineSearchText.trimmingCharacters(in: .whitespaces).isEmpty {
+                                if filteredTrending.isEmpty {
+                                    ContentUnavailableView(
+                                        "No Matches",
+                                        systemImage: "magnifyingglass",
+                                        description: Text("No trending titles match \"\(inlineSearchText)\".")
+                                    )
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 60)
+                                } else {
+                                    AnimeSection(
+                                        title: "Results",
+                                        items: filteredTrending,
+                                        category: .trending
+                                    )
+                                }
+                            } else {
                             // ────────────────────────────────────────────────────────
                             // 1. HERO — Full-bleed featured carousel.
                             //    The ONLY hero element on the page; everything below it
@@ -83,109 +210,25 @@ struct HomeView: View {
                             #endif
 
                             // ────────────────────────────────────────────────────────
-                            // 3. CATEGORY GRID — replaces the old vertical scroll of
-                            //    AnimeSections. Six large tappable tiles, two columns.
-                            //    Tapping any tile pushes BrowseView with that category.
+                            // 3. BROWSE SECTIONS — vertical stack of horizontal
+                            //    AnimeSection carousels (This Season, Trending Now,
+                            //    All-Time Popular, Top Rated, Recently Completed,
+                            //    Upcoming). Gated by the "Show Browse Categories on
+                            //    Home" appearance toggle (#120): when OFF, Home shows
+                            //    only the carousel + continue watching / reading; when
+                            //    ON, these browse sections render below.
                             // ────────────────────────────────────────────────────────
-                            Text("Browse Categories")
-                                .font(.title3.weight(.bold))
-                                .padding(.horizontal, 16)
-
-                            LazyVGrid(
-                                columns: [
-                                    GridItem(.flexible(), spacing: 12),
-                                    GridItem(.flexible(), spacing: 12)
-                                ],
-                                spacing: 12
-                            ) {
-                                NavigationLink {
-                                    BrowseView(category: .seasonal)
-                                } label: {
-                                    CategoryGridCard(
-                                        title: "This Season",
-                                        count: vm.seasonal.count,
-                                        iconName: "calendar.badge.clock",
-                                        gradientColors: [.green, .teal],
-                                        imageURL: vm.seasonal.first?.coverImage.best
-                                    )
-                                    .equatable()
-                                }
-                                .buttonStyle(HomePressStyle())
-
-                                NavigationLink {
-                                    BrowseView(category: .trending)
-                                } label: {
-                                    CategoryGridCard(
-                                        title: "Trending",
-                                        count: vm.trending.count,
-                                        iconName: "flame.fill",
-                                        gradientColors: [.red, .orange],
-                                        imageURL: vm.trending.first?.coverImage.best
-                                    )
-                                    .equatable()
-                                }
-                                .buttonStyle(HomePressStyle())
-
-                                NavigationLink {
-                                    BrowseView(category: .popular)
-                                } label: {
-                                    CategoryGridCard(
-                                        title: "Popular",
-                                        count: vm.popular.count,
-                                        iconName: "star.fill",
-                                        gradientColors: [.pink, .purple],
-                                        imageURL: vm.popular.first?.coverImage.best
-                                    )
-                                    .equatable()
-                                }
-                                .buttonStyle(HomePressStyle())
-
-                                NavigationLink {
-                                    BrowseView(category: .topRated)
-                                } label: {
-                                    CategoryGridCard(
-                                        title: "Top Rated",
-                                        count: vm.topRated.count,
-                                        iconName: "trophy.fill",
-                                        gradientColors: [.orange, .yellow],
-                                        imageURL: vm.topRated.first?.coverImage.best
-                                    )
-                                    .equatable()
-                                }
-                                .buttonStyle(HomePressStyle())
-
-                                NavigationLink {
-                                    BrowseView(category: .popular)
-                                } label: {
-                                    CategoryGridCard(
-                                        title: "Recently Completed",
-                                        count: vm.recentlyCompleted.count,
-                                        iconName: "checkmark.seal.fill",
-                                        gradientColors: [.gray, .black],
-                                        imageURL: vm.recentlyCompleted.first?.coverImage.best
-                                    )
-                                    .equatable()
-                                }
-                                .buttonStyle(HomePressStyle())
-
-                                NavigationLink {
-                                    BrowseView(category: .trending)
-                                } label: {
-                                    CategoryGridCard(
-                                        title: "Upcoming",
-                                        count: vm.upcoming.count,
-                                        iconName: "clock.arrow.circlepath",
-                                        gradientColors: [.indigo, .purple],
-                                        imageURL: vm.upcoming.first?.coverImage.best
-                                    )
-                                    .equatable()
-                                }
-                                .buttonStyle(HomePressStyle())
+                            if showBrowseCategories {
+                                AnimeSection(title: "This Season", items: vm.seasonal, category: .seasonal)
+                                AnimeSection(title: "Trending Now", items: vm.trending, category: .trending)
+                                AnimeSection(title: "All-Time Popular", items: vm.popular, category: .popular)
+                                AnimeSection(title: "Top Rated", items: vm.topRated, category: .topRated)
+                                AnimeSection(title: "Recently Completed", items: vm.recentlyCompleted, category: .popular)
+                                AnimeSection(title: "Upcoming", items: vm.upcoming, category: .trending)
                             }
-                            .padding(.horizontal, 16)
-                            .animation(.easeInOut(duration: 0.3), value: vm.trending)
 
                             Spacer().frame(height: 28)
+                            } // end of #118 inline-search else branch
                         }
                     }
                     .refreshable {
@@ -232,7 +275,7 @@ struct HomeView: View {
             .modifier(TransparentNavBarModifier())
             #endif
             .toolbar {
-                // Schedule icon — matches the Notifications bell styling exactly
+                // Schedule icon — matches the Settings gear styling exactly
                 ToolbarItem(placement: .primaryAction) {
                     NavigationLink(destination: ScheduleView()) {
                         Image(systemName: "calendar")
@@ -240,10 +283,12 @@ struct HomeView: View {
                             .foregroundStyle(.primary)
                     }
                 }
-                // Notifications bell — same styling as Schedule
+                // Settings gear (#117) — replaced the previous Notifications
+                // bell with a Settings entry so the Home toolbar exposes
+                // Schedule + Settings instead of Schedule + Notifications.
                 ToolbarItem(placement: .primaryAction) {
-                    NavigationLink(destination: NotificationsPage()) {
-                        Image(systemName: "bell")
+                    NavigationLink(destination: SettingsView()) {
+                        Image(systemName: "gearshape")
                             .font(.system(size: 18, weight: .medium))
                             .foregroundStyle(.primary)
                     }
@@ -254,6 +299,13 @@ struct HomeView: View {
             }
             // Outside the ScrollView: the hidden NavigationLink that performs the push.
             .continueWatchingNavigation($cwNavTarget)
+            // #118 — Programmatic push to SearchView when the inline search bar
+            // is in "navigate" mode (i.e. `inlineSearchOnHome` is disabled).
+            // Triggered by tapping the pill-shaped search affordance at the top
+            // of Home.
+            .navigationDestination(isPresented: $navigateToSearch) {
+                SearchView()
+            }
             #if os(iOS)
             .fullScreenCover(item: $readerContext) { ctx in
                 MangaReaderView(context: ctx)
@@ -1198,82 +1250,92 @@ struct ScheduleView: View {
         let monthDays = currentMonthGridDays()
         let selectedBucket = buckets.first(where: { calendar.isDate($0.date, inSameDayAs: selectedDate) })
 
-        VStack(spacing: 0) {
-            // Month header — always a single month/year (e.g. "August 2026")
-            // driven by `monthStart` (the first day of the displayed month).
-            // Prev/next arrows shift the calendar by one whole month (#80).
-            HStack(spacing: 6) {
-                Button {
-                    shiftMonth(by: -1)
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 14, weight: .semibold))
-                        .frame(width: 30, height: 30)
-                        .background(Circle().fill(Color.secondary.opacity(0.1)))
-                        .foregroundStyle(.primary)
+        // #80/107 — ONE outer ScrollView wraps the month header, weekday
+        // labels, month grid, AND the selected day's episode list together.
+        // Previously the episode list lived in its own nested ScrollView,
+        // which — when a 6-row month grid consumed most of the viewport —
+        // caused the bottom of the episode list to be cropped below the
+        // tab bar / safe area. Collapsing to a single scroll surface means
+        // the whole schedule scrolls as one block and the bottom is always
+        // reachable.
+        ScrollView {
+            VStack(spacing: 0) {
+                // Month header — always a single month/year (e.g. "August 2026")
+                // driven by `monthStart` (the first day of the displayed month).
+                // Prev/next arrows shift the calendar by one whole month (#80).
+                HStack(spacing: 6) {
+                    Button {
+                        shiftMonth(by: -1)
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 14, weight: .semibold))
+                            .frame(width: 30, height: 30)
+                            .background(Circle().fill(Color.secondary.opacity(0.1)))
+                            .foregroundStyle(.primary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Previous month")
+
+                    Text(monthYearHeader)
+                        .font(.headline)
+                        .frame(maxWidth: .infinity, alignment: .center)
+
+                    Button {
+                        shiftMonth(by: 1)
+                    } label: {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14, weight: .semibold))
+                            .frame(width: 30, height: 30)
+                            .background(Circle().fill(Color.secondary.opacity(0.1)))
+                            .foregroundStyle(.primary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Next month")
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Previous month")
+                .padding(.horizontal, 12)
+                .padding(.top, 6)
+                .padding(.bottom, 8)
 
-                Text(monthYearHeader)
-                    .font(.headline)
-                    .frame(maxWidth: .infinity, alignment: .center)
-
-                Button {
-                    shiftMonth(by: 1)
-                } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .semibold))
-                        .frame(width: 30, height: 30)
-                        .background(Circle().fill(Color.secondary.opacity(0.1)))
-                        .foregroundStyle(.primary)
+                // Weekday labels (Sun–Sat) — single row above the 7-column grid.
+                HStack(spacing: 6) {
+                    ForEach(weekdayLabels, id: \.self) { label in
+                        Text(label)
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .lineLimit(1)
+                    }
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Next month")
-            }
-            .padding(.horizontal, 12)
-            .padding(.top, 6)
-            .padding(.bottom, 8)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 6)
 
-            // Weekday labels (Sun–Sat) — single row above the 7-column grid.
-            HStack(spacing: 6) {
-                ForEach(weekdayLabels, id: \.self) { label in
-                    Text(label)
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity)
-                        .lineLimit(1)
+                // Month grid — every day in the displayed month (plus leading/trailing
+                // days from adjacent months to fill the 7-column layout). Standard
+                // months fit in 4–6 rows of 7; cells are sized so 6 rows fit without
+                // scrolling on a typical phone. Each cell shows the date number, an
+                // episode-count badge (if > 0), a today marker, and a selection
+                // highlight. Tapping a leading/trailing day shifts the calendar to
+                // that month and selects the day.
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7),
+                    spacing: 4
+                ) {
+                    ForEach(monthDays, id: \.self) { day in
+                        dayCell(
+                            date: day,
+                            count: countByDay[day] ?? 0,
+                            isSelected: calendar.isDate(day, inSameDayAs: selectedDate),
+                            isToday: calendar.isDateInToday(day),
+                            isInMonth: calendar.isDate(day, equalTo: monthStart, toGranularity: .month)
+                        )
+                    }
                 }
-            }
-            .padding(.horizontal, 12)
-            .padding(.bottom, 6)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 12)
 
-            // Month grid — every day in the displayed month (plus leading/trailing
-            // days from adjacent months to fill the 7-column layout). Standard
-            // months fit in 4–6 rows of 7; cells are sized so 6 rows fit without
-            // scrolling on a typical phone. Each cell shows the date number, an
-            // episode-count badge (if > 0), a today marker, and a selection
-            // highlight. Tapping a leading/trailing day shifts the calendar to
-            // that month and selects the day.
-            LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7),
-                spacing: 4
-            ) {
-                ForEach(monthDays, id: \.self) { day in
-                    dayCell(
-                        date: day,
-                        count: countByDay[day] ?? 0,
-                        isSelected: calendar.isDate(day, inSameDayAs: selectedDate),
-                        isToday: calendar.isDateInToday(day),
-                        isInMonth: calendar.isDate(day, equalTo: monthStart, toGranularity: .month)
-                    )
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.bottom, 12)
-
-            // Selected day's episodes.
-            ScrollView {
+                // Selected day's episodes. Lives DIRECTLY in the outer ScrollView
+                // (no nested ScrollView) so a tall month grid can't crop the list
+                // below it — the whole schedule scrolls as one block (#80/107).
                 if let bucket = selectedBucket, !bucket.entries.isEmpty {
                     LazyVStack(spacing: 12) {
                         HStack {
@@ -2398,16 +2460,26 @@ struct NotificationsPage: View {
     }
 
     private var notifLoadingView: some View {
+        // #3 (revised) — Skeleton matches the new NotificationRow layout:
+        // a 50×70 rounded-rectangle poster placeholder on the left and
+        // three stacked text bars on the right (title / description /
+        // timestamp). 14pt spacing + 6pt vertical padding mirror the real
+        // row so the loading → loaded transition doesn't shift.
         VStack(spacing: 12) {
             ForEach(0..<6, id: \.self) { _ in
-                HStack(spacing: 12) {
-                    Circle().fill(Color.secondary.opacity(0.15)).frame(width: 36, height: 36)
+                HStack(alignment: .top, spacing: 14) {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color.secondary.opacity(0.15))
+                        .frame(width: 50, height: 70)
                     VStack(alignment: .leading, spacing: 6) {
+                        RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.15)).frame(width: 90, height: 11)
                         RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.15)).frame(height: 14)
                         RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.15)).frame(width: 180, height: 10)
+                        RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.15)).frame(width: 50, height: 9)
                     }
-                    Spacer()
+                    Spacer(minLength: 0)
                 }
+                .padding(.vertical, 6)
             }
             Spacer()
         }
@@ -2425,15 +2497,36 @@ struct NotificationsPage: View {
 private struct NotificationRow: View {
     let notification: AniListNotification
     var body: some View {
-        HStack(spacing: 12) {
+        // #3 (revised) — Larger 50×70 poster on the left (matches Library
+        // poster dimensions) with a cleaner three-line layout on the right:
+        //   • Title (short category label, tinted with iconColor)
+        //   • Description (the full sentence — e.g. "Episode X of Y aired")
+        //   • Timestamp (relative, secondary)
+        // Wider 14pt spacing + extra vertical padding breathe the row out so
+        // the larger artwork doesn't feel cramped.
+        HStack(alignment: .top, spacing: 14) {
             iconView
-            VStack(alignment: .leading, spacing: 2) {
-                Text(description).font(.subheadline).lineLimit(2)
-                Text(timestamp).font(.caption2).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(iconColor)
+                    .lineLimit(1)
+                    .textCase(.uppercase)
+                Text(description)
+                    .font(.subheadline)
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                if !timestamp.isEmpty {
+                    Text(timestamp)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
-            Spacer()
+            Spacer(minLength: 0)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
     }
 
     // MARK: - Icon (cover image / avatar / fallback placeholder)
@@ -2444,41 +2537,56 @@ private struct NotificationRow: View {
     /// badge. Each image variant still overlays a small SF Symbol so the
     /// notification type is identifiable at a glance even when the image
     /// hasn't loaded yet or the URL is nil.
+    //
+    /// #3 (revised) — Poster size bumped from 30×42 → 50×70 (cover) and
+    /// 36×36 → 50×50 (avatar) so the artwork reads at the same scale as
+    /// Library posters. The trailing badge is scaled up too (15 → 20pt)
+    /// so it stays legible against the larger image. The placeholder (no
+    /// image at all) is now a 50×70 rounded rectangle with a centred SF
+    /// Symbol, matching the cover-image footprint so every row aligns.
     @ViewBuilder
     private var iconView: some View {
         if let coverURL = coverImageURL, !coverURL.isEmpty {
             ZStack(alignment: .bottomTrailing) {
                 CachedAsyncImage(urlString: coverURL)
-                    .frame(width: 30, height: 42)
-                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                    .frame(width: 50, height: 70)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 Image(systemName: iconName)
-                    .font(.system(size: 7, weight: .bold))
+                    .font(.system(size: 9, weight: .bold))
                     .foregroundStyle(.white)
-                    .frame(width: 15, height: 15)
+                    .frame(width: 20, height: 20)
                     .background(Circle().fill(iconColor))
-                    .overlay(Circle().strokeBorder(Color.white.opacity(0.85), lineWidth: 1))
-                    .offset(x: 3, y: 3)
+                    .overlay(Circle().strokeBorder(Color.white.opacity(0.85), lineWidth: 1.2))
+                    .offset(x: 4, y: 4)
             }
-            .frame(width: 34, height: 46)
+            .frame(width: 54, height: 74)
         } else if let avatarURL = avatarURL, !avatarURL.isEmpty {
             ZStack(alignment: .bottomTrailing) {
                 CachedAsyncImage(urlString: avatarURL)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 50, height: 50)
                     .clipShape(Circle())
                 Image(systemName: iconName)
-                    .font(.system(size: 7, weight: .bold))
+                    .font(.system(size: 9, weight: .bold))
                     .foregroundStyle(.white)
-                    .frame(width: 15, height: 15)
+                    .frame(width: 20, height: 20)
                     .background(Circle().fill(iconColor))
-                    .overlay(Circle().strokeBorder(Color.white.opacity(0.85), lineWidth: 1))
-                    .offset(x: 3, y: 3)
+                    .overlay(Circle().strokeBorder(Color.white.opacity(0.85), lineWidth: 1.2))
+                    .offset(x: 4, y: 4)
             }
-            .frame(width: 40, height: 40)
+            // Frame matches the cover-image width (54pt) so rows with avatars
+            // align with rows that have media posters, even though the avatar
+            // itself is a 50×50 circle.
+            .frame(width: 54, height: 54)
         } else {
             ZStack {
-                Circle().fill(Color.secondary.opacity(0.1)).frame(width: 36, height: 36)
-                Image(systemName: iconName).font(.system(size: 14)).foregroundStyle(.secondary)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.secondary.opacity(0.12))
+                    .frame(width: 50, height: 70)
+                Image(systemName: iconName)
+                    .font(.system(size: 20))
+                    .foregroundStyle(.secondary)
             }
+            .frame(width: 54, height: 74)
         }
     }
 
@@ -2545,6 +2653,31 @@ private struct NotificationRow: View {
         case .mediaAddition, .mediaDataChange, .mediaMerge: return "arrow.triangle.2.circlepath"
         case .mediaDeletion: return "trash.fill"
         case .unknown: return "bell.fill"
+        }
+    }
+
+    /// #3 (revised) — Short, ALL-CAPS category label that sits above the full
+    /// description on the right of the poster. Gives the row a clear visual
+    /// hierarchy at a glance: "NEW EPISODE / Episode 4 of Frieren aired / 2h
+    /// ago" reads much better than a single dense sentence. The label is
+    /// tinted with `iconColor` so it pairs with the corner badge on the
+    /// poster.
+    private var title: String {
+        switch notification {
+        case .airing:                                return "New Episode"
+        case .following:                             return "New Follow"
+        case .activityMessage:                       return "Message"
+        case .activityReply, .activityReplySubscribed: return "Reply"
+        case .activityMention:                       return "Mention"
+        case .activityLike, .activityReplyLike:      return "Like"
+        case .threadCommentMention, .threadCommentReply,
+             .threadCommentSubscribed, .threadCommentLike: return "Thread Comment"
+        case .threadLike:                            return "Liked Thread"
+        case .mediaAddition:                         return "Media Added"
+        case .mediaDataChange:                       return "Media Updated"
+        case .mediaMerge:                            return "Media Merged"
+        case .mediaDeletion:                         return "Media Deleted"
+        case .unknown:                               return "Notification"
         }
     }
 

@@ -130,70 +130,47 @@ struct ToastContainerView: View {
 /// relative to `total`) are scaled down and nudged up to create the layered,
 /// "liquid glass" stack visual.
 ///
-/// #89 — Interactions (driven entirely by a single `DragGesture` attached to
-/// the OUTERMOST view of the card, never to an inner element):
-/// - Swipe left > 100pt: dismisses immediately.
-/// - Swipe down > 50pt: dismisses immediately.
-/// - Swipe left > 15pt (but < 100pt): reveals an inline "X" dismiss button
-///   on the trailing edge. The toast itself stays COMPLETELY STATIC during
-///   the drag — no `.offset()` is ever applied in response to drag values.
-///   The X button appears via a `.scale.combined(with: .opacity)` transition
-///   (driven by an `if revealDismiss { ... }` branch in the HStack, NOT an
-///   `.opacity()` modifier on an always-present button). When the drag ends
-///   without crossing the dismiss threshold, `revealDismiss` flips back to
-///   `false` and the X hides again with the same spring.
+/// #89 (revised) — Interactions:
+/// - `.highPriorityGesture(DragGesture(minimumDistance: 15))` attached AFTER
+///   `.contentShape(Rectangle())` so the drag is recognized across the WHOLE
+///   card and takes priority over any competing gestures in the underlying
+///   view hierarchy. The previous `.gesture(...)` form was being silently
+///   suppressed by the parent NavigationStack/List gestures; the
+///   high-priority variant wins arbitration.
+/// - Drag left past -15pt: reveals the inline "X" dismiss button via
+///   `if revealDismiss { ... }`. Drag back near 0: hides it again.
+/// - Drag left past -100pt OR drag down past 50pt (at gesture end): dismiss.
+/// - `.onTapGesture` AFTER the drag — both coexist because the drag has a
+///   15pt minimum distance; a pure tap (no translation) falls through to
+///   the tap handler which fires the toast's optional action + dismisses.
+/// - The toast's frame is NEVER offset in response to drag values — only
+///   the conditional X button appears/disappears via a spring transition.
 struct ToastView: View {
     let toast: ToastData
     let stackIndex: Int
     let total: Int
-
-    /// #89 — Drives the inline X button visibility. Set to `true` while the
-    /// user is actively swiping left past the reveal threshold; reset to
-    /// `false` (with a spring animation) when the drag ends so the X hides
-    /// again. The toast's frame NEVER moves in response to this state —
-    /// only the conditional `if revealDismiss { Button { } }` branch
-    /// adds/removes the X button from the HStack.
     @State private var revealDismiss = false
 
     var body: some View {
-        let isTop = stackIndex == total - 1  // newest is on top of the stack
-
         HStack(spacing: 12) {
-            // Icon circle
+            // Icon
             ZStack {
-                Circle()
-                    .fill(toast.iconColor.opacity(0.2))
-                Image(systemName: toast.icon)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(toast.iconColor)
+                Circle().fill(toast.iconColor.opacity(0.2))
+                Image(systemName: toast.icon).font(.system(size: 18, weight: .semibold)).foregroundStyle(toast.iconColor)
             }
             .frame(width: 36, height: 36)
 
-            // Text content
+            // Text
             VStack(alignment: .leading, spacing: 2) {
-                Text(toast.title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                Text(toast.message)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
+                Text(toast.title).font(.subheadline.weight(.semibold)).foregroundStyle(.primary).lineLimit(1)
+                Text(toast.message).font(.caption).foregroundStyle(.secondary).lineLimit(2)
             }
-
             Spacer(minLength: 8)
 
-            // #89 — Inline "X" dismiss button. Conditionally inserted into the
-            // HStack via `if revealDismiss { ... }` so its appearance/disappearance
-            // is animated by SwiftUI's standard transition machinery. The toast
-            // itself NEVER moves — only this button appears/disappears.
+            // X button — only visible when revealed
             if revealDismiss {
-                Button {
-                    ToastManager.shared.dismiss(toast.id)
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 22))
-                        .foregroundStyle(.red)
+                Button { ToastManager.shared.dismiss(toast.id) } label: {
+                    Image(systemName: "xmark.circle.fill").font(.system(size: 22)).foregroundStyle(.red)
                 }
                 .buttonStyle(.plain)
                 .transition(.scale.combined(with: .opacity))
@@ -201,54 +178,38 @@ struct ToastView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(.ultraThinMaterial)  // liquid glass / frosted
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
-        )
+        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(.ultraThinMaterial))
+        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5))
         .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
-        // Stacked visual: non-top toasts are scaled down and nudged up.
-        // These transforms are layout-only (driven by stackIndex, not user
-        // input) — the toast itself never moves in response to a drag.
-        .scaleEffect(isTop ? 1.0 : 0.95)
-        .offset(y: isTop ? 0 : CGFloat((total - 1 - stackIndex)) * -6)
-        .opacity(isTop ? 1.0 : 0.8)
+        .scaleEffect(stackIndex == total - 1 ? 1.0 : 0.95)
+        .opacity(stackIndex == total - 1 ? 1.0 : 0.8)
         .contentShape(Rectangle())
-        // #89 — Re-enable hit testing on this individual toast so taps /
-        // swipes / the X button all work, even though the parent container
-        // has `.allowsHitTesting(false)`. MUST be present so the gesture below
-        // can receive touches at all.
+        // #89 — The parent ToastContainerView has `.allowsHitTesting(false)`
+        // so the empty space above the toast stack passes touches through to
+        // the underlying app content. That flag ALSO blocks touches from
+        // reaching the toasts themselves — re-enable hit testing here so the
+        // drag + tap gestures below can actually receive touches.
         .allowsHitTesting(true)
-        // #89 — Single DragGesture attached to the OUTERMOST view of the toast
-        // card (NOT inside the HStack). The gesture inspects translation during
-        // the drag ONLY to toggle `revealDismiss` (which controls the
-        // conditional X button) — it NEVER applies an offset to the toast
-        // itself, so the toast stays COMPLETELY STATIC. At gesture END we
-        // decide whether the swipe was big enough to commit to dismissal, and
-        // (if not) reset `revealDismiss` so the X hides again with a spring.
-        // No `.onTapGesture` is attached anywhere — it would compete with the
-        // DragGesture's minimumDistance: 15 detection and break the reveal.
-        .gesture(
+        .highPriorityGesture(
             DragGesture(minimumDistance: 15)
                 .onChanged { value in
-                    withAnimation(.spring(response: 0.3)) {
-                        revealDismiss = value.translation.width < -15
+                    if value.translation.width < -15 {
+                        withAnimation(.spring(response: 0.3)) { revealDismiss = true }
+                    } else if value.translation.width > -5 {
+                        withAnimation(.spring(response: 0.3)) { revealDismiss = false }
                     }
                 }
                 .onEnded { value in
-                    if value.translation.width < -100 {
-                        ToastManager.shared.dismiss(toast.id)
-                    } else if value.translation.height > 50 {
+                    if value.translation.width < -100 || value.translation.height > 50 {
                         ToastManager.shared.dismiss(toast.id)
                     } else {
-                        withAnimation(.spring(response: 0.3)) {
-                            revealDismiss = false
-                        }
+                        withAnimation(.spring(response: 0.3)) { revealDismiss = false }
                     }
                 }
         )
+        .onTapGesture {
+            if let action = toast.action { action() }
+            ToastManager.shared.dismiss(toast.id)
+        }
     }
 }

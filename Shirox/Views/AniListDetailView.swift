@@ -23,6 +23,8 @@ struct AniListDetailView: View {
     @State private var showResetConfirmation = false
     @State private var autoPlayOnLoad = false
     @AppStorage("dualSync") private var dualSync = false
+    /// #122 — Controls whether the Statistics grid renders on detail pages.
+    @AppStorage("showStatistics") private var showStatistics = true
     @State private var showLibraryEdit = false
     @State private var existingEntry: LibraryEntry? = nil
     @State private var existingMALEntry: LibraryEntry? = nil
@@ -651,6 +653,11 @@ struct AniListDetailView: View {
                     .frame(maxWidth: .infinity)
                 metadataSection(media: media)
                     .frame(maxWidth: .infinity)
+                if showStatistics {
+                    statisticsSection(media: media)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 16)
+                }
                 if let desc = media.plainDescription, !desc.isEmpty {
                     SynopsisSection(text: desc)
                         .padding(.top, 16)
@@ -1031,6 +1038,48 @@ struct AniListDetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16)
         .padding(.bottom, 4)
+    }
+
+    // MARK: - Statistics
+    /// #122 — Restored 2-column Statistics grid. Renders a compact grid of
+    /// media metadata (Type, Format, Status, Episodes, Rating, Season,
+    /// Duration, Studio, Source, Premiered) right after the hero/metadata
+    /// sections. Gated by the `showStatistics` AppStorage toggle in
+    /// `AppearanceSettingsPage` so users who prefer a leaner detail page can
+    /// hide it.
+    @ViewBuilder
+    private func statisticsSection(media: Media) -> some View {
+        let items: [(String, String)] = [
+            ("Type", media.type ?? "Anime"),
+            ("Format", media.format ?? "—"),
+            ("Status", media.statusDisplay ?? "—"),
+            ("Episodes", media.episodes.map { String($0) } ?? "—"),
+            ("Rating", media.averageScore.map { "\($0)%" } ?? "—"),
+            ("Season", [media.season?.capitalized, media.seasonYear.map { String($0) }].compactMap { $0 }.joined(separator: " ")),
+            ("Duration", media.duration.map { "\($0) min" } ?? "—"),
+            ("Studio", media.mainStudioName ?? "—"),
+            ("Source", media.sourceDisplay ?? "—"),
+            ("Premiered", media.airDateRange ?? "—")
+        ]
+        return VStack(alignment: .leading, spacing: 12) {
+            Text("Statistics")
+                .font(.title3.weight(.bold))
+                .padding(.horizontal, 16)
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                ForEach(items, id: \.0) { item in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(item.0)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(item.1)
+                            .font(.subheadline.weight(.medium))
+                    }
+                    .padding(12)
+                    .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
+                }
+            }
+            .padding(.horizontal, 16)
+        }
     }
 
     // MARK: - Episodes

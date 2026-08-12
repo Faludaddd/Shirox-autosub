@@ -34,7 +34,7 @@ struct SettingsView: View {
         NavigationStack {
             List {
                 // Appearance
-                Section("Appearance") {
+                Section {
                     NavigationLink {
                         AppearanceSettingsPage()
                     } label: {
@@ -43,7 +43,7 @@ struct SettingsView: View {
                 }
 
                 // Playback
-                Section("Playback") {
+                Section {
                     NavigationLink {
                         PlaybackSettingsPage()
                     } label: {
@@ -57,7 +57,7 @@ struct SettingsView: View {
                 }
 
                 // Library & Tracking
-                Section("Library & Tracking") {
+                Section {
                     NavigationLink {
                         LibrarySettingsPage()
                     } label: {
@@ -71,7 +71,7 @@ struct SettingsView: View {
                 }
 
                 // Sources & Modules
-                Section("Sources & Modules") {
+                Section {
                     NavigationLink {
                         SourcesSettingsPage()
                     } label: {
@@ -85,7 +85,7 @@ struct SettingsView: View {
                 }
 
                 // Schedule & Notifications
-                Section("Schedule & Notifications") {
+                Section {
                     NavigationLink {
                         ScheduleSettingsPage()
                     } label: {
@@ -99,7 +99,7 @@ struct SettingsView: View {
                 }
 
                 // Data & Performance
-                Section("Data & Performance") {
+                Section {
                     NavigationLink {
                         PerformanceModeSettingsPage()
                     } label: {
@@ -123,7 +123,7 @@ struct SettingsView: View {
                 }
 
                 // About
-                Section("About") {
+                Section {
                     NavigationLink {
                         AboutSettingsPage()
                     } label: {
@@ -759,6 +759,15 @@ struct AppearanceSettingsPage: View {
     @AppStorage("reduceMotion") private var reduceMotion = false
     @AppStorage("glowEnabled") private var glowEnabled = true
     @AppStorage("glowIntensity") private var glowIntensity: Double = 0.5
+    /// #120 — Toggles the browse AnimeSections (This Season, Trending Now, …)
+    /// on the Home tab. When OFF, Home shows only the carousel + continue
+    /// watching / reading.
+    @AppStorage("showBrowseCategories") private var showBrowseCategories = false
+    /// #122 — Whether to render the Statistics grid on detail pages.
+    @AppStorage("showStatistics") private var showStatistics = true
+    /// #118 — Whether the search bar is shown inline at the top of Home
+    /// (filtering trending items) instead of pushing a dedicated Search tab.
+    @AppStorage("inlineSearchOnHome") private var inlineSearchOnHome = false
 
     private struct AccentSwatch: Identifiable {
         let id: String
@@ -810,6 +819,23 @@ struct AppearanceSettingsPage: View {
                 Toggle("Reduce Motion", isOn: $reduceMotion)
                     .tint(Color.gray)
             }
+            Section("Home") {
+                Toggle("Show Browse Categories on Home", isOn: $showBrowseCategories)
+                    .tint(Color.gray)
+            }
+            // #118 / #122 — Detail-page and Home-screen layout toggles.
+            Section {
+                Toggle("Show Statistics on Detail Pages", isOn: $showStatistics)
+                    .tint(Color.gray)
+                Toggle("Inline Search on Home", isOn: $inlineSearchOnHome)
+                    .tint(Color.gray)
+            } header: {
+                Text("Layout")
+            } footer: {
+                Text("Show Statistics renders the compact metadata grid on detail pages. Inline Search replaces the Home search button with a live search bar that filters trending titles.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Section {
                 Toggle("Enable Glow", isOn: $glowEnabled)
                     .tint(Color.gray)
@@ -840,6 +866,9 @@ struct AppearanceSettingsPage: View {
                     reduceMotion = false
                     glowEnabled = true
                     glowIntensity = 0.5
+                    showStatistics = true
+                    inlineSearchOnHome = false
+                    showBrowseCategories = false
                 }
                 .tint(.appAccent)
             }
@@ -2989,6 +3018,12 @@ struct SubtitleSettingsPage: View {
     @AppStorage("subtitleDelaySeconds") private var subtitleDelaySeconds: Double = 0
     @AppStorage("subtitleShadowOffset") private var subtitleShadowOffset: Double = 2
 
+    // #114 extension — Vertical position control. -100 = top of screen,
+    // 100 = bottom of screen, 0 = default (near-bottom) subtitle position.
+    // The live preview and LandscapeSubtitlePreview both read this key so the
+    // user can drag the slider and see the caption move in real time.
+    @AppStorage("subtitleVerticalOffset") private var subtitleVerticalOffset: Double = 0
+
     @State private var previewImageURL: String?
     @State private var showLandscapePreview = false
 
@@ -3007,6 +3042,7 @@ struct SubtitleSettingsPage: View {
                 quickPresetsCard
                 livePreviewCard
                 appearanceControlsCard
+                positionCard
                 typographyCard
                 timingCard
                 effectsCard
@@ -3117,6 +3153,11 @@ struct SubtitleSettingsPage: View {
 
                 subtitlePreviewText
                     .padding(.bottom, 16)
+                    // #114 extension — Apply the user's vertical offset so the
+                    // preview caption moves in real time as the slider drags.
+                    // The multiplier (0.5) scales the -100…100 range down to
+                    // ±50pt so the caption stays inside the 180pt preview frame.
+                    .offset(y: -subtitleVerticalOffset * 0.5)
             }
             .frame(maxWidth: .infinity)
 
@@ -3307,6 +3348,60 @@ struct SubtitleSettingsPage: View {
         .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
+    // MARK: - Position & Background Card (#114 extension)
+
+    /// #114 extension — Vertical position control. The slider runs -100…100
+    /// (top…bottom) with 0 as the default (near-bottom) subtitle position so
+    /// existing installs are unaffected until the user opts in.
+    private var positionCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Label("Position & Background", systemImage: "arrow.up.and.down.text.horizontal")
+                .font(.headline)
+
+            Toggle("Background", isOn: $subtitleBackgroundEnabled)
+                .tint(.appAccent)
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("Vertical Position")
+                    Spacer()
+                    Text(String(format: "%+.0f", subtitleVerticalOffset))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+                Slider(value: $subtitleVerticalOffset, in: -100...100, step: 1)
+                    .tint(.appAccent)
+                HStack {
+                    Text("Top")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("Bottom")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Text("Negative values lift the caption toward the top of the screen, positive values push it toward the bottom. 0 = default position near the bottom edge.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        subtitleVerticalOffset = 0
+                    }
+                } label: {
+                    Label("Reset to 0", systemImage: "arrow.counterclockwise")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .tint(.appAccent)
+                .disabled(subtitleVerticalOffset == 0)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
     // MARK: - Effects Card (#114)
 
     private var effectsCard: some View {
@@ -3437,6 +3532,9 @@ struct LandscapeSubtitlePreview: View {
     @AppStorage("subtitleLineSpacing") private var subtitleLineSpacing: Double = 1.0
     @AppStorage("subtitleMaxWidth") private var subtitleMaxWidth: Double = 90
     @AppStorage("subtitleShadowOffset") private var subtitleShadowOffset: Double = 2
+    // #114 extension — Mirror the vertical-offset key so the landscape preview
+    // honors the same slider the user just dragged in the inline preview.
+    @AppStorage("subtitleVerticalOffset") private var subtitleVerticalOffset: Double = 0
 
     @Environment(\.dismiss) private var dismiss
     @State private var hasAppliedLandscapeLock = false
@@ -3488,9 +3586,14 @@ struct LandscapeSubtitlePreview: View {
                     // the user-selected style settings (color, stroke,
                     // background, weight, design, opacity, line spacing,
                     // shadow) are applied so the preview matches playback 1:1.
+                    // #114 extension — Apply the user's vertical offset so the
+                    // landscape preview matches the inline preview's caption
+                    // position. Positive offset pushes down (closer to / past
+                    // the default bottom inset), negative lifts toward the top.
                     captionText
                         .frame(maxWidth: captionMaxWidth)
                         .padding(.bottom, bottomInset)
+                        .offset(y: -subtitleVerticalOffset * 0.8)
                 }
 
                 // Subtle helper text just above the caption so the user

@@ -161,9 +161,14 @@ struct GlowingToggleStyle: ToggleStyle {
             configuration.label
             Spacer()
             ZStack {
+                // #123 — Long pill capsule. Widened from 51→60pt and made
+                // taller (31→34pt) so the toggle reads as a long pill rather
+                // than a small switch. The thumb grows proportionally (27→30pt)
+                // and travel distance increases (±10→±12) so the ON/OFF thumb
+                // position is clearly differentiated at a glance.
                 Capsule()
                     .fill(configuration.isOn ? Color.gray : Color.gray.opacity(0.3))
-                    .frame(width: 51, height: 31)
+                    .frame(width: 60, height: 34)
                     .shadow(
                         color: configuration.isOn && Color.glowEnabled
                             ? Color.gray.opacity(Color.glowIntensity) : .clear,
@@ -171,8 +176,8 @@ struct GlowingToggleStyle: ToggleStyle {
                     )
                 Circle()
                     .fill(Color.white)
-                    .frame(width: 27, height: 27)
-                    .offset(x: configuration.isOn ? 10 : -10)
+                    .frame(width: 30, height: 30)
+                    .offset(x: configuration.isOn ? 12 : -12)
             }
             .animation(.easeInOut(duration: 0.2), value: configuration.isOn)
             .onTapGesture {
@@ -194,14 +199,6 @@ struct ShiroxApp: App {
     // Appearance settings — applied globally via .preferredColorScheme and .tint
     @AppStorage("appearanceMode") private var appearanceMode = "system"
     @AppStorage("accentColorHex") private var accentColorHex = ""
-    @State private var showSplash = true
-    /// #109 — Drives the subtle entrance fade on `RootTabView` once the splash
-    /// finishes. Held as separate state (rather than deriving it from
-    /// `!showSplash`) so the fade-in can be triggered explicitly inside the
-    /// splash-dismiss `withAnimation` block — that way the splash fades out
-    /// AND the root view fades in over the same 0.5s window without one
-    /// animation needing to wait for the other.
-    @State private var rootVisible = false
 
     /// Resolves the appearance mode to a ColorScheme (nil = follow system).
     private var colorScheme: ColorScheme? {
@@ -259,40 +256,17 @@ struct ShiroxApp: App {
                 // Bumping `.id(...)` discards the old view tree and rebuilds it
                 // fresh with the new accent color / color scheme applied.
                 .id("\(accentColorHex)-\(appearanceMode)")
-                // #109 — Subtle entrance fade on the root view once the splash
-                // finishes. `rootVisible` flips from `false` → `true` in its
-                // own `withAnimation(.easeInOut(duration: 0.3))` block (see the
-                // splash-dismiss task below) so the root fades in over 0.3s
-                // while the splash simultaneously fades out + scales up over
-                // 0.5s. The fade is intentionally shorter than the splash
-                // dismissal so the root is fully visible BEFORE the splash
-                // overlay finishes lifting away — that hides any flash of
-                // empty content during the hand-off.
-                .opacity(rootVisible ? 1 : 0)
-                .overlay {
-                    if showSplash {
-                        AnimatedSplashView()
-                            // #109 — Smoother dismissal: combine the opacity
-                            // fade with a subtle scale-up (1.0 → 1.05) so the
-                            // splash appears to gently "lift" away rather than
-                            // just blinking out.
-                            .transition(.opacity.combined(with: .scale(scale: 1.05)))
-                    }
-                }
                 .overlay {
                     ToastContainerView()
                 }
                 .task {
                     // #93 — Preload Schedule + Notifications in the background
-                    // during the splash. The fetches stay in `Task.detached`
-                    // (a slow network never blocks app entry), but the splash
-                    // window is now 3.5s so the preload has a much better
-                    // chance of completing before the home tab appears. The
-                    // schedule fetch uses the SAME window `ScheduleView` will
-                    // request (start-of-today → +windowDays) so the result
-                    // lands in `AniListService`'s in-memory cache and
-                    // `ScheduleView.load()` can read it back without a second
-                    // network call.
+                    // on launch. The fetches stay in `Task.detached` so a slow
+                    // network never blocks app entry. The schedule fetch uses
+                    // the SAME window `ScheduleView` will request
+                    // (start-of-today → +windowDays) so the result lands in
+                    // `AniListService`'s in-memory cache and `ScheduleView.load()`
+                    // can read it back without a second network call.
                     Task.detached(priority: .userInitiated) {
                         // Match ScheduleView's fetch window exactly so the
                         // cached entries cover every day the schedule tab will
@@ -306,27 +280,6 @@ struct ShiroxApp: App {
                         async let schedule = try? AniListService.shared.airingSchedules(from: from, to: to)
                         async let notifications = try? AniListSocialService.shared.fetchNotifications()
                         _ = await (schedule, notifications)
-                    }
-                    // #93 — Extended splash window (3.5s) gives the preload a
-                    // head start so the Home tab is more likely to be
-                    // populated when it appears.
-                    try? await Task.sleep(nanoseconds: 3_500_000_000)
-                    // #109 — Smooth splash dismissal (0.5s) + root entrance
-                    // fade (0.3s). Two separate `withAnimation` blocks so each
-                    // state change picks up its own duration: the splash
-                    // overlay fades out AND scales up to 1.05 (driven by its
-                    // `.transition(.opacity.combined(with: .scale(scale: 1.05)))`)
-                    // over 0.5s, while the root view simultaneously fades in
-                    // from 0 → 1 over a shorter 0.3s window. Running them in
-                    // parallel (rather than sequentially) keeps the total
-                    // transition at 0.5s and lets the root become fully
-                    // visible BEFORE the splash finishes lifting away, hiding
-                    // any flash of empty content during the hand-off.
-                    withAnimation(.easeInOut(duration: 0.5)) {
-                        showSplash = false
-                    }
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        rootVisible = true
                     }
                 }
                 .onChange(of: scenePhase) { phase in
