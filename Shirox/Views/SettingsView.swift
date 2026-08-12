@@ -1119,7 +1119,7 @@ struct QualitySettingsPage: View {
                                 .font(.subheadline.weight(.semibold))
                                 .lineLimit(1)
                                 .fixedSize(horizontal: true, vertical: false)
-                            Text("Streamed quality is capped at 480p to reduce mobile data usage.")
+                            Text("Streaming quality is capped at roughly 480p to reduce mobile data usage. Even if you pick a higher quality in the player, playback stays at this cap until Data Saving is turned off.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -1171,6 +1171,10 @@ struct QualitySettingsPage: View {
                         .tint(Color.gray)
                         .lineLimit(1)
                         .fixedSize(horizontal: true, vertical: false)
+                    Text("Caps streaming quality at roughly 480p to use less mobile data. The video player's quality picker is also locked to this cap while Data Saving is on. Downloads and local files are not affected.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .padding(.vertical, 16)
@@ -1432,15 +1436,25 @@ struct PiPSettingsPage: View {
                 PlaybackSettingsCard(title: "Picture-in-Picture") {
                     Toggle("PiP When Leaving App", isOn: $pipWhenLeavingApp)
                         .tint(Color.gray)
-                    Text("Automatically enter Picture-in-Picture when leaving Shirox during playback.")
+                    Text("When you swipe out of Shirox during playback, the video shrinks into a small floating window so you can keep watching while using other apps. Turn this off if you'd rather the video just pause.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 PlaybackSettingsCard(title: "Auto-Pause") {
                     Toggle("Auto-Pause on Interruption", isOn: $autoPauseOnInterruption)
                         .tint(Color.gray)
+                    Text("Pauses playback automatically when something else takes over audio — an incoming call, Siri, an alarm, or another media app starting. Playback resumes when the interruption ends if the system allows it.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Divider().opacity(0.4)
                     Toggle("Auto-Pause on Control Center", isOn: $autoPauseOnControlCenter)
                         .tint(Color.gray)
+                    Text("Pauses playback when you open Control Center or Notification Center by swiping down from the top-right or top of the screen. Playback doesn't auto-resume when you close it — tap play to continue. Opening the app switcher or going to the home screen is not affected (those use PiP instead).")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .padding(.vertical, 16)
@@ -2268,13 +2282,30 @@ struct ModuleStorePage: View {
     @State private var searchText = ""
     @State private var moduleURL = ""
     @State private var isInstalling = false
+    /// #130 — Layout toggle. Grid (default, 3-column) or list (1-column row).
+    /// Persisted so the user's choice survives re-opening the store.
+    @AppStorage("moduleStoreLayout") private var layout: ModuleStoreLayout = .grid
 
-    private let storeURL = "https://modulesbypaul.dev"
-    private let columns: [GridItem] = [
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12)
-    ]
+    /// #133 — cufiy.net Sora Module Library JSON endpoint. This is the
+    /// authoritative, structured source for the full module listing — every
+    /// module from `https://library.cufiy.net/library/` is available here as
+    /// a clean JSON object (no HTML scraping required). The previous
+    /// `modulesbypaul.dev` endpoint was a smaller, regex-parsed subset.
+    private let storeURL = "https://library.cufiy.net/api/modules.json"
+    private var columns: [GridItem] {
+        // #130 — Grid is 3-column, list is a single column (the list-row tile
+        // handles its own internal layout).
+        switch layout {
+        case .grid:
+            return [
+                GridItem(.flexible(), spacing: 12),
+                GridItem(.flexible(), spacing: 12),
+                GridItem(.flexible(), spacing: 12)
+            ]
+        case .list:
+            return [GridItem(.flexible(), spacing: 10)]
+        }
+    }
 
     /// Modules shown in the "🔥 Popular Sources" section — anime-typed or
     /// English-language sources, which are the most commonly requested.
@@ -2379,7 +2410,7 @@ struct ModuleStorePage: View {
                                 .padding(.horizontal, 14)
                             LazyVGrid(columns: columns, spacing: 12) {
                                 ForEach(popularSources) { mod in
-                                    StoreModuleTile(mod: mod, isInstalled: isModuleInstalled(mod), isInstalling: isInstalling) {
+                                    StoreModuleTile(mod: mod, isInstalled: isModuleInstalled(mod), isInstalling: isInstalling, layout: layout) {
                                         installModule(mod)
                                     }
                                 }
@@ -2396,7 +2427,7 @@ struct ModuleStorePage: View {
                                 .padding(.top, 4)
                             LazyVGrid(columns: columns, spacing: 12) {
                                 ForEach(communitySources) { mod in
-                                    StoreModuleTile(mod: mod, isInstalled: isModuleInstalled(mod), isInstalling: isInstalling) {
+                                    StoreModuleTile(mod: mod, isInstalled: isModuleInstalled(mod), isInstalling: isInstalling, layout: layout) {
                                         installModule(mod)
                                     }
                                 }
@@ -2413,7 +2444,7 @@ struct ModuleStorePage: View {
                             .padding(.horizontal, 14)
                         LazyVGrid(columns: columns, spacing: 12) {
                             ForEach(filteredModules) { mod in
-                                StoreModuleTile(mod: mod, isInstalled: isModuleInstalled(mod), isInstalling: isInstalling) {
+                                StoreModuleTile(mod: mod, isInstalled: isModuleInstalled(mod), isInstalling: isInstalling, layout: layout) {
                                     installModule(mod)
                                 }
                             }
@@ -2429,6 +2460,25 @@ struct ModuleStorePage: View {
         .navigationTitle("Module Store")
         .task { await loadStore() }
         .refreshable { await loadStore() }
+        .toolbar {
+            // #130 — Grid/list view toggle. Icon shows the layout the user
+            // will switch TO (not the current one) so the tap reads as
+            // "switch to list" / "switch to grid".
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        layout = (layout == .grid) ? .list : .grid
+                    }
+                    #if os(iOS)
+                    Haptics.selection()
+                    #endif
+                } label: {
+                    Image(systemName: layout.toggleIconName)
+                        .font(.system(size: 14, weight: .medium))
+                }
+                .accessibilityLabel(layout == .grid ? "Switch to list view" : "Switch to grid view")
+            }
+        }
     }
 
     private var filteredModules: [StoreModuleItem] {
@@ -2453,126 +2503,89 @@ struct ModuleStorePage: View {
         }
     }
 
-    /// Fetches the modulesbypaul.dev HTML page and extracts module data from the
-    /// embedded JSON. The page contains escaped JSON with jsonUrl, sourceName,
-    /// and iconUrl fields for each module.
+    /// #133 — Fetches the cufiy.net Sora Module Library JSON API
+    /// (`https://library.cufiy.net/api/modules.json`), which is the
+    /// authoritative source for the full module listing. The previous
+    /// implementation scraped the `modulesbypaul.dev` HTML with regex over
+    /// backslash-escaped JSON; the cufiy.net endpoint returns structured JSON
+    /// directly, so we get clean field names, real install counts, and
+    /// curation flags (featured / recommendation) for free.
+    ///
+    /// After fetching, modules are sorted by `popularityRank` (Miruro pinned
+    /// first, then featured → recommendation → installCount → alphabetical)
+    /// so the store opens with the most popular, best-regarded sources at
+    /// the top. This integrates with the existing Popular/Community split
+    /// (#79) — `isPopularSource` now reads the real curation flags instead
+    /// of guessing from type/language.
     private func loadStore() async {
         isLoading = true; storeError = nil
         do {
             let url = URL(string: storeURL)!
             var request = URLRequest(url: url)
             request.setValue("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", forHTTPHeaderField: "User-Agent")
+            // cufiy.net is a static JSON API; cache-bust every load so the
+            // user always sees the freshest module list (new modules are
+            // added frequently).
+            request.cachePolicy = .reloadIgnoringLocalCacheData
             let (data, response) = try await URLSession.shared.data(for: request)
             if let http = response as? HTTPURLResponse, http.statusCode != 200 {
                 throw URLError(.badServerResponse)
             }
-            let html = String(data: data, encoding: .utf8) ?? ""
-            storeModules = parseModulesFromHTML(html)
+            // The API returns a top-level JSON array of module objects.
+            let modules = try JSONDecoder().decode([StoreModuleItem].self, from: data)
+            // Deduplicate by manifestUrl (the API is already clean, but a
+            // defensive dedupe keeps the listing stable if the API ever
+            // returns duplicates).
+            var seen = Set<String>()
+            let deduped = modules.filter { mod in
+                if mod.manifestUrl.isEmpty { return false }
+                if seen.contains(mod.manifestUrl) { return false }
+                seen.insert(mod.manifestUrl)
+                return true
+            }
+            // #133 — Sort by real popularity: Miruro pinned first, then
+            // featured → recommendation → installCount → alphabetical.
+            storeModules = deduped.sorted { lhs, rhs in
+                let lhsRank = lhs.popularityRank
+                let rhsRank = rhs.popularityRank
+                if lhsRank != rhsRank { return lhsRank > rhsRank }
+                return lhs.name.lowercased() < rhs.name.lowercased()
+            }
             if storeModules.isEmpty {
-                storeError = "No modules found. The repository may have changed."
+                storeError = "No modules found. The library may have changed."
             }
         } catch {
-            storeError = "Could not load store. Check your connection and try again."
+            storeError = "Could not load the module library. Check your connection and try again."
         }
         isLoading = false
-    }
-
-    /// Parses module data from the HTML page by extracting jsonUrl, sourceName,
-    /// iconUrl, type and language from the embedded escaped JSON.
-    ///
-    /// Each module's JSON block is bounded by its `jsonUrl` key and the next
-    /// module's `jsonUrl` key, so fields can appear in any order without
-    /// leaking into neighbouring modules.
-    private func parseModulesFromHTML(_ html: String) -> [StoreModuleItem] {
-        // The HTML contains literal backslash-quoted JSON, one block per module:
-        //   \"jsonUrl\":\"https://...\",\"sourceName\":\"AnimePahe\",
-        //   \"iconUrl\":\"https://...\",\"language\":\"English\",
-        //   \"type\":\"anime/movies/shows\",...
-
-        var results: [StoreModuleItem] = []
-        var seen = Set<String>()
-
-        let jsonKey = "\\\"jsonUrl\\\":\\\""
-        var searchRange = html.startIndex..<html.endIndex
-
-        while let jsonUrlRange = html.range(of: jsonKey, options: .literal, range: searchRange) {
-            // URL starts right after the search key, ends at the next \"
-            let urlStart = jsonUrlRange.upperBound
-            guard let urlEnd = html.range(of: "\\\"", options: .literal, range: urlStart..<html.endIndex) else { break }
-            let jsonUrl = String(html[urlStart..<urlEnd.lowerBound])
-
-            // Bound this module's block: from after the jsonUrl value to the
-            // next jsonUrl occurrence (or end of HTML for the last module).
-            let nextJsonRange = html.range(of: jsonKey, options: .literal, range: urlEnd.upperBound..<html.endIndex)
-            let blockEnd = nextJsonRange?.lowerBound ?? html.endIndex
-            let blockRange = urlEnd.upperBound..<blockEnd
-
-            // sourceName (anywhere inside this module's block)
-            var name = "Unknown"
-            let nameKey = "\\\"sourceName\\\":\\\""
-            if let nameKeyRange = html.range(of: nameKey, options: .literal, range: blockRange) {
-                let nameStart = nameKeyRange.upperBound
-                if let nameEnd = html.range(of: "\\\"", options: .literal, range: nameStart..<blockEnd) {
-                    name = String(html[nameStart..<nameEnd.lowerBound])
-                }
-            }
-
-            // iconUrl (optional)
-            var iconUrl: String? = nil
-            let iconKey = "\\\"iconUrl\\\":\\\""
-            if let iconKeyRange = html.range(of: iconKey, options: .literal, range: blockRange) {
-                let iconStart = iconKeyRange.upperBound
-                if let iconEnd = html.range(of: "\\\"", options: .literal, range: iconStart..<blockEnd) {
-                    iconUrl = String(html[iconStart..<iconEnd.lowerBound])
-                }
-            }
-
-            // type (e.g. "anime", "anime/movies/shows", "mangas", "novels")
-            var type: String? = nil
-            let typeKey = "\\\"type\\\":\\\""
-            if let typeKeyRange = html.range(of: typeKey, options: .literal, range: blockRange) {
-                let typeStart = typeKeyRange.upperBound
-                if let typeEnd = html.range(of: "\\\"", options: .literal, range: typeStart..<blockEnd) {
-                    type = String(html[typeStart..<typeEnd.lowerBound])
-                }
-            }
-
-            // language (e.g. "English", "Arabic", "Tamil")
-            var language: String? = nil
-            let languageKey = "\\\"language\\\":\\\""
-            if let languageKeyRange = html.range(of: languageKey, options: .literal, range: blockRange) {
-                let languageStart = languageKeyRange.upperBound
-                if let languageEnd = html.range(of: "\\\"", options: .literal, range: languageStart..<blockEnd) {
-                    language = String(html[languageStart..<languageEnd.lowerBound])
-                }
-            }
-
-            // Deduplicate by URL
-            if !seen.contains(jsonUrl) {
-                seen.insert(jsonUrl)
-                results.append(StoreModuleItem(
-                    id: jsonUrl,
-                    name: name,
-                    description: nil,
-                    version: nil,
-                    manifestUrl: jsonUrl,
-                    iconUrl: iconUrl?.isEmpty == true ? nil : iconUrl,
-                    author: "modulesbypaul.dev",
-                    type: type?.isEmpty == true ? nil : type,
-                    language: language?.isEmpty == true ? nil : language
-                ))
-            }
-
-            // Continue searching at the next module's jsonUrl (or stop)
-            guard let nextJsonRange = nextJsonRange else { break }
-            searchRange = nextJsonRange.lowerBound..<html.endIndex
-        }
-
-        return results.sorted { $0.name.lowercased() < $1.name.lowercased() }
     }
 }
 
 struct StoreModuleWrapper: Codable { let modules: [StoreModuleItem] }
+
+/// #130 — Layout preference for `ModuleStorePage`. Grid is the original
+/// 3-column tile layout; List is a single-column row layout that shows more
+/// metadata (type, language) at a glance and is easier to scan on phones.
+enum ModuleStoreLayout: String, CaseIterable {
+    case grid
+    case list
+
+    var iconName: String {
+        switch self {
+        case .grid: return "square.grid.2x2"
+        case .list: return "list.bullet"
+        }
+    }
+
+    var toggleIconName: String {
+        // Icon shows the LAYOUT YOU'LL SWITCH TO when tapped, so the user
+        // reads it as "tap to switch to list/grid".
+        switch self {
+        case .grid: return "list.bullet"        // currently grid → tap goes to list
+        case .list: return "square.grid.2x2"    // currently list → tap goes to grid
+        }
+    }
+}
 
 struct StoreModuleItem: Codable, Identifiable {
     let id: String
@@ -2585,18 +2598,43 @@ struct StoreModuleItem: Codable, Identifiable {
     let type: String?
     let language: String?
 
+    // #133 — Popularity / curation fields sourced from the cufiy.net Sora
+    // Module Library JSON API (`https://library.cufiy.net/api/modules.json`).
+    // All optional so legacy `modulesbypaul.dev`-style parses (which don't
+    // carry these fields) still decode without failing.
+    let installCount: Int?
+    let recommendation: Int?
+    let featured: Int?
+    let note: String?
+
     enum CodingKeys: String, CodingKey {
-        case id, name, description, version, type, language
-        case manifestUrl = "manifest_url"
-        case iconUrl = "icon_url"
+        case id, name, description, version, type, language, note
+        // cufiy.net uses `sourceName` for the display name and `manifestUrl`
+        // for the install URL. The legacy `modulesbypaul.dev` scrape used
+        // `sourceName` (parsed manually) and `jsonUrl`/`manifest_url` —
+        // we accept either spelling so both sources decode cleanly.
+        case sourceName
+        case manifestUrl
+        case manifest_url
+        case jsonUrl
+        case iconUrl
+        case icon_url
         case author
+        case installCount
+        case recommendation
+        case featured
     }
 
-    /// Whether this module qualifies as a "Popular Source" — either an
-    /// anime-typed source (type contains "anime" as one of its slash-separated
-    /// segments) or an English-language source. Used by `ModuleStorePage` to
-    /// split the store into Popular vs. Community sections.
+    /// Whether this module qualifies as a "Popular Source" for the
+    /// 🔥 Popular section. #133 — Now driven by real curation data from
+    /// cufiy.net: featured > recommendation > installCount. Falls back to
+    /// the older heuristic (anime-typed or English-language) when the
+    /// curation fields are missing, so legacy parses still split sensibly.
     var isPopularSource: Bool {
+        if let featured, featured > 0 { return true }
+        if let recommendation, recommendation > 0 { return true }
+        if let installCount, installCount >= 100 { return true }
+        // Legacy fallback.
         let types = (type ?? "").lowercased()
             .split(separator: "/")
             .map { String($0).trimmingCharacters(in: .whitespaces) }
@@ -2604,7 +2642,24 @@ struct StoreModuleItem: Codable, Identifiable {
         return (language ?? "").lowercased() == "english"
     }
 
-    init(id: String, name: String, description: String?, version: String?, manifestUrl: String, iconUrl: String?, author: String?, type: String? = nil, language: String? = nil) {
+    /// #133 — Composite popularity rank for ordering the store listing.
+    /// Higher = more popular. Components (in priority order):
+    ///   1. Miruro pinned to the very top (explicit user request).
+    ///   2. `featured` flag (cufiy.net editor's pick).
+    ///   3. `recommendation` score.
+    ///   4. `installCount` (clamped so a single viral hit doesn't dominate).
+    ///   5. Alphabetical tiebreaker for stable ordering.
+    var popularityRank: Int {
+        // Miruro always wins.
+        if name.lowercased() == "miruro" { return 1_000_000_000 }
+        var rank = 0
+        if let featured, featured > 0 { rank += 1_000_000 }
+        if let recommendation { rank += recommendation * 10_000 }
+        if let installCount { rank += min(installCount, 100_000) }
+        return rank
+    }
+
+    init(id: String, name: String, description: String?, version: String?, manifestUrl: String, iconUrl: String?, author: String?, type: String? = nil, language: String? = nil, installCount: Int? = nil, recommendation: Int? = nil, featured: Int? = nil, note: String? = nil) {
         self.id = id
         self.name = name
         self.description = description
@@ -2614,19 +2669,77 @@ struct StoreModuleItem: Codable, Identifiable {
         self.author = author
         self.type = type
         self.language = language
+        self.installCount = installCount
+        self.recommendation = recommendation
+        self.featured = featured
+        self.note = note
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        // cufiy.net uses `id` (short hash); legacy scrape synthesised one from
+        // the manifest URL. Accept either.
         id = try c.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString
-        name = try c.decodeIfPresent(String.self, forKey: .name) ?? "Unknown"
+        // cufiy.net: `sourceName`. Legacy: `name`. Prefer sourceName, then name.
+        if let sourceName = try c.decodeIfPresent(String.self, forKey: .sourceName), !sourceName.isEmpty {
+            name = sourceName
+        } else {
+            name = try c.decodeIfPresent(String.self, forKey: .name) ?? "Unknown"
+        }
         description = try c.decodeIfPresent(String.self, forKey: .description)
         version = try c.decodeIfPresent(String.self, forKey: .version)
-        manifestUrl = try c.decodeIfPresent(String.self, forKey: .manifestUrl) ?? ""
-        iconUrl = try c.decodeIfPresent(String.self, forKey: .iconUrl)
-        author = try c.decodeIfPresent(String.self, forKey: .author)
+        // manifestUrl preferred; fall back to manifest_url / jsonUrl for the
+        // legacy scrape shape.
+        if let manifest = try c.decodeIfPresent(String.self, forKey: .manifestUrl), !manifest.isEmpty {
+            manifestUrl = manifest
+        } else if let manifest = try c.decodeIfPresent(String.self, forKey: .manifest_url), !manifest.isEmpty {
+            manifestUrl = manifest
+        } else if let jsonUrl = try c.decodeIfPresent(String.self, forKey: .jsonUrl), !jsonUrl.isEmpty {
+            manifestUrl = jsonUrl
+        } else {
+            manifestUrl = ""
+        }
+        if let icon = try c.decodeIfPresent(String.self, forKey: .iconUrl) {
+            iconUrl = icon
+        } else {
+            iconUrl = try c.decodeIfPresent(String.self, forKey: .icon_url)
+        }
+        // cufiy.net nests author under an `author` object with a `name` field.
+        // Legacy scrape stored the author name directly as a string. Handle
+        // both shapes.
+        if let authorObj = try? c.decodeIfPresent(AuthorObject.self, forKey: .author) {
+            author = authorObj.name
+        } else {
+            author = try? c.decodeIfPresent(String.self, forKey: .author)
+        }
         type = try c.decodeIfPresent(String.self, forKey: .type)
         language = try c.decodeIfPresent(String.self, forKey: .language)
+        installCount = try c.decodeIfPresent(Int.self, forKey: .installCount)
+        recommendation = try c.decodeIfPresent(Int.self, forKey: .recommendation)
+        featured = try c.decodeIfPresent(Int.self, forKey: .featured)
+        note = try c.decodeIfPresent(String.self, forKey: .note)
+    }
+
+    /// Nested `author` object from cufiy.net (`{ "name": "50/50", "icon": "..." }`).
+    private struct AuthorObject: Decodable {
+        let name: String?
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(name, forKey: .sourceName)
+        try c.encodeIfPresent(description, forKey: .description)
+        try c.encodeIfPresent(version, forKey: .version)
+        try c.encode(manifestUrl, forKey: .manifestUrl)
+        try c.encodeIfPresent(iconUrl, forKey: .iconUrl)
+        try c.encodeIfPresent(author, forKey: .author)
+        try c.encodeIfPresent(type, forKey: .type)
+        try c.encodeIfPresent(language, forKey: .language)
+        try c.encodeIfPresent(installCount, forKey: .installCount)
+        try c.encodeIfPresent(recommendation, forKey: .recommendation)
+        try c.encodeIfPresent(featured, forKey: .featured)
+        try c.encodeIfPresent(note, forKey: .note)
     }
 }
 
@@ -2635,8 +2748,23 @@ private struct StoreModuleTile: View {
     let isInstalled: Bool
     let isInstalling: Bool
     let onInstall: () -> Void
+    /// #130 — Which layout to render. `.grid` is the original vertical tile
+    /// (icon-top, name-below, install-button-bottom). `.list` is a horizontal
+    /// row (icon-left, metadata-center, install-button-right) that surfaces
+    /// type and language chips for at-a-glance scanning.
+    var layout: ModuleStoreLayout = .grid
 
+    @ViewBuilder
     var body: some View {
+        switch layout {
+        case .grid: gridBody
+        case .list: listBody
+        }
+    }
+
+    // MARK: - Grid layout (original)
+
+    private var gridBody: some View {
         VStack(spacing: 6) {
             // Compact icon at top, centered, 40x40
             Group {
@@ -2671,27 +2799,7 @@ private struct StoreModuleTile: View {
             Spacer(minLength: 2)
 
             // Install button at bottom
-            if isInstalled {
-                Label("Installed", systemImage: "checkmark.circle.fill")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.green)
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 3)
-            } else if isInstalling {
-                ProgressView()
-                    .scaleEffect(0.65)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 3)
-            } else {
-                Button(action: onInstall) {
-                    Text("Install")
-                        .font(.system(size: 10, weight: .semibold))
-                        .lineLimit(1)
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(GlowingInstallButtonStyle())
-            }
+            installButton
         }
         .padding(10)
         .frame(maxWidth: .infinity, minHeight: 156, alignment: .top)
@@ -2711,6 +2819,111 @@ private struct StoreModuleTile: View {
                 ? CGFloat(8 * Color.glowIntensity)
                 : 0
         )
+    }
+
+    // MARK: - List layout (#130)
+
+    private var listBody: some View {
+        HStack(spacing: 12) {
+            // Icon on the left, 44x44 (slightly larger than grid tile so the
+            // row reads well at the wider single-column width).
+            Group {
+                if let iconUrl = mod.iconUrl, let url = URL(string: iconUrl) {
+                    AsyncImage(url: url) { phase in
+                        if case .success(let img) = phase { img.resizable().scaledToFill() }
+                        else { fallbackIcon }
+                    }
+                } else { fallbackIcon }
+            }
+            .frame(width: 44, height: 44)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+
+            // Center: name + author + type/language chips
+            VStack(alignment: .leading, spacing: 4) {
+                Text(mod.name)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                if let author = mod.author, !author.isEmpty {
+                    Text(author)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                // Type + language chips — only shown in list layout where
+                // there's horizontal room for them. Helps the user scan a
+                // long store listing for the source type they need.
+                HStack(spacing: 6) {
+                    if let type = mod.type, !type.isEmpty {
+                        chipLabel(type, icon: "rectangle.stack")
+                    }
+                    if let language = mod.language, !language.isEmpty {
+                        chipLabel(language, icon: "globe")
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            // Right: install state / button
+            installButton
+                .frame(width: 84)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.secondary.opacity(0.08), lineWidth: 1)
+        )
+        .shadow(
+            color: isInstalled && Color.glowEnabled
+                ? Color.appAccent.opacity(Color.glowIntensity * 0.5)
+                : .clear,
+            radius: isInstalled && Color.glowEnabled
+                ? CGFloat(8 * Color.glowIntensity)
+                : 0
+        )
+    }
+
+    // MARK: - Shared install button
+
+    @ViewBuilder
+    private var installButton: some View {
+        if isInstalled {
+            Label("Installed", systemImage: "checkmark.circle.fill")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.green)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, 3)
+        } else if isInstalling {
+            ProgressView()
+                .scaleEffect(0.65)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, 3)
+        } else {
+            Button(action: onInstall) {
+                Text("Install")
+                    .font(.system(size: 10, weight: .semibold))
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(GlowingInstallButtonStyle())
+        }
+    }
+
+    private func chipLabel(_ text: String, icon: String) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: icon)
+                .font(.system(size: 8, weight: .semibold))
+            Text(text)
+                .font(.system(size: 9, weight: .medium))
+        }
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(Color.secondary.opacity(0.1), in: Capsule())
     }
 
     private var fallbackIcon: some View {
@@ -3062,7 +3275,10 @@ struct SubtitleSettingsPage: View {
         }
         #if os(iOS)
         .fullScreenCover(isPresented: $showLandscapePreview) {
-            LandscapeSubtitlePreview()
+            // #114 (bug) — Pass the fetched anime backdrop URL into the
+            // landscape preview so the caption renders over a real anime
+            // still (matching playback conditions), not just a flat gradient.
+            LandscapeSubtitlePreview(backdropImageURL: previewImageURL)
         }
         #endif
     }
@@ -3520,7 +3736,17 @@ private extension View {
 /// view borrows `PlayerPresenter`'s orientation-lock machinery to rotate the
 /// device into landscape exactly like real playback, then draws the caption
 /// with no scaling so the user can judge readability at the genuine size.
+///
+/// #114 (bug fix) — Now renders the actual anime backdrop (banner/cover) URL
+/// passed in from `SubtitleSettingsPage` behind the caption, instead of the
+/// previous flat dark gradient. The backdrop is darkened with a 45% black
+/// overlay so the caption stays readable regardless of the artwork's
+/// brightness, matching real playback where subtitles overlay the video.
 struct LandscapeSubtitlePreview: View {
+    /// Optional anime artwork (banner or cover URL) shown behind the caption.
+    /// Nil falls back to the dark gradient placeholder.
+    var backdropImageURL: String? = nil
+
     @AppStorage("subtitleTextColor") private var subtitleTextColor: String = "white"
     @AppStorage("subtitleStrokeColor") private var subtitleStrokeColor: String = "black"
     @AppStorage("subtitleStrokeWidth") private var subtitleStrokeWidth: Double = 1.0
@@ -3544,18 +3770,13 @@ struct LandscapeSubtitlePreview: View {
             let captionMaxWidth = proxy.size.width * (subtitleMaxWidth / 100.0)
             let bottomInset = max(proxy.size.height * 0.08, 48)
             ZStack(alignment: .top) {
-                // Faux video frame — a dark gradient stands in for a paused
-                // film frame so the caption has context but isn't competing
-                // with bright imagery.
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.04, green: 0.04, blue: 0.06),
-                        Color(red: 0.10, green: 0.09, blue: 0.13)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
+                // #114 (bug fix) — Real anime backdrop. The SubtitleSettingsPage
+                // fetches a trending title on appear and passes its banner/cover
+                // URL here. We render it aspect-fill across the whole frame so
+                // the caption sits on top of actual anime art, just like real
+                // playback. A 45% black overlay guarantees caption legibility
+                // regardless of the artwork's brightness.
+                backdropView
 
                 VStack(spacing: 0) {
                     // Top bar with Done button — always reachable so the user
@@ -3630,6 +3851,57 @@ struct LandscapeSubtitlePreview: View {
             }
             #endif
         }
+    }
+
+    // MARK: - Backdrop
+
+    /// The backdrop behind the caption. When `backdropImageURL` is present,
+    /// renders the anime artwork aspect-fill across the whole frame with a
+    /// 45% black overlay for caption legibility (matching real playback where
+    /// subtitles overlay video). When absent (network failed / no trending
+    /// title yet), falls back to the original dark gradient placeholder.
+    @ViewBuilder
+    private var backdropView: some View {
+        if let urlString = backdropImageURL, !urlString.isEmpty, let url = URL(string: urlString) {
+            ZStack {
+                // Aspect-fill the artwork so the whole landscape frame is
+                // covered, just like a real video frame. SwiftUI's built-in
+                // AsyncImage is used (not CachedAsyncImage) because we need
+                // the phase closure to fall back to the gradient placeholder
+                // while the image loads or if it fails.
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    case .failure, .empty:
+                        // While loading or if the URL fails, show the gradient
+                        // placeholder so the preview never shows a black void.
+                        gradientPlaceholder
+                    @unknown default:
+                        gradientPlaceholder
+                    }
+                }
+                // Darken the artwork so white captions stay readable.
+                Color.black.opacity(0.45)
+            }
+            .ignoresSafeArea()
+        } else {
+            gradientPlaceholder
+                .ignoresSafeArea()
+        }
+    }
+
+    private var gradientPlaceholder: some View {
+        LinearGradient(
+            colors: [
+                Color(red: 0.04, green: 0.04, blue: 0.06),
+                Color(red: 0.10, green: 0.09, blue: 0.13)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
     }
 
     // MARK: - Caption
@@ -3860,11 +4132,17 @@ struct TrackersSettingsPage: View {
                         .font(.headline)
                     Toggle("Enable Sync", isOn: $enableSync)
                         .tint(Color.gray)
-                    Toggle("Auto Sync Ratings", isOn: $autoSyncRatings)
-                        .tint(Color.gray)
-                    Text("When enabled, ratings are pushed automatically to your connected tracker after you finish an episode.")
+                    Text("When on, your library changes (status, progress, score) are pushed to AniList and MyAnimeList automatically. Turn this off if you want to edit your library locally without affecting your online accounts. Both anime and manga entries are synced.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Divider().opacity(0.4)
+                    Toggle("Auto Sync Ratings", isOn: $autoSyncRatings)
+                        .tint(Color.gray)
+                    Text("After you finish an episode (or read the final chapter of a manga), prompts you to rate it and pushes that rating to your connected tracker. Disable if you'd rather rate things manually.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding()
@@ -3971,15 +4249,56 @@ struct PerformanceModeSettingsPage: View {
                 .padding(.horizontal, 16)
                 .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
 
+                // #127 — Plain-language explanation of what Performance Mode
+                // actually does. Listed as concrete bullet points so the user
+                // can decide whether the trade-off is worth it for their device.
+                VStack(alignment: .leading, spacing: 14) {
+                    Label("What Performance Mode Does", systemImage: "info.circle.fill")
+                        .font(.headline)
+                    Text("When enabled, Shirox turns off decorative visual effects so the app feels snappier and uses less battery. This is most useful on older devices or when you're low on power.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        performanceBullet(
+                            icon: "sparkles",
+                            title: "Animated Background Off",
+                            detail: "The drifting gradient backdrop on the Home tab is replaced with a flat static gradient."
+                        )
+                        performanceBullet(
+                            icon: "wand.and.stars",
+                            title: "Glow Halos Off",
+                            detail: "The soft glow around toggles, source cards, and install buttons is removed."
+                        )
+                        performanceBullet(
+                            icon: "rectangle.split.3x1",
+                            title: "Instant Tab Switching",
+                            detail: "The cross-fade animation when switching between Home, Library, Search, and Settings is skipped — tabs swap immediately."
+                        )
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+                .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+
                 // Skip AniList Traversal card
                 VStack(alignment: .leading, spacing: 14) {
                     Label("Advanced", systemImage: "bolt.fill")
                         .font(.headline)
                     Toggle("Skip AniList Traversal", isOn: $skipAniListTraversal)
                         .tint(Color.gray)
-                    Text("When enabled, the app skips redundant AniList media lookups when module data is sufficient. This can significantly speed up library and search load times.")
+                    // #128 — Rewritten in plain language: what the setting
+                    // actually does, when it helps, and when it might miss
+                    // data — without jargon.
+                    Text("When you open a manga or anime from a module, Shirox normally makes an extra request to AniList to fetch richer metadata (synopsis, genres, score, studio). Turning this on skips that extra lookup and uses only the data the module already provided.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("Pages load faster, especially on slow networks, but the detail screen may show less information (for example: no average score, no studio, no genres) for titles the module doesn't fully describe.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding()
@@ -3989,6 +4308,27 @@ struct PerformanceModeSettingsPage: View {
         }
         .navigationTitle("Performance")
         .inlineNavBar()
+    }
+
+    // #127 — Helper for the bullet list. Each row pairs an icon, a bold
+    // title, and a one-sentence explanation so the user can scan the list
+    // and understand the full impact of Performance Mode at a glance.
+    @ViewBuilder
+    private func performanceBullet(icon: String, title: String, detail: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Color.appAccent)
+                .frame(width: 28, alignment: .center)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 }
 

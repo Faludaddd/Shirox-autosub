@@ -146,6 +146,13 @@ struct PlayerView: View {
     // When we were truly backgrounded (home/app-switch/lock), so foreground can tell a
     // brief resign-active from a suspension long enough to have killed the source.
     @State private var backgroundedAt: Date? = nil
+    /// #34 — Pending Control Center auto-pause task. Scheduled on
+    /// `willResignActiveNotification` and cancelled if the app actually goes
+    /// to background (home button / app switcher / lock). If the task fires
+    /// without a `didEnterBackground` cancellation, it means the resign-active
+    /// was caused by Control Center or Notification Center — pause playback.
+    @State private var controlCenterPauseTask: Task<Void, Never>? = nil
+    @AppStorage("autoPauseOnControlCenter") private var autoPauseOnControlCenter: Bool = false
 
     // Audio-session interruption (calls, Siri, other media apps)
     @State private var wasPlayingBeforeInterruption = false
@@ -433,8 +440,47 @@ struct PlayerView: View {
                 isSpeedBoosted = false
                 player?.rate = isPlaying ? Float(playbackSpeed) : 0
             }
+            // #34 — Auto-pause on Control Center. `willResignActive` fires for
+            // many reasons (Control Center, Notification Center, multitasking,
+            // backgrounding). We can't tell them apart at notification time —
+            // `applicationState` is already `.inactive`. So we schedule a
+            // delayed pause (350ms). If the app actually backgrounds, the
+            // `didEnterBackground` handler cancels this task; if the task
+            // survives to fire, it was Control Center / Notification Center
+            // and we pause. 350ms is fast enough to feel instant on resume
+            // but slow enough that the background notification (which arrives
+            // ~50–150ms after willResignActive) reliably cancels it first.
+            if autoPauseOnControlCenter && isPlaying {
+                controlCenterPauseTask?.cancel()
+                let snapshotPlayer = player
+                let snapshotSpeed = playbackSpeed
+                controlCenterPauseTask = Task { @MainActor [weak snapshotPlayer] in
+                    try? await Task.sleep(nanoseconds: 350_000_000)
+                    guard !Task.isCancelled else { return }
+                    // Defensive: confirm we're still in the foreground (didn't
+                    // background in the meantime). If we did background, the
+                    // didEnterBackground handler should have cancelled us, but
+                    // check anyway as a belt-and-braces guard.
+                    guard UIApplication.shared.applicationState != .background else { return }
+                    guard snapshotPlayer?.timeControlStatus == .playing else { return }
+                    snapshotPlayer?.pause()
+                    isPlaying = false
+                    // Capture the play state for foreground-resume logic so a
+                    // user who re-opens from Control Center can pick up where
+                    // they left off (manual tap to resume, not auto).
+                    _ = snapshotSpeed
+                }
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+            // #34 — Cancel any pending Control Center auto-pause: a real
+            // background (home / app switcher / lock) is NOT Control Center,
+            // and the foreground-resume logic + PiP path handle the pause
+            // separately. Letting the control-center task fire here would
+            // double-pause and confuse the resume state.
+            controlCenterPauseTask?.cancel()
+            controlCenterPauseTask = nil
+
             // Stamp the moment we're TRULY backgrounded (home / app switch / lock) — not a
             // transient resign-active like Control Center or a banner. The foreground handler
             // reads this to decide whether we were suspended long enough that the source died.
@@ -1392,6 +1438,14 @@ struct PlayerView: View {
         let item = AVPlayerItem(asset: asset)
         item.preferredForwardBufferDuration = 0 // Automatic: let AVPlayer size the buffer adaptively (YouTube-style ABR). A fixed value fights stall-minimization and prolongs stalls on flaky CDNs.
         item.canUseNetworkResourcesForLiveStreamingWhilePaused = true // Continue buffering when paused
+
+        // #126 — Data Saving Mode: cap the peak bitrate so AVPlayer never
+        // buffers above ~480p. `preferredPeakBitRate` is in bits per second;
+        // 480p H.264 averages ~1 Mbps, so 1_000_000 bps is a safe ceiling.
+        // When Data Saving is off, 0.0 means "no limit" (let ABR decide).
+        if Color.dataSavingMode {
+            item.preferredPeakBitRate = 1_000_000
+        }
         
         // Fix: Local files and fast streams might already be ready or need a status observer
         Task { @MainActor in
@@ -2263,7 +2317,14 @@ struct PlayerView: View {
     @MainActor
     private func selectQuality(_ bandwidth: Int?) {
         selectedQualityBandwidth = bandwidth
-        player?.currentItem?.preferredPeakBitRate = bandwidth.map { Double($0) } ?? 0.0
+        // #126 — Data Saving Mode overrides manual selection: even if the
+        // user picks 1080p from the quality menu, Data Saving clamps the
+        // peak bitrate to the 480p ceiling so mobile data is still spared.
+        if Color.dataSavingMode {
+            player?.currentItem?.preferredPeakBitRate = 1_000_000
+        } else {
+            player?.currentItem?.preferredPeakBitRate = bandwidth.map { Double($0) } ?? 0.0
+        }
     }
 
     private func switchQuality(_ next: StreamResult) {
@@ -2275,6 +2336,10 @@ struct PlayerView: View {
         let newItem = AVPlayerItem(asset: asset)
         newItem.preferredForwardBufferDuration = 0
         newItem.canUseNetworkResourcesForLiveStreamingWhilePaused = true
+        // #126 — Data Saving Mode applies on stream swap too.
+        if Color.dataSavingMode {
+            newItem.preferredPeakBitRate = 1_000_000
+        }
         setupPlaybackEndObserver(for: newItem)
         player?.replaceCurrentItem(with: newItem)
         subtitleTracks = next.allSubtitles ?? subtitleTracks
@@ -2329,6 +2394,10 @@ struct PlayerView: View {
         let newItem = AVPlayerItem(asset: asset)
         newItem.preferredForwardBufferDuration = 0
         newItem.canUseNetworkResourcesForLiveStreamingWhilePaused = true
+        // #126 — Data Saving Mode applies on next-episode swap too.
+        if Color.dataSavingMode {
+            newItem.preferredPeakBitRate = 1_000_000
+        }
         setupPlaybackEndObserver(for: newItem)
         player?.replaceCurrentItem(with: newItem)
         player?.rate = Float(playbackSpeed)

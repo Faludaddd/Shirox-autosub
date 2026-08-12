@@ -139,11 +139,36 @@ extension Color {
     }
 
     static var glowEnabled: Bool {
+        // #126 — Performance Mode implicitly disables all glow halos (toggles,
+        // sources, install buttons) so the GPU isn't paid for shadow passes
+        // the user can't perceive under the perf-mode lens.
+        if performanceModeEnabled { return false }
         UserDefaults.standard.object(forKey: "glowEnabled") as? Bool ?? true
     }
 
     static var dataSavingMode: Bool {
-        UserDefaults.standard.bool(forKey: "dataSavingMode")
+        // #126 — Read the real `dataSavingEnabled` key (the one the Quality
+        // settings page writes via `@AppStorage("dataSavingEnabled")`). The
+        // older `dataSavingMode` key is kept as a legacy alias for any code
+        // path that hasn't migrated.
+        UserDefaults.standard.bool(forKey: "dataSavingEnabled")
+            || UserDefaults.standard.bool(forKey: "dataSavingMode")
+    }
+
+    /// #126 — Performance Mode gates non-essential visual work (animated
+    /// backgrounds, transition animations, glow halos) to keep scrolling and
+    /// navigation responsive on older devices. Read from the same
+    /// `@AppStorage("performanceModeEnabled")` key the Performance settings
+    /// page writes.
+    static var performanceModeEnabled: Bool {
+        UserDefaults.standard.bool(forKey: "performanceModeEnabled")
+    }
+
+    /// #126 — Effective video quality cap. When Data Saving is on, the cap is
+    /// 480p regardless of the user's preferred quality. Used by the player to
+    /// clamp the initial `preferredPeakBitRate`.
+    static var dataSavingQualityCap: Int {
+        dataSavingMode ? 480 : Int.max
     }
 }
 
@@ -481,11 +506,13 @@ private struct RootTabView: View {
                         .tag(4)
                 }
                 .tint(.appAccent)
-                .animation(.easeInOut(duration: 0.25), value: selectedTab)
+                // #126 — Performance Mode skips the tab-switch fade so tab
+                // changes are instant on older devices.
+                .animation(Color.performanceModeEnabled ? nil : .easeInOut(duration: 0.25), value: selectedTab)
                 .glassTabBarBackground()
             }
         }
-        .animation(.easeInOut(duration: 0.25), value: selectedTab)
+        .animation(Color.performanceModeEnabled ? nil : .easeInOut(duration: 0.25), value: selectedTab)
         // #96 — Selection haptic whenever the user switches tabs.
         .onChange(of: selectedTab) { _ in Haptics.selection() }
         .onOpenURL { url in

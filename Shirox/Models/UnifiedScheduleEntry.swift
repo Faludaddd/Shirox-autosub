@@ -10,11 +10,21 @@ enum ScheduleSource: String, Codable, Hashable, Sendable {
 
 // MARK: - ScheduleMode
 
-/// Top-level toggle for the schedule view: show only anime, only Western, or both combined.
-enum ScheduleMode: String, CaseIterable, Codable, Hashable, Sendable {
+/// Top-level toggle for the schedule view.
+///
+/// #124 — Western and Combined were removed from the user-facing schedule; the
+/// schedule now only ever shows Anime. The `.western` and `.combined` cases
+/// are retained for backwards-compatible decoding of persisted `@AppStorage`
+/// values, but are no longer presented in `ScheduleSettingsPage`. `ScheduleSettings`
+/// always coerces any persisted non-anime value back to `.anime` on read.
+enum ScheduleMode: String, Codable, Hashable, Sendable {
     case anime
     case western
     case combined
+
+    /// The only mode selectable by the user post-#124. Used by
+    /// `ScheduleSettingsPage` and the schedule view's load switch.
+    static var allCases: [ScheduleMode] { [.anime] }
 
     var displayName: String {
         switch self {

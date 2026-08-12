@@ -1109,10 +1109,13 @@ enum ScheduleSettings {
         return [7, 14, 21, 30].contains(stored) ? stored : 7
     }
 
-    /// Default content mode (anime / western / combined). Defaults to anime.
+    /// Default content mode. #124 — Schedule is Anime-only now; any persisted
+    /// Western/Combined value is silently coerced back to `.anime` so the
+    /// schedule view never enters a dead code path.
     static var defaultMode: ScheduleMode {
         let raw = UserDefaults.standard.string(forKey: defaultModeKey) ?? ScheduleMode.anime.rawValue
-        return ScheduleMode(rawValue: raw) ?? .anime
+        let parsed = ScheduleMode(rawValue: raw) ?? .anime
+        return parsed == .anime ? .anime : .anime
     }
 
     /// Default timezone toggle — `true` to show times in UTC. Defaults to local.
@@ -1542,25 +1545,18 @@ struct ScheduleView: View {
                     fetched = items.map { UnifiedScheduleEntry(item: $0) }
                 }
 
-            case .western:
-                let items = try await WesternScheduleService.shared.fetchSchedule(dayCount: windowDays)
-                fetched = items.compactMap { entry -> UnifiedScheduleEntry? in
-                    // Drop Western entries without an air timestamp — they can't be bucketed.
-                    guard entry.airTimestamp != nil else { return nil }
-                    return UnifiedScheduleEntry(entry: entry)
+            case .western, .combined:
+                // #124 — Western and Combined are no longer selectable from
+                // settings; `ScheduleSettings.defaultMode` always coerces to
+                // `.anime`. Treat any stale persisted value as Anime so the
+                // schedule stays functional instead of crashing into a dead
+                // TVMaze path the user can no longer opt into.
+                if let cached = AniListService.shared.cachedAiringSchedules(from: startTs, to: endTs) {
+                    fetched = cached.map { UnifiedScheduleEntry(item: $0) }
+                } else {
+                    let items = try await AniListService.shared.airingSchedules(from: startTs, to: endTs)
+                    fetched = items.map { UnifiedScheduleEntry(item: $0) }
                 }
-
-            case .combined:
-                // Fan out both fetches concurrently; await them together. The
-                // anime branch still honours the #93 cache probe.
-                async let animeFetch = try await fetchAnimeCachedOrFresh(from: startTs, to: endTs)
-                async let westernFetch = try await WesternScheduleService.shared.fetchSchedule(dayCount: windowDays)
-                let (animeItems, westernItems) = try await (animeFetch, westernFetch)
-                fetched = animeItems.map { UnifiedScheduleEntry(item: $0) }
-                    + westernItems.compactMap { entry -> UnifiedScheduleEntry? in
-                        guard entry.airTimestamp != nil else { return nil }
-                        return UnifiedScheduleEntry(entry: entry)
-                    }
             }
 
             // Defensive filter: drop anything that fell before the start of today.
@@ -2361,11 +2357,15 @@ struct ScheduleDetailView: View {
 // MARK: - Schedule Settings Page
 
 /// Settings page for the schedule — pushed from the gear icon in `ScheduleView`'s toolbar.
-/// Edits the persisted defaults: look-ahead window (7/14/21/30 days), default content mode,
-/// and default timezone (Local / UTC).
+/// Edits the persisted defaults: look-ahead window (7/14/21/30 days), and default timezone
+/// (Local / UTC).
+///
+/// #124 — Content Mode picker was removed: the schedule now only ever shows
+/// Anime. Western and Combined are no longer selectable. Section HEADERS are
+/// intentionally retained here (#121 correction — Schedule settings is exempt
+/// from the global "remove all section headers" rule).
 struct ScheduleSettingsPage: View {
     @State private var windowDays: Int        = ScheduleSettings.windowDays
-    @State private var defaultMode: ScheduleMode = ScheduleSettings.defaultMode
     @State private var defaultUseUTC: Bool    = ScheduleSettings.defaultUseUTC
 
     var body: some View {
@@ -2383,22 +2383,7 @@ struct ScheduleSettingsPage: View {
             } header: {
                 Text("Window Range")
             } footer: {
-                Text("How many days ahead to fetch and display in the schedule. Western TV data is limited to roughly 14 days; anime covers the full window.")
-            }
-
-            Section {
-                Picker("Default Content", selection: $defaultMode) {
-                    ForEach(ScheduleMode.allCases, id: \.self) { mode in
-                        Text(mode.displayName).tag(mode)
-                    }
-                }
-                .onChange(of: defaultMode) { value in
-                    ScheduleSettings.setDefaultMode(value)
-                }
-            } header: {
-                Text("Content Mode")
-            } footer: {
-                Text("Which source to show by default when opening the schedule.")
+                Text("How many days ahead to fetch and display in the schedule. AniList airing data covers the full window.")
             }
 
             Section {
