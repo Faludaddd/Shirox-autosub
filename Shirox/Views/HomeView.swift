@@ -1339,7 +1339,7 @@ struct ScheduleView: View {
                             .frame(width: 58, height: 72)
                             .background(
                                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .fill(isSelected ? Color.appAccent : Color.gray.opacity(0.25))
+                                    .fill(isSelected ? Color.appAccent : .ultraThinMaterial)
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -1440,7 +1440,7 @@ struct ScheduleView: View {
                             .frame(minHeight: 48)
                             .background(
                                 RoundedRectangle(cornerRadius: 10)
-                                    .fill(isSelected ? Color.primary.opacity(0.12) : Color.gray.opacity(0.25))
+                                    .fill(isSelected ? Color.primary.opacity(0.12) : .ultraThinMaterial)
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10)

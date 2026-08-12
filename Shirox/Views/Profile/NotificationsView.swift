@@ -106,33 +106,36 @@ struct NotificationsView: View {
         } else if vm.notifications.isEmpty {
             ContentUnavailableView("No Notifications", systemImage: "bell.slash")
         } else {
-            ScrollView {
-                LazyVStack(spacing: 8) {
-                    ForEach(vm.notifications) { notif in
-                        Group {
-                            if isTappable(notif) {
-                                NavigationLink {
-                                    destinationView(for: notif)
-                                } label: {
-                                    notificationRow(notif)
-                                }
-                                .buttonStyle(.plain)
-                            } else {
+            List {
+                ForEach(vm.notifications) { notif in
+                    Group {
+                        if isTappable(notif) {
+                            NavigationLink {
+                                destinationView(for: notif)
+                            } label: {
                                 notificationRow(notif)
                             }
+                            .buttonStyle(.plain)
+                        } else {
+                            notificationRow(notif)
                         }
-                        .padding(.horizontal, 12)
-                        .contextMenu {
-                            Button(role: .destructive) {
-                                vm.removeNotification(notif)
-                            } label: {
-                                Label("Close", systemImage: "xmark")
-                            }
+                    }
+                    .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            withAnimation { vm.removeNotification(notif) }
+                        } label: {
+                            Label("Close", systemImage: "xmark")
                         }
                     }
                 }
-                .padding(.vertical, 10)
             }
+            .listStyle(.plain)
+            #if os(iOS)
+            .scrollContentBackground(.hidden)
+            #endif
             .refreshable { await vm.loadNotifications() }
         }
     }
