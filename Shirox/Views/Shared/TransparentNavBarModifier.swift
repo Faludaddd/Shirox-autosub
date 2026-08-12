@@ -7,15 +7,21 @@ import UIKit
 /// Makes the navigation bar transparent so content can scroll underneath it.
 ///
 /// - On iOS 16+ uses the native `.toolbarBackground(.hidden, for: .navigationBar)` modifier.
-/// - On iOS 15 falls back to configuring `UINavigationBar.appearance()` via a hidden
-///   `NavBarAppearanceConfigurator` view inserted into the hierarchy.
+/// - On iOS 15, this is a no-op (the global appearance-proxy approach used
+///   previously leaked transparent bars to ALL screens, causing the black
+///   top bar bug on detail screens — issue #13). Home's transparent bar is
+///   a cosmetic enhancement, not critical functionality; on iOS 15 Home just
+///   uses the system default bar background.
 struct TransparentNavBarModifier: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 16, *) {
             content
                 .toolbarBackground(.hidden, for: .navigationBar)
         } else {
-            content.background(NavBarAppearanceConfigurator())
+            // Issue #13 — Do NOT set UINavigationBar.appearance() globally.
+            // It leaks to all screens and causes black top bars on detail
+            // screens that need a solid nav bar background.
+            content
         }
     }
 }
@@ -64,10 +70,10 @@ struct NavBarAppearanceConfigurator: UIViewRepresentable {
 /// - When `isScrolled` is `true` (user has scrolled past the header), the standard
 ///   bar materializes and the inline title appears, so the user keeps context.
 ///
-/// On iOS 16+ this uses the native `.toolbarBackground(_:for:)` API. On iOS 15 the
-/// transparent appearance is applied via `NavBarAppearanceConfigurator` (the bar
-/// can't be selectively re-materialized without heavy appearance-proxy juggling, so
-/// we keep it transparent and only toggle the title).
+/// On iOS 16+ this uses the native `.toolbarBackground(_:for:)` API. On iOS 15
+/// the bar stays transparent (the appearance-proxy approach can't selectively
+/// re-materialize without affecting other screens, which was causing the black
+/// top bar bug on the anime detail screen — issue #13).
 struct ScrollAwareNavBarModifier: ViewModifier {
     let isScrolled: Bool
     let title: String
@@ -78,8 +84,14 @@ struct ScrollAwareNavBarModifier: ViewModifier {
                 .toolbarBackground(isScrolled ? .visible : .hidden, for: .navigationBar)
                 .navigationTitle(isScrolled ? title : "")
         } else {
+            // Issue #13 — On iOS 15, do NOT apply NavBarAppearanceConfigurator
+            // here. It sets UINavigationBar.appearance() globally, which
+            // overrides the detail screen's attempt to show a solid bar
+            // background — resulting in a black top area where the transparent
+            // bar lets the dark content behind it show through. Instead, just
+            // toggle the title; the bar background stays at whatever the
+            // system default is (which is correct for detail screens).
             content
-                .background(NavBarAppearanceConfigurator())
                 .navigationTitle(isScrolled ? title : "")
         }
     }

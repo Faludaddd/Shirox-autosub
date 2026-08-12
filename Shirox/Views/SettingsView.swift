@@ -86,20 +86,21 @@ struct SettingsView: View {
     }
 
     // MARK: - Category List (default, no search)
+    //
+    // Issue #11 — Settings items were too spread out because each category
+    // was in its own Section (insetGrouped adds ~35pt between sections).
+    // Now consolidated into two cohesive sections so related items sit
+    // close together and the list feels tight and structured.
 
     private var categoryList: some View {
         List {
-            // Appearance
+            // Section 1: Content & Playback (Appearance, Playback, Subtitles)
             Section {
                 NavigationLink {
                     AppearanceSettingsPage()
                 } label: {
                     SettingsCategoryRow(icon: "paintbrush.fill", title: "Appearance", subtitle: "Theme, accent color, motion")
                 }
-            }
-
-            // Playback
-            Section {
                 NavigationLink {
                     PlaybackSettingsPage()
                 } label: {
@@ -112,7 +113,7 @@ struct SettingsView: View {
                 }
             }
 
-            // Library & Tracking
+            // Section 2: Library & Tracking
             Section {
                 NavigationLink {
                     LibrarySettingsPage()
@@ -126,7 +127,7 @@ struct SettingsView: View {
                 }
             }
 
-            // Sources & Modules
+            // Section 3: Sources & Modules
             Section {
                 NavigationLink {
                     SourcesSettingsPage()
@@ -140,7 +141,7 @@ struct SettingsView: View {
                 }
             }
 
-            // Schedule & Notifications
+            // Section 4: Schedule & Notifications
             Section {
                 NavigationLink {
                     ScheduleSettingsPage()
@@ -154,7 +155,7 @@ struct SettingsView: View {
                 }
             }
 
-            // Data & Performance
+            // Section 5: Data, Performance & Advanced
             Section {
                 NavigationLink {
                     PerformanceModeSettingsPage()
@@ -178,7 +179,7 @@ struct SettingsView: View {
                 }
             }
 
-            // About
+            // Section 6: About
             Section {
                 NavigationLink {
                     AboutSettingsPage()
@@ -3816,7 +3817,10 @@ struct LandscapeSubtitlePreview: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let captionMaxWidth = proxy.size.width * (subtitleMaxWidth / 100.0)
+            // Issue #9 — Clamp caption width to 92% of screen width so text
+            // never overflows off-screen in landscape, even if the user's
+            // subtitleMaxWidth slider is set to 100%.
+            let captionMaxWidth = min(proxy.size.width * (subtitleMaxWidth / 100.0), proxy.size.width * 0.92)
             let bottomInset = max(proxy.size.height * 0.08, 48)
             ZStack(alignment: .top) {
                 // #114 (bug fix) — Real anime backdrop. The SubtitleSettingsPage
@@ -3862,6 +3866,7 @@ struct LandscapeSubtitlePreview: View {
                     // the default bottom inset), negative lifts toward the top.
                     captionText
                         .frame(maxWidth: captionMaxWidth)
+                        .padding(.horizontal, 16)
                         .padding(.bottom, bottomInset)
                         .offset(y: -subtitleVerticalOffset * 0.8)
                 }

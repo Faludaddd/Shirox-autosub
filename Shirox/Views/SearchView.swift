@@ -62,16 +62,19 @@ struct SearchView: View {
                 .background(SearchActivationObserver { vm.clearResults() })
                 .navigationTitle("Search")
                 .toolbar {
-                    // Sources picker — #90. Same visibility rule as the filter button:
-                    // only shown when a module isn't active (filters/providers are AniList-side).
+                    // Sources picker — only when not using a local/Jellyfin
+                    // module (those don't use the provider system).
                     ToolbarItem(placement: .automatic) {
-                        if !usingModule && !isLocalModule && !isJellyfinModule {
+                        if !isLocalModule && !isJellyfinModule {
                             sourcesButton
                         }
                     }
-                    // Filter button — only when NOT using a module (filters are AniList-only)
+                    // Issue #10 — Filter button is ALWAYS visible. Search is
+                    // AniList-only (per prior requirement), so filters always
+                    // apply. Even when a streaming module is active, the
+                    // user can still filter the AniList metadata search.
                     ToolbarItem(placement: .automatic) {
-                        if !usingModule && !isLocalModule && !isJellyfinModule {
+                        if !isLocalModule && !isJellyfinModule {
                             filterButton
                         }
                     }
