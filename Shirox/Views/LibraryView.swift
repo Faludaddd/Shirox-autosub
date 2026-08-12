@@ -33,7 +33,6 @@ struct LibraryView: View {
         LibrarySortOrder(rawValue: sortOrderRaw) ?? .score
     }
     @AppStorage("dualSync") private var dualSync = false
-    @State private var selectedGenres: Set<String> = []
     @State private var selectedEntry: LibraryEntry? = nil
     @State private var pendingEntry: LibraryEntry? = nil
     @State private var showProviderPicker = false
@@ -91,16 +90,6 @@ struct LibraryView: View {
         return saved + missing
     }
 
-    private var availableGenres: [String] {
-        var seen = Set<Int>()
-        let entries = vm.entries.filter { seen.insert($0.media.id).inserted }
-        var genres = Set<String>()
-        for entry in entries {
-            for genre in (entry.media.genres ?? []) { genres.insert(genre) }
-        }
-        return genres.sorted()
-    }
-
     private var displayedEntries: [LibraryEntry] {
         var seen = Set<Int>()
         var entries = vm.entries.filter { seen.insert($0.media.id).inserted }
@@ -109,12 +98,6 @@ struct LibraryView: View {
             entries = entries.filter {
                 ($0.media.title.english?.lowercased().contains(q) ?? false) ||
                 ($0.media.title.romaji?.lowercased().contains(q) ?? false)
-            }
-        }
-        if !selectedGenres.isEmpty {
-            entries = entries.filter { entry in
-                let genres = Set(entry.media.genres ?? [])
-                return !selectedGenres.isDisjoint(with: genres)
             }
         }
         entries.sort {
@@ -281,37 +264,6 @@ struct LibraryView: View {
         }
     }
 
-    /// The genre picker items (shared by the macOS capsule and the iOS toolbar button).
-    @ViewBuilder
-    private var genreMenuContent: some View {
-        Section("Genres") {
-            if !selectedGenres.isEmpty {
-                Button(role: .destructive) {
-                    selectedGenres.removeAll()
-                } label: {
-                    Label("Clear All Filters", systemImage: "xmark.circle")
-                }
-            }
-            ForEach(availableGenres, id: \.self) { genre in
-                Button {
-                    if selectedGenres.contains(genre) {
-                        selectedGenres.remove(genre)
-                    } else {
-                        selectedGenres.insert(genre)
-                    }
-                } label: {
-                    HStack {
-                        Text(genre)
-                        if selectedGenres.contains(genre) {
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    /// macOS keeps the static switcher + capsule filter row; these wrap the shared menu content.
     @ViewBuilder
     private func statusFilterMenu() -> some View {
         Menu { statusMenuContent } label: {
@@ -328,29 +280,10 @@ struct LibraryView: View {
     }
 
     @ViewBuilder
-    private func genreFilterMenu() -> some View {
-        Menu { genreMenuContent } label: {
-            LibraryFilterLabel(
-                systemImage: "tag",
-                text: selectedGenres.isEmpty ? "All Genres" : "\(selectedGenres.count) selected",
-                isActive: !selectedGenres.isEmpty,
-                collapsed: false
-            )
-        }
-        .menuIndicator(.hidden)
-        .foregroundStyle(.primary)
-        .buttonStyle(.plain)
-    }
-
-    /// The capsule filter row (List on the left, Genre on the right) shared by macOS and iOS.
-    @ViewBuilder
     private var filterCapsuleRow: some View {
         HStack {
             statusFilterMenu()
             Spacer()
-            if !availableGenres.isEmpty {
-                genreFilterMenu()
-            }
         }
     }
 
@@ -553,8 +486,6 @@ struct LibraryView: View {
                         entry: entry,
                         status: entry.status,
                         progress: entry.progress + 1,
-                        // Pass the score in the active format so the canonical
-                        // value is preserved (not reinterpreted in a new scale).
                         score: entry.displayScore(in: scoreFormat)
                     )
                 }
@@ -563,7 +494,47 @@ struct LibraryView: View {
             }
             .tint(.green)
         }
+        .contextMenu {
+            libraryContextMenu(for: entry)
+        }
         #endif
+    }
+
+    @ViewBuilder
+    private func libraryContextMenu(for entry: LibraryEntry) -> some View {
+        ForEach(MediaListStatus.allCases) { status in
+            if status != entry.status {
+                Button {
+                    Task {
+                        await vm.update(
+                            entry: entry,
+                            status: status,
+                            progress: entry.progress,
+                            score: entry.displayScore(in: scoreFormat)
+                        )
+                    }
+                } label: {
+                    Label("Move to \(status.displayName(for: vm.mediaType))", systemImage: statusIcon(status))
+                }
+            }
+        }
+        Divider()
+        Button(role: .destructive) {
+            Task { await vm.delete(entry) }
+        } label: {
+            Label("Remove from Library", systemImage: "trash")
+        }
+    }
+
+    private func statusIcon(_ status: MediaListStatus) -> String {
+        switch status {
+        case .current:   return "play.circle"
+        case .planning:  return "bookmark"
+        case .completed: return "checkmark.circle"
+        case .dropped:   return "xmark.circle"
+        case .paused:    return "pause.circle"
+        case .repeating: return "arrow.counterclockwise.circle"
+        }
     }
 
     /// Module-scraped and AniList/MAL entries navigate to a detail screen (branched destination).

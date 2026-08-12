@@ -747,11 +747,25 @@ private struct FeaturedCard: View, Equatable {
             } else {
                 GeometryReader { geo in
                     let pageOffset = geo.frame(in: .global).minX
-                    let buffer: CGFloat = 100
-                    TVDBPosterImage(media: media)
-                        .frame(width: geo.size.width + buffer, height: geo.size.height)
-                        .offset(x: -(buffer / 2) - pageOffset * 0.25)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                    let imageURL = media.coverImage.extraLarge ?? media.coverImage.large ?? ""
+                    ZStack {
+                        if let url = URL(string: imageURL) {
+                            AsyncImage(url: url) { phase in
+                                if case .success(let img) = phase {
+                                    img.resizable()
+                                        .scaledToFill()
+                                        .frame(width: geo.size.width, height: geo.size.height)
+                                        .clipped()
+                                } else {
+                                    Color.secondary.opacity(0.15)
+                                }
+                            }
+                            .frame(width: geo.size.width, height: geo.size.height)
+                            .offset(x: -pageOffset * 0.25)
+                        } else {
+                            Color.secondary.opacity(0.15)
+                        }
+                    }
                 }
                 .clipped()
             }
@@ -1244,19 +1258,20 @@ struct ScheduleView: View {
                             .background(Capsule().fill(Color.red.opacity(0.12)))
                         }
                         ForEach(bucket.entries) { entry in
-                            ScheduleCard(
-                                entry: entry,
-                                useUTC: useUTC,
-                                isNotificationOn: scheduledIds.contains(entry.id),
-                                onToggleNotification: { toggleNotification(for: entry) },
-                                onAddToPlanning:     { addToLibrary(entry, status: .planning) },
-                                onAddToWatching:     { addToLibrary(entry, status: .current) },
-                                onViewDetails:       { detailEntry = entry }
-                            )
-                            .contentShape(Rectangle())
-                            .onTapGesture {
+                            Button {
                                 detailEntry = entry
+                            } label: {
+                                ScheduleCard(
+                                    entry: entry,
+                                    useUTC: useUTC,
+                                    isNotificationOn: scheduledIds.contains(entry.id),
+                                    onToggleNotification: { toggleNotification(for: entry) },
+                                    onAddToPlanning:     { addToLibrary(entry, status: .planning) },
+                                    onAddToWatching:     { addToLibrary(entry, status: .current) },
+                                    onViewDetails:       { detailEntry = entry }
+                                )
                             }
+                            .buttonStyle(.plain)
                         }
                     }
                     .padding(.horizontal, 16)
@@ -1303,14 +1318,22 @@ struct ScheduleView: View {
                                 Text("\(calendar.component(.day, from: day))")
                                     .font(.title3.weight(.bold))
                                     .foregroundStyle(isSelected ? .white : .primary)
-                                Circle()
-                                    .fill(hasEpisodes ? Color.red : (isToday ? Color.red.opacity(0.5) : Color.clear))
-                                    .frame(width: 5, height: 5)
+                                if hasEpisodes {
+                                    Circle()
+                                        .fill(Color.red)
+                                        .frame(width: 5, height: 5)
+                                } else if isToday {
+                                    Circle()
+                                        .fill(Color.red.opacity(0.5))
+                                        .frame(width: 5, height: 5)
+                                } else {
+                                    Spacer().frame(height: 5)
+                                }
                             }
                             .frame(width: 58, height: 72)
                             .background(
                                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .fill(isSelected ? Color.appAccent : Color.secondary.opacity(0.08))
+                                    .fill(isSelected ? Color.appAccent : Color(.systemGray6))
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -1394,16 +1417,24 @@ struct ScheduleView: View {
                                 Text("\(calendar.component(.day, from: day))")
                                     .font(.subheadline.weight(.bold))
                                     .foregroundStyle(.primary)
-                                Circle()
-                                    .fill(count > 0 ? Color.red : (isToday ? Color.red.opacity(0.5) : Color.secondary.opacity(0.3)))
-                                    .frame(width: 5, height: 5)
+                                if count > 0 {
+                                    Circle()
+                                        .fill(Color.red)
+                                        .frame(width: 5, height: 5)
+                                } else if isToday {
+                                    Circle()
+                                        .fill(Color.red.opacity(0.5))
+                                        .frame(width: 5, height: 5)
+                                } else {
+                                    Spacer().frame(height: 5)
+                                }
                             }
                             .frame(maxWidth: .infinity)
                             .aspectRatio(1, contentMode: .fit)
                             .frame(minHeight: 48)
                             .background(
                                 RoundedRectangle(cornerRadius: 10)
-                                    .fill(isSelected ? Color.primary.opacity(0.12) : Color.secondary.opacity(0.06))
+                                    .fill(isSelected ? Color.primary.opacity(0.12) : Color(.systemGray6))
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10)
