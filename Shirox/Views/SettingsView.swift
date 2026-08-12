@@ -29,106 +29,26 @@ struct SettingsView: View {
     // per-category `@AppStorage` / cache-size state and the inline storage UI
     // that previously lived here were migrated to those sub-pages (Appearance,
     // Playback, Advanced, …), so this view now holds no state of its own.
+    //
+    // #125 — A search bar at the top lets the user type a feature name and
+    // jump directly to the setting (even deep inside a sub-page). When the
+    // search text is non-empty, the category list is replaced by a results
+    // list; tapping a result pushes the containing page.
+
+    @State private var searchText: String = ""
+    @State private var searchResults: [SettingsSearchEntry] = []
+    /// #125 — Drives a hidden NavigationLink for the iOS 15-compatible push
+    /// (the app's NavigationStack shim doesn't reliably honor
+    /// `navigationDestination(item:)`). Set when the user taps a search result.
+    @State private var pushedPage: SettingsPage? = nil
 
     var body: some View {
         NavigationStack {
-            List {
-                // Appearance
-                Section {
-                    NavigationLink {
-                        AppearanceSettingsPage()
-                    } label: {
-                        SettingsCategoryRow(icon: "paintbrush.fill", title: "Appearance", subtitle: "Theme, accent color, motion")
-                    }
-                }
-
-                // Playback
-                Section {
-                    NavigationLink {
-                        PlaybackSettingsPage()
-                    } label: {
-                        SettingsCategoryRow(icon: "play.circle.fill", title: "Playback", subtitle: "Player, quality, skip, speed")
-                    }
-                    NavigationLink {
-                        SubtitleSettingsPage()
-                    } label: {
-                        SettingsCategoryRow(icon: "captions.bubble.fill", title: "Subtitles", subtitle: "Style, color, presets, live preview")
-                    }
-                }
-
-                // Library & Tracking
-                Section {
-                    NavigationLink {
-                        LibrarySettingsPage()
-                    } label: {
-                        SettingsCategoryRow(icon: "books.vertical.fill", title: "Library", subtitle: "Tracking, sync, scores")
-                    }
-                    NavigationLink {
-                        TrackersSettingsPage()
-                    } label: {
-                        SettingsCategoryRow(icon: "antenna.radiowaves.left.and.right", title: "Trackers", subtitle: "AniList, MAL, sync settings")
-                    }
-                }
-
-                // Sources & Modules
-                Section {
-                    NavigationLink {
-                        SourcesSettingsPage()
-                    } label: {
-                        SettingsCategoryRow(icon: "person.crop.circle.badge.checkmark", title: "Sources", subtitle: "AniList, MyAnimeList, accounts")
-                    }
-                    NavigationLink {
-                        ModulesSettingsPage()
-                    } label: {
-                        SettingsCategoryRow(icon: "puzzlepiece.extension.fill", title: "Modules", subtitle: "Streaming sources, store")
-                    }
-                }
-
-                // Schedule & Notifications
-                Section {
-                    NavigationLink {
-                        ScheduleSettingsPage()
-                    } label: {
-                        SettingsCategoryRow(icon: "calendar", title: "Schedule", subtitle: "Airing schedules, timing")
-                    }
-                    NavigationLink {
-                        NotificationsSettingsPage()
-                    } label: {
-                        SettingsCategoryRow(icon: "bell.fill", title: "Notifications", subtitle: "Reminders, airing alerts")
-                    }
-                }
-
-                // Data & Performance
-                Section {
-                    NavigationLink {
-                        PerformanceModeSettingsPage()
-                    } label: {
-                        SettingsCategoryRow(icon: "gauge.medium", title: "Performance Mode", subtitle: "Speed optimizations")
-                    }
-                    NavigationLink {
-                        AdvancedSettingsPage()
-                    } label: {
-                        SettingsCategoryRow(icon: "gearshape.2.fill", title: "Advanced", subtitle: "Cache, reset, storage")
-                    }
-                    NavigationLink {
-                        BackupRestoreSettingsPage()
-                    } label: {
-                        SettingsCategoryRow(icon: "externaldrive.badge.timemachine", title: "Backup & Restore", subtitle: "Export/import preferences")
-                    }
-                    NavigationLink {
-                        LoggerSettingsPage()
-                    } label: {
-                        SettingsCategoryRow(icon: "terminal", title: "Logger", subtitle: "App logs, debug info")
-                    }
-                }
-
-                // About
-                Section {
-                    NavigationLink {
-                        AboutSettingsPage()
-                    } label: {
-                        SettingsCategoryRow(icon: "info.circle.fill", title: "About", subtitle: "Version, licenses")
-                    }
+            Group {
+                if searchText.isEmpty {
+                    categoryList
+                } else {
+                    searchResultsList
                 }
             }
             #if os(iOS)
@@ -136,10 +56,198 @@ struct SettingsView: View {
             #endif
             .navigationTitle("Settings")
             .inlineNavBar()
+            .searchable(text: $searchText, prompt: "Search settings…")
+            .onChangeOf(searchText) { query in
+                searchResults = SettingsSearchIndex.search(query)
+            }
+            // #125 — Hidden NavigationLink that pushes the selected settings
+            // page. The binding flips to non-nil when a search result is tapped,
+            // and back to nil on pop. Works on iOS 15+ where
+            // `navigationDestination(item:)` isn't available.
+            .background(
+                NavigationLink(
+                    destination: Group {
+                        if let page = pushedPage {
+                            settingsPageView(for: page)
+                        }
+                    },
+                    isActive: Binding(
+                        get: { pushedPage != nil },
+                        set: { active in if !active { pushedPage = nil } }
+                    )
+                ) { EmptyView() }
+            )
             .onAppear {
                 #if os(iOS)
                 PlayerPresenter.shared.resetToAppOrientation()
                 #endif
+            }
+        }
+    }
+
+    // MARK: - Category List (default, no search)
+
+    private var categoryList: some View {
+        List {
+            // Appearance
+            Section {
+                NavigationLink {
+                    AppearanceSettingsPage()
+                } label: {
+                    SettingsCategoryRow(icon: "paintbrush.fill", title: "Appearance", subtitle: "Theme, accent color, motion")
+                }
+            }
+
+            // Playback
+            Section {
+                NavigationLink {
+                    PlaybackSettingsPage()
+                } label: {
+                    SettingsCategoryRow(icon: "play.circle.fill", title: "Playback", subtitle: "Player, quality, skip, speed")
+                }
+                NavigationLink {
+                    SubtitleSettingsPage()
+                } label: {
+                    SettingsCategoryRow(icon: "captions.bubble.fill", title: "Subtitles", subtitle: "Style, color, presets, live preview")
+                }
+            }
+
+            // Library & Tracking
+            Section {
+                NavigationLink {
+                    LibrarySettingsPage()
+                } label: {
+                    SettingsCategoryRow(icon: "books.vertical.fill", title: "Library", subtitle: "Tracking, sync, scores")
+                }
+                NavigationLink {
+                    TrackersSettingsPage()
+                } label: {
+                    SettingsCategoryRow(icon: "antenna.radiowaves.left.and.right", title: "Trackers", subtitle: "AniList, MAL, sync settings")
+                }
+            }
+
+            // Sources & Modules
+            Section {
+                NavigationLink {
+                    SourcesSettingsPage()
+                } label: {
+                    SettingsCategoryRow(icon: "person.crop.circle.badge.checkmark", title: "Sources", subtitle: "AniList, MyAnimeList, accounts")
+                }
+                NavigationLink {
+                    ModulesSettingsPage()
+                } label: {
+                    SettingsCategoryRow(icon: "puzzlepiece.extension.fill", title: "Modules", subtitle: "Streaming sources, store")
+                }
+            }
+
+            // Schedule & Notifications
+            Section {
+                NavigationLink {
+                    ScheduleSettingsPage()
+                } label: {
+                    SettingsCategoryRow(icon: "calendar", title: "Schedule", subtitle: "Airing schedules, timing")
+                }
+                NavigationLink {
+                    NotificationsSettingsPage()
+                } label: {
+                    SettingsCategoryRow(icon: "bell.fill", title: "Notifications", subtitle: "Reminders, airing alerts")
+                }
+            }
+
+            // Data & Performance
+            Section {
+                NavigationLink {
+                    PerformanceModeSettingsPage()
+                } label: {
+                    SettingsCategoryRow(icon: "gauge.medium", title: "Performance Mode", subtitle: "Speed optimizations")
+                }
+                NavigationLink {
+                    AdvancedSettingsPage()
+                } label: {
+                    SettingsCategoryRow(icon: "gearshape.2.fill", title: "Advanced", subtitle: "Cache, reset, storage")
+                }
+                NavigationLink {
+                    BackupRestoreSettingsPage()
+                } label: {
+                    SettingsCategoryRow(icon: "externaldrive.badge.timemachine", title: "Backup & Restore", subtitle: "Export/import preferences")
+                }
+                NavigationLink {
+                    LoggerSettingsPage()
+                } label: {
+                    SettingsCategoryRow(icon: "terminal", title: "Logger", subtitle: "App logs, debug info")
+                }
+            }
+
+            // About
+            Section {
+                NavigationLink {
+                    AboutSettingsPage()
+                } label: {
+                    SettingsCategoryRow(icon: "info.circle.fill", title: "About", subtitle: "Version, licenses")
+                }
+            }
+        }
+    }
+
+    // MARK: - Search Results List (#125)
+
+    /// Replaces the category list when the user types in the search bar.
+    /// Each row shows the setting's icon, label, and the page it lives on;
+    /// tapping pushes the page (and the destination page can use the entry's
+    /// `anchor` with a ScrollViewReader to scroll to the exact row).
+    private var searchResultsList: some View {
+        List {
+            if searchResults.isEmpty {
+                Section {
+                    VStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 28))
+                            .foregroundStyle(.tertiary)
+                        Text("No settings match \"\(searchText)\"")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Text("Try a different name or check the category list above.")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 24)
+                }
+            } else {
+                Section {
+                    ForEach(searchResults) { entry in
+                        Button {
+                            pushedPage = entry.page
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: entry.icon)
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(Color.appAccent)
+                                    .frame(width: 28, alignment: .center)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(entry.label)
+                                        .font(.body)
+                                        .foregroundStyle(.primary)
+                                    Text(entry.category)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer(minLength: 0)
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                } header: {
+                    Text("\(searchResults.count) result\(searchResults.count == 1 ? "" : "s")")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .textCase(nil)
+                }
             }
         }
     }

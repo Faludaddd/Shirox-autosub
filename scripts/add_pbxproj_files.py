@@ -32,6 +32,8 @@ FILES_TO_ADD = [
     ("Shirox/Views/Shared/Haptics.swift",                  "Shared"),
     # #98 — custom pull-to-refresh overlay used by HomeView.
     ("Shirox/Views/Shared/CustomRefreshControl.swift",     "Shared"),
+    # #125 — Settings search index for jump-to-feature.
+    ("Shirox/Views/Shared/SettingsSearchIndex.swift",      "Shared"),
 ]
 
 # Sources build phase IDs for each target (looked up from pbxproj).
@@ -97,32 +99,32 @@ def find_group_block(text, group_path):
       - children_close_index is the index of the `);` that closes the children list.
     Returns None if not found.
     """
-    # Match each PBXGroup block header. The header line is
-    # `\t\t<HEXID> /* <name> */ = {` immediately followed (next line) by
-    # `\t\t\tisa = PBXGroup;`.
+    # Match each PBXGroup block header. Indentation varies (2 tabs in old
+    # pbxproj, 4+ tabs in newer ones), so accept any leading whitespace.
     header_re = re.compile(
-        r"\t\t([0-9A-Fa-f]{24}) /\* ([^*]+?) \*/ = \{\n"
-        r"\t\t\tisa = PBXGroup;\n"
+        r"(?m)^\s+([0-9A-Fa-f]{24}) /\* ([^*]+?) \*/ = \{\n"
+        r"\s+isa = PBXGroup;\n"
     )
     for m in header_re.finditer(text):
         block_start = m.start()
-        # Find the end of this block: the next `\n\t\t};` at the same indent level.
-        # Since PBXGroup blocks do not nest, the next `\n\t\t};` after the header
-        # is the closing brace of this block.
-        end_match = re.search(r"\n\t\t};", text[m.end():])
+        # Find the end of this block: the next `\n\s+};` after the header.
+        end_match = re.search(r"\n\s+};", text[m.end():])
         if end_match is None:
             continue
         block_end = m.end() + end_match.end()
         body = text[block_start:block_end]
-        # Check the path attribute matches.
-        path_re = re.compile(r"\n\t\t\tpath\s*=\s*" + re.escape(group_path) + r"\s*;\n")
+        # Check the path attribute matches. Indentation can vary (3 or 8
+        # tabs depending on the group's nesting level), so accept any
+        # leading whitespace.
+        path_re = re.compile(r"\n\s+path\s*=\s*" + re.escape(group_path) + r"\s*;\n")
         if not path_re.search(body):
             continue
-        # Find children = ( ... );
-        children_open_match = re.search(r"\n\t\t\tchildren = \(\n", body)
+        # Find children = ( ... ); Indentation varies, so accept any leading
+        # whitespace before `children = (` and `);`.
+        children_open_match = re.search(r"\n\s+children = \(\n", body)
         if children_open_match is None:
             continue
-        children_close_match = re.search(r"\n\t\t\t\);", body[children_open_match.end():])
+        children_close_match = re.search(r"\n\s+\);", body[children_open_match.end():])
         if children_close_match is None:
             continue
         # children_close_match matched `\n\t\t\t);` starting at offset
@@ -157,23 +159,25 @@ def find_sources_phase_block(text, phase_id):
     Returns None if not found.
     """
     # Match the block header: `\t\t<phase_id> /* Sources */ = {`
+    # Indentation varies (some pbxproj files use 4 tabs), so accept any
+    # leading whitespace before the phase_id.
     header_pattern = re.compile(
-        r"\t\t" + re.escape(phase_id) + r"\s*/\*\s*Sources\s*\*/\s*=\s*\{"
+        r"(?m)^\s*" + re.escape(phase_id) + r"\s*/\*\s*Sources\s*\*/\s*=\s*\{"
     )
     m = header_pattern.search(text)
     if not m:
         return None
     block_start = m.start()
-    # Find `\n\t\t\tfiles = (\n` and the matching `\n\t\t\t);`.
-    body_end_match = re.search(r"\n\t\t};", text[m.end():])
+    # Find `\n\s+files = (\n` and the matching `\n\s+);`. Indentation varies.
+    body_end_match = re.search(r"\n\s+};", text[m.end():])
     if body_end_match is None:
         return None
     block_end = m.end() + body_end_match.end()
     body = text[block_start:block_end]
-    files_open_match = re.search(r"\n\t\t\tfiles = \(\n", body)
+    files_open_match = re.search(r"\n\s+files = \(\n", body)
     if files_open_match is None:
         return None
-    files_close_match = re.search(r"\n\t\t\t\);", body[files_open_match.end():])
+    files_close_match = re.search(r"\n\s+\);", body[files_open_match.end():])
     if files_close_match is None:
         return None
     close_line_start_in_body = files_open_match.end() + files_close_match.start()

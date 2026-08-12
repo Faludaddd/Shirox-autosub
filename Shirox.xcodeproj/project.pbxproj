@@ -637,6 +637,10 @@
                 AE0E0074652F42FF99D98593 /* app-logo.png in Resources */ = {isa = PBXBuildFile; fileRef = ACCF2A92A85C4B4BA8E11E55 /* app-logo.png */; };
                 41ECBA699CB9404AAE84293C /* app-logo.png in Resources */ = {isa = PBXBuildFile; fileRef = ACCF2A92A85C4B4BA8E11E55 /* app-logo.png */; };
                 3C2CD6ABFBD54C04B88011A9 /* app-logo.png in Resources */ = {isa = PBXBuildFile; fileRef = ACCF2A92A85C4B4BA8E11E55 /* app-logo.png */; };
+		9FC65E10AF3F4044AA31F0E7 /* SettingsSearchIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E540997BA864448B082B725 /* SettingsSearchIndex.swift */; };
+		CE8BECC8DB5A46128FE0F71F /* SettingsSearchIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E540997BA864448B082B725 /* SettingsSearchIndex.swift */; };
+		2E0E8A3882B1417499E1D5FA /* SettingsSearchIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E540997BA864448B082B725 /* SettingsSearchIndex.swift */; };
+		01A20920D09146A29404813E /* SettingsSearchIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E540997BA864448B082B725 /* SettingsSearchIndex.swift */; };
 
 /* End PBXBuildFile section */
 
@@ -886,6 +890,7 @@
                 CB9A6134C59C4A32B8003889 /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
                 7B960C6896464EEC9886FA2B /* CustomRefreshControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomRefreshControl.swift; sourceTree = "<group>"; };
                 ACCF2A92A85C4B4BA8E11E55 /* app-logo.png */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = image.png; path = app-logo.png; sourceTree = "<group>"; };
+		4E540997BA864448B082B725 /* SettingsSearchIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSearchIndex.swift; sourceTree = "<group>"; };
 
 /* End PBXFileReference section */
 
@@ -1163,6 +1168,7 @@
                                 1ED5C58C75D046CCB3CEEE12 /* ToastSystem.swift */,
                                 CB9A6134C59C4A32B8003889 /* Haptics.swift */,
                                 7B960C6896464EEC9886FA2B /* CustomRefreshControl.swift */,
+				4E540997BA864448B082B725 /* SettingsSearchIndex.swift */,
                         );
                         path = Shared;
                         sourceTree = "<group>";
@@ -1528,6 +1534,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 895B393387144BA2B7146905 /* ToastSystem.swift in Sources */,
                                 57BF5714069E486B97AA8FBF /* Haptics.swift in Sources */,
                                 D13549A1608449AF9EBDE353 /* CustomRefreshControl.swift in Sources */,
+				01A20920D09146A29404813E /* SettingsSearchIndex.swift in Sources */,
                         );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -1724,6 +1731,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 F600445A08244B5095556D9D /* ToastSystem.swift in Sources */,
                                 7F79015A0ABA4261AA83F778 /* Haptics.swift in Sources */,
                                 4ECDE91B709E40C4B7131936 /* CustomRefreshControl.swift in Sources */,
+				2E0E8A3882B1417499E1D5FA /* SettingsSearchIndex.swift in Sources */,
                         );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -1921,6 +1929,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 EA699B91BC6B4BCF8B325D40 /* ToastSystem.swift in Sources */,
                                 A059508F65B7400595DF13C4 /* Haptics.swift in Sources */,
                                 77C010496C1B48E08ACD3FEB /* CustomRefreshControl.swift in Sources */,
+				CE8BECC8DB5A46128FE0F71F /* SettingsSearchIndex.swift in Sources */,
                         );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -2118,6 +2127,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 05EE7CC248EF4889882F5264 /* ToastSystem.swift in Sources */,
                                 FB3055616FBE4A399FAA8A5D /* Haptics.swift in Sources */,
                                 32DA168EE48448DE9CB5FBB2 /* CustomRefreshControl.swift in Sources */,
+				9FC65E10AF3F4044AA31F0E7 /* SettingsSearchIndex.swift in Sources */,
                         );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
