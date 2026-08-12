@@ -158,13 +158,8 @@ struct SettingsView: View {
                 }
             }
 
-            // Section 5: Data, Performance & Advanced
+            // Section 5: Data & Advanced
             Section {
-                NavigationLink {
-                    PerformanceModeSettingsPage()
-                } label: {
-                    SettingsCategoryRow(icon: "gauge.medium", title: "Performance Mode", subtitle: "Speed optimizations")
-                }
                 NavigationLink {
                     AdvancedSettingsPage()
                 } label: {
@@ -4292,122 +4287,6 @@ struct TrackersSettingsPage: View {
         }
         .padding()
         .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-}
-
-// MARK: - Performance Mode Settings Page
-
-struct PerformanceModeSettingsPage: View {
-    @AppStorage("performanceModeEnabled") private var performanceModeEnabled = false
-    @AppStorage("skipAniListTraversal") private var skipAniListTraversal = false
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                // Hero card
-                VStack(spacing: 16) {
-                    Image(systemName: "gauge.medium")
-                        .font(.system(size: 56))
-                        .foregroundStyle(Color.appAccent)
-
-                    Text("Performance Mode")
-                        .font(.title2.bold())
-
-                    Toggle("Performance Mode", isOn: $performanceModeEnabled)
-                        .scaleEffect(1.2)
-                        .frame(maxWidth: 220)
-
-                    Text(performanceModeEnabled
-                         ? "Enabled — app runs in fast mode"
-                         : "Disabled — default behavior")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 28)
-                .padding(.horizontal, 16)
-                .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-
-                // #127 — Plain-language explanation of what Performance Mode
-                // actually does. Listed as concrete bullet points so the user
-                // can decide whether the trade-off is worth it for their device.
-                VStack(alignment: .leading, spacing: 14) {
-                    Label("What Performance Mode Does", systemImage: "info.circle.fill")
-                        .font(.headline)
-                    Text("When enabled, Shirox turns off decorative visual effects so the app feels snappier and uses less battery. This is most useful on older devices or when you're low on power.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    VStack(alignment: .leading, spacing: 10) {
-                        performanceBullet(
-                            icon: "sparkles",
-                            title: "Animated Background Off",
-                            detail: "The drifting gradient backdrop on the Home tab is replaced with a flat static gradient."
-                        )
-                        performanceBullet(
-                            icon: "wand.and.stars",
-                            title: "Glow Halos Off",
-                            detail: "The soft glow around toggles, source cards, and install buttons is removed."
-                        )
-                        performanceBullet(
-                            icon: "rectangle.split.3x1",
-                            title: "Instant Tab Switching",
-                            detail: "The cross-fade animation when switching between Home, Library, Search, and Settings is skipped — tabs swap immediately."
-                        )
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding()
-                .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-
-                // Skip AniList Traversal card
-                VStack(alignment: .leading, spacing: 14) {
-                    Label("Advanced", systemImage: "bolt.fill")
-                        .font(.headline)
-                    Toggle("Skip AniList Traversal", isOn: $skipAniListTraversal)
-                    // #128 — Rewritten in plain language: what the setting
-                    // actually does, when it helps, and when it might miss
-                    // data — without jargon.
-                    Text("When you open a manga or anime from a module, Shirox normally makes an extra request to AniList to fetch richer metadata (synopsis, genres, score, studio). Turning this on skips that extra lookup and uses only the data the module already provided.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text("Pages load faster, especially on slow networks, but the detail screen may show less information (for example: no average score, no studio, no genres) for titles the module doesn't fully describe.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding()
-                .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            }
-            .padding()
-        }
-        .navigationTitle("Performance")
-        .inlineNavBar()
-    }
-
-    // #127 — Helper for the bullet list. Each row pairs an icon, a bold
-    // title, and a one-sentence explanation so the user can scan the list
-    // and understand the full impact of Performance Mode at a glance.
-    @ViewBuilder
-    private func performanceBullet(icon: String, title: String, detail: String) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Color.appAccent)
-                .frame(width: 28, alignment: .center)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                Text(detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
     }
 }
 

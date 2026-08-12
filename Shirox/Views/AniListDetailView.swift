@@ -1049,33 +1049,59 @@ struct AniListDetailView: View {
     /// hide it.
     @ViewBuilder
     private func statisticsSection(media: Media) -> some View {
-        let items: [(String, String)] = [
-            ("Type", media.type ?? "Anime"),
-            ("Format", media.format ?? "—"),
-            ("Status", media.statusDisplay ?? "—"),
-            ("Episodes", media.episodes.map { String($0) } ?? "—"),
-            ("Rating", media.averageScore.map { "\($0)%" } ?? "—"),
-            ("Season", [media.season?.capitalized, media.seasonYear.map { String($0) }].compactMap { $0 }.joined(separator: " ")),
-            ("Duration", media.duration.map { "\($0) min" } ?? "—"),
-            ("Studio", media.mainStudioName ?? "—"),
-            ("Source", media.sourceDisplay ?? "—"),
-            ("Premiered", media.airDateRange ?? "—")
-        ]
-        return VStack(alignment: .leading, spacing: 12) {
-            Text("Statistics")
-                .font(.title3.weight(.bold))
-                .padding(.horizontal, 16)
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+        let items: [(String, String, String)] = [
+            ("Type", media.type ?? "Anime", "rectangle.stack"),
+            ("Format", media.format ?? "—", "film"),
+            ("Status", media.statusDisplay ?? "—", "circle.fill"),
+            ("Episodes", media.episodes.map { String($0) } ?? "—", "number"),
+            ("Rating", media.averageScore.map { "\($0)%" } ?? "—", "star.fill"),
+            ("Popularity", media.popularity.map { String($0) } ?? "—", "person.3.fill"),
+            ("Season", [media.season?.capitalized, media.seasonYear.map { String($0) }].compactMap { $0 }.joined(separator: " "), "calendar"),
+            ("Duration", media.duration.map { "\($0) min" } ?? "—", "clock"),
+            ("Studio", media.mainStudioName ?? "—", "building.2.fill"),
+            ("Source", media.sourceDisplay ?? "—", "books.vertical.fill"),
+            ("Premiered", media.airDateRange ?? "—", "sparkles"),
+            ("Country", media.countryOfOrigin ?? "—", "globe")
+        ].filter { !$0.1.isEmpty && $0.1 != "—" }
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 8) {
+                Image(systemName: "chart.bar.fill")
+                    .font(.title3)
+                    .foregroundStyle(Color.appAccent)
+                Text("Statistics")
+                    .font(.title3.weight(.bold))
+            }
+            .padding(.horizontal, 16)
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
                 ForEach(items, id: \.0) { item in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(item.0)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text(item.1)
-                            .font(.subheadline.weight(.medium))
+                    HStack(spacing: 10) {
+                        Image(systemName: item.2)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.appAccent)
+                            .frame(width: 24, height: 24)
+                            .background(Color.appAccent.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.0)
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(.secondary)
+                                .textCase(.uppercase)
+                            Text(item.1)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.primary)
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 0)
                     }
                     .padding(12)
-                    .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color.secondary.opacity(0.05))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(Color.secondary.opacity(0.06), lineWidth: 0.5)
+                    )
                 }
             }
             .padding(.horizontal, 16)

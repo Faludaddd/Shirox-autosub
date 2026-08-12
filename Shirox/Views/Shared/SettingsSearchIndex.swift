@@ -32,7 +32,6 @@ enum SettingsPage: Hashable {
     case modules
     case schedule
     case notifications
-    case performance
     case advanced
     case backup
     case logger
@@ -122,9 +121,7 @@ enum SettingsSearchIndex {
         .init("Schedule Timezone", aliases: ["utc", "local time", "schedule timezone"], category: "Schedule", page: .schedule, anchor: "timezone", icon: "globe"),
         .init("Notifications", aliases: ["alerts", "airing alerts", "push notifications"], category: "Notifications", page: .notifications, anchor: "notifications", icon: "bell.fill"),
 
-        // Performance & Advanced
-        .init("Performance Mode", aliases: ["fast mode", "speed up", "reduce effects", "performance"], category: "Performance", page: .performance, anchor: "performance", icon: "gauge.medium"),
-        .init("Skip AniList Traversal", aliases: ["skip metadata lookup", "fast load", "anilist lookup"], category: "Performance", page: .performance, anchor: "skipTraversal", icon: "bolt.fill"),
+        // Advanced
         .init("Advanced", aliases: ["cache", "clear cache", "reset", "storage"], category: "Advanced", page: .advanced, anchor: "advanced", icon: "gearshape.2.fill"),
         .init("Clear Image Cache", aliases: ["delete images", "free space", "image cache"], category: "Advanced", page: .advanced, anchor: "clearImageCache", icon: "photo.stack"),
         .init("Reset Continue Watching", aliases: ["clear continue watching", "reset progress", "cw reset"], category: "Advanced", page: .advanced, anchor: "resetCW", icon: "arrow.counterclockwise"),
@@ -233,7 +230,6 @@ func settingsPageView(for page: SettingsPage) -> some View {
     case .modules:       ModulesSettingsPage()
     case .schedule:      ScheduleSettingsPage()
     case .notifications: NotificationsSettingsPage()
-    case .performance:   PerformanceModeSettingsPage()
     case .advanced:      AdvancedSettingsPage()
     case .backup:        BackupRestoreSettingsPage()
     case .logger:        LoggerSettingsPage()

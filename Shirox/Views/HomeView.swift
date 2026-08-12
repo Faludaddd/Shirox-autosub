@@ -454,12 +454,13 @@ private struct FeaturedCarousel: View {
                             AniListDetailView(mediaId: currentMedia.id, preloadedMedia: currentMedia)
                         } label: {
                             HStack(spacing: 6) {
-                                Image(systemName: "play.fill").font(.footnote.weight(.semibold))
-                                Text("Watch").fontWeight(.semibold)
+                                Image(systemName: "play.fill").font(.caption.weight(.bold))
+                                Text("Watch").font(.subheadline.weight(.semibold))
                             }
-                            .foregroundStyle(platformBackground)
-                            .frame(width: 160, height: 42)
-                            .background(Color.primary, in: RoundedRectangle(cornerRadius: 12))
+                            .foregroundStyle(.primary)
+                            .frame(width: 130, height: 38)
+                            .background(.ultraThinMaterial, in: Capsule())
+                            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
                         }
                         .buttonStyle(.plain)
 
@@ -750,6 +751,7 @@ private struct FeaturedCard: View, Equatable {
                     TVDBPosterImage(media: media)
                         .frame(width: geo.size.width + buffer, height: geo.size.height)
                         .offset(x: -(buffer / 2) - pageOffset * 0.25)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
                 }
                 .clipped()
             }
@@ -1229,9 +1231,17 @@ struct ScheduleView: View {
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(.secondary)
                             Spacer()
-                            Text("\(bucket.entries.count) episode\(bucket.entries.count == 1 ? "" : "s")")
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(.secondary)
+                            HStack(spacing: 4) {
+                                Circle()
+                                    .fill(Color.red)
+                                    .frame(width: 7, height: 7)
+                                Text("\(bucket.entries.count) episode\(bucket.entries.count == 1 ? "" : "s")")
+                                    .font(.subheadline.weight(.bold))
+                                    .foregroundStyle(Color.red)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Capsule().fill(Color.red.opacity(0.12)))
                         }
                         ForEach(bucket.entries) { entry in
                             ScheduleCard(
@@ -1280,6 +1290,7 @@ struct ScheduleView: View {
                         let count = countByDay[day] ?? 0
                         let isSelected = calendar.isDate(day, inSameDayAs: selectedDate)
                         let isToday = calendar.isDateInToday(day)
+                        let hasEpisodes = count > 0
                         Button {
                             withAnimation(.easeOut(duration: 0.18)) {
                                 selectedDate = day
@@ -1292,22 +1303,11 @@ struct ScheduleView: View {
                                 Text("\(calendar.component(.day, from: day))")
                                     .font(.title3.weight(.bold))
                                     .foregroundStyle(isSelected ? .white : .primary)
-                                if count > 0 {
-                                    Text("\(count)")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .foregroundStyle(isSelected ? .white : .red)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
-                                        .background(
-                                            Capsule().fill(isSelected ? Color.white.opacity(0.25) : Color.red.opacity(0.15))
-                                        )
-                                } else {
-                                    Circle()
-                                        .fill(isToday ? Color.red : Color.clear)
-                                        .frame(width: 5, height: 5)
-                                }
+                                Circle()
+                                    .fill(hasEpisodes ? Color.red : (isToday ? Color.red.opacity(0.5) : Color.clear))
+                                    .frame(width: 5, height: 5)
                             }
-                            .frame(width: 58, height: 84)
+                            .frame(width: 58, height: 72)
                             .background(
                                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                                     .fill(isSelected ? Color.appAccent : Color.secondary.opacity(0.08))
@@ -1394,23 +1394,9 @@ struct ScheduleView: View {
                                 Text("\(calendar.component(.day, from: day))")
                                     .font(.subheadline.weight(.bold))
                                     .foregroundStyle(.primary)
-                                if count > 0 {
-                                    Text("\(count)")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .foregroundStyle(.white)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 1)
-                                        .background(Capsule().fill(Color.red))
-                                        .fixedSize()
-                                } else if isToday {
-                                    Circle()
-                                        .fill(Color.primary)
-                                        .frame(width: 5, height: 5)
-                                } else {
-                                    Circle()
-                                        .fill(Color.secondary.opacity(0.3))
-                                        .frame(width: 5, height: 5)
-                                }
+                                Circle()
+                                    .fill(count > 0 ? Color.red : (isToday ? Color.red.opacity(0.5) : Color.secondary.opacity(0.3)))
+                                    .frame(width: 5, height: 5)
                             }
                             .frame(maxWidth: .infinity)
                             .aspectRatio(1, contentMode: .fit)

@@ -18,10 +18,6 @@ struct AnimatedBackgroundView: View {
     @AppStorage("backgroundAnimationQuality") private var qualityRaw: String = Quality.medium.rawValue
     @AppStorage("backgroundFrameRate") private var frameRate: Int = 30
     @AppStorage("reduceMotion") private var reduceMotion: Bool = false
-    /// #126 — Performance Mode disables the animated background entirely
-    /// (falls back to a flat static gradient) so older devices don't burn
-    /// CPU/GPU on a decorative TimelineView while scrolling.
-    @AppStorage("performanceModeEnabled") private var performanceModeEnabled: Bool = false
 
     // MARK: - Quality
 
@@ -64,7 +60,7 @@ struct AnimatedBackgroundView: View {
             // #126 — Performance Mode gates the whole TimelineView/Canvas
             // pipeline off, the same as Reduce Motion. This is the single
             // biggest per-frame GPU cost on the home screen.
-            if reduceMotion || performanceModeEnabled {
+            if reduceMotion {
                 staticGradient
             } else {
                 TimelineView(
