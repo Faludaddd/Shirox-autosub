@@ -1181,6 +1181,9 @@ struct ScheduleView: View {
                     scheduleContent
                 }
             }
+            #if os(iOS)
+            .background(Color(.systemBackground))
+            #endif
             .navigationTitle("Schedule")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -1336,7 +1339,7 @@ struct ScheduleView: View {
                             .frame(width: 58, height: 72)
                             .background(
                                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .fill(isSelected ? Color.appAccent : Color.gray.opacity(0.15))
+                                    .fill(isSelected ? Color.appAccent : Color.secondary.opacity(0.2))
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -1437,7 +1440,7 @@ struct ScheduleView: View {
                             .frame(minHeight: 48)
                             .background(
                                 RoundedRectangle(cornerRadius: 10)
-                                    .fill(isSelected ? Color.primary.opacity(0.12) : Color.gray.opacity(0.15))
+                                    .fill(isSelected ? Color.primary.opacity(0.12) : Color.secondary.opacity(0.2))
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10)
