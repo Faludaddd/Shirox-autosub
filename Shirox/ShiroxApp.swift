@@ -172,39 +172,58 @@ extension Color {
     }
 }
 
-// MARK: - Glowing Toggle Style
+// MARK: - Liquid Glass Toggle Style (#123 correction)
 //
-// The global `.tint(Color.gray)` in `ShiroxApp` overrides the default green tint
-// for `Toggle`, but it also strips the toggle of any glow halo. This custom
-// `ToggleStyle` re-introduces a soft gray glow on the capsule when the toggle is
-// ON, gated by `Color.glowEnabled` and scaled by `Color.glowIntensity` so the
-// effect respects the user's Glow preference in Settings.
-
+// #123 correction — The previous `GlowingToggleStyle` used a solid gray
+// capsule fill. The user requested the alternate Liquid Glass treatment: a
+// frosted translucent capsule (`.ultraThinMaterial`) that matches the app's
+// glass material language (toast system, sheets, tab bar). The thumb is a
+// white circle with a subtle shadow. When ON, the capsule tints with the
+// accent color at low opacity so the glass effect is preserved but the state
+// is clearly readable. Glow is gated by `Color.glowEnabled` /
+// `Color.glowIntensity` as before.
 struct GlowingToggleStyle: ToggleStyle {
     func makeBody(configuration: Configuration) -> some View {
         HStack {
             configuration.label
             Spacer()
             ZStack {
-                // #123 — Long pill capsule. Widened from 51→60pt and made
-                // taller (31→34pt) so the toggle reads as a long pill rather
-                // than a small switch. The thumb grows proportionally (27→30pt)
-                // and travel distance increases (±10→±12) so the ON/OFF thumb
-                // position is clearly differentiated at a glance.
+                // #123 correction — Liquid Glass capsule. The fill is a
+                // frosted ultraThinMaterial (translucent, blurs the content
+                // behind it) layered with a subtle accent tint when ON so the
+                // state is visible through the glass. When OFF, the capsule
+                // stays neutral glass.
                 Capsule()
-                    .fill(configuration.isOn ? Color.gray : Color.gray.opacity(0.3))
+                    .fill(.ultraThinMaterial)
                     .frame(width: 60, height: 34)
+                    .overlay(
+                        Capsule()
+                            .fill(configuration.isOn
+                                  ? Color.appAccent.opacity(0.25)
+                                  : Color.secondary.opacity(0.1))
+                    )
+                    .overlay(
+                        Capsule()
+                            .strokeBorder(
+                                configuration.isOn
+                                ? Color.appAccent.opacity(0.4)
+                                : Color.secondary.opacity(0.2),
+                                lineWidth: 0.5
+                            )
+                    )
                     .shadow(
                         color: configuration.isOn && Color.glowEnabled
-                            ? Color.gray.opacity(Color.glowIntensity) : .clear,
-                        radius: configuration.isOn && Color.glowEnabled ? CGFloat(21 * Color.glowIntensity) : 0
+                            ? Color.appAccent.opacity(Color.glowIntensity * 0.6) : .clear,
+                        radius: configuration.isOn && Color.glowEnabled
+                            ? CGFloat(18 * Color.glowIntensity) : 0
                     )
                 Circle()
                     .fill(Color.white)
-                    .frame(width: 30, height: 30)
+                    .frame(width: 28, height: 28)
+                    .shadow(color: .black.opacity(0.15), radius: 2, x: 0, y: 1)
                     .offset(x: configuration.isOn ? 12 : -12)
             }
-            .animation(.easeInOut(duration: 0.2), value: configuration.isOn)
+            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: configuration.isOn)
             .onTapGesture {
                 configuration.isOn.toggle()
                 Haptics.light()
@@ -496,10 +515,11 @@ private struct RootTabView: View {
                         .tabItem { Label("Downloads", systemImage: "arrow.down.circle.fill") }
                         .tag(2)
                     #endif
-                    SearchView()
-                        .transition(.opacity)
-                        .tabItem { Label("Search", systemImage: "magnifyingglass") }
-                        .tag(3)
+                    // #118 (revised) — Search tab removed from the bottom tab
+                    // bar. Search is now triggered by a dedicated icon in the
+                    // Home toolbar that reveals a frosted pill search bar
+                    // inline. The full SearchView is still reachable from
+                    // within that inline search when needed.
                     SettingsView()
                         .transition(.opacity)
                         .tabItem { Label("Settings", systemImage: "gearshape.fill") }

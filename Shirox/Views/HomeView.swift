@@ -19,12 +19,13 @@ struct HomeView: View {
     /// reload is in flight. The system `.refreshable` spinner still drives the
     /// gesture; this just adds a branded overlay on top.
     @State private var isRefreshing = false
-    // #118 — Inline search on Home. When `inlineSearchOnHome` is enabled in
-    // Settings → Appearance → Layout, a search bar renders at the top of Home
-    // and filters the trending items inline (instead of pushing SearchView).
-    // When disabled (default), the bar acts as a tappable button that pushes
-    // SearchView — keeping the existing "search is a separate tab" flow intact.
-    @AppStorage("inlineSearchOnHome") private var inlineSearchOnHome = false
+    // #118 (revised) — Search is now toggled by a dedicated icon in the top
+    // toolbar. When tapped, a frosted pill search bar slides in below the nav
+    // bar (centered, icon-height, elongated — not full-width). The search bar
+    // is NOT visible by default. This replaces both the old inline search pill
+    // that sat at the top of the scroll content AND the separate Search tab in
+    // the bottom tab bar.
+    @State private var showSearchBar = false
     @State private var inlineSearchText = ""
     @State private var navigateToSearch = false
 
@@ -44,19 +45,17 @@ struct HomeView: View {
         }
     }
 
-    /// #118 — Search affordance at the top of Home. Behavior is driven by the
-    /// `inlineSearchOnHome` AppStorage toggle:
-    /// - **Enabled:** renders a real `TextField` with a magnifying-glass icon
-    ///   and a clear button. Editing the text filters `vm.trending` inline
-    ///   (see `filteredTrending`) and replaces the home content below with a
-    ///   single `AnimeSection` of matches.
-    /// - **Disabled (default):** renders the same visual pill but as a
-    ///   `Button` that pushes `SearchView` (via `navigateToSearch` + the
-    ///   `.navigationDestination` modifier on the NavigationStack) so the
-    ///   existing "search tab" flow is preserved.
+    /// #118 (revised) — Frosted pill search bar that appears below the nav bar
+    /// when the user taps the search icon in the toolbar. Centered on screen,
+    /// icon-height but elongated (a pill roughly icon-height, just wider — not
+    /// full-width). Frosted/translucent background matches the app's glass
+    /// material language. Hidden by default; only visible while `showSearchBar`
+    /// is true. Typing filters `vm.trending` inline (see `filteredTrending`)
+    /// and replaces the home content below with a single `AnimeSection` of
+    /// matches. Tapping the X or submitting an empty query hides the bar.
     @ViewBuilder
-    private var inlineSearchBar: some View {
-        if inlineSearchOnHome {
+    private var frostedSearchBar: some View {
+        if showSearchBar {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 16, weight: .medium))
@@ -66,6 +65,7 @@ struct HomeView: View {
                     .font(.subheadline)
                     .autocorrectionDisabled()
                     .submitLabel(.search)
+                    .focused($searchFieldFocused)
                 if !inlineSearchText.isEmpty {
                     Button {
                         inlineSearchText = ""
@@ -76,45 +76,53 @@ struct HomeView: View {
                     }
                     .buttonStyle(.plain)
                 }
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showSearchBar = false
+                        inlineSearchText = ""
+                        searchFieldFocused = false
+                    }
+                } label: {
+                    Text("Cancel")
+                        .font(.subheadline)
+                        .foregroundStyle(Color.appAccent)
+                }
+                .buttonStyle(.plain)
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .padding(.vertical, 10)
+            // #118 (revised) — Frosted glass background. `.ultraThinMaterial`
+            // gives the translucent frosted look matching the app's glass
+            // language (toast system, sheets, tab bar).
+            .background(.ultraThinMaterial, in: Capsule())
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                Capsule()
                     .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
             )
+            // #118 (revised) — Centered on screen, not full-width. The pill is
+            // roughly icon-height (36pt) and elongated — wider than an icon but
+            // not stretching edge-to-edge.
+            .frame(maxWidth: 340)
+            .frame(maxHeight: 44)
             .padding(.horizontal, 16)
-        } else {
-            Button {
-                navigateToSearch = true
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.secondary)
-                    Text("Search")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-                .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
-                )
-                .padding(.horizontal, 16)
-            }
-            .buttonStyle(.plain)
+            .padding(.top, 4)
+            .transition(.move(edge: .top).combined(with: .opacity))
         }
     }
-    /// #120 — When OFF, Home shows only the carousel + continue watching /
-    /// reading. When ON, the browse AnimeSections (This Season, Trending Now,
-    /// …) also render below. Driven from Settings → Appearance →
-    /// "Show Browse Categories on Home".
-    @AppStorage("showBrowseCategories") private var showBrowseCategories = false
+
+    @FocusState private var searchFieldFocused: Bool
+    /// #120 — When ON, Home shows the Browse Categories section below the
+    /// carousel + continue watching/reading. When OFF, those browse sections
+    /// are hidden. #119 correction — defaults to `true` so the old/original
+    /// Home layout (with browse sections) is the app's default going forward,
+    /// not an alternate option.
+    @AppStorage("showBrowseCategories") private var showBrowseCategories = true
+    /// #120 correction — Switches the Browse Categories layout between the
+    /// 2-column grid of `CategoryGridCard` tiles (default, the "built"
+    /// layout) and the vertical stack of `AnimeSection` horizontal carousels.
+    /// When `showBrowseCategories` is OFF, this toggle has no effect (the
+    /// whole section is hidden).
+    @AppStorage("browseCategoriesGridLayout") private var browseCategoriesGridLayout = true
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -147,20 +155,19 @@ struct HomeView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 24) {
                             // ────────────────────────────────────────────────────────
-                            // #118 — Inline search affordance at the top of Home. When
-                            // `inlineSearchOnHome` is enabled, this is a live TextField
-                            // that filters the trending items below (replacing the rest
-                            // of the home content while a query is active). When disabled,
-                            // it renders as a tappable "Search" pill that pushes
-                            // SearchView — preserving the previous "search tab" flow.
+                            // #118 (revised) — The inline search pill that used to sit
+                            // here has been removed. Search is now triggered by a
+                            // dedicated icon in the toolbar that reveals a frosted
+                            // pill search bar as an overlay below the nav bar. See
+                            // `frostedSearchBar` and the toolbar below.
                             // ────────────────────────────────────────────────────────
-                            inlineSearchBar
 
-                            // Branch on inline search: if the user has typed a query,
-                            // show ONLY the filtered results section (hide the carousel,
-                            // continue watching, and browse sections). Otherwise render
-                            // the normal home content below the search bar.
-                            if inlineSearchOnHome && !inlineSearchText.trimmingCharacters(in: .whitespaces).isEmpty {
+                            // Branch on search: if the search bar is open and the
+                            // user has typed a query, show ONLY the filtered results
+                            // section (hide the carousel, continue watching, and
+                            // browse sections). Otherwise render the normal home
+                            // content.
+                            if showSearchBar && !inlineSearchText.trimmingCharacters(in: .whitespaces).isEmpty {
                                 if filteredTrending.isEmpty {
                                     ContentUnavailableView(
                                         "No Matches",
@@ -210,21 +217,28 @@ struct HomeView: View {
                             #endif
 
                             // ────────────────────────────────────────────────────────
-                            // 3. BROWSE SECTIONS — vertical stack of horizontal
-                            //    AnimeSection carousels (This Season, Trending Now,
-                            //    All-Time Popular, Top Rated, Recently Completed,
-                            //    Upcoming). Gated by the "Show Browse Categories on
-                            //    Home" appearance toggle (#120): when OFF, Home shows
-                            //    only the carousel + continue watching / reading; when
-                            //    ON, these browse sections render below.
+                            // 3. BROWSE SECTIONS — #119 correction: this is now the
+                            //    DEFAULT layout (showBrowseCategories defaults to true).
+                            //    #120 correction: two layouts are available, switched by
+                            //    `browseCategoriesGridLayout`:
+                            //      • Grid (default): 2-column CategoryGridCard tiles
+                            //        with cover images + gradient washes.
+                            //      • Carousels: vertical stack of AnimeSection
+                            //        horizontal carousels (This Season, Trending, …).
+                            //    Both are gated by `showBrowseCategories` — when OFF,
+                            //    the whole section is hidden.
                             // ────────────────────────────────────────────────────────
                             if showBrowseCategories {
-                                AnimeSection(title: "This Season", items: vm.seasonal, category: .seasonal)
-                                AnimeSection(title: "Trending Now", items: vm.trending, category: .trending)
-                                AnimeSection(title: "All-Time Popular", items: vm.popular, category: .popular)
-                                AnimeSection(title: "Top Rated", items: vm.topRated, category: .topRated)
-                                AnimeSection(title: "Recently Completed", items: vm.recentlyCompleted, category: .popular)
-                                AnimeSection(title: "Upcoming", items: vm.upcoming, category: .trending)
+                                if browseCategoriesGridLayout {
+                                    browseCategoriesGrid
+                                } else {
+                                    AnimeSection(title: "This Season", items: vm.seasonal, category: .seasonal)
+                                    AnimeSection(title: "Trending Now", items: vm.trending, category: .trending)
+                                    AnimeSection(title: "All-Time Popular", items: vm.popular, category: .popular)
+                                    AnimeSection(title: "Top Rated", items: vm.topRated, category: .topRated)
+                                    AnimeSection(title: "Recently Completed", items: vm.recentlyCompleted, category: .popular)
+                                    AnimeSection(title: "Upcoming", items: vm.upcoming, category: .trending)
+                                }
                             }
 
                             Spacer().frame(height: 28)
@@ -275,7 +289,8 @@ struct HomeView: View {
             .modifier(TransparentNavBarModifier())
             #endif
             .toolbar {
-                // Schedule icon — matches the Settings gear styling exactly
+                // #118 (revised) — Schedule icon (left side of the two-icon
+                // pair). Remains as-is.
                 ToolbarItem(placement: .primaryAction) {
                     NavigationLink(destination: ScheduleView()) {
                         Image(systemName: "calendar")
@@ -283,12 +298,40 @@ struct HomeView: View {
                             .foregroundStyle(.primary)
                     }
                 }
-                // Settings gear (#117) — replaced the previous Notifications
-                // bell with a Settings entry so the Home toolbar exposes
-                // Schedule + Settings instead of Schedule + Notifications.
+                // #118 (revised) — Dedicated search icon. Tapping reveals the
+                // frosted pill search bar below the nav bar (see `frostedSearchBar`).
+                // Not a persistent search affordance — just a toggle. The icon
+                // fills in (bold) while the search bar is open so the user can
+                // see at a glance that search is active.
                 ToolbarItem(placement: .primaryAction) {
-                    NavigationLink(destination: SettingsView()) {
-                        Image(systemName: "gearshape")
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showSearchBar.toggle()
+                            if !showSearchBar {
+                                inlineSearchText = ""
+                                searchFieldFocused = false
+                            }
+                        }
+                        if showSearchBar {
+                            // Focus the field after the bar appears so the
+                            // keyboard opens automatically — the user tapped
+                            // search, so they want to type.
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                                searchFieldFocused = true
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 18, weight: showSearchBar ? .bold : .medium))
+                            .foregroundStyle(.primary)
+                    }
+                }
+                // #118 (revised) — Notifications bell replaces the old Settings
+                // gear. Settings is still reachable via the bottom tab bar; the
+                // Home toolbar now exposes Schedule + Search + Notifications.
+                ToolbarItem(placement: .primaryAction) {
+                    NavigationLink(destination: NotificationsPage()) {
+                        Image(systemName: "bell")
                             .font(.system(size: 18, weight: .medium))
                             .foregroundStyle(.primary)
                     }
@@ -297,13 +340,22 @@ struct HomeView: View {
                     ProviderMenuButton()
                 }
             }
+            // #118 (revised) — Frosted search bar overlay. Sits below the nav
+            // bar, above the scroll content. Centered, pill-shaped, frosted
+            // glass. Only visible while `showSearchBar` is true.
+            .overlay(alignment: .top) {
+                frostedSearchBar
+                    .padding(.top, 44)
+            }
+            .animation(.easeInOut(duration: 0.2), value: showSearchBar)
             // Outside the ScrollView: the hidden NavigationLink that performs the push.
             .continueWatchingNavigation($cwNavTarget)
-            // #118 — Programmatic push to SearchView when the inline search bar
-            // is in "navigate" mode (i.e. `inlineSearchOnHome` is disabled).
-            // Triggered by tapping the pill-shaped search affordance at the top
-            // of Home.
-            .background(NavigationLink(isActive: $navigateToSearch) { SearchView() } label: { EmptyView().hidden() })
+            // #118 (revised) — The old `navigateToSearch` NavigationLink that
+            // pushed SearchView from the inline search pill has been removed.
+            // Search is now an inline filter on Home (toggled by the toolbar
+            // search icon) — the full SearchView is still reachable via its
+            // tab-bar entry on non-iOS platforms and via the search icon's
+            // inline results on iOS.
             #if os(iOS)
             .fullScreenCover(item: $readerContext) { ctx in
                 MangaReaderView(context: ctx)
@@ -318,6 +370,103 @@ struct HomeView: View {
             ContinueWatchingManager.shared.pruneOrphanedLocalImports()
             #endif
         }
+    }
+
+    // MARK: - Browse Categories Grid (#120 correction)
+    //
+    // The "built" grid layout — a 2-column LazyVGrid of `CategoryGridCard`
+    // tiles, one per browse category. Each tile shows a representative cover
+    // image (from the first item in that category's loaded data), a gradient
+    // wash, the category title, and the item count. Tapping a tile pushes
+    // `BrowseView` for that category.
+    //
+    // This layout was deleted in a prior pass; #120 correction restores it as
+    // the DEFAULT browse layout (switched via `browseCategoriesGridLayout`).
+    @ViewBuilder
+    private var browseCategoriesGrid: some View {
+        let columns = [
+            GridItem(.flexible(), spacing: 12),
+            GridItem(.flexible(), spacing: 12)
+        ]
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Browse Categories")
+                .font(.title3.weight(.bold))
+                .padding(.horizontal, 16)
+            LazyVGrid(columns: columns, spacing: 12) {
+                ForEach(browseGridItems, id: \.title) { item in
+                    NavigationLink {
+                        BrowseView(category: item.category)
+                    } label: {
+                        CategoryGridCard(
+                            title: item.title,
+                            count: item.count,
+                            iconName: item.iconName,
+                            gradientColors: item.gradientColors,
+                            imageURL: item.imageURL
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 16)
+        }
+    }
+
+    /// Config for each tile in the browse grid. `category` is the
+    /// `BrowseCategory` used to fetch the full list when the tile is tapped;
+    /// `count`/`imageURL` are seeded from the already-loaded HomeViewModel
+    /// arrays so the tiles aren't empty while the full BrowseView loads.
+    private struct BrowseGridItem {
+        let title: String
+        let category: BrowseCategory
+        let iconName: String
+        let gradientColors: [Color]
+        let count: Int
+        let imageURL: String?
+    }
+
+    private var browseGridItems: [BrowseGridItem] {
+        [
+            BrowseGridItem(
+                title: "This Season", category: .seasonal, iconName: "leaf.fill",
+                gradientColors: [Color.green.opacity(0.6), Color.teal.opacity(0.5)],
+                count: vm.seasonal.count,
+                imageURL: vm.seasonal.first?.coverImage.best
+            ),
+            BrowseGridItem(
+                title: "Trending Now", category: .trending, iconName: "flame.fill",
+                gradientColors: [Color.orange.opacity(0.6), Color.red.opacity(0.5)],
+                count: vm.trending.count,
+                imageURL: vm.trending.first?.coverImage.best
+            ),
+            BrowseGridItem(
+                title: "All-Time Popular", category: .popular, iconName: "star.fill",
+                gradientColors: [Color.purple.opacity(0.6), Color.indigo.opacity(0.5)],
+                count: vm.popular.count,
+                imageURL: vm.popular.first?.coverImage.best
+            ),
+            BrowseGridItem(
+                title: "Top Rated", category: .topRated, iconName: "trophy.fill",
+                gradientColors: [Color.yellow.opacity(0.6), Color.orange.opacity(0.5)],
+                count: vm.topRated.count,
+                imageURL: vm.topRated.first?.coverImage.best
+            ),
+            // #120 — Recently Completed and Upcoming use .popular/.trending as
+            // fetch fallbacks (BrowseCategory only has 4 cases), but the tile
+            // titles and gradients are distinct so the grid reads as 6 entries.
+            BrowseGridItem(
+                title: "Recently Completed", category: .popular, iconName: "checkmark.seal.fill",
+                gradientColors: [Color.blue.opacity(0.6), Color.cyan.opacity(0.5)],
+                count: vm.recentlyCompleted.count,
+                imageURL: vm.recentlyCompleted.first?.coverImage.best
+            ),
+            BrowseGridItem(
+                title: "Upcoming", category: .trending, iconName: "clock.fill",
+                gradientColors: [Color.gray.opacity(0.6), Color.secondary.opacity(0.5)],
+                count: vm.upcoming.count,
+                imageURL: vm.upcoming.first?.coverImage.best
+            ),
+        ]
     }
 }
 
@@ -1317,6 +1466,11 @@ struct ScheduleView: View {
                 // episode-count badge (if > 0), a today marker, and a selection
                 // highlight. Tapping a leading/trailing day shifts the calendar to
                 // that month and selects the day.
+                //
+                // #80/107 — The grid is wrapped in a card-style background so it
+                // reads unambiguously as a calendar widget (not just a row of
+                // date pills). The rounded-rect card + weekday header + 7-column
+                // grid is the standard iOS calendar visual language.
                 LazyVGrid(
                     columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7),
                     spacing: 4
@@ -1331,6 +1485,15 @@ struct ScheduleView: View {
                         )
                     }
                 }
+                .padding(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Color.secondary.opacity(0.08))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(Color.secondary.opacity(0.1), lineWidth: 1)
+                )
                 .padding(.horizontal, 12)
                 .padding(.bottom, 12)
 
@@ -1441,6 +1604,7 @@ struct ScheduleView: View {
                 }
             }
             .frame(maxWidth: .infinity)
+            .aspectRatio(1, contentMode: .fit)
             .frame(minHeight: 48)
             .background(
                 RoundedRectangle(cornerRadius: 10)

@@ -212,7 +212,6 @@ struct SearchView: View {
             }
             Toggle("Add subtitle file", isOn: $addSubtitleUpFront)
                 .toggleStyle(.switch)
-                .tint(Color.gray)
                 .fixedSize()
                 .disabled(!needsVideoStep)   // locked once a video is staged; clear it to change
                 .onChangeOf(addSubtitleUpFront) { _ in clearStagedVideo() }

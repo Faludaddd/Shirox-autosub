@@ -867,15 +867,17 @@ struct AppearanceSettingsPage: View {
     @AppStorage("reduceMotion") private var reduceMotion = false
     @AppStorage("glowEnabled") private var glowEnabled = true
     @AppStorage("glowIntensity") private var glowIntensity: Double = 0.5
-    /// #120 — Toggles the browse AnimeSections (This Season, Trending Now, …)
-    /// on the Home tab. When OFF, Home shows only the carousel + continue
-    /// watching / reading.
-    @AppStorage("showBrowseCategories") private var showBrowseCategories = false
+    /// #119 correction — Browse Categories defaults to ON so the old/original
+    /// Home layout (with browse sections) is the app's default.
+    @AppStorage("showBrowseCategories") private var showBrowseCategories = true
+    /// #120 correction — Switches Browse Categories between the grid layout
+    /// (CategoryGridCard tiles, default) and the horizontal carousels
+    /// (AnimeSection). Only effective when `showBrowseCategories` is ON.
+    @AppStorage("browseCategoriesGridLayout") private var browseCategoriesGridLayout = true
     /// #122 — Whether to render the Statistics grid on detail pages.
     @AppStorage("showStatistics") private var showStatistics = true
-    /// #118 — Whether the search bar is shown inline at the top of Home
-    /// (filtering trending items) instead of pushing a dedicated Search tab.
-    @AppStorage("inlineSearchOnHome") private var inlineSearchOnHome = false
+    // #118 (revised) — `inlineSearchOnHome` AppStorage removed. Search is now
+    // always triggered by the toolbar icon; there's no alternate mode to toggle.
 
     private struct AccentSwatch: Identifiable {
         let id: String
@@ -925,28 +927,30 @@ struct AppearanceSettingsPage: View {
             }
             Section("Motion") {
                 Toggle("Reduce Motion", isOn: $reduceMotion)
-                    .tint(Color.gray)
             }
             Section("Home") {
                 Toggle("Show Browse Categories on Home", isOn: $showBrowseCategories)
-                    .tint(Color.gray)
+                // #120 correction — Layout switch for Browse Categories. When
+                // ON, the grid (CategoryGridCard tiles) is shown; when OFF,
+                // the horizontal carousels (AnimeSection) are shown. Only
+                // has an effect when "Show Browse Categories on Home" is ON.
+                Toggle("Browse Categories as Grid", isOn: $browseCategoriesGridLayout)
             }
             // #118 / #122 — Detail-page and Home-screen layout toggles.
+            // #118 (revised) — "Inline Search on Home" toggle removed: search
+            // is now always triggered by the toolbar icon and reveals a
+            // frosted pill bar. There's no longer an alternate mode to toggle.
             Section {
                 Toggle("Show Statistics on Detail Pages", isOn: $showStatistics)
-                    .tint(Color.gray)
-                Toggle("Inline Search on Home", isOn: $inlineSearchOnHome)
-                    .tint(Color.gray)
             } header: {
                 Text("Layout")
             } footer: {
-                Text("Show Statistics renders the compact metadata grid on detail pages. Inline Search replaces the Home search button with a live search bar that filters trending titles.")
+                Text("Show Statistics renders the compact metadata grid on detail pages.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             Section {
                 Toggle("Enable Glow", isOn: $glowEnabled)
-                    .tint(Color.gray)
                 if glowEnabled {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
@@ -957,7 +961,6 @@ struct AppearanceSettingsPage: View {
                                 .foregroundStyle(.secondary)
                         }
                         Slider(value: $glowIntensity, in: 0.0...1.0, step: 0.1)
-                            .tint(Color.gray)
                     }
                 }
             } header: {
@@ -975,8 +978,8 @@ struct AppearanceSettingsPage: View {
                     glowEnabled = true
                     glowIntensity = 0.5
                     showStatistics = true
-                    inlineSearchOnHome = false
-                    showBrowseCategories = false
+                    showBrowseCategories = true
+                    browseCategoriesGridLayout = true
                 }
                 .tint(.appAccent)
             }
@@ -1031,7 +1034,10 @@ struct AppearanceSettingsPage: View {
 struct PlaybackSettingsPage: View {
     var body: some View {
         Form {
-            Section("Player") {
+            // #121 — Section headers removed from Playback sub-tab (all
+            // Settings sub-page headers are removed per the global header-
+            // removal rule, except Schedule settings which is exempt).
+            Section {
                 NavigationLink {
                     PlayerGeneralSettingsPage()
                 } label: {
@@ -1042,8 +1048,6 @@ struct PlaybackSettingsPage: View {
                 } label: {
                     SettingsCategoryRow(icon: "sparkles.tv.fill", title: "Quality", subtitle: "Resolution, data saving")
                 }
-            }
-            Section("Playback") {
                 NavigationLink {
                     GesturesSettingsPage()
                 } label: {
@@ -1064,15 +1068,11 @@ struct PlaybackSettingsPage: View {
                 } label: {
                     SettingsCategoryRow(icon: "speedometer", title: "Hold-Speed", subtitle: "Sensitivity, multiplier")
                 }
-            }
-            Section("Audio") {
                 NavigationLink {
                     AudioSettingsPage()
                 } label: {
                     SettingsCategoryRow(icon: "speaker.wave.2.fill", title: "Audio", subtitle: "Surround, comfort, frame rate")
                 }
-            }
-            Section("Display") {
                 NavigationLink {
                     PiPSettingsPage()
                 } label: {
@@ -1173,15 +1173,10 @@ struct PlayerGeneralSettingsPage: View {
                 }
                 PlaybackSettingsCard(title: "Player Controls") {
                     Toggle("Force Landscape Mode", isOn: $forceLandscape)
-                        .tint(Color.gray)
                     Toggle("Show Lock Button", isOn: $showLockButton)
-                        .tint(Color.gray)
                     Toggle("Show Services Button", isOn: $showServicesButton)
-                        .tint(Color.gray)
                     Toggle("Prefer Downloaded", isOn: $preferDownloaded)
-                        .tint(Color.gray)
                     Toggle("Show Remaining Time", isOn: $showRemainingTime)
-                        .tint(Color.gray)
                 }
             }
             .padding(.vertical, 16)
@@ -1276,7 +1271,6 @@ struct QualitySettingsPage: View {
                     }
                     Divider()
                     Toggle("Data Saving", isOn: $dataSavingEnabled)
-                        .tint(Color.gray)
                         .lineLimit(1)
                         .fixedSize(horizontal: true, vertical: false)
                     Text("Caps streaming quality at roughly 480p to use less mobile data. The video player's quality picker is also locked to this cap while Data Saving is on. Downloads and local files are not affected.")
@@ -1312,25 +1306,18 @@ struct GesturesSettingsPage: View {
             VStack(spacing: 16) {
                 PlaybackSettingsCard(title: "Touch Gestures") {
                     Toggle("Brightness Gesture", isOn: $brightnessGesture)
-                        .tint(Color.gray)
                     Toggle("Volume Gesture", isOn: $volumeGesture)
-                        .tint(Color.gray)
                     Toggle("Two-Finger Seek", isOn: $twoFingerGesture)
-                        .tint(Color.gray)
                     Toggle("Center-Tap to Toggle UI", isOn: $centerTapGesture)
-                        .tint(Color.gray)
                     Toggle("Double-Tap to Seek", isOn: $doubleTapGesture)
-                        .tint(Color.gray)
                 }
                 PlaybackSettingsCard(title: "Skip Durations") {
                     Picker("Skip Duration", selection: $skipShort) {
                         ForEach(shortOptions, id: \.self) { Text("\($0)s").tag($0) }
                     }
-                    .tint(Color.gray)
                     Picker("Long Skip Duration", selection: $skipLong) {
                         ForEach(longOptions, id: \.self) { Text("\($0)s").tag($0) }
                     }
-                    .tint(Color.gray)
                 }
             }
             .padding(.vertical, 16)
@@ -1355,17 +1342,12 @@ struct SkipSegmentsSettingsPage: View {
             VStack(spacing: 16) {
                 PlaybackSettingsCard(title: "Sources") {
                     Toggle("AniSkip", isOn: $useAniSkip)
-                        .tint(Color.gray)
                     Toggle("TheIntroDB", isOn: $useTheIntroDB)
-                        .tint(Color.gray)
                     Toggle("IntroDB", isOn: $useIntroDB)
-                        .tint(Color.gray)
                 }
                 PlaybackSettingsCard(title: "Auto-Skip") {
                     Toggle("Auto-Skip Segments", isOn: $autoSkipSegments)
-                        .tint(Color.gray)
                     Toggle("Always Show Skip Button", isOn: $alwaysShowSkipSegments)
-                        .tint(Color.gray)
                 }
                 PlaybackSettingsCard(title: "Skip 85s") {
                     HStack(alignment: .top, spacing: 12) {
@@ -1377,7 +1359,6 @@ struct SkipSegmentsSettingsPage: View {
                             .foregroundStyle(.secondary)
                     }
                     Toggle("85s Fallback", isOn: $fallback85s)
-                        .tint(Color.gray)
                 }
             }
             .padding(.vertical, 16)
@@ -1402,17 +1383,12 @@ struct NextEpisodeSettingsPage: View {
             VStack(spacing: 16) {
                 PlaybackSettingsCard(title: "Auto-Play") {
                     Toggle("Auto Next Episode", isOn: $autoNextEpisode)
-                        .tint(Color.gray)
                     Toggle("Show Next Episode Button", isOn: $showNextEpisodeButton)
-                        .tint(Color.gray)
                     Toggle("Show Episode Browser Button", isOn: $showNextEpisodeBrowserButton)
-                        .tint(Color.gray)
                 }
                 PlaybackSettingsCard(title: "Options") {
                     Toggle("Use Poster Art", isOn: $usePosterForNextEpisode)
-                        .tint(Color.gray)
                     Toggle("Skip Filler Episodes", isOn: $skipFillerEpisodes)
-                        .tint(Color.gray)
                 }
                 PlaybackSettingsCard(title: "Threshold") {
                     HStack {
@@ -1423,7 +1399,6 @@ struct NextEpisodeSettingsPage: View {
                             .monospacedDigit()
                     }
                     Slider(value: $appearanceThreshold, in: 50...100, step: 5)
-                        .tint(Color.gray)
                     Text("The next-episode card appears once playback reaches this percentage of the current episode.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -1450,7 +1425,6 @@ struct HoldSpeedSettingsPage: View {
             VStack(spacing: 16) {
                 PlaybackSettingsCard(title: "Hold-to-Speed") {
                     Toggle("Enable", isOn: $holdSpeedEnabled)
-                        .tint(Color.gray)
                     if holdSpeedEnabled {
                         Group {
                             Divider()
@@ -1462,13 +1436,11 @@ struct HoldSpeedSettingsPage: View {
                                     .monospacedDigit()
                             }
                             Slider(value: $holdSpeedSensitivity, in: 0.1...1.0, step: 0.1)
-                                .tint(Color.gray)
                             Picker("Speed Multiplier", selection: $holdSpeedMultiplier) {
                                 ForEach(multipliers, id: \.self) { mult in
                                     Text(doubleLabel(mult)).tag(mult)
                                 }
                             }
-                            .tint(Color.gray)
                         }
                         .transition(.opacity)
                     }
@@ -1496,7 +1468,6 @@ struct AudioSettingsPage: View {
             VStack(spacing: 16) {
                 PlaybackSettingsCard(title: "Surround Sound") {
                     Toggle("Surround Sound", isOn: $surroundSound)
-                        .tint(Color.gray)
                     Text("Outputs multi-channel audio when supported by the stream and device.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -1507,7 +1478,6 @@ struct AudioSettingsPage: View {
                         Text("Medium").tag("medium")
                         Text("Strong").tag("strong")
                     }
-                    .tint(Color.gray)
                     Text("Compresses the dynamic range so quiet sounds are louder and loud sounds are quieter.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -1518,7 +1488,6 @@ struct AudioSettingsPage: View {
                             Text("\(fps) fps").tag(fps)
                         }
                     }
-                    .tint(Color.gray)
                     Text("Target frame rate for inline (in-feed) playback.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -1543,7 +1512,6 @@ struct PiPSettingsPage: View {
             VStack(spacing: 16) {
                 PlaybackSettingsCard(title: "Picture-in-Picture") {
                     Toggle("PiP When Leaving App", isOn: $pipWhenLeavingApp)
-                        .tint(Color.gray)
                     Text("When you swipe out of Shirox during playback, the video shrinks into a small floating window so you can keep watching while using other apps. Turn this off if you'd rather the video just pause.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -1551,14 +1519,12 @@ struct PiPSettingsPage: View {
                 }
                 PlaybackSettingsCard(title: "Auto-Pause") {
                     Toggle("Auto-Pause on Interruption", isOn: $autoPauseOnInterruption)
-                        .tint(Color.gray)
                     Text("Pauses playback automatically when something else takes over audio — an incoming call, Siri, an alarm, or another media app starting. Playback resumes when the interruption ends if the system allows it.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                     Divider().opacity(0.4)
                     Toggle("Auto-Pause on Control Center", isOn: $autoPauseOnControlCenter)
-                        .tint(Color.gray)
                     Text("Pauses playback when you open Control Center or Notification Center by swiping down from the top-right or top of the screen. Playback doesn't auto-resume when you close it — tap play to continue. Opening the app switcher or going to the home screen is not affected (those use PiP instead).")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -1584,9 +1550,7 @@ struct StreamingSettingsPage: View {
             VStack(spacing: 16) {
                 PlaybackSettingsCard(title: "Auto-Pick") {
                     Toggle("Auto-pick Last Stream", isOn: $autoPickLastStream)
-                        .tint(Color.gray)
                     Toggle("Auto-pick Last Search Result", isOn: $autoPickLastSearchResult)
-                        .tint(Color.gray)
                 }
                 PlaybackSettingsCard(title: "Progress Tracking") {
                     HStack {
@@ -1597,7 +1561,6 @@ struct StreamingSettingsPage: View {
                             .monospacedDigit()
                     }
                     Slider(value: $watchedPercentage, in: 50...100, step: 5)
-                        .tint(Color.gray)
                     Text("Episodes are marked as watched once playback passes this percentage.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -1743,7 +1706,6 @@ struct LibrarySettingsPage: View {
 
     private func toggleRow(_ title: String, isOn: Binding<Bool>) -> some View {
         Toggle(title, isOn: isOn)
-            .tint(Color.gray)
             .padding(.vertical, 6)
     }
 }
@@ -1759,8 +1721,6 @@ struct DownloadsSettingsPage: View {
             Section("Downloads") {
                 Picker("Concurrent Downloads", selection: $maxConcurrentDownloads) {
                     Text("1").tag(1); Text("2").tag(2); Text("3").tag(3); Text("4").tag(4); Text("5").tag(5)
-                }.tint(Color.gray)
-                Toggle("Background Downloads", isOn: $backgroundDownloadsEnabled).tint(Color.gray)
             }
         }
         .navigationTitle("Downloads")
@@ -1888,9 +1848,7 @@ struct NotificationsSettingsPage: View {
         VStack(alignment: .leading, spacing: 14) {
             cardHeader("Types", systemImage: "checkmark.circle.fill")
             Toggle("Episode Reminders", isOn: $episodeReminders)
-                .tint(Color.gray)
             Toggle("Airing Notifications", isOn: $airingNotifications)
-                .tint(Color.gray)
             Text("Reminders fire before an episode airs. Requires an AniList account and a connected schedule.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -2056,7 +2014,6 @@ struct SearchSettingsPage: View {
         Form {
             Section("Search") {
                 Toggle("Use Default Extension Only", isOn: $useDefaultExtension)
-                    .tint(Color.gray)
                     .disabled(moduleManager.activeModule == nil)
             }
             Section {
@@ -4239,14 +4196,12 @@ struct TrackersSettingsPage: View {
                     Label("Sync", systemImage: "arrow.triangle.2.circlepath")
                         .font(.headline)
                     Toggle("Enable Sync", isOn: $enableSync)
-                        .tint(Color.gray)
                     Text("When on, your library changes (status, progress, score) are pushed to AniList and MyAnimeList automatically. Turn this off if you want to edit your library locally without affecting your online accounts. Both anime and manga entries are synced.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                     Divider().opacity(0.4)
                     Toggle("Auto Sync Ratings", isOn: $autoSyncRatings)
-                        .tint(Color.gray)
                     Text("After you finish an episode (or read the final chapter of a manga), prompts you to rate it and pushes that rating to your connected tracker. Disable if you'd rather rate things manually.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -4341,7 +4296,6 @@ struct PerformanceModeSettingsPage: View {
                         .font(.title2.bold())
 
                     Toggle("Performance Mode", isOn: $performanceModeEnabled)
-                        .tint(Color.gray)
                         .scaleEffect(1.2)
                         .frame(maxWidth: 220)
 
@@ -4395,7 +4349,6 @@ struct PerformanceModeSettingsPage: View {
                     Label("Advanced", systemImage: "bolt.fill")
                         .font(.headline)
                     Toggle("Skip AniList Traversal", isOn: $skipAniListTraversal)
-                        .tint(Color.gray)
                     // #128 — Rewritten in plain language: what the setting
                     // actually does, when it helps, and when it might miss
                     // data — without jargon.
