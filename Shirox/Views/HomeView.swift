@@ -1341,7 +1341,7 @@ struct ScheduleView: View {
                             .frame(width: 58, height: 72)
                             .background(
                                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .fill(isSelected ? Color.appAccent : Color.secondary.opacity(0.15))
+                                    .fill(isSelected ? Color.scheduleSelectedPill : Color.secondary.opacity(0.15))
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 14, style: .continuous)

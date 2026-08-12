@@ -134,6 +134,10 @@ extension Color {
         #endif
     }
 
+    static var scheduleSelectedPill: Color {
+        Color.red
+    }
+
     static var glowIntensity: Double {
         UserDefaults.standard.object(forKey: "glowIntensity") as? Double ?? 0.5
     }
