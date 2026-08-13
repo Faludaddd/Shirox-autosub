@@ -16,10 +16,10 @@ private func crNavDestination(_ target: ContinueReadingNavTarget) -> some View {
             item: SearchItem(title: mangaTitle, image: coverImage, href: mangaHref)
         )
         .onAppear {
-            // Select the correct module before the source page loads,
-            // matching how anime's View Details works.
-            if let module = ModuleManager.shared.modules.first(where: { $0.id == moduleId }) {
-                ModuleManager.shared.selectModule(module)
+            Task { @MainActor in
+                if let module = ModuleManager.shared.modules.first(where: { $0.id == moduleId }) {
+                    ModuleManager.shared.selectModule(module)
+                }
             }
         }
     case .anilist(let id):
