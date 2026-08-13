@@ -266,15 +266,6 @@ struct CachedAsyncImage: View {
             return loaded
         }
 
-        // 404 from an image CDN (e.g. cdn.anipixcdn.co) is an upstream issue —
-        // the image doesn't exist on the server. Downgrade from Error to Debug
-        // so it doesn't clutter the user's error log, and return nil so the
-        // placeholder stays. A retry won't help (the file is genuinely missing).
-        if httpStatus == 404 {
-            Logger.shared.log("[Image] 404 not found host=\(url.host ?? "?") path=\(url.path)", type: "Debug")
-            return nil
-        }
-
         guard let loaded = PlatformImage(data: data) else {
             let snippet = responseText.prefix(160).replacingOccurrences(of: "\n", with: " ")
             Logger.shared.log("[Image] decode failed status=\(httpStatus) host=\(url.host ?? "?") len=\(data.count) body=\(snippet)", type: "Error")
