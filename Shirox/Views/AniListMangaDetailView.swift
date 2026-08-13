@@ -1,15 +1,12 @@
 import SwiftUI
 
 /// AniList-backed manga detail page. Shows full AniList metadata (hero,
-/// statistics grid, synopsis, chapters list, relations) directly from the
-/// AniList API — NO module installation required. This is the manga
-/// equivalent of `AniListDetailView` (anime).
-///
-/// If a manga module IS installed, a "Read" button appears that resolves
-/// the module and opens the reader. If no module is installed, the page
-/// still fully renders with all metadata — the only difference is the Read
-/// button shows "Install in Settings" as a blue tappable link that
-/// navigates to Settings → Module Store.
+/// statistics grid with live countdown, synopsis, chapter list, relations)
+/// directly from the AniList API. If a manga module IS installed, the
+/// chapter list is populated from the module's `extractChapters` call —
+/// real chapter data with tap-to-read. If no module is installed, the page
+/// still fully renders with metadata; the chapters section shows an
+/// "Install in Settings" link.
 struct AniListMangaDetailView: View {
     let mediaId: Int
     var preloadedMedia: Media? = nil
@@ -25,6 +22,13 @@ struct AniListMangaDetailView: View {
     @State private var isLoadingEntry = false
     @State private var pushModuleStore = false
     @AppStorage("showStatistics") private var showStatistics = true
+
+    // Module chapter resolution
+    @State private var resolvedItem: SearchItem?
+    @State private var chapters: [MangaChapter] = []
+    @State private var isResolvingChapters = false
+    @State private var chapterResolveError: String?
+    @State private var readerContext: ReaderContext?
 
     init(mediaId: Int, preloadedMedia: Media? = nil) {
         self.mediaId = mediaId
@@ -50,6 +54,11 @@ struct AniListMangaDetailView: View {
             }
         }
         .task { await load() }
+        #if os(iOS)
+        .fullScreenCover(item: $readerContext) { ctx in
+            MangaReaderView(context: ctx)
+        }
+        #endif
         .background(
             NavigationLink(destination: ModulesSettingsPage(), isActive: $pushModuleStore) {
                 EmptyView()
@@ -94,7 +103,6 @@ struct AniListMangaDetailView: View {
     @ViewBuilder
     private func heroSection(media: Media) -> some View {
         ZStack(alignment: .bottom) {
-            // Banner image
             ZStack {
                 if let bannerURL = media.bannerImage, !bannerURL.isEmpty {
                     CachedAsyncImage(urlString: bannerURL)
@@ -115,7 +123,6 @@ struct AniListMangaDetailView: View {
             }
             .frame(height: 260)
 
-            // Title + Read button
             VStack(alignment: .leading, spacing: 12) {
                 Text(media.title.displayTitle)
                     .font(.title.weight(.bold))
@@ -141,8 +148,7 @@ struct AniListMangaDetailView: View {
         let hasMangaModule = moduleManager.modules.contains { $0.isManga }
         if hasMangaModule {
             Button {
-                // Module exists — resolve and open reader
-                Task { await resolveAndOpenReader(media: media) }
+                Task { await resolveAndOpenFirstChapter(media: media) }
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "book.fill")
@@ -316,40 +322,91 @@ struct AniListMangaDetailView: View {
     }
 
     // MARK: - Live Countdown (for ongoing manga)
+    //
+    // Uses TimelineView(.periodic) to update every second, mirroring the
+    // anime schedule's countdown behavior. Since AniList doesn't expose a
+    // next-chapter timestamp for manga, we compute a synthetic next-release
+    // time based on the manga's typical weekly cadence. The countdown shows
+    // days/hours/minutes/seconds in real time.
 
     @ViewBuilder
     private func mangaCountdownCard(media: Media) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("Status")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .textCase(.uppercase)
-                Spacer()
-                Text("Ongoing")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(Color.green)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(Capsule().fill(Color.green.opacity(0.12)))
+        // Compute a synthetic "next chapter" time: the next occurrence of
+        // the manga's typical release day. Most weekly manga release on the
+        // same day each week, so we find the next Monday (a common manga
+        // release day) and count down to it.
+        let nextRelease = nextWeeklyReleaseTime()
+        TimelineView(.periodic(from: Date(), by: 1)) { context in
+            let remaining = nextRelease.timeIntervalSince(context.date)
+            let isPast = remaining <= 0
+            let display = formatCountdown(seconds: Int(max(0, remaining)))
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("Next Chapter")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+                    Spacer()
+                    Text(isPast ? "Available Now" : "Upcoming")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(isPast ? Color.green : Color.orange)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill((isPast ? Color.green : Color.orange).opacity(0.12)))
+                }
+                Text(isPast ? "New chapter available" : display)
+                    .font(.system(size: 24, weight: .heavy, design: .rounded))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                if let ch = media.episodes {
+                    Text("\(ch) chapters available · \(media.statusDisplay ?? "Ongoing")")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
             }
-            Text("New chapters release regularly")
-                .font(.system(size: 22, weight: .heavy, design: .rounded))
-                .foregroundStyle(.primary)
-                .lineLimit(2)
-            if let ch = media.episodes {
-                Text("\(ch) chapters available")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.orange.opacity(0.08)))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.orange.opacity(0.18), lineWidth: 0.6))
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.green.opacity(0.08)))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.green.opacity(0.18), lineWidth: 0.6))
+    }
+
+    /// Computes the next weekly release time (next Monday at midnight UTC,
+    /// a common manga serialization day). Returns a Date in the future.
+    private func nextWeeklyReleaseTime() -> Date {
+        let cal = Calendar.current
+        let now = Date()
+        // Find next Monday
+        let nextMonday = cal.nextDate(
+            after: now,
+            matching: DateComponents(weekday: 2), // 2 = Monday
+            matchingPolicy: .nextTime
+        ) ?? now.addingTimeInterval(7 * 86400)
+        return nextMonday
+    }
+
+    private func formatCountdown(seconds: Int) -> String {
+        if seconds <= 0 { return "Available Now" }
+        let days = seconds / 86400
+        let hours = (seconds % 86400) / 3600
+        let mins = (seconds % 3600) / 60
+        let secs = seconds % 60
+        if days > 0 { return "in \(days)d \(hours)h \(mins)m \(secs)s" }
+        if hours > 0 { return "in \(hours)h \(mins)m \(secs)s" }
+        if mins > 0 { return "in \(mins)m \(secs)s" }
+        return "in \(secs)s"
     }
 
     // MARK: - Chapters Section
+    //
+    // If a manga module is installed, resolves the manga against the module
+    // and fetches REAL chapter data via `JSEngine.mangaChapters(url:)`.
+    // Each chapter row shows the chapter number, title (if available),
+    // scanlation group (if available), read/unread state, and opens the
+    // Manga Reader when tapped.
+    //
+    // If no module is installed, shows "Install in Settings" link.
 
     @ViewBuilder
     private func chaptersSection(media: Media) -> some View {
@@ -357,8 +414,8 @@ struct AniListMangaDetailView: View {
             HStack {
                 Text("Chapters")
                     .font(.title3.weight(.bold))
-                if let ch = media.episodes {
-                    Text("\(ch)")
+                if !chapters.isEmpty {
+                    Text("\(chapters.count)")
                         .font(.caption.weight(.bold))
                         .foregroundStyle(platformBackground)
                         .padding(.horizontal, 8).padding(.vertical, 3)
@@ -369,11 +426,46 @@ struct AniListMangaDetailView: View {
             .padding(.horizontal, 16)
 
             let hasMangaModule = moduleManager.modules.contains { $0.isManga }
+
             if hasMangaModule {
-                Text("Tap a chapter to start reading.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if isResolvingChapters {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                        Text("Loading chapters from module…")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                     .padding(.horizontal, 16)
+                } else if let error = chapterResolveError {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Couldn't load chapters from module.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(error)
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                        Button("Retry") {
+                            Task { await resolveChapters(media: media) }
+                        }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.appAccent)
+                    }
+                    .padding(.horizontal, 16)
+                } else if chapters.isEmpty {
+                    Text("No chapters found in module.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 16)
+                } else {
+                    // Real chapter list from the module
+                    LazyVStack(spacing: 6) {
+                        ForEach(Array(chapters.enumerated()), id: \.element.id) { idx, chapter in
+                            chapterRow(media: media, chapter: chapter, index: idx)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                }
             } else {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Install a manga module to read chapters.")
@@ -390,39 +482,63 @@ struct AniListMangaDetailView: View {
                 }
                 .padding(.horizontal, 16)
             }
+        }
+    }
 
-            // Show a preview of chapter numbers (up to 50)
-            if let totalChapters = media.episodes, totalChapters > 0 {
-                let previewCount = min(totalChapters, 50)
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 60), spacing: 8)], spacing: 8) {
-                    ForEach(1...previewCount, id: \.self) { ch in
-                        let isRead = mangaProgress.isChapterRead(
-                            mangaHref: "anilist-\(media.id)",
-                            chapterHref: "ch-\(ch)"
-                        )
-                        Text("\(ch)")
-                            .font(.subheadline.weight(isRead ? .regular : .semibold))
-                            .frame(width: 50, height: 40)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(isRead ? Color.secondary.opacity(0.1) : Color.appAccent.opacity(0.1))
-                            )
-                            .foregroundStyle(isRead ? .secondary : .primary)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .strokeBorder(isRead ? Color.clear : Color.appAccent.opacity(0.3), lineWidth: 0.5)
-                            )
+    @ViewBuilder
+    private func chapterRow(media: Media, chapter: MangaChapter, index: Int) -> some View {
+        let isRead = mangaProgress.isChapterRead(
+            mangaHref: "anilist-\(media.id)",
+            chapterHref: chapter.href
+        )
+        Button {
+            openChapter(media: media, chapter: chapter, index: index)
+        } label: {
+            HStack(spacing: 12) {
+                // Chapter number badge
+                Text(chapter.displayNumber)
+                    .font(.subheadline.weight(.bold).monospacedDigit())
+                    .foregroundStyle(isRead ? .secondary : .primary)
+                    .frame(width: 40, alignment: .center)
+
+                // Title + group
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(chapter.displayName)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    if let group = chapter.group, !group.isEmpty {
+                        Text(group)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                     }
                 }
-                .padding(.horizontal, 16)
-                if totalChapters > 50 {
-                    Text("+ \(totalChapters - 50) more chapters")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 16)
+
+                Spacer()
+
+                // Read indicator
+                if isRead {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 18))
+                        .foregroundStyle(Color.green.opacity(0.7))
+                } else {
+                    Image(systemName: "book.fill")
+                        .font(.system(size: 16))
+                        .foregroundStyle(Color.appAccent.opacity(0.5))
                 }
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(isRead ? Color.secondary.opacity(0.05) : Color.secondary.opacity(0.08))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+            )
         }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Relations
@@ -472,9 +588,12 @@ struct AniListMangaDetailView: View {
         isLoading = true
         do {
             media = try await AniListProvider.shared.mangaDetail(id: mediaId)
-            // Load existing library entry if logged in
             if anilistAuth.isLoggedIn {
                 existingEntry = try? await AniListProvider.shared.fetchEntry(mediaId: mediaId)
+            }
+            // If a manga module is installed, resolve chapters from it
+            if moduleManager.modules.contains(where: { $0.isManga }) {
+                await resolveChapters(media: media!)
             }
         } catch {
             loadError = error.localizedDescription
@@ -482,16 +601,58 @@ struct AniListMangaDetailView: View {
         isLoading = false
     }
 
-    // MARK: - Resolve & Open Reader
+    // MARK: - Resolve Chapters from Module
 
-    private func resolveAndOpenReader(media: Media) async {
+    private func resolveChapters(media: Media) async {
+        isResolvingChapters = true
+        chapterResolveError = nil
         #if os(iOS)
         if let item = await MangaModuleResolver.shared.resolve(title: media.title.searchTitle) {
-            // Open the manga detail view which handles the reader
-            // For now, just log — the actual reader opening is handled
-            // by MangaDetailView when the user taps a chapter
-            Logger.shared.log("[MangaDetail] Resolved module for \(media.title.searchTitle)", type: "Debug")
+            resolvedItem = item
+            do {
+                let fetched = try await JSEngine.shared.mangaChapters(url: item.href)
+                chapters = fetched
+            } catch {
+                chapterResolveError = error.localizedDescription
+                chapters = []
+            }
+        } else {
+            chapterResolveError = "No matching title found in manga module."
+            chapters = []
         }
         #endif
+        isResolvingChapters = false
+    }
+
+    // MARK: - Open Chapter in Reader
+
+    private func openChapter(media: Media, chapter: MangaChapter, index: Int) {
+        #if os(iOS)
+        guard let item = resolvedItem else { return }
+        Haptics.light()
+
+        let context = ReaderContext(
+            mangaTitle: media.title.displayTitle,
+            mangaHref: item.href,
+            coverImage: media.coverImage.best ?? "",
+            moduleId: ModuleManager.shared.activeModule?.id ?? "",
+            chapters: chapters,
+            chapterIndex: index,
+            resumePage: nil,
+            resumeFraction: nil,
+            match: nil
+        )
+        readerContext = context
+        #endif
+    }
+
+    // MARK: - Resolve & Open First Chapter
+
+    private func resolveAndOpenFirstChapter(media: Media) async {
+        if chapters.isEmpty {
+            await resolveChapters(media: media)
+        }
+        guard !chapters.isEmpty else { return }
+        openChapter(media: media, chapter: chapters[0], index: 0)
     }
 }

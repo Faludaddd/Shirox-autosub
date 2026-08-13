@@ -25,7 +25,7 @@ struct UpdateSettingsPage: View {
     /// Whether the app should look for updates automatically on launch / in the
     /// background. Lives in its own `update.` UserDefaults namespace so it never
     /// collides with anime/manga settings.
-    @AppStorage("update.autoCheck") private var autoCheck: Bool = true
+    @AppStorage("update.autoCheck") private var autoCheck: Bool = false
     /// How often (in minutes) the auto-check should run. Stored in minutes
     /// because that's the unit the stepper operates in; `AppUpdateManager`'s
     /// own `checkIntervalSeconds` remains the canonical value used by the
@@ -185,7 +185,11 @@ struct UpdateSettingsPage: View {
             .padding(.vertical, 13)
             .background(
                 RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .fill(Color.appAccent)
+                    .fill(Color.accentColor)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.15), lineWidth: 0.5)
             )
         }
         .buttonStyle(.plain)
