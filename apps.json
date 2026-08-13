@@ -32,7 +32,7 @@
           "date": "2026-08-13",
           "localizedDescription": "Fixed Downloads tab: tapping an in-progress or failed download now opens the anime's detail page instead of doing nothing. The offline episode list now shows all download states (downloading, pending, failed, completed) with the right badge on each row, so you can see at a glance what's still in progress. Batch downloads from the module detail page now correctly save the detail href so the offline detail view can re-enrich artwork and metadata later.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 10674004,
+          "size": 10715410,
           "minOSVersion": "15.0"
         },
         {
