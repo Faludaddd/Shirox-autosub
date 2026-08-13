@@ -9,6 +9,29 @@ enum LibrarySortOrder: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+/// Top-level mode for the Library tab. "Library" shows the user's tracked
+/// list (anime/manga). "History" shows the unified anime+manga activity feed.
+enum LibraryViewMode: String, CaseIterable, Identifiable {
+    case library
+    case history
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .library: return "Library"
+        case .history: return "History"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .library: return "books.vertical.fill"
+        case .history: return "clock.arrow.circlepath"
+        }
+    }
+}
+
 struct LibraryView: View {
     @StateObject private var vm = LibraryViewModel()
     @ObservedObject private var anilistAuth = AniListAuthManager.shared
@@ -53,6 +76,10 @@ struct LibraryView: View {
     #endif
 
     @AppStorage("libraryStatusOrder") private var statusOrderRaw: String = MediaListStatus.allCases.map(\.rawValue).joined(separator: ",")
+
+    /// Top-level Library tab mode: "Library" (the user's tracked list) or
+    /// "History" (the unified anime+manga activity feed). Defaults to Library.
+    @State private var libraryViewMode: LibraryViewMode = .library
 
     /// The provider type that should drive the library UI right now.
     /// Normally the primary provider; falls back to secondary when primary is down.
@@ -127,7 +154,13 @@ struct LibraryView: View {
         // the working SearchView pattern). Logged-out users default to the local source, so
         // there's always something to show; sign-in lives in the toolbar + Settings.
         NavigationStack {
-            libraryContent
+            Group {
+                if libraryViewMode == .history {
+                    LibraryHistoryView()
+                } else {
+                    libraryContent
+                }
+            }
         }
     }
 
@@ -295,6 +328,39 @@ struct LibraryView: View {
             Spacer()
         }
         .padding(.vertical, 8)
+    }
+
+    /// Top-level Library / History segment. Two capsule pills the user can
+    /// tap to switch between the tracked-list view and the activity-history
+    /// view. Matches the visual language of `mediaTypeSegment`.
+    @ViewBuilder private var viewModeSegment: some View {
+        HStack(spacing: 8) {
+            ForEach(LibraryViewMode.allCases) { mode in
+                let selected = libraryViewMode == mode
+                Button {
+                    Haptics.selection()
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        libraryViewMode = mode
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: mode.icon)
+                            .font(.system(size: 13, weight: .semibold))
+                            .frame(width: 16, height: 16)
+                        Text(mode.label)
+                            .font(.subheadline.weight(.semibold))
+                            .lineLimit(1)
+                    }
+                    .fixedSize(horizontal: true, vertical: false)
+                    .padding(.horizontal, 14).padding(.vertical, 8)
+                    .background(Capsule().fill(selected ? Color.primary.opacity(0.12) : Color.secondary.opacity(0.08)))
+                    .overlay(Capsule().strokeBorder(selected ? Color.primary.opacity(0.3) : Color.clear, lineWidth: 1))
+                    .foregroundStyle(selected ? Color.primary : .secondary)
+                }
+                .buttonStyle(.plain)
+            }
+            Spacer()
+        }
     }
 
     @ViewBuilder
@@ -640,6 +706,13 @@ struct LibraryView: View {
 
     private var libraryContentBase: some View {
         VStack(spacing: 0) {
+            // Top-level Library / History segment. Pinned at the top so it's
+            // always reachable regardless of scroll position.
+            viewModeSegment
+                .padding(.horizontal, 16)
+                .padding(.top, 6)
+                .padding(.bottom, 4)
+
             #if !os(iOS)
             LibrarySourceSwitcher(selected: vm.source) { vm.selectSource($0) }
                 .padding(.horizontal, 16)

@@ -649,6 +649,22 @@
 		73E828E8CEDC4F4FADE37960 /* AppModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 180EA8BB63D54E6BBFCE8E9A /* AppModeManager.swift */; };
 		BAAA0A4B15404C19805883A1 /* AppModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 180EA8BB63D54E6BBFCE8E9A /* AppModeManager.swift */; };
 		D9AE76341D1B4FF99675633F /* AppModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 180EA8BB63D54E6BBFCE8E9A /* AppModeManager.swift */; };
+		9B9E10BF51174701A886E01E /* AppUpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB80077A4D92485BBE75B22E /* AppUpdateManager.swift */; };
+		99B13F351A134812AD75DA49 /* AppUpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB80077A4D92485BBE75B22E /* AppUpdateManager.swift */; };
+		AF2335D043404C4E97C5932A /* AppUpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB80077A4D92485BBE75B22E /* AppUpdateManager.swift */; };
+		753C771E5776493EA7C838DF /* AppUpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB80077A4D92485BBE75B22E /* AppUpdateManager.swift */; };
+		D87FB5B29B0A4DE59A88A058 /* HistoryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A70A5ACBBFA0410391A8C9F6 /* HistoryManager.swift */; };
+		D847E8CD8DA6404781337E38 /* HistoryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A70A5ACBBFA0410391A8C9F6 /* HistoryManager.swift */; };
+		C2E5D4EA9DF6453B98F51FBA /* HistoryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A70A5ACBBFA0410391A8C9F6 /* HistoryManager.swift */; };
+		6463DD5F742F4F18BB4A3665 /* HistoryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A70A5ACBBFA0410391A8C9F6 /* HistoryManager.swift */; };
+		50A1F4F7258D49B0BD7460D2 /* UpdatePopupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D49C555B4254095BB55B993 /* UpdatePopupView.swift */; };
+		C9A3590B21B64B25B5304AF7 /* UpdatePopupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D49C555B4254095BB55B993 /* UpdatePopupView.swift */; };
+		7C4DB59480FD4A69B93F1D1E /* UpdatePopupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D49C555B4254095BB55B993 /* UpdatePopupView.swift */; };
+		404051D2676B4B82B5A868F8 /* UpdatePopupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D49C555B4254095BB55B993 /* UpdatePopupView.swift */; };
+		A85A090582534E02B19833B9 /* LibraryHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B7FE5D7DC524A62A71C54FB /* LibraryHistoryView.swift */; };
+		EB13BA31A6924FC499DBBB5B /* LibraryHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B7FE5D7DC524A62A71C54FB /* LibraryHistoryView.swift */; };
+		941EEFF3DBCD4FAC8BE6656D /* LibraryHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B7FE5D7DC524A62A71C54FB /* LibraryHistoryView.swift */; };
+		1D84E3B0273F4A46B71F2792 /* LibraryHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B7FE5D7DC524A62A71C54FB /* LibraryHistoryView.swift */; };
 
 /* End PBXBuildFile section */
 
@@ -901,6 +917,10 @@
 		4E540997BA864448B082B725 /* SettingsSearchIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSearchIndex.swift; sourceTree = "<group>"; };
 		9F913A366E28436E9B132B7B /* MangaHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MangaHomeView.swift; sourceTree = "<group>"; };
 		180EA8BB63D54E6BBFCE8E9A /* AppModeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModeManager.swift; sourceTree = "<group>"; };
+		BB80077A4D92485BBE75B22E /* AppUpdateManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdateManager.swift; sourceTree = "<group>"; };
+		A70A5ACBBFA0410391A8C9F6 /* HistoryManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryManager.swift; sourceTree = "<group>"; };
+		5D49C555B4254095BB55B993 /* UpdatePopupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdatePopupView.swift; sourceTree = "<group>"; };
+		2B7FE5D7DC524A62A71C54FB /* LibraryHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryHistoryView.swift; sourceTree = "<group>"; };
 
 /* End PBXFileReference section */
 
@@ -1072,6 +1092,8 @@
                                 08ACB6FE07C044C1B7F17A79 /* EpisodeNotificationManager.swift */,
                                 2EBB2ADA20A14B00AF5D265F /* WesternScheduleService.swift */,
 				180EA8BB63D54E6BBFCE8E9A /* AppModeManager.swift */,
+				BB80077A4D92485BBE75B22E /* AppUpdateManager.swift */,
+				A70A5ACBBFA0410391A8C9F6 /* HistoryManager.swift */,
                         );
                         path = Services;
                         sourceTree = "<group>";
@@ -1113,6 +1135,7 @@
                                 3D6742C550B97293CCFDC834 /* LibraryCollapsingHeader.swift */,
                                 A88804D3B352FD28723122E3 /* NotificationBadge.swift */,
                                 DE497D28BD37BD64210898B9 /* ManageCollectionsView.swift */,
+				2B7FE5D7DC524A62A71C54FB /* LibraryHistoryView.swift */,
                         );
                         path = Library;
                         sourceTree = "<group>";
@@ -1180,6 +1203,7 @@
                                 CB9A6134C59C4A32B8003889 /* Haptics.swift */,
                                 7B960C6896464EEC9886FA2B /* CustomRefreshControl.swift */,
 				4E540997BA864448B082B725 /* SettingsSearchIndex.swift */,
+				5D49C555B4254095BB55B993 /* UpdatePopupView.swift */,
                         );
                         path = Shared;
                         sourceTree = "<group>";
@@ -1549,6 +1573,10 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
 				01A20920D09146A29404813E /* SettingsSearchIndex.swift in Sources */,
 				AE5D7AE099454F4DBFFA1406 /* MangaHomeView.swift in Sources */,
 				D9AE76341D1B4FF99675633F /* AppModeManager.swift in Sources */,
+				753C771E5776493EA7C838DF /* AppUpdateManager.swift in Sources */,
+				6463DD5F742F4F18BB4A3665 /* HistoryManager.swift in Sources */,
+				404051D2676B4B82B5A868F8 /* UpdatePopupView.swift in Sources */,
+				1D84E3B0273F4A46B71F2792 /* LibraryHistoryView.swift in Sources */,
                         );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -1748,6 +1776,10 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
 				2E0E8A3882B1417499E1D5FA /* SettingsSearchIndex.swift in Sources */,
 				1CAC259234054464BCC1E60C /* MangaHomeView.swift in Sources */,
 				BAAA0A4B15404C19805883A1 /* AppModeManager.swift in Sources */,
+				AF2335D043404C4E97C5932A /* AppUpdateManager.swift in Sources */,
+				C2E5D4EA9DF6453B98F51FBA /* HistoryManager.swift in Sources */,
+				7C4DB59480FD4A69B93F1D1E /* UpdatePopupView.swift in Sources */,
+				941EEFF3DBCD4FAC8BE6656D /* LibraryHistoryView.swift in Sources */,
                         );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -1948,6 +1980,10 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
 				CE8BECC8DB5A46128FE0F71F /* SettingsSearchIndex.swift in Sources */,
 				49018AF1B1824E1BBB4FBF2F /* MangaHomeView.swift in Sources */,
 				73E828E8CEDC4F4FADE37960 /* AppModeManager.swift in Sources */,
+				99B13F351A134812AD75DA49 /* AppUpdateManager.swift in Sources */,
+				D847E8CD8DA6404781337E38 /* HistoryManager.swift in Sources */,
+				C9A3590B21B64B25B5304AF7 /* UpdatePopupView.swift in Sources */,
+				EB13BA31A6924FC499DBBB5B /* LibraryHistoryView.swift in Sources */,
                         );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -2148,6 +2184,10 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
 				9FC65E10AF3F4044AA31F0E7 /* SettingsSearchIndex.swift in Sources */,
 				9E2601C92E784D40961B5E9A /* MangaHomeView.swift in Sources */,
 				9EE290864CBC47F394FC0115 /* AppModeManager.swift in Sources */,
+				9B9E10BF51174701A886E01E /* AppUpdateManager.swift in Sources */,
+				D87FB5B29B0A4DE59A88A058 /* HistoryManager.swift in Sources */,
+				50A1F4F7258D49B0BD7460D2 /* UpdatePopupView.swift in Sources */,
+				A85A090582534E02B19833B9 /* LibraryHistoryView.swift in Sources */,
                         );
                         runOnlyForDeploymentPostprocessing = 0;
                 };

@@ -281,6 +281,16 @@ struct ShiroxApp: App {
                     ToastContainerView()
                 }
                 .task {
+                    // Update check — fire on launch, then periodically while
+                    // the app is active. Non-blocking (the popup only renders
+                    // when an update is actually available).
+                    await AppUpdateManager.shared.checkForUpdates()
+                    Task {
+                        while !Task.isCancelled {
+                            try? await Task.sleep(nanoseconds: 3_600_000_000_000) // 1 hour
+                            await AppUpdateManager.shared.checkForUpdates()
+                        }
+                    }
                     // #93 — Preload Schedule + Notifications in the background
                     // on launch. The fetches stay in `Task.detached` so a slow
                     // network never blocks app entry. The schedule fetch uses
@@ -304,7 +314,13 @@ struct ShiroxApp: App {
                     }
                 }
                 .onChange(of: scenePhase) { phase in
-                    if phase == .active { Task { await PendingWriteQueue.shared.flush() } }
+                    if phase == .active {
+                        Task { await PendingWriteQueue.shared.flush() }
+                        // Re-check for updates whenever the app returns to the
+                        // foreground, so an update published while the app was
+                        // backgrounded is surfaced promptly.
+                        Task { await AppUpdateManager.shared.checkForUpdates() }
+                    }
                 }
         }
         #if targetEnvironment(macCatalyst) || os(macOS)
@@ -403,6 +419,7 @@ private struct MacSidebarView: View {
 private struct RootTabView: View {
     @EnvironmentObject private var moduleManager: ModuleManager
     @ObservedObject private var cfManager = CloudflareBypassManager.shared
+    @ObservedObject private var updateManager = AppUpdateManager.shared
     #if os(iOS)
     @ObservedObject private var playerPresenter = PlayerPresenter.shared
     @ObservedObject private var quickActions = QuickActionManager.shared
@@ -567,6 +584,17 @@ private struct RootTabView: View {
                 CloudflareBypassWindowController.shared.show()
             } else {
                 CloudflareBypassWindowController.shared.hide()
+            }
+        }
+
+        // Update popup — presented when AppUpdateManager.shared.availableUpdate
+        // is non-nil. Forced (critical) updates are non-dismissible.
+        .sheet(item: Binding(
+            get: { updateManager.availableUpdate },
+            set: { if $0 == nil { updateManager.dismiss() } }
+        )) { info in
+            UpdatePopupView(info: info) {
+                updateManager.dismiss()
             }
         }
         #endif

@@ -84,11 +84,19 @@ import Combine
             return
         }
 
-        Logger.shared.log("[CW] save inprog: ep=\(item.episodeNumber) watched=\(item.watchedSeconds)/\(item.totalSeconds) title=\(item.mediaTitle)", type: "Debug")
+        Logger.shared.log("[CW] save inprog: ep=\(item.episodeNumber) watched=\(item.watchedSeconds)/\(item.totalSeconds) title=\(item.mediaTitle]", type: "Debug")
         newItems.insert(item, at: 0)
         if newItems.count > maxItems { newItems = Array(newItems.prefix(maxItems)) }
         items = newItems
         persist()
+        // Record in the unified History system so the Library tab's History
+        // section reflects this activity in real time.
+        HistoryManager.shared.recordAnimeActivity(
+            aniListID: item.aniListID,
+            mediaTitle: item.mediaTitle,
+            episodeNumber: item.episodeNumber,
+            coverImageURL: item.imageUrl.isEmpty ? nil : item.imageUrl
+        )
         Logger.shared.log("[CW] save done: items=\(items.map { "\($0.episodeNumber)\($0.streamUrl.isEmpty ? "P" : "I")" }.joined(separator: ",")) title=\(item.mediaTitle)", type: "Debug")
     }
 

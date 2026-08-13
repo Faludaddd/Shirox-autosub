@@ -46,6 +46,14 @@ import Combine
     func saveProgress(_ item: MangaReadingItem) {
         items = Self.upsert(item, into: items)
         persist()
+        // Record in the unified History system so the Library tab's History
+        // section reflects this activity in real time.
+        HistoryManager.shared.recordMangaActivity(
+            mangaHref: item.mangaHref,
+            mediaTitle: item.mangaTitle,
+            chapterNumber: item.chapterNumber,
+            coverImageURL: item.coverImage.isEmpty ? nil : item.coverImage
+        )
     }
 
     func markChapterRead(mangaHref: String, chapterHref: String) {
