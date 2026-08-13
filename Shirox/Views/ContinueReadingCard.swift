@@ -43,7 +43,7 @@ struct ContinueReadingSection: View {
                             } label: {
                                 Label("View Details", systemImage: "info.circle")
                             }
-                            if let aniListId = MangaMatchManager.shared.cachedMatch(mangaHref: item.mangaHref)?.aniListId {
+                            if let aniListId = MangaMatchManager.shared.cachedMatch(mangaHref: item.mangaHref)?.aniListID {
                                 Button {
                                     #if os(iOS)
                                     if let url = URL(string: "https://anilist.co/manga/\(aniListId)") {
