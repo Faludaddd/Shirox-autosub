@@ -1167,36 +1167,15 @@ struct ScheduleView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if appMode.mode == .reading {
-                    mangaScheduleContent
-                } else {
-                    animeScheduleContent
-                }
-            }
+            scheduleGroup
             #if os(iOS)
             .background(Color(.systemBackground))
             #endif
             .navigationTitle(appMode.mode == .reading ? "Releases" : "Schedule")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar { scheduleToolbar }
             #endif
-            .toolbar {
-                // Only show the anime schedule settings gear in Anime Mode.
-                // Reading Mode's schedule is a simpler release feed and has
-                // no settings to configure.
-                if appMode.mode == .anime {
-                    ToolbarItem(placement: .primaryAction) {
-                        NavigationLink {
-                            ScheduleSettingsPage()
-                        } label: {
-                            Image(systemName: "gearshape")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundStyle(.primary)
-                        }
-                    }
-                }
-            }
             .navigationDestinationCompat(item: $detailEntry) { entry in
                 ScheduleDetailView(
                     entry: entry,
@@ -1205,30 +1184,44 @@ struct ScheduleView: View {
                     onToggleNotification: { toggleNotification(for: entry) }
                 )
             }
-            .task {
-                if appMode.mode == .reading {
-                    await loadMangaReleases()
-                } else {
-                    await load()
-                }
-            }
-            .refreshable {
-                if appMode.mode == .reading {
-                    await loadMangaReleases()
-                } else {
-                    await load()
-                }
-            }
+            .task { await scheduleLoad() }
+            .refreshable { await scheduleLoad() }
             .onChange(of: mode) { _ in Task { await load() } }
             .onChange(of: windowDays) { _ in Task { await load() } }
             .onChange(of: useUTC) { _ in resetCalendarToToday() }
-            .onChange(of: appMode.mode) { newMode in
-                if newMode == .reading {
-                    Task { await loadMangaReleases() }
-                } else {
-                    Task { await load() }
+            .onChange(of: appMode.mode) { _ in Task { await scheduleLoad() } }
+        }
+    }
+
+    @ViewBuilder
+    private var scheduleGroup: some View {
+        if appMode.mode == .reading {
+            mangaScheduleContent
+        } else {
+            animeScheduleContent
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var scheduleToolbar: some ToolbarContent {
+        if appMode.mode == .anime {
+            ToolbarItem(placement: .primaryAction) {
+                NavigationLink {
+                    ScheduleSettingsPage()
+                } label: {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(.primary)
                 }
             }
+        }
+    }
+
+    private func scheduleLoad() async {
+        if appMode.mode == .reading {
+            await loadMangaReleases()
+        } else {
+            await load()
         }
     }
 
