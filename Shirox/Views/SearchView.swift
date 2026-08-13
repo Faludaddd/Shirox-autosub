@@ -236,8 +236,6 @@ struct SearchView: View {
                     .multilineTextAlignment(.center)
             }
             Toggle("Add subtitle file", isOn: $addSubtitleUpFront)
-                // Issue #10 — Use the global Liquid Glass toggle (no explicit
-                // .toggleStyle needed — GlowingToggleStyle is applied globally).
                 .fixedSize()
                 .disabled(!needsVideoStep)   // locked once a video is staged; clear it to change
                 .onChangeOf(addSubtitleUpFront) { _ in clearStagedVideo() }

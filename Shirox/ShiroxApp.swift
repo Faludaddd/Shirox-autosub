@@ -152,113 +152,19 @@ extension Color {
     }
 }
 
-// MARK: - Liquid Glass Toggle Style (#123 correction)
-//
-// #123 correction — The previous `GlowingToggleStyle` used a solid gray
-// capsule fill. The user requested the alternate Liquid Glass treatment: a
-// frosted translucent capsule (`.ultraThinMaterial`) that matches the app's
-// glass material language (toast system, sheets, tab bar). The thumb is a
-// white circle with a subtle shadow. When ON, the capsule tints with the
-// accent color at low opacity so the glass effect is preserved but the state
-// is clearly readable. Glow is gated by `Color.glowEnabled` /
-// `Color.glowIntensity` as before.
-struct GlowingToggleStyle: ToggleStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack {
-            configuration.label
-            Spacer()
-            DraggableGlassToggle(isOn: configuration.isOn) {
-                configuration.isOn.toggle()
-                Haptics.light()
-            } onChange: { newValue in
-                configuration.isOn = newValue
-                Haptics.light()
-            }
-        }
-    }
-}
+// MARK: - Hex Color Extension
 
-/// Draggable Liquid Glass toggle. The thumb follows the finger during a
-/// drag gesture and snaps to the nearest end on release. Tap toggles
-/// instantly. Uses spring animation for smooth, physics-based movement.
-private struct DraggableGlassToggle: View {
-    let isOn: Bool
-    let onTap: () -> Void
-    let onChange: (Bool) -> Void
-
-    @State private var dragOffset: CGFloat = 0
-    @State private var isDragging = false
-
-    private let capsuleWidth: CGFloat = 60
-    private let capsuleHeight: CGFloat = 34
-    private let thumbSize: CGFloat = 28
-    private let thumbTravel: CGFloat = 24 // distance between off and on positions
-
-    private var thumbX: CGFloat {
-        let base: CGFloat = isOn ? thumbTravel : -thumbTravel
-        if isDragging {
-            return base + dragOffset
-        }
-        return base
-    }
-
-    var body: some View {
-        ZStack {
-            // Liquid Glass capsule
-            Capsule()
-                .fill(.ultraThinMaterial)
-                .frame(width: capsuleWidth, height: capsuleHeight)
-                .overlay(
-                    Capsule()
-                        .fill(isOn ? Color.appAccent.opacity(0.25) : Color.secondary.opacity(0.1))
-                )
-                .overlay(
-                    Capsule()
-                        .strokeBorder(
-                            isOn ? Color.appAccent.opacity(0.4) : Color.secondary.opacity(0.2),
-                            lineWidth: 0.5
-                        )
-                )
-                .shadow(
-                    color: isOn && Color.glowEnabled
-                        ? Color.appAccent.opacity(Color.glowIntensity * 0.6) : .clear,
-                    radius: isOn && Color.glowEnabled
-                        ? CGFloat(18 * Color.glowIntensity) : 0
-                )
-
-            // Thumb
-            Circle()
-                .fill(Color.white)
-                .frame(width: thumbSize, height: thumbSize)
-                .shadow(color: .black.opacity(0.15), radius: 2, x: 0, y: 1)
-                .offset(x: isDragging ? thumbX : (isOn ? thumbTravel : -thumbTravel))
-                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isDragging ? false : isOn)
-        }
-        .gesture(
-            DragGesture(minimumDistance: 1)
-                .onChanged { value in
-                    isDragging = true
-                    dragOffset = value.translation.width
-                }
-                .onEnded { value in
-                    let base: CGFloat = isOn ? thumbTravel : -thumbTravel
-                    let final = base + value.translation.width
-                    // Snap to nearest end
-                    let shouldTurnOn = final > 0
-                    if shouldTurnOn != isOn {
-                        onChange(shouldTurnOn)
-                    }
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                        dragOffset = 0
-                        isDragging = false
-                    }
-                }
-        )
-        .onTapGesture {
-            if !isDragging {
-                onTap()
-            }
-        }
+extension UIColor {
+    /// Initializes a UIColor from a hex string (e.g. "#FF6B6B" or "FF6B6B").
+    /// Returns nil for invalid input.
+    convenience init?(hex: String) {
+        var cleaned = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        if cleaned.hasPrefix("#") { cleaned.removeFirst() }
+        guard cleaned.count == 6, let value = UInt32(cleaned, radix: 16) else { return nil }
+        let r = CGFloat((value >> 16) & 0xFF) / 255.0
+        let g = CGFloat((value >> 8) & 0xFF) / 255.0
+        let b = CGFloat(value & 0xFF) / 255.0
+        self.init(red: r, green: g, blue: b, alpha: 1.0)
     }
 }
 
@@ -318,7 +224,6 @@ struct ShiroxApp: App {
             RootTabView()
                 .environmentObject(moduleManager)
                 .tint(accentColor)
-                .toggleStyle(GlowingToggleStyle())
                 .preferredColorScheme(colorScheme)
                 // Requirement #2 — Appearance changes must NOT reset navigation
                 // or rebuild the view tree. The previous `.id(...)` modifier
