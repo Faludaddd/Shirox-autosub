@@ -185,52 +185,78 @@ struct MangaDetailView: View {
         }
         .adaptiveSheet(isPresented: $showAniListEdit) {
             if let aid = mangaAniListID, let detail = vm.detail {
-                LibraryEntryEditSheet(
-                    entry: existingAniListEntry,
-                    media: editorMedia(provider: .anilist, id: aid, detail: detail),
-                    progressUnit: "chapter",
-                    onSave: { status, progress, score in
-                        Task {
-                            try? await AniListLibraryService.shared.updateEntry(
-                                mediaId: aid, status: status, progress: progress, score: score, type: .manga)
-                            if let raw = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid, type: .manga) {
-                                existingAniListEntry = AniListProvider.shared.mapEntry(raw)
-                            }
-                        }
-                    },
-                    onDelete: existingAniListEntry != nil ? {
-                        if let entryId = existingAniListEntry?.id {
-                            existingAniListEntry = nil
-                            Task { try? await AniListLibraryService.shared.deleteEntry(entryId: entryId) }
-                        }
-                    } : nil)
-                .adaptivePresentationDetents([.medium, .large])
+                aniListEditSheet(aid: aid, detail: detail)
             }
         }
         .adaptiveSheet(isPresented: $showMALEdit) {
             if let mid = mangaMALID, let detail = vm.detail {
-                LibraryEntryEditSheet(
-                    entry: existingMALEntry,
-                    media: editorMedia(provider: .mal, id: mid, detail: detail),
-                    progressUnit: "chapter",
-                    onSave: { status, progress, score in
-                        Task {
-                            try? await MALMangaLibraryService.shared.updateEntry(
-                                malId: mid, status: status, progress: progress, score: score)
-                            if let entry = try? await MALMangaLibraryService.shared.fetchEntry(malId: mid) {
-                                existingMALEntry = MALMangaLibraryService.libraryEntry(
-                                    from: entry, media: editorMedia(provider: .mal, id: mid, detail: detail))
-                            }
-                        }
-                    },
-                    onDelete: existingMALEntry != nil ? {
-                        existingMALEntry = nil
-                        Task { try? await MALMangaLibraryService.shared.deleteEntry(malId: mid) }
-                    } : nil)
-                .adaptivePresentationDetents([.medium, .large])
+                malEditSheet(mid: mid, detail: detail)
             }
         }
         #endif
+    }
+
+    // MARK: - Edit sheets (extracted to keep type-checker happy)
+
+    @ViewBuilder
+    private func aniListEditSheet(aid: Int, detail: MangaDetail) -> some View {
+        LibraryEntryEditSheet(
+            entry: existingAniListEntry,
+            media: editorMedia(provider: .anilist, id: aid, detail: detail),
+            progressUnit: "chapter",
+            onSave: { status, progress, score in
+                Task {
+                    try? await AniListLibraryService.shared.updateEntry(
+                        mediaId: aid, status: status, progress: progress, score: score, type: .manga)
+                    if let raw = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid, type: .manga) {
+                        existingAniListEntry = AniListProvider.shared.mapEntry(raw)
+                    }
+                }
+            },
+            onTogglePrivate: { newValue in
+                Task {
+                    try? await AniListLibraryService.shared.updateEntry(
+                        mediaId: aid,
+                        status: existingAniListEntry?.status ?? .current,
+                        progress: existingAniListEntry?.progress ?? 0,
+                        score: existingAniListEntry?.score ?? 0,
+                        type: .manga, isPrivate: newValue)
+                }
+            },
+            onDelete: existingAniListEntry != nil ? {
+                if let entryId = existingAniListEntry?.id {
+                    existingAniListEntry = nil
+                    Task { try? await AniListLibraryService.shared.deleteEntry(entryId: entryId) }
+                }
+            } : nil)
+        .adaptivePresentationDetents([.medium, .large])
+    }
+
+    @ViewBuilder
+    private func malEditSheet(mid: Int, detail: MangaDetail) -> some View {
+        LibraryEntryEditSheet(
+            entry: existingMALEntry,
+            media: editorMedia(provider: .mal, id: mid, detail: detail),
+            progressUnit: "chapter",
+            onSave: { status, progress, score in
+                Task {
+                    try? await MALMangaLibraryService.shared.updateEntry(
+                        malId: mid, status: status, progress: progress, score: score)
+                    if let entry = try? await MALMangaLibraryService.shared.fetchEntry(malId: mid) {
+                        existingMALEntry = MALMangaLibraryService.libraryEntry(
+                            from: entry, media: editorMedia(provider: .mal, id: mid, detail: detail))
+                    }
+                }
+            },
+            onTogglePrivate: { newValue in
+                // MAL API has no private field — store in-app only.
+                existingMALEntry?.isPrivate = newValue
+            },
+            onDelete: existingMALEntry != nil ? {
+                existingMALEntry = nil
+                Task { try? await MALMangaLibraryService.shared.deleteEntry(malId: mid) }
+            } : nil)
+        .adaptivePresentationDetents([.medium, .large])
     }
 
     // MARK: - Tracking match
@@ -262,9 +288,12 @@ struct MangaDetailView: View {
                     if !synopsis.isEmpty {
                         synopsisSection(text: synopsis).padding(.top, 16)
                     }
-                    // Statistics section removed from the provider source page.
-                    // Statistics are hosted exclusively on the dedicated
-                    // internal AniList manga details page (AniListMangaDetailView).
+                    // Statistics section: shown only when opened from the
+                    // AniList manga detail page (aniListMedia != nil).
+                    if let media = aniListMedia, showStatistics {
+                        statisticsSection(media: media)
+                            .padding(.top, 4)
+                    }
                     #if os(iOS)
                     readButton(detail)
                         .padding(.horizontal, 16)

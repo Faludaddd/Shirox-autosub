@@ -109,40 +109,11 @@ struct DownloadsView: View {
 
     // MARK: - Body
 
-    /// Builds a DetailView destination for any DownloadItem — used by in-progress,
-    /// failed, and completed rows so tapping any of them opens the anime's detail
-    /// page. Uses the snapshot from the store when available; otherwise backfills a
-    /// minimal snapshot from the DownloadItem's own fields so the DetailView always
-    /// has something to render offline.
+    /// Builds a DownloadDetailView for any DownloadItem — the custom download
+    /// manager detail with circular progress ring, ETA, speed, and Find File.
     @ViewBuilder
-    private func detailDestination(for item: DownloadItem) -> some View {
-        let moduleId = item.moduleId ?? ""
-        let snap = DownloadedMediaSnapshotStore.shared
-            .snapshot(mediaTitle: item.mediaTitle, moduleId: moduleId)
-            ?? DownloadedMediaSnapshotStore.shared.backfill(
-                mediaTitle: item.mediaTitle,
-                moduleId: moduleId,
-                items: [item]
-            )
-        let posterURLString: String = snap.posterFile
-            .map { DownloadedMediaSnapshotStore.shared.localFileURL(in: snap, relative: $0).absoluteString }
-            ?? item.imageUrl
-        let detailHref = item.detailHref ?? ""
-        DetailView(
-            item: SearchItem(title: snap.mediaTitle, image: posterURLString, href: detailHref),
-            offlineSnapshot: snap,
-            moduleId: moduleId,
-            aniListID: snap.aniListID
-        )
-        .task {
-            // One-shot auto-upgrade for snapshots written by the pre-v2 enrichment
-            // pipeline. Fire-and-forget — the view renders whatever's on disk now and
-            // re-renders when the upgrade persists.
-            if snap.schemaVersion < DownloadedMediaSnapshot.currentSchemaVersion {
-                await DownloadedMediaSnapshotStore.shared
-                    .reenrichIfStale(mediaKey: snap.mediaKey)
-            }
-        }
+    private func downloadDetailDestination(for item: DownloadItem) -> some View {
+        DownloadDetailView(item: item)
     }
 
     var body: some View {
@@ -162,7 +133,7 @@ struct DownloadsView: View {
                             Section("Downloading") {
                                 ForEach(inProgress) { item in
                                     NavigationLink {
-                                        detailDestination(for: item)
+                                        downloadDetailDestination(for: item)
                                     } label: {
                                         DownloadProgressRow(item: item)
                                     }
@@ -233,7 +204,7 @@ struct DownloadsView: View {
                             Section("Failed") {
                                 ForEach(failed) { item in
                                     NavigationLink {
-                                        detailDestination(for: item)
+                                        downloadDetailDestination(for: item)
                                     } label: {
                                         DownloadProgressRow(item: item)
                                     }
@@ -382,6 +353,12 @@ private struct DownloadProgressRow: View {
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                             .fixedSize(horizontal: true, vertical: false)
+                    }
+                    if item.speedFormatted != "--" {
+                        Text("\(item.speedFormatted) · \(item.etaFormatted) left")
+                            .font(.system(size: 9, weight: .medium, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
                 case .pending:
                     Text("Waiting…")

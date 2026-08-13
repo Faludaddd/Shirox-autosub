@@ -55,6 +55,8 @@ final class DownloadManager: NSObject, ObservableObject {
     private let hlsDownloader = HLSDownloader()
     private var hlsTasks: [UUID: Task<Void, Never>] = [:]
     private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
+    /// Per-task speed smoothing state for exponential moving average.
+    private var speedState: [Int: (lastBytes: Int64, lastTime: Date, smoothedSpeed: Double)] = [:]
     private var backgroundCompletionHandler: (() -> Void)?
     private var isBackgrounded = false
     private static let keepAliveReason = "hls-downloads"
@@ -814,6 +816,8 @@ final class DownloadManager: NSObject, ObservableObject {
             items[idx].progress = 1.0
             items[idx].fileName = fileName
             items[idx].completedAt = Date()
+            items[idx].bytesPerSecond = nil
+            if let taskKey = items[idx].taskIdentifier { speedState.removeValue(forKey: taskKey) }
             persist()
 
             let appState = UIApplication.shared.applicationState
@@ -956,6 +960,25 @@ extension DownloadManager: URLSessionDownloadDelegate {
                 if totalBytesExpectedToWrite > 0 {
                     let p = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
                     items[idx].progress = p
+                    items[idx].bytesReceived = totalBytesWritten
+                    items[idx].totalBytes = totalBytesExpectedToWrite
+
+                    // Exponential moving average speed (alpha = 0.3).
+                    let now = Date()
+                    let taskKey = downloadTask.taskIdentifier
+                    let prev = speedState[taskKey]
+                    if let prev = prev, now.timeIntervalSince(prev.lastTime) > 0 {
+                        let dt = now.timeIntervalSince(prev.lastTime)
+                        let instantSpeed = Double(totalBytesWritten - prev.lastBytes) / dt
+                        let alpha = 0.3
+                        let smoothed = prev.smoothedSpeed == 0
+                            ? instantSpeed
+                            : (alpha * instantSpeed + (1 - alpha) * prev.smoothedSpeed)
+                        speedState[taskKey] = (totalBytesWritten, now, smoothed)
+                        items[idx].bytesPerSecond = smoothed
+                    } else if prev == nil {
+                        speedState[taskKey] = (totalBytesWritten, now, 0)
+                    }
                     objectWillChange.send()
                 }
             }
