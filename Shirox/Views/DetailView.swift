@@ -336,6 +336,7 @@ struct DetailView: View {
                     imageUrl: detail.image,
                     aniListID: vm.aniListID,
                     moduleId: ModuleManager.shared.activeModule?.id,
+                    detailHref: vm.detailHref ?? item.href,
                     episodes: detail.episodes,
                     episodeNumbers: Array(selectedEpisodeNumbers).sorted(),
                     onDismiss: {
@@ -1570,17 +1571,27 @@ struct DetailView: View {
         let dm = DownloadManager.shared
         let store = DownloadedMediaSnapshotStore.shared
 
-        let completed = dm.items
-            .filter { $0.mediaTitle == snapshot.mediaTitle && $0.moduleId == snapshot.moduleId && $0.state == .completed }
+        // Show EVERY download item for this media — in-progress, completed, and
+        // failed — so the user can see the full state of their downloads in one
+        // place. Previously only `.completed` items rendered here, which meant
+        // opening the DetailView from the Downloads tab while an episode was still
+        // downloading showed an empty "No downloaded episodes left" state — even
+        // though the episode was right there in the Downloads list actively
+        // downloading. Tapping such an episode does nothing (it can't play yet),
+        // but the row's state badge (spinner / red exclamation / blue checkmark)
+        // is what tells the user what's going on.
+        let allItems = dm.items
+            .filter { $0.mediaTitle == snapshot.mediaTitle && $0.moduleId == snapshot.moduleId }
             .sorted { $0.episodeNumber < $1.episodeNumber }
-        let sorted = isReversed ? completed.reversed() : completed
+        let sorted = isReversed ? allItems.reversed() : allItems
+        let completedCount = allItems.filter { $0.state == .completed }.count
 
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center) {
                 HStack(spacing: 8) {
                     Text("Downloaded Episodes").font(.title3.weight(.bold))
                         .lineLimit(1)
-                    Text("\(completed.count)")
+                    Text("\(completedCount)")
                         .font(.caption.weight(.bold))
                         .foregroundStyle(platformBackground)
                         .padding(.horizontal, 8).padding(.vertical, 3)
@@ -1621,15 +1632,17 @@ struct DetailView: View {
             .padding(.top, 12)
 
             // Selection bar — visible only when selection mode is on. Lets the user batch-
-            // delete downloaded episodes.
+            // delete downloaded episodes. Only completed items are selectable — cancelling
+            // an in-progress download is a swipe action on its row, not a batch operation.
             if isSelectionMode && !sorted.isEmpty {
-                let allSelected = sorted.allSatisfy { selectedEpisodeNumbers.contains($0.episodeNumber) }
+                let selectable = sorted.filter { $0.state == .completed }
+                let allSelected = selectable.allSatisfy { selectedEpisodeNumbers.contains($0.episodeNumber) }
                 HStack(spacing: 8) {
                     Button(allSelected ? "Deselect All" : "Select All") {
                         if allSelected {
-                            sorted.forEach { selectedEpisodeNumbers.remove($0.episodeNumber) }
+                            selectable.forEach { selectedEpisodeNumbers.remove($0.episodeNumber) }
                         } else {
-                            sorted.forEach { selectedEpisodeNumbers.insert($0.episodeNumber) }
+                            selectable.forEach { selectedEpisodeNumbers.insert($0.episodeNumber) }
                         }
                     }
                     .font(.subheadline.weight(.bold))
@@ -1641,7 +1654,7 @@ struct DetailView: View {
 
                     Spacer()
 
-                    let selectedItems = sorted.filter { selectedEpisodeNumbers.contains($0.episodeNumber) }
+                    let selectedItems = selectable.filter { selectedEpisodeNumbers.contains($0.episodeNumber) }
                     if !selectedItems.isEmpty {
                         Button(role: .destructive) {
                             for it in selectedItems {
@@ -1662,7 +1675,7 @@ struct DetailView: View {
                 .padding(.top, 4)
             }
 
-            if completed.isEmpty {
+            if allItems.isEmpty {
                 VStack(spacing: 12) {
                     Image(systemName: "folder.badge.minus").font(.system(size: 48)).foregroundStyle(.secondary)
                     Text("No downloaded episodes left").font(.headline).foregroundStyle(.secondary)
@@ -1679,6 +1692,13 @@ struct DetailView: View {
                         let displayTitle = epSnap?.title ?? downloadItem.episodeTitle
                         let progressValue: Double? = offlineProgress(for: epNum, href: downloadItem.episodeHref, snapshot: snapshot)
                         let isSel = selectedEpisodeNumbers.contains(epNum)
+                        // Pass the actual download state so the row renders the right
+                        // badge: blue checkmark (completed), spinner (downloading),
+                        // hourglass (pending), red exclamation (failed).
+                        let rowState: DownloadState = downloadItem.state
+                        // Only completed episodes are tappable to play. For non-completed
+                        // items, tapping does nothing — the state badge tells the user why.
+                        let canPlay = downloadItem.state == .completed
 
                         ThumbnailEpisodeRow(
                             number: epNum,
@@ -1687,12 +1707,14 @@ struct DetailView: View {
                             progress: progressValue,
                             onTap: {
                                 if isSelectionMode {
+                                    // Only completed items can be selected for batch delete.
+                                    guard downloadItem.state == .completed else { return }
                                     if selectedEpisodeNumbers.contains(epNum) {
                                         selectedEpisodeNumbers.remove(epNum)
                                     } else {
                                         selectedEpisodeNumbers.insert(epNum)
                                     }
-                                } else {
+                                } else if canPlay {
                                     playDownloaded(downloadItem)
                                 }
                             },
@@ -1709,7 +1731,7 @@ struct DetailView: View {
                             },
                             isSelectionMode: isSelectionMode,
                             isSelected: isSel,
-                            downloadState: .completed
+                            downloadState: rowState
                         )
                     }
                 }

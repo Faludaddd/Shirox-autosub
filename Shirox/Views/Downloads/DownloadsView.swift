@@ -109,6 +109,42 @@ struct DownloadsView: View {
 
     // MARK: - Body
 
+    /// Builds a DetailView destination for any DownloadItem — used by in-progress,
+    /// failed, and completed rows so tapping any of them opens the anime's detail
+    /// page. Uses the snapshot from the store when available; otherwise backfills a
+    /// minimal snapshot from the DownloadItem's own fields so the DetailView always
+    /// has something to render offline.
+    @ViewBuilder
+    private func detailDestination(for item: DownloadItem) -> some View {
+        let moduleId = item.moduleId ?? ""
+        let snap = DownloadedMediaSnapshotStore.shared
+            .snapshot(mediaTitle: item.mediaTitle, moduleId: moduleId)
+            ?? DownloadedMediaSnapshotStore.shared.backfill(
+                mediaTitle: item.mediaTitle,
+                moduleId: moduleId,
+                items: [item]
+            )
+        let posterURLString: String = snap.posterFile
+            .map { DownloadedMediaSnapshotStore.shared.localFileURL(in: snap, relative: $0).absoluteString }
+            ?? item.imageUrl
+        let detailHref = item.detailHref ?? ""
+        DetailView(
+            item: SearchItem(title: snap.mediaTitle, image: posterURLString, href: detailHref),
+            offlineSnapshot: snap,
+            moduleId: moduleId,
+            aniListID: snap.aniListID
+        )
+        .task {
+            // One-shot auto-upgrade for snapshots written by the pre-v2 enrichment
+            // pipeline. Fire-and-forget — the view renders whatever's on disk now and
+            // re-renders when the upgrade persists.
+            if snap.schemaVersion < DownloadedMediaSnapshot.currentSchemaVersion {
+                await DownloadedMediaSnapshotStore.shared
+                    .reenrichIfStale(mediaKey: snap.mediaKey)
+            }
+        }
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -120,17 +156,23 @@ struct DownloadsView: View {
                     )
                 } else {
                     List {
-                        // Downloading / Pending
+                        // Downloading / Pending — tappable so the user can jump into the
+                        // anime's detail page to see all downloads for it in one place.
                         if !inProgress.isEmpty {
                             Section("Downloading") {
                                 ForEach(inProgress) { item in
-                                    DownloadProgressRow(item: item)
-                                        .swipeActions(edge: .trailing) {
-                                            Button(role: .destructive) { dm.remove(item) } label: {
-                                                Label("Cancel", systemImage: "xmark")
-                                            }
-                                            .tint(.red)
+                                    NavigationLink {
+                                        detailDestination(for: item)
+                                    } label: {
+                                        DownloadProgressRow(item: item)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .swipeActions(edge: .trailing) {
+                                        Button(role: .destructive) { dm.remove(item) } label: {
+                                            Label("Cancel", systemImage: "xmark")
                                         }
+                                        .tint(.red)
+                                    }
                                 }
                             }
                         }
@@ -174,6 +216,7 @@ struct DownloadsView: View {
                                             count: mediaGroup.items.count
                                         )
                                     }
+                                    .buttonStyle(.plain)
                                 }
                             } header: {
                                 ModuleSectionHeader(
@@ -184,17 +227,23 @@ struct DownloadsView: View {
                             }
                         }
 
-                        // Failed
+                        // Failed — also tappable so the user can retry from the detail
+                        // page or inspect what failed.
                         if !failed.isEmpty {
                             Section("Failed") {
                                 ForEach(failed) { item in
-                                    DownloadProgressRow(item: item)
-                                        .swipeActions(edge: .trailing) {
-                                            Button(role: .destructive) { dm.remove(item) } label: {
-                                                Label("Delete", systemImage: "trash")
-                                            }
-                                            .tint(.red)
+                                    NavigationLink {
+                                        detailDestination(for: item)
+                                    } label: {
+                                        DownloadProgressRow(item: item)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .swipeActions(edge: .trailing) {
+                                        Button(role: .destructive) { dm.remove(item) } label: {
+                                            Label("Delete", systemImage: "trash")
                                         }
+                                        .tint(.red)
+                                    }
                                 }
                             }
                         }

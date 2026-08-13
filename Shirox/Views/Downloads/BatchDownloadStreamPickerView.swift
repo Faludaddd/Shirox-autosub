@@ -8,6 +8,7 @@ struct BatchDownloadStreamPickerView: View {
     let imageUrl: String
     var aniListID: Int? = nil
     let moduleId: String?
+    var detailHref: String? = nil
     let episodes: [EpisodeLink]  // full EpisodeLink list so we can match by number
     let episodeNumbers: [Int]    // the selected subset to download
     let onDismiss: () -> Void
@@ -129,7 +130,7 @@ struct BatchDownloadStreamPickerView: View {
             imageUrl: imageUrl,
             aniListID: aniListID,
             moduleId: moduleId,
-            detailHref: nil,
+            detailHref: detailHref,
             episodes: episodes,
             episodeNumbers: episodeNumbers,
             streamTitle: streamTitle,
