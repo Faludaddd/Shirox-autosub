@@ -284,7 +284,7 @@ struct HomeView: View {
 
 // MARK: - Featured Carousel (full width, indicator below)
 
-private struct FeaturedCarousel: View {
+struct FeaturedCarousel: View {
     let items: [Media]
     // `selectedTab` starts in the *middle* rotation of a `displayCount * 3`
     // page window so the user can swipe freely in both directions. A bounded

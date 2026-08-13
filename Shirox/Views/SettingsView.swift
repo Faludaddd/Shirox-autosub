@@ -3904,21 +3904,12 @@ struct LandscapeSubtitlePreview: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
                 // Caption — bottom-anchored, centered, width-capped.
-                // ViewThatFits tries the user's chosen font size first; if
-                // the caption is too tall to fit (e.g. a very long sentence
-                // on a small landscape height), it steps down to smaller
-                // sizes so the text always remains fully visible.
-                ViewThatFits(in: .vertical) {
-                    captionText(fontSize: CGFloat(subtitleFontSize))
-                        .frame(maxWidth: captionMaxWidth, alignment: .center)
-                    captionText(fontSize: CGFloat(subtitleFontSize) * 0.85)
-                        .frame(maxWidth: captionMaxWidth, alignment: .center)
-                    captionText(fontSize: CGFloat(subtitleFontSize) * 0.7)
-                        .frame(maxWidth: captionMaxWidth, alignment: .center)
-                }
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.bottom, bottomPadding)
-                .offset(y: -subtitleVerticalOffset * 0.8)
+                // On iOS 16+ ViewThatFits tries the user's chosen font size
+                // first; if the caption is too tall to fit, it steps down to
+                // smaller sizes so the text always remains fully visible.
+                // iOS 15 falls back to a single size (the user's chosen font
+                // size) since ViewThatFits isn't available.
+                captionContainer(captionMaxWidth: captionMaxWidth, bottomPadding: bottomPadding)
 
                 // Helper text above the caption.
                 VStack {
@@ -3945,6 +3936,36 @@ struct LandscapeSubtitlePreview: View {
                 PlayerPresenter.shared.updateOrientationLock(.portrait, shouldRotate: true)
             }
             #endif
+        }
+    }
+
+    // MARK: - Caption Container (iOS 15 / 16+ compatible)
+
+    /// Wraps the caption text with bottom-anchoring, centering, and the
+    /// vertical offset. On iOS 16+ uses `ViewThatFits` to step the font size
+    /// down if the caption is too tall; on iOS 15 falls back to the user's
+    /// chosen font size (with the width cap, long sentences wrap inside the
+    /// frame regardless).
+    @ViewBuilder
+    private func captionContainer(captionMaxWidth: CGFloat, bottomPadding: CGFloat) -> some View {
+        if #available(iOS 16, *) {
+            ViewThatFits(in: .vertical) {
+                captionText(fontSize: CGFloat(subtitleFontSize))
+                    .frame(maxWidth: captionMaxWidth, alignment: .center)
+                captionText(fontSize: CGFloat(subtitleFontSize) * 0.85)
+                    .frame(maxWidth: captionMaxWidth, alignment: .center)
+                captionText(fontSize: CGFloat(subtitleFontSize) * 0.7)
+                    .frame(maxWidth: captionMaxWidth, alignment: .center)
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.bottom, bottomPadding)
+            .offset(y: -subtitleVerticalOffset * 0.8)
+        } else {
+            captionText(fontSize: CGFloat(subtitleFontSize))
+                .frame(maxWidth: captionMaxWidth, alignment: .center)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.bottom, bottomPadding)
+                .offset(y: -subtitleVerticalOffset * 0.8)
         }
     }
 
