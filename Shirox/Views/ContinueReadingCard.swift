@@ -1,6 +1,42 @@
 #if os(iOS)
 import SwiftUI
 
+// MARK: - Continue Reading context-menu navigation
+
+/// Where a Continue Reading context-menu item wants to navigate.
+enum ContinueReadingNavTarget {
+    case detail(mangaHref: String, mangaTitle: String, coverImage: String, moduleId: String?, aniListID: Int?)
+    case anilist(Int)
+}
+
+@ViewBuilder
+private func crNavDestination(_ target: ContinueReadingNavTarget) -> some View {
+    switch target {
+    case let .detail(mangaHref, mangaTitle, coverImage, moduleId, aniListID):
+        if let aid = aniListID {
+            AniListMangaDetailView(mediaId: aid)
+        } else {
+            MangaDetailView(
+                item: SearchItem(title: mangaTitle, image: coverImage, href: mangaHref),
+                moduleId: moduleId
+            )
+        }
+    case .anilist(let id):
+        AniListMangaDetailView(mediaId: id)
+    }
+}
+
+extension View {
+    /// Drives Continue Reading context-menu navigation from the parent view.
+    /// Attach outside the ScrollView. Uses `navigationDestinationCompat`,
+    /// which pushes via a hidden `NavigationLink` on iOS (the app's
+    /// `NavigationStack` is really a `NavigationView`, which ignores
+    /// `navigationDestination(...)`).
+    func continueReadingNavigation(_ target: Binding<ContinueReadingNavTarget?>) -> some View {
+        self.navigationDestinationCompat(item: target) { crNavDestination($0) }
+    }
+}
+
 /// "Continue Reading" row on Home: one card per manga with the last-read
 /// chapter/page. Tapping re-activates the manga's module if needed, re-fetches
 /// the chapter list (so prev/next works in the reader), then opens the reader
@@ -9,6 +45,8 @@ struct ContinueReadingSection: View {
     let items: [MangaReadingItem]
     /// Owned by HomeView, drives its fullScreenCover.
     @Binding var readerContext: ReaderContext?
+    /// Owned by the parent view, drives context-menu navigation.
+    @Binding var navTarget: ContinueReadingNavTarget?
     @State private var loadingHref: String?
 
     var body: some View {
@@ -39,19 +77,22 @@ struct ContinueReadingSection: View {
                         .frame(width: 160)
                         .contextMenu {
                             Button {
-                                open(item)
+                                let match = MangaMatchManager.shared.cachedMatch(mangaHref: item.mangaHref)
+                                navTarget = .detail(
+                                    mangaHref: item.mangaHref,
+                                    mangaTitle: item.mangaTitle,
+                                    coverImage: item.coverImage,
+                                    moduleId: item.moduleId,
+                                    aniListID: match?.aniListID
+                                )
                             } label: {
                                 Label("View Details", systemImage: "info.circle")
                             }
                             if let aniListId = MangaMatchManager.shared.cachedMatch(mangaHref: item.mangaHref)?.aniListID {
                                 Button {
-                                    #if os(iOS)
-                                    if let url = URL(string: "https://anilist.co/manga/\(aniListId)") {
-                                        UIApplication.shared.open(url)
-                                    }
-                                    #endif
+                                    navTarget = .anilist(aniListId)
                                 } label: {
-                                    Label("View on AniList", systemImage: "safari")
+                                    Label("View on AniList", systemImage: "book.closed")
                                 }
                             }
                             Button(role: .destructive) {

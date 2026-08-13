@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "1.10",
+          "buildVersion": "1",
+          "date": "2026-08-14",
+          "localizedDescription": "Fixed manga reader scroll-up teleporting by deferring strip mutations during active scrolling. Added custom DownloadDetailView with circular progress ring, ETA, speed, and Find File button. Added Statistics section to AniList manga detail page. Wired Mark as Private toggle on manga edit entry (AniList + MAL). Applied ToggleGlow to all manga settings toggles. Added haptics to Preload Pages stepper. Fixed Continue Reading context menu: View Details now routes to AniListMangaDetailView, View on AniList opens the in-app page instead of Safari.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 10669076,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.9",
           "buildVersion": "1",
           "date": "2026-08-13",
@@ -75,6 +84,15 @@
     }
   ],
   "news": [
+    {
+      "title": "New in 1.10 - Reader scroll fix, custom download manager, manga stats",
+      "identifier": "news-1.10-reader-downloads-stats",
+      "caption": "Manga reader no longer teleports when scrolling up. Tapping a download opens a custom detail view with circular progress ring, ETA, speed, and Find File button. Manga AniList detail page now shows Statistics. Mark as Private works on manga edit entry. Toggle glow restored on all manga settings toggles.",
+      "tintColor": "ef4444",
+      "date": "2026-08-14",
+      "notify": true,
+      "appID": "com.shirox.app"
+    },
     {
       "title": "New in 1.9 - Downloads tab tap-to-open fix",
       "identifier": "news-1.9-downloads-fix",
