@@ -177,8 +177,13 @@ struct SettingsView: View {
                 }
             }
 
-            // Section 6: About
+            // Section 6: Update & About
             Section {
+                NavigationLink {
+                    UpdateSettingsPage()
+                } label: {
+                    SettingsCategoryRow(icon: "arrow.down.circle.fill", title: "Update", subtitle: "Check for updates, download, install")
+                }
                 NavigationLink {
                     AboutSettingsPage()
                 } label: {

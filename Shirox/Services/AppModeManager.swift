@@ -49,8 +49,11 @@ final class AppModeManager: ObservableObject {
     }
 
     private init() {
-        let raw = UserDefaults.standard.string(forKey: key) ?? Mode.anime.rawValue
-        self.mode = Mode(rawValue: raw) ?? .anime
+        // CRITICAL: Always start in Anime Mode on launch. The user's last
+        // selected mode is NOT restored — the app ALWAYS launches into the
+        // Anime experience. The user can freely switch to Reading Mode
+        // after launch by tapping the mode-toggle icon.
+        self.mode = .anime
     }
 
     func toggle() {

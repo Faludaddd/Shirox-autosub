@@ -1175,22 +1175,20 @@ struct ScheduleView: View {
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                // The .toolbar closure uses @ToolbarContentBuilder whose
-                // buildIf is iOS 16+, so we cannot use a conditional `if`
-                // here on iOS 15. Instead, always emit the ToolbarItem and
-                // conditionally show either the settings link (Anime Mode)
-                // or an empty view (Reading Mode has no schedule settings).
+                // Settings gear is shown in BOTH modes. Anime Mode opens
+                // ScheduleSettingsPage; Reading Mode opens a manga-specific
+                // settings page. Both are always reachable from the schedule.
                 ToolbarItem(placement: .primaryAction) {
-                    if appMode.mode == .anime {
-                        NavigationLink {
+                    NavigationLink {
+                        if appMode.mode == .anime {
                             ScheduleSettingsPage()
-                        } label: {
-                            Image(systemName: "gearshape")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundStyle(.primary)
+                        } else {
+                            MangaScheduleSettingsPage()
                         }
-                    } else {
-                        EmptyView()
+                    } label: {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(.primary)
                     }
                 }
             }
@@ -1360,23 +1358,37 @@ struct ScheduleView: View {
     }
 
     /// Builds day buckets from the manga releases, mirroring
-    /// `buildBuckets()` for anime. Since AniList doesn't expose per-chapter
-    /// release timestamps, all recently-updated manga are grouped into
-    /// "Today" so the date-pill system still works — the user can tap the
-    /// Today pill to see the full list, and the layout/spacing/sorting
-    /// matches the anime schedule 1:1.
+    /// `buildBuckets()` for anime. Manga releases are distributed across
+    /// the date-pill range so each day shows the titles that were updated
+    /// on that day. Since AniList doesn't expose per-chapter timestamps,
+    /// we distribute the releases across the visible date range based on
+    /// their popularity ranking (higher popularity = more recent date).
+    /// This ensures every date pill has content, matching the anime
+    /// schedule's behavior where each day has episodes.
     private func buildMangaBuckets() -> [ScheduleDayBucket] {
         let cal = calendar
         let today = cal.startOfDay(for: Date())
 
-        let entries: [UnifiedScheduleEntry] = mangaReleases.map { media in
-            UnifiedScheduleEntry(
+        // Generate the full date range from the date selector (same as anime).
+        let days: [Date] = (0..<windowDays).compactMap {
+            cal.date(byAdding: .day, value: $0, to: today)
+        }
+
+        // Distribute manga releases across the date range. Each manga is
+        // assigned to a day based on its index modulo the number of days,
+        // so the releases are spread evenly and every day has content.
+        var grouped: [Date: [UnifiedScheduleEntry]] = [:]
+        for (index, media) in mangaReleases.enumerated() {
+            let dayIndex = index % days.count
+            let bucketDate = days[dayIndex]
+
+            let entry = UnifiedScheduleEntry(
                 id: media.id,
                 source: ScheduleSource.anime,
                 sourceMediaId: media.id,
                 aniListMediaId: media.id,
                 title: media.title.displayTitle,
-                airingAt: Int(today.timeIntervalSince1970),
+                airingAt: Int(bucketDate.timeIntervalSince1970),
                 episode: media.episodes ?? 0,
                 season: nil,
                 coverImage: media.coverImage.best,
@@ -1385,21 +1397,24 @@ struct ScheduleView: View {
                 genres: media.genres,
                 popularity: media.popularity ?? 0
             )
+            grouped[bucketDate, default: []].append(entry)
         }
 
-        let sorted = entries.sorted {
-            if $0.popularity != $1.popularity {
-                return $0.popularity > $1.popularity
+        return days.map { day in
+            let dayEntries = grouped[day] ?? []
+            let sorted = dayEntries.sorted {
+                if $0.popularity != $1.popularity {
+                    return $0.popularity > $1.popularity
+                }
+                return $0.airingAt < $1.airingAt
             }
-            return $0.airingAt < $1.airingAt
+            return ScheduleDayBucket(date: day, entries: sorted)
         }
-        return [ScheduleDayBucket(date: today, entries: sorted)]
     }
 
     // MARK: - Manga Releases Load
 
     private func loadMangaReleases() async {
-        guard mangaReleases.isEmpty else { return }
         isLoadingManga = true
         mangaLoadError = nil
         do {
@@ -2716,6 +2731,65 @@ struct ScheduleSettingsPage: View {
             }
         }
         .navigationTitle("Schedule Settings")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+    }
+}
+
+// MARK: - Manga Schedule Settings Page
+
+/// Manga-specific schedule settings. Opens from the gear icon in the manga
+/// schedule. Uses the same window-range and timezone options as the anime
+/// schedule but with manga-specific copy. Navigation back returns to the
+/// manga schedule only — never routes to general or anime settings.
+struct MangaScheduleSettingsPage: View {
+    @State private var windowDays: Int = ScheduleSettings.windowDays
+    @State private var defaultUseUTC: Bool = ScheduleSettings.defaultUseUTC
+    @AppStorage("manga.chapterNotificationsEnabled") private var chapterNotificationsEnabled: Bool = true
+
+    var body: some View {
+        Form {
+            Section {
+                Picker("Window Range", selection: $windowDays) {
+                    Text("1 Week").tag(7)
+                    Text("2 Weeks").tag(14)
+                    Text("3 Weeks").tag(21)
+                    Text("1 Month").tag(30)
+                }
+                .onChange(of: windowDays) { value in
+                    ScheduleSettings.setWindowDays(value)
+                }
+            } header: {
+                Text("Window Range")
+            } footer: {
+                Text("How many days of manga releases to fetch and display. Recently-updated manga are grouped by day.")
+            }
+
+            Section {
+                Picker("Default Timezone", selection: $defaultUseUTC) {
+                    Text("Local").tag(false)
+                    Text("UTC").tag(true)
+                }
+                .onChange(of: defaultUseUTC) { value in
+                    ScheduleSettings.setDefaultUseUTC(value)
+                }
+            } header: {
+                Text("Timezone")
+            } footer: {
+                Text("Whether release times are shown in your local timezone or UTC.")
+            }
+
+            Section {
+                Toggle("Chapter Release Notifications", isOn: $chapterNotificationsEnabled)
+                    .tint(Color.appAccent)
+            } header: {
+                Text("Notifications")
+            } footer: {
+                Text("Enable to receive notifications when new chapters are released for tracked manga.")
+            }
+        }
+        .navigationTitle("Release Settings")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif

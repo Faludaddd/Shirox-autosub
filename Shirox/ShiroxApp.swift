@@ -419,7 +419,6 @@ private struct MacSidebarView: View {
 private struct RootTabView: View {
     @EnvironmentObject private var moduleManager: ModuleManager
     @ObservedObject private var cfManager = CloudflareBypassManager.shared
-    @ObservedObject private var updateManager = AppUpdateManager.shared
     #if os(iOS)
     @ObservedObject private var playerPresenter = PlayerPresenter.shared
     @ObservedObject private var quickActions = QuickActionManager.shared
@@ -587,16 +586,9 @@ private struct RootTabView: View {
             }
         }
 
-        // Update popup — presented when AppUpdateManager.shared.availableUpdate
-        // is non-nil. Forced (critical) updates are non-dismissible.
-        .sheet(item: Binding(
-            get: { updateManager.availableUpdate },
-            set: { if $0 == nil { updateManager.dismiss() } }
-        )) { info in
-            UpdatePopupView(info: info) {
-                updateManager.dismiss()
-            }
-        }
+        // Update popup removed — updates are now handled via Settings → Update
+        // tab (UpdateSettingsPage). The popup was non-functional and replaced
+        // with a dedicated settings page that has check/download/copy/share.
         #endif
         #if targetEnvironment(macCatalyst)
         .onAppear {
