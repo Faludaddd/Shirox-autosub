@@ -872,28 +872,47 @@ private struct MangaTrackingSettingsPage: View {
     @AppStorage("manga.autoMarkRead") private var autoMarkRead: Bool = true
     @AppStorage("manga.defaultSort") private var defaultSort: String = "source"
     @ObservedObject private var anilistAuth = AniListAuthManager.shared
+    @ObservedObject private var malAuth = MALAuthManager.shared
+    #if os(iOS)
+    @State private var presentationWindow: UIWindow?
+    #endif
 
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                // Connection status header
-                HStack(spacing: 12) {
-                    Circle()
-                        .fill(anilistAuth.isLoggedIn ? Color.green : Color.gray)
-                        .frame(width: 12, height: 12)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("AniList")
-                            .font(.subheadline.weight(.semibold))
-                        Text(anilistAuth.isLoggedIn ? "Connected as \(anilistAuth.username ?? "user")" : "Not connected")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                // AniList connection card with icon + glow
+                trackingServiceCard(
+                    name: "AniList",
+                    iconURL: ProviderType.anilist.iconURL,
+                    isLoggedIn: anilistAuth.isLoggedIn,
+                    username: anilistAuth.username,
+                    onConnect: {
+                        #if os(iOS)
+                        if anilistAuth.isLoggedIn {
+                            anilistAuth.logout()
+                        } else if let window = presentationWindow {
+                            anilistAuth.login(presentationAnchor: window)
+                        }
+                        #endif
                     }
-                    Spacer()
-                    Image(systemName: "checkmark.seal.fill")
-                        .foregroundStyle(anilistAuth.isLoggedIn ? Color.green : Color.gray.opacity(0.3))
-                }
-                .padding(16)
-                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
+                )
+
+                // MAL connection card with icon + glow
+                trackingServiceCard(
+                    name: "MyAnimeList",
+                    iconURL: ProviderType.mal.iconURL,
+                    isLoggedIn: malAuth.isLoggedIn,
+                    username: malAuth.username,
+                    onConnect: {
+                        #if os(iOS)
+                        if malAuth.isLoggedIn {
+                            malAuth.logout()
+                        } else if let window = presentationWindow {
+                            malAuth.login(presentationAnchor: window)
+                        }
+                        #endif
+                    }
+                )
 
                 // Sync options
                 VStack(alignment: .leading, spacing: 12) {
@@ -937,7 +956,58 @@ private struct MangaTrackingSettingsPage: View {
         .navigationTitle("Library & Tracking")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            presentationWindow = UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap { $0.windows }
+                .first { $0.isKeyWindow }
+        }
         #endif
+    }
+
+    private func trackingServiceCard(name: String, iconURL: String?, isLoggedIn: Bool, username: String?, onConnect: @escaping () -> Void) -> some View {
+        let glowColor: Color = isLoggedIn ? .green : .red
+        let glowOpacity: Double = Color.glowEnabled ? Color.glowIntensity * 1.0 : 0
+        let glowRadius: CGFloat = Color.glowEnabled ? CGFloat(28 * Color.glowIntensity) : 0
+
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 14) {
+                CachedAsyncImage(urlString: iconURL ?? "")
+                    .frame(width: 44, height: 44)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.12)))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .strokeBorder(glowColor.opacity(Color.glowEnabled ? 0.85 : 0.5), lineWidth: 1.5)
+                    )
+                    .shadow(color: glowColor.opacity(glowOpacity), radius: glowRadius)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(name)
+                        .font(.body.weight(.semibold))
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(isLoggedIn ? Color.green : Color.secondary.opacity(0.6))
+                            .frame(width: 7, height: 7)
+                        Text(isLoggedIn ? "Connected as \(username ?? "user")" : "Not connected")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+                Spacer()
+            }
+
+            HStack {
+                Spacer()
+                Button(isLoggedIn ? "Disconnect" : "Connect", action: onConnect)
+                    .font(.caption.weight(.semibold))
+                    .buttonStyle(.bordered)
+                    .tint(isLoggedIn ? .red : .appAccent)
+            }
+        }
+        .padding(16)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
     }
 }
 

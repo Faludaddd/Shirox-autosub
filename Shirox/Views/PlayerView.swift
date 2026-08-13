@@ -152,7 +152,7 @@ struct PlayerView: View {
     /// without a `didEnterBackground` cancellation, it means the resign-active
     /// was caused by Control Center or Notification Center — pause playback.
     @State private var controlCenterPauseTask: Task<Void, Never>? = nil
-    @AppStorage("autoPauseOnControlCenter") private var autoPauseOnControlCenter: Bool = false
+    @AppStorage("autoPauseOnControlCenter") private var autoPauseOnControlCenter: Bool = true
 
     // Audio-session interruption (calls, Siri, other media apps)
     @State private var wasPlayingBeforeInterruption = false

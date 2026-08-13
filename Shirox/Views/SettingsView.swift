@@ -1771,17 +1771,31 @@ struct NotificationsSettingsPage: View {
 
     private var phoneNotificationsCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            cardHeader("Phone Notifications", systemImage: "iphone")
+            cardHeader("Phone Notifications", systemImage: "iphone.radiowaves.left.and.right")
             Toggle("Enable Phone Notifications", isOn: $phoneNotificationsEnabled)
             Text("Controls real system notifications that appear outside the app — Lock Screen, Notification Center, and banner alerts. Requires iOS notification permission.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Divider().opacity(0.4)
-            Toggle("Episode Reminders", isOn: $episodeReminders)
-                .disabled(!phoneNotificationsEnabled)
-            Toggle("Airing Notifications", isOn: $airingNotifications)
-                .disabled(!phoneNotificationsEnabled)
+            Toggle(isOn: $episodeReminders) {
+                HStack(spacing: 6) {
+                    Image(systemName: "calendar.badge.clock")
+                        .font(.caption)
+                        .foregroundStyle(Color.appAccent)
+                    Text("Episode Reminders")
+                }
+            }
+            .disabled(!phoneNotificationsEnabled)
+            Toggle(isOn: $airingNotifications) {
+                HStack(spacing: 6) {
+                    Image(systemName: "tv.fill")
+                        .font(.caption)
+                        .foregroundStyle(Color.appAccent)
+                    Text("Airing Notifications")
+                }
+            }
+            .disabled(!phoneNotificationsEnabled)
             Text("Reminders fire before an episode airs. Requires an AniList account and a connected schedule.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
