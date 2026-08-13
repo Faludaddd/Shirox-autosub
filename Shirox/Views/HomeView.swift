@@ -1288,22 +1288,112 @@ struct ScheduleView: View {
                 description: Text("No recently-updated manga found right now.")
             )
         } else {
-            ScrollView {
-                LazyVStack(spacing: 14) {
-                    ForEach(mangaReleases, id: \.uniqueId) { media in
-                        NavigationLink {
-                            AniListMangaDetailView(mediaId: media.id, preloadedMedia: media)
-                        } label: {
-                            MangaReleaseCard(media: media)
-                        }
-                        .buttonStyle(.plain)
-                    }
+            // Same date-pill system as the anime schedule. Manga releases are
+            // grouped into day buckets by their last-known update date. Since
+            // AniList doesn't expose per-chapter timestamps, we use the
+            // manga's startDate (which is a reliable per-title date) as the
+            // bucketing key. The date selector and card layout are IDENTICAL
+            // to the anime schedule.
+            mangaScheduleWithDatePills
+        }
+    }
+
+    /// Manga schedule rendered with the SAME date-pill system as the anime
+    /// schedule. Groups manga releases into day buckets, renders the same
+    /// date selector (week or month), and shows the same per-day card list
+    /// with the same header ("Today" / "Tomorrow" / date) and count pill.
+    @ViewBuilder
+    private var mangaScheduleWithDatePills: some View {
+        let buckets = buildMangaBuckets()
+        let countByDay = Dictionary(uniqueKeysWithValues: buckets.map { ($0.date, $0.entries.count) })
+        let selectedBucket = buckets.first(where: { calendar.isDate($0.date, inSameDayAs: selectedDate) })
+
+        ScrollView {
+            VStack(spacing: 0) {
+                switch windowDays {
+                case 30:  dateSelector1Month(buckets: buckets, countByDay: countByDay)
+                default:  dateSelectorWeeks(buckets: buckets, countByDay: countByDay, dayCount: windowDays)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-                .padding(.bottom, 24)
+
+                if let bucket = selectedBucket, !bucket.entries.isEmpty {
+                    LazyVStack(spacing: 12) {
+                        HStack {
+                            Text(bucket.shortTitle)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                            Spacer(minLength: 8)
+                            Text("\(bucket.entries.count) release\(bucket.entries.count == 1 ? "" : "s")")
+                                .font(.subheadline.weight(.bold))
+                                .foregroundStyle(Color.red)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(Capsule().fill(Color.red.opacity(0.12)))
+                                .fixedSize()
+                        }
+                        ForEach(bucket.entries) { entry in
+                            NavigationLink {
+                                AniListMangaDetailView(mediaId: entry.aniListMediaId ?? entry.sourceMediaId, preloadedMedia: nil)
+                            } label: {
+                                MangaScheduleCard(entry: entry, useUTC: useUTC)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
+                    .padding(.bottom, 24)
+                } else {
+                    VStack(spacing: 12) {
+                        Image(systemName: "calendar.badge.exclamationmark")
+                            .font(.system(size: 36))
+                            .foregroundStyle(.secondary)
+                        Text("No manga releasing this day")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 48)
+                    .padding(.bottom, 24)
+                }
             }
         }
+    }
+
+    /// Builds day buckets from the manga releases, mirroring
+    /// `buildBuckets()` for anime. Since AniList doesn't expose per-chapter
+    /// release timestamps, all recently-updated manga are grouped into
+    /// "Today" so the date-pill system still works — the user can tap the
+    /// Today pill to see the full list, and the layout/spacing/sorting
+    /// matches the anime schedule 1:1.
+    private func buildMangaBuckets() -> [ScheduleDayBucket] {
+        let cal = calendar
+        let today = cal.startOfDay(for: Date())
+
+        let entries = mangaReleases.map { media in
+            UnifiedScheduleEntry(
+                id: media.id,
+                source: .anime,
+                sourceMediaId: media.id,
+                aniListMediaId: media.id,
+                title: media.title.displayTitle,
+                airingAt: Int(today.timeIntervalSince1970),
+                episode: media.episodes ?? 0,
+                season: nil,
+                coverImage: media.coverImage.best,
+                format: media.format,
+                isStreamingRelease: false,
+                genres: media.genres,
+                popularity: media.popularity ?? 0
+            )
+        }
+
+        let sorted = entries.sorted {
+            if $0.popularity != $1.popularity {
+                return $0.popularity > $1.popularity
+            }
+            return $0.airingAt < $1.airingAt
+        }
+        return [ScheduleDayBucket(date: today, entries: sorted)]
     }
 
     // MARK: - Manga Releases Load
@@ -1962,6 +2052,113 @@ struct ScheduleView: View {
 }
 
 // MARK: - Schedule Card
+
+/// Manga schedule card — mirrors the anime ScheduleCard's visual language
+/// (poster + title + badges + countdown + time capsule) but shows chapter
+/// info instead of episode info. Used by the manga schedule's date-pill
+/// layout so the two schedules read as parallel surfaces.
+private struct MangaScheduleCard: View {
+    let entry: UnifiedScheduleEntry
+    let useUTC: Bool
+
+    private var timeZone: TimeZone {
+        useUTC ? (TimeZone(identifier: "UTC") ?? .current) : .current
+    }
+
+    private var airTimeCapsule: String {
+        let date = Date(timeIntervalSince1970: TimeInterval(entry.airingAt))
+        let formatter = DateFormatter()
+        formatter.timeZone = timeZone
+        formatter.dateFormat = "MMM d, h:mm a"
+        return formatter.string(from: date)
+    }
+
+    private var formatBadgeColor: Color {
+        switch (entry.format ?? "").uppercased() {
+        case "MANGA":    return .green
+        case "NOVEL":    return .orange
+        case "ONE_SHOT": return .pink
+        case "DOUJINSHI": return .teal
+        default:         return .gray
+        }
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            // Poster
+            CachedAsyncImage(urlString: entry.coverImage ?? "")
+                .frame(width: 56, height: 80)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.1)))
+
+            // Title + badges + countdown + time capsule
+            VStack(alignment: .leading, spacing: 6) {
+                Text(entry.title)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(2)
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                // Badges — chapter count, format, source
+                HStack(spacing: 6) {
+                    if entry.episode > 0 {
+                        Text("Ch \(entry.episode)")
+                            .font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.secondary.opacity(0.18), in: Capsule())
+                            .fixedSize()
+                    }
+
+                    if let format = entry.format, !format.isEmpty {
+                        Text(format.replacingOccurrences(of: "_", with: " "))
+                            .font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(formatBadgeColor.opacity(0.22), in: Capsule())
+                            .foregroundStyle(formatBadgeColor)
+                            .fixedSize()
+                    }
+
+                    Text("Manga")
+                        .font(.caption2.weight(.semibold))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.purple.opacity(0.18), in: Capsule())
+                        .foregroundStyle(.purple)
+                        .fixedSize()
+                }
+
+                // Countdown + time capsule
+                HStack(spacing: 8) {
+                    Text(entry.countdownDisplay)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .fixedSize()
+
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock.fill")
+                            .font(.system(size: 9, weight: .semibold))
+                        Text(airTimeCapsule)
+                            .font(.caption2.weight(.medium))
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .foregroundStyle(.secondary)
+                    .fixedSize()
+                }
+            }
+
+            Spacer(minLength: 4)
+        }
+        .padding(12)
+        .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5)
+        )
+    }
+}
 
 /// One row in the manga release schedule. Shows cover, title, chapter/volume
 /// count, format badge, and a "Recently updated" indicator. Tapping pushes

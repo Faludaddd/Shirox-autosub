@@ -417,176 +417,378 @@ struct MangaLibraryView: View {
 // MARK: - MangaSettingsView
 //
 // Reading Mode's own settings system — fully independent from the anime
-// SettingsView. All keys are prefixed `manga.` so they live in their own
-// UserDefaults namespace and never collide with anime preferences. The UI
-// is a custom card-based layout (NOT a system Form) so it matches the
-// app's visual language rather than reusing Apple's grouped-form style.
+// SettingsView. Uses the SAME tab-based architecture as the anime settings
+// (a category menu that pushes dedicated sub-pages) so the two settings
+// systems feel structurally parallel. Each sub-page has its OWN unique
+// layout (not a shared template), matching how every anime settings page
+// already has a distinct design.
+//
+// All keys are prefixed `manga.` so they live in their own UserDefaults
+// namespace and never collide with anime preferences.
 
 struct MangaSettingsView: View {
+    var body: some View {
+        List {
+            // Section 1: Reading Experience
+            Section {
+                NavigationLink {
+                    MangaReaderSettingsPage()
+                } label: {
+                    MangaSettingsCategoryRow(icon: "book.fill", title: "Reader", subtitle: "Direction, layout, zoom, tap zones")
+                }
+                NavigationLink {
+                    MangaDisplaySettingsPage()
+                } label: {
+                    MangaSettingsCategoryRow(icon: "rectangle.on.rectangle", title: "Display", subtitle: "Background, image quality, page numbers")
+                }
+            }
+
+            // Section 2: Library & Tracking
+            Section {
+                NavigationLink {
+                    MangaTrackingSettingsPage()
+                } label: {
+                    MangaSettingsCategoryRow(icon: "books.vertical.fill", title: "Library & Tracking", subtitle: "AniList sync, progress, ratings")
+                }
+                NavigationLink {
+                    MangaNotificationsSettingsPage()
+                } label: {
+                    MangaSettingsCategoryRow(icon: "bell.fill", title: "Notifications", subtitle: "Chapter release alerts")
+                }
+            }
+
+            // Section 3: Data & Downloads
+            Section {
+                NavigationLink {
+                    MangaDataSettingsPage()
+                } label: {
+                    MangaSettingsCategoryRow(icon: "externaldrive.fill", title: "Data & Downloads", subtitle: "Data saving, offline reading")
+                }
+            }
+
+            // Section 4: About
+            Section {
+                NavigationLink {
+                    AboutSettingsPage()
+                } label: {
+                    MangaSettingsCategoryRow(icon: "info.circle.fill", title: "About", subtitle: "Version, licenses")
+                }
+            }
+        }
+        #if os(iOS)
+        .listStyle(.insetGrouped)
+        #endif
+        .navigationTitle("Settings")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+    }
+}
+
+// MARK: - Manga Settings Category Row
+
+private struct MangaSettingsCategoryRow: View {
+    let icon: String
+    let title: String
+    let subtitle: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 20))
+                .foregroundStyle(Color.appAccent)
+                .frame(width: 28, alignment: .center)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+// MARK: - Manga Reader Settings Page
+//
+// Unique layout: custom card-based UI (NOT a system Form) with reading
+// direction, page layout, zoom, tap zones, transitions, and brightness.
+
+private struct MangaReaderSettingsPage: View {
     @AppStorage("manga.readingDirection") private var readingDirection: String = "auto"
     @AppStorage("manga.pageGap") private var pageGap: Bool = false
     @AppStorage("manga.invertHorizontal") private var invertHorizontal: Bool = false
-    @AppStorage("manga.imageQuality") private var imageQuality: String = "high"
-    @AppStorage("manga.preloadPages") private var preloadPages: Int = 3
     @AppStorage("manga.tapZones") private var tapZones: String = "edges"
-    @AppStorage("manga.keepScreenOn") private var keepScreenOn: Bool = true
-    @AppStorage("manga.autoMarkRead") private var autoMarkRead: Bool = true
-    @AppStorage("manga.showPageNumbers") private var showPageNumbers: Bool = false
-    @AppStorage("manga.backgroundColor") private var backgroundColor: String = "black"
-    @AppStorage("manga.defaultSort") private var defaultSort: String = "source"
-    @AppStorage("manga.downsampleImages") private var downsampleImages: Bool = false
     @AppStorage("manga.swipeToNavigate") private var swipeToNavigate: Bool = true
     @AppStorage("manga.volumeButtons") private var volumeButtons: Bool = false
-    @AppStorage("manga.cropMargins") private var cropMargins: Bool = false
     @AppStorage("manga.hapticFeedback") private var hapticFeedback: Bool = true
+    @AppStorage("manga.pageTransition") private var pageTransition: String = "slide"
+    @AppStorage("manga.zoomMode") private var zoomMode: String = "fitWidth"
+    @AppStorage("manga.rememberZoomPerSeries") private var rememberZoomPerSeries: Bool = false
+    @AppStorage("manga.brightnessOverlay") private var brightnessOverlay: Double = 1.0
+    @AppStorage("manga.cropMargins") private var cropMargins: Bool = false
 
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                readerSection
-                displaySection
-                navigationSection
-                progressSection
-                infoCard
+                directionCard
+                layoutCard
+                zoomCard
+                tapZonesCard
+                transitionsCard
+                brightnessCard
             }
             .padding(16)
         }
-        .background(background.ignoresSafeArea())
-        .navigationTitle("Manga Settings")
+        .background(bg.ignoresSafeArea())
+        .navigationTitle("Reader")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
     }
 
-    // MARK: - Reader Section
-
-    private var readerSection: some View {
-        SettingsCard(title: "Reader", icon: "book.fill") {
-            SettingsPickerRow(
-                title: "Reading Direction",
-                value: $readingDirection,
-                options: [
-                    ("Auto (follow source)", "auto"),
-                    ("Left to Right", "ltr"),
-                    ("Right to Left", "rtl"),
-                    ("Vertical (Webtoon)", "vertical")
-                ]
-            )
-            SettingsToggleRow(title: "Page Gap Between Pages", isOn: $pageGap)
-            SettingsToggleRow(title: "Invert Horizontal Direction", isOn: $invertHorizontal)
-            SettingsToggleRow(title: "Crop Page Margins", isOn: $cropMargins)
-            SettingsStepperRow(title: "Preload Pages", value: $preloadPages, range: 1...6, suffix: " pages")
+    private var directionCard: some View {
+        SettingsCard(title: "Reading Direction", icon: "arrow.left.arrow.right") {
+            SettingsPickerRow(title: "Direction", value: $readingDirection, options: [
+                ("Auto (follow source)", "auto"), ("Left to Right", "ltr"),
+                ("Right to Left", "rtl"), ("Vertical (Webtoon)", "vertical")
+            ])
+            SettingsToggleRow(title: "Invert Horizontal", icon: "arrow.left.arrow.right.circle", isOn: $invertHorizontal)
+            SettingsToggleRow(title: "Page Gap Between Pages", icon: "rectangle.split.2x1", isOn: $pageGap)
         }
     }
 
-    // MARK: - Display Section
-
-    private var displaySection: some View {
-        SettingsCard(title: "Display", icon: "rectangle.on.rectangle") {
-            SettingsPickerRow(
-                title: "Image Quality",
-                value: $imageQuality,
-                options: [
-                    ("High (Recommended)", "high"),
-                    ("Medium", "medium"),
-                    ("Low (Data Saver)", "low")
-                ]
-            )
-            SettingsPickerRow(
-                title: "Background",
-                value: $backgroundColor,
-                options: [
-                    ("Black", "black"),
-                    ("Dark Gray", "gray"),
-                    ("White", "white")
-                ]
-            )
-            SettingsToggleRow(title: "Show Page Numbers", isOn: $showPageNumbers)
-            SettingsToggleRow(title: "Downsample Large Images", isOn: $downsampleImages)
+    private var layoutCard: some View {
+        SettingsCard(title: "Page Layout", icon: "rectangle.on.rectangle") {
+            SettingsPickerRow(title: "Layout", value: $zoomMode, options: [
+                ("Single Page", "single"), ("Double Page Spread", "double"),
+                ("Fit Width", "fitWidth"), ("Fit Height", "fitHeight"), ("Fit Screen", "fitScreen")
+            ])
+            SettingsToggleRow(title: "Crop Page Margins", icon: "crop", isOn: $cropMargins)
         }
     }
 
-    // MARK: - Navigation Section
-
-    private var navigationSection: some View {
-        SettingsCard(title: "Navigation", icon: "hand.tap.fill") {
-            SettingsPickerRow(
-                title: "Tap Zones",
-                value: $tapZones,
-                options: [
-                    ("Screen Edges", "edges"),
-                    ("Left/Right Halves", "halves"),
-                    ("Disabled", "disabled")
-                ]
-            )
-            SettingsToggleRow(title: "Swipe to Navigate", isOn: $swipeToNavigate)
-            SettingsToggleRow(title: "Volume Buttons Navigate", isOn: $volumeButtons)
-            SettingsToggleRow(title: "Haptic Feedback", isOn: $hapticFeedback)
-            SettingsToggleRow(title: "Keep Screen Awake", isOn: $keepScreenOn)
+    private var zoomCard: some View {
+        SettingsCard(title: "Zoom", icon: "plus.magnifyingglass") {
+            SettingsToggleRow(title: "Remember Zoom Per Series", icon: "bookmark.fill", isOn: $rememberZoomPerSeries)
         }
     }
 
-    // MARK: - Progress Section
-
-    private var progressSection: some View {
-        SettingsCard(title: "Progress", icon: "checkmark.circle.fill") {
-            SettingsToggleRow(title: "Auto-Mark Chapters Read", isOn: $autoMarkRead)
-            SettingsPickerRow(
-                title: "Default Library Sort",
-                value: $defaultSort,
-                options: [
-                    ("Source Order", "source"),
-                    ("By Title", "title"),
-                    ("By Last Read", "recent")
-                ]
-            )
+    private var tapZonesCard: some View {
+        SettingsCard(title: "Tap Zones & Navigation", icon: "hand.tap.fill") {
+            SettingsPickerRow(title: "Tap Zones", value: $tapZones, options: [
+                ("Screen Edges", "edges"), ("Left/Right Halves", "halves"), ("Disabled", "disabled")
+            ])
+            SettingsToggleRow(title: "Swipe to Navigate", icon: "hand.draw.fill", isOn: $swipeToNavigate)
+            SettingsToggleRow(title: "Volume Buttons Navigate", icon: "speaker.waves.2.fill", isOn: $volumeButtons)
+            SettingsToggleRow(title: "Haptic Feedback", icon: "iphone.radiowaves.left.and.right", isOn: $hapticFeedback)
         }
     }
 
-    // MARK: - Info Card
-
-    private var infoCard: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "lock.shield.fill")
-                .font(.system(size: 22))
-                .foregroundStyle(.secondary)
-            Text("Independent from Anime Settings")
-                .font(.subheadline.weight(.semibold))
-            Text("Manga settings are kept fully separate from anime settings. Changes here only affect Reading Mode and the manga reader — your anime playback, subtitles, and library preferences are never modified.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
+    private var transitionsCard: some View {
+        SettingsCard(title: "Page Transitions", icon: "rectangle.stack") {
+            SettingsPickerRow(title: "Transition Style", value: $pageTransition, options: [
+                ("Slide", "slide"), ("Fade", "fade"), ("Instant", "instant")
+            ])
         }
-        .padding(16)
-        .frame(maxWidth: .infinity)
-        .background(cardBackground, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
-    // MARK: - Colors
+    private var brightnessCard: some View {
+        SettingsCard(title: "Brightness", icon: "sun.max.fill") {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Reader Brightness")
+                        .font(.subheadline.weight(.medium))
+                    Spacer()
+                    Text("\(Int(brightnessOverlay * 100))%")
+                        .font(.subheadline.weight(.bold).monospacedDigit())
+                        .foregroundStyle(Color.appAccent)
+                }
+                Slider(value: $brightnessOverlay, in: 0.3...1.0, step: 0.05)
+                    .tint(Color.appAccent)
+                Text("Dims the reader independently of system brightness.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
 
-    private var background: Color {
+    private var bg: Color {
         #if os(iOS)
         return Color(.systemGroupedBackground)
         #else
         return Color.black.opacity(0.05)
         #endif
     }
+}
 
-    private var cardBackground: Color {
+// MARK: - Manga Display Settings Page
+//
+// Unique layout: system Form with image quality, background color, page
+// numbers, and data saving for manga images.
+
+private struct MangaDisplaySettingsPage: View {
+    @AppStorage("manga.imageQuality") private var imageQuality: String = "high"
+    @AppStorage("manga.backgroundColor") private var backgroundColor: String = "black"
+    @AppStorage("manga.showPageNumbers") private var showPageNumbers: Bool = false
+    @AppStorage("manga.downsampleImages") private var downsampleImages: Bool = false
+    @AppStorage("manga.dataSavingCellular") private var dataSavingCellular: Bool = false
+    @AppStorage("manga.keepScreenOn") private var keepScreenOn: Bool = true
+
+    var body: some View {
+        Form {
+            Section("Image Quality") {
+                Picker("Quality", selection: $imageQuality) {
+                    Text("High (Recommended)").tag("high")
+                    Text("Medium").tag("medium")
+                    Text("Low (Data Saver)").tag("low")
+                }
+                Toggle("Downsample Large Images", isOn: $downsampleImages)
+                Toggle("Data Saving on Cellular", isOn: $dataSavingCellular)
+            }
+            Section("Reader Background") {
+                Picker("Background Color", selection: $backgroundColor) {
+                    Text("Black").tag("black")
+                    Text("Dark Gray").tag("gray")
+                    Text("White").tag("white")
+                }
+            }
+            Section("Display Options") {
+                Toggle("Show Page Numbers", isOn: $showPageNumbers)
+                Toggle("Keep Screen Awake", isOn: $keepScreenOn)
+            }
+            Section {
+                Text("Manga background is independent of the app's overall theme. White backgrounds are recommended for manga since pages are typically white.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .navigationTitle("Display")
         #if os(iOS)
-        return Color(.secondarySystemGroupedBackground)
-        #else
-        return Color.secondary.opacity(0.15)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+    }
+}
+
+// MARK: - Manga Tracking Settings Page
+//
+// Unique layout: system Form mirroring the anime Library/Tracking settings
+// but scoped to manga progress. AniList sync, edit sync, never reduce
+// progress, prompt to rate.
+
+private struct MangaTrackingSettingsPage: View {
+    @AppStorage("manga.trackOnAniList") private var trackOnAniList: Bool = true
+    @AppStorage("manga.syncEdits") private var syncEdits: Bool = true
+    @AppStorage("manga.neverReduceProgress") private var neverReduceProgress: Bool = false
+    @AppStorage("manga.promptToRate") private var promptToRate: Bool = true
+    @AppStorage("manga.autoMarkRead") private var autoMarkRead: Bool = true
+    @AppStorage("manga.defaultSort") private var defaultSort: String = "source"
+
+    var body: some View {
+        Form {
+            Section("AniList Sync") {
+                Toggle("Track on AniList", isOn: $trackOnAniList)
+                Toggle("Sync Edits", isOn: $syncEdits)
+                Toggle("Never Reduce Progress", isOn: $neverReduceProgress)
+                Toggle("Prompt to Rate After Finishing", isOn: $promptToRate)
+            }
+            Section("Progress") {
+                Toggle("Auto-Mark Chapters Read", isOn: $autoMarkRead)
+                Picker("Default Library Sort", selection: $defaultSort) {
+                    Text("Source Order").tag("source")
+                    Text("By Title").tag("title")
+                    Text("By Last Read").tag("recent")
+                }
+            }
+            Section {
+                Text("These settings only affect manga tracking. Anime tracking settings are completely separate.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .navigationTitle("Library & Tracking")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+    }
+}
+
+// MARK: - Manga Notifications Settings Page
+//
+// Unique layout: system Form controlling chapter release notifications.
+
+private struct MangaNotificationsSettingsPage: View {
+    @AppStorage("manga.chapterNotificationsEnabled") private var chapterNotificationsEnabled: Bool = true
+    @AppStorage("manga.inAppToastsEnabled") private var inAppToastsEnabled: Bool = true
+    @AppStorage("manga.phoneNotificationsEnabled") private var phoneNotificationsEnabled: Bool = false
+    @AppStorage("manga.notificationLeadTime") private var notificationLeadTime: Int = 0
+
+    var body: some View {
+        Form {
+            Section("Chapter Notifications") {
+                Toggle("New Chapter Alerts", isOn: $chapterNotificationsEnabled)
+                Toggle("In-App Toasts", isOn: $inAppToastsEnabled)
+                Toggle("Phone Notifications", isOn: $phoneNotificationsEnabled)
+            }
+            Section("Timing") {
+                Stepper("Lead Time: \(notificationLeadTime == 0 ? "On Release" : "\(notificationLeadTime)m Before")",
+                        value: $notificationLeadTime, in: 0...60, step: 5)
+            }
+            Section {
+                Text("Notifications for manga chapter releases use the same system as anime episode alerts. Settings here only affect manga — anime notification settings are separate.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .navigationTitle("Notifications")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+    }
+}
+
+// MARK: - Manga Data Settings Page
+//
+// Unique layout: system Form for data saving and offline reading.
+
+private struct MangaDataSettingsPage: View {
+    @AppStorage("manga.dataSavingCellular") private var dataSavingCellular: Bool = false
+    @AppStorage("manga.preloadPages") private var preloadPages: Int = 3
+    @AppStorage("manga.downsampleImages") private var downsampleImages: Bool = false
+    @AppStorage("manga.imageQuality") private var imageQuality: String = "high"
+
+    var body: some View {
+        Form {
+            Section("Data Saving") {
+                Toggle("Data Saving on Cellular", isOn: $dataSavingCellular)
+                Toggle("Downsample Large Images", isOn: $downsampleImages)
+                Picker("Image Quality", selection: $imageQuality) {
+                    Text("High (Recommended)").tag("high")
+                    Text("Medium").tag("medium")
+                    Text("Low (Data Saver)").tag("low")
+                }
+            }
+            Section("Preloading") {
+                Stepper("Preload Pages: \(preloadPages)", value: $preloadPages, in: 1...6)
+                Text("Controls how many pages ahead the reader fetches. Higher values mean smoother reading but more data usage.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Section {
+                Text("Manga data saving loads lower-resolution page images on cellular connections, following the same approach as the video Data Saving Mode but scoped to image resolution.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .navigationTitle("Data & Downloads")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
         #endif
     }
 }
 
 // MARK: - Manga Settings UI Components
-//
-// Custom card-based settings UI matching the app's visual language. Avoids
-// the system Form style so Reading Mode settings feel distinct from the
-// anime settings (which use the system Form).
 
 private struct SettingsCard<Content: View>: View {
     let title: String
@@ -660,10 +862,14 @@ private struct SettingsPickerRow: View {
 
 private struct SettingsToggleRow: View {
     let title: String
+    var icon: String = "checkmark.circle"
     @Binding var isOn: Bool
 
     var body: some View {
         HStack {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.secondary)
             Text(title)
                 .font(.subheadline.weight(.medium))
             Spacer()
