@@ -167,46 +167,96 @@ struct GlowingToggleStyle: ToggleStyle {
         HStack {
             configuration.label
             Spacer()
-            ZStack {
-                // #123 correction — Liquid Glass capsule. The fill is a
-                // frosted ultraThinMaterial (translucent, blurs the content
-                // behind it) layered with a subtle accent tint when ON so the
-                // state is visible through the glass. When OFF, the capsule
-                // stays neutral glass.
-                Capsule()
-                    .fill(.ultraThinMaterial)
-                    .frame(width: 60, height: 34)
-                    .overlay(
-                        Capsule()
-                            .fill(configuration.isOn
-                                  ? Color.appAccent.opacity(0.25)
-                                  : Color.secondary.opacity(0.1))
-                    )
-                    .overlay(
-                        Capsule()
-                            .strokeBorder(
-                                configuration.isOn
-                                ? Color.appAccent.opacity(0.4)
-                                : Color.secondary.opacity(0.2),
-                                lineWidth: 0.5
-                            )
-                    )
-                    .shadow(
-                        color: configuration.isOn && Color.glowEnabled
-                            ? Color.appAccent.opacity(Color.glowIntensity * 0.6) : .clear,
-                        radius: configuration.isOn && Color.glowEnabled
-                            ? CGFloat(18 * Color.glowIntensity) : 0
-                    )
-                Circle()
-                    .fill(Color.white)
-                    .frame(width: 28, height: 28)
-                    .shadow(color: .black.opacity(0.15), radius: 2, x: 0, y: 1)
-                    .offset(x: configuration.isOn ? 12 : -12)
-            }
-            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: configuration.isOn)
-            .onTapGesture {
+            DraggableGlassToggle(isOn: configuration.isOn) {
                 configuration.isOn.toggle()
                 Haptics.light()
+            } onChange: { newValue in
+                configuration.isOn = newValue
+                Haptics.light()
+            }
+        }
+    }
+}
+
+/// Draggable Liquid Glass toggle. The thumb follows the finger during a
+/// drag gesture and snaps to the nearest end on release. Tap toggles
+/// instantly. Uses spring animation for smooth, physics-based movement.
+private struct DraggableGlassToggle: View {
+    let isOn: Bool
+    let onTap: () -> Void
+    let onChange: (Bool) -> Void
+
+    @State private var dragOffset: CGFloat = 0
+    @State private var isDragging = false
+
+    private let capsuleWidth: CGFloat = 60
+    private let capsuleHeight: CGFloat = 34
+    private let thumbSize: CGFloat = 28
+    private let thumbTravel: CGFloat = 24 // distance between off and on positions
+
+    private var thumbX: CGFloat {
+        let base: CGFloat = isOn ? thumbTravel : -thumbTravel
+        if isDragging {
+            return base + dragOffset
+        }
+        return base
+    }
+
+    var body: some View {
+        ZStack {
+            // Liquid Glass capsule
+            Capsule()
+                .fill(.ultraThinMaterial)
+                .frame(width: capsuleWidth, height: capsuleHeight)
+                .overlay(
+                    Capsule()
+                        .fill(isOn ? Color.appAccent.opacity(0.25) : Color.secondary.opacity(0.1))
+                )
+                .overlay(
+                    Capsule()
+                        .strokeBorder(
+                            isOn ? Color.appAccent.opacity(0.4) : Color.secondary.opacity(0.2),
+                            lineWidth: 0.5
+                        )
+                )
+                .shadow(
+                    color: isOn && Color.glowEnabled
+                        ? Color.appAccent.opacity(Color.glowIntensity * 0.6) : .clear,
+                    radius: isOn && Color.glowEnabled
+                        ? CGFloat(18 * Color.glowIntensity) : 0
+                )
+
+            // Thumb
+            Circle()
+                .fill(Color.white)
+                .frame(width: thumbSize, height: thumbSize)
+                .shadow(color: .black.opacity(0.15), radius: 2, x: 0, y: 1)
+                .offset(x: isDragging ? thumbX : (isOn ? thumbTravel : -thumbTravel))
+                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isDragging ? false : isOn)
+        }
+        .gesture(
+            DragGesture(minimumDistance: 1)
+                .onChanged { value in
+                    isDragging = true
+                    dragOffset = value.translation.width
+                }
+                .onEnded { value in
+                    let base: CGFloat = isOn ? thumbTravel : -thumbTravel
+                    let final = base + value.translation.width
+                    // Snap to nearest end
+                    let shouldTurnOn = final > 0
+                    if shouldTurnOn != isOn {
+                        onChange(shouldTurnOn)
+                    }
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                        dragOffset = 0
+                        isDragging = false
+                    }
+                }
+        )
+        .onTapGesture {
+            if !isDragging {
+                onTap()
             }
         }
     }

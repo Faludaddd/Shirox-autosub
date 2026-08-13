@@ -21,42 +21,17 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-      - name: Bump version sequentially
+      - name: Set build version
         run: |
-          # Sequential version bumping: read the current MARKETING_VERSION from
-          # the pbxproj, increment the minor component (1.4 → 1.5 → 1.6 → …),
-          # and write it back. The build number uses the GitHub run_number so
-          # every build is uniquely identifiable. The bumped MARKETING_VERSION
-          # is committed back to main so the next run sees the new value.
-          CURRENT_VER=$(grep -m1 'MARKETING_VERSION' Shirox.xcodeproj/project.pbxproj | sed -E 's/.*MARKETING_VERSION = ([0-9.]+);.*/\1/')
-          echo "Current MARKETING_VERSION: $CURRENT_VER"
-
-          # Split on '.' and increment the minor component. Supports both
-          # major.minor (1.4) and major.minor.patch (1.4.0) — the patch is
-          # dropped on bump so the result is always major.minor.
-          MAJOR=$(echo "$CURRENT_VER" | cut -d. -f1)
-          MINOR=$(echo "$CURRENT_VER" | cut -d. -f2)
-          MAJOR=${MAJOR:-1}
-          MINOR=${MINOR:-0}
-          NEW_MINOR=$((MINOR + 1))
-          NEW_VER="$MAJOR.$NEW_MINOR"
+          # Keep MARKETING_VERSION at 1.4 (manually controlled). Only the
+          # build number (CURRENT_PROJECT_VERSION) auto-increments via
+          # github.run_number so every build is uniquely identifiable.
           BUILD_NUM="${{ github.run_number }}"
-
-          echo "New MARKETING_VERSION: $NEW_VER"
-          echo "Build number: $BUILD_NUM"
-
-          sed -i '' "s/MARKETING_VERSION = [0-9.]*/MARKETING_VERSION = $NEW_VER/g" Shirox.xcodeproj/project.pbxproj
+          echo "Setting CURRENT_PROJECT_VERSION=$BUILD_NUM (MARKETING_VERSION stays at 1.4)"
           sed -i '' "s/CURRENT_PROJECT_VERSION = [0-9]*/CURRENT_PROJECT_VERSION = $BUILD_NUM/g" Shirox.xcodeproj/project.pbxproj
-
           echo "## Build Version" >> $GITHUB_STEP_SUMMARY
-          echo "**Marketing version:** $NEW_VER" >> $GITHUB_STEP_SUMMARY
+          echo "**Marketing version:** 1.4" >> $GITHUB_STEP_SUMMARY
           echo "**Build number:** $BUILD_NUM (GitHub run #${{ github.run_number }})" >> $GITHUB_STEP_SUMMARY
-
-          # Persist the version bump so the next run picks up from $NEW_VER.
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Shirox.xcodeproj/project.pbxproj
-          git diff --cached --quiet || (git commit -m "chore: bump version to $NEW_VER [skip ci]" && git push)
 
       - name: Make build script executable
         run: chmod +x ./buildipa.sh

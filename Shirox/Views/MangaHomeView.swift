@@ -457,7 +457,30 @@ struct MangaSettingsView: View {
                 }
             }
 
-            // Section 3: Data & Downloads
+            // Section 3: Sources & Modules (universal — same as anime)
+            Section {
+                NavigationLink {
+                    SourcesSettingsPage()
+                } label: {
+                    MangaSettingsCategoryRow(icon: "person.crop.circle.badge.checkmark", title: "Sources", subtitle: "AniList, MyAnimeList, accounts")
+                }
+                NavigationLink {
+                    ModulesSettingsPage()
+                } label: {
+                    MangaSettingsCategoryRow(icon: "puzzlepiece.extension.fill", title: "Modules", subtitle: "Manga sources, store, install")
+                }
+            }
+
+            // Section 4: Appearance (universal)
+            Section {
+                NavigationLink {
+                    AppearanceSettingsPage()
+                } label: {
+                    MangaSettingsCategoryRow(icon: "paintbrush.fill", title: "Appearance", subtitle: "Theme, accent color, motion")
+                }
+            }
+
+            // Section 5: Data & Downloads
             Section {
                 NavigationLink {
                     MangaDataSettingsPage()
@@ -466,7 +489,30 @@ struct MangaSettingsView: View {
                 }
             }
 
-            // Section 4: About
+            // Section 6: Update (universal)
+            Section {
+                NavigationLink {
+                    UpdateSettingsPage()
+                } label: {
+                    MangaSettingsCategoryRow(icon: "arrow.down.circle.fill", title: "Update", subtitle: "Check for updates, download")
+                }
+            }
+
+            // Section 7: Advanced & Logs (universal)
+            Section {
+                NavigationLink {
+                    AdvancedSettingsPage()
+                } label: {
+                    MangaSettingsCategoryRow(icon: "gearshape.2.fill", title: "Advanced", subtitle: "Cache, reset, storage")
+                }
+                NavigationLink {
+                    LoggerSettingsPage()
+                } label: {
+                    MangaSettingsCategoryRow(icon: "terminal", title: "Logger", subtitle: "App logs, debug info")
+                }
+            }
+
+            // Section 8: About
             Section {
                 NavigationLink {
                     AboutSettingsPage()
