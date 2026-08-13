@@ -143,9 +143,8 @@ struct HomeView: View {
                         } else if !anilistAuth.isLoggedIn {
                             ContinueWatchingSignInPrompt()
                         }
-                        if !mangaProgress.items.isEmpty {
-                            ContinueReadingSection(items: mangaProgress.items, readerContext: $readerContext)
-                        }
+                        // Continue Reading section is ONLY shown in Manga/Reading
+                        // Mode (inside MangaHomeContent), NOT in Anime Home.
                         #endif
                         if browseCategoriesGridLayout {
                             browseCategoriesGrid
@@ -460,7 +459,7 @@ struct FeaturedCarousel: View {
                         } label: {
                             HStack(spacing: 6) {
                                 Image(systemName: isManga ? "book.fill" : "play.fill").font(.caption.weight(.bold))
-                                Text(isManga ? "Read" : "Watch").font(.subheadline.weight(.semibold))
+                                Text(isManga ? "Start Reading" : "Watch").font(.subheadline.weight(.semibold))
                             }
                             .foregroundStyle(.primary)
                             .frame(width: 130, height: 38)
@@ -634,7 +633,7 @@ private struct MacFeaturedCarousel: View {
                                 } label: {
                                     HStack(spacing: 6) {
                                         Image(systemName: isManga ? "book.fill" : "play.fill").font(.footnote.weight(.semibold))
-                                        Text(isManga ? "Read" : "Watch").fontWeight(.semibold)
+                                        Text(isManga ? "Start Reading" : "Watch").fontWeight(.semibold)
                                             .lineLimit(1)
                                     }
                                     .foregroundStyle(platformBackground)

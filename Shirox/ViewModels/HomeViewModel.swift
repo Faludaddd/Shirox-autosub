@@ -20,7 +20,7 @@ final class HomeViewModel: ObservableObject {
         ProviderManager.shared.$orderedProviders
             .map { $0.first?.providerType }
             .removeDuplicates { $0 == $1 }
-            .dropFirst() // skip initial value — load() is called by the view's .task
+            .dropFirst()
             .sink { [weak self] _ in
                 guard let self else { return }
                 Task { await self.reload() }
@@ -33,11 +33,12 @@ final class HomeViewModel: ObservableObject {
         isLoading = true
         error = nil
 
-        do {
-            // Jikan (MAL) enforces ~3 req/s; load sequentially to avoid 429s.
-            // AniList supports concurrent requests, so detect provider type first.
-            let isMAL = ProviderManager.shared.primary?.providerType == .mal
-            if isMAL {
+        let isMAL = ProviderManager.shared.primary?.providerType == .mal
+
+        if isMAL {
+            // MAL: sequential to avoid 429s. Recently Completed and Upcoming
+            // are AniList-only, so they won't load — that's expected.
+            do {
                 trending = try await ProviderManager.shared.call { try await $0.trending() }
                 try await Task.sleep(nanoseconds: 400_000_000)
                 seasonal = try await ProviderManager.shared.call { try await $0.seasonal() }
@@ -45,48 +46,58 @@ final class HomeViewModel: ObservableObject {
                 popular = try await ProviderManager.shared.call { try await $0.popular() }
                 try await Task.sleep(nanoseconds: 400_000_000)
                 topRated = try await ProviderManager.shared.call { try await $0.topRated() }
-            } else {
-                // AniList: fetch all sections concurrently, including new ones.
-                async let t = ProviderManager.shared.call { try await $0.trending() }
-                async let s = ProviderManager.shared.call { try await $0.seasonal() }
-                async let p = ProviderManager.shared.call { try await $0.popular() }
-                async let r = ProviderManager.shared.call { try await $0.topRated() }
-                async let rc = fetchRecentlyCompleted()
-                async let u = fetchUpcoming()
-                let (tResult, sResult, pResult, rResult, rcResult, uResult) = try await (t, s, p, r, rc, u)
-                trending = tResult
-                seasonal = sResult
-                popular = pResult
-                topRated = rResult
-                recentlyCompleted = rcResult
-                upcoming = uResult
+            } catch {
+                self.error = error.localizedDescription
             }
-            loaded = true
-        } catch {
-            self.error = error.localizedDescription
+        } else {
+            // AniList: fetch each section independently so a slow response
+            // from one doesn't block the others. Each result is assigned as
+            // soon as it arrives, so the UI populates progressively.
+            async let t: Void = loadTrending()
+            async let s: Void = loadSeasonal()
+            async let p: Void = loadPopular()
+            async let r: Void = loadTopRated()
+            async let rc: Void = loadRecentlyCompleted()
+            async let u: Void = loadUpcoming()
+            _ = await (t, s, p, r, rc, u)
         }
 
+        loaded = true
         isLoading = false
     }
 
-    /// Fetches recently completed anime from last season (AniList only).
-    private func fetchRecentlyCompleted() async throws -> [Media] {
-        do {
-            let media = try await AniListService.shared.recentlyCompletedLastSeason()
-            return media.map { AniListProvider.shared.mapMedia($0) }
-        } catch {
-            return []
-        }
+    private func loadTrending() async {
+        do { trending = try await ProviderManager.shared.call { try await $0.trending() } }
+        catch { /* individual failures don't block other sections */ }
     }
 
-    /// Fetches upcoming anime (AniList only).
-    private func fetchUpcoming() async throws -> [Media] {
+    private func loadSeasonal() async {
+        do { seasonal = try await ProviderManager.shared.call { try await $0.seasonal() } }
+        catch { }
+    }
+
+    private func loadPopular() async {
+        do { popular = try await ProviderManager.shared.call { try await $0.popular() } }
+        catch { }
+    }
+
+    private func loadTopRated() async {
+        do { topRated = try await ProviderManager.shared.call { try await $0.topRated() } }
+        catch { }
+    }
+
+    private func loadRecentlyCompleted() async {
+        do {
+            let media = try await AniListService.shared.recentlyCompletedLastSeason()
+            recentlyCompleted = media.map { AniListProvider.shared.mapMedia($0) }
+        } catch { recentlyCompleted = [] }
+    }
+
+    private func loadUpcoming() async {
         do {
             let media = try await AniListService.shared.upcoming()
-            return media.map { AniListProvider.shared.mapMedia($0) }
-        } catch {
-            return []
-        }
+            upcoming = media.map { AniListProvider.shared.mapMedia($0) }
+        } catch { upcoming = [] }
     }
 
     func reload() async {

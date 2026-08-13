@@ -36,8 +36,24 @@ struct ContinueReadingSection: View {
                             )
                         }
                         .buttonStyle(.plain)
-                        .frame(width: 260)
+                        .frame(width: 160)
                         .contextMenu {
+                            Button {
+                                open(item)
+                            } label: {
+                                Label("View Details", systemImage: "info.circle")
+                            }
+                            if let aniListId = MangaMatchManager.shared.cachedMatch(mangaHref: item.mangaHref)?.aniListId {
+                                Button {
+                                    #if os(iOS)
+                                    if let url = URL(string: "https://anilist.co/manga/\(aniListId)") {
+                                        UIApplication.shared.open(url)
+                                    }
+                                    #endif
+                                } label: {
+                                    Label("View on AniList", systemImage: "safari")
+                                }
+                            }
                             Button(role: .destructive) {
                                 MangaProgressManager.shared.remove(item)
                             } label: {
@@ -128,33 +144,24 @@ struct ContinueReadingCardDisplay: View {
     }
 
     var body: some View {
-        // Full-bleed 2:3 cover. Chapter badge, title, and progress bar are all
-        // layered over the cover so the card is a single visual unit (no
-        // trailing title row) — mirrors ContinueWatchingCardDisplay.
+        // 16:9 horizontal card matching ContinueWatchingCard's format.
         Color.clear
-            .aspectRatio(2/3, contentMode: .fit)
+            .aspectRatio(16/9, contentMode: .fit)
             .overlay(
                 CachedAsyncImage(urlString: item.coverImage)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipped()
             )
-            // Chapter badge — top-left corner
             .overlay(alignment: .topLeading) {
                 Text(item.chapterName)
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(.white)
                     .lineLimit(1)
-                    .truncationMode(.tail)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(
-                        Color.black.opacity(0.55),
-                        in: Capsule()
-                    )
+                    .background(Color.black.opacity(0.55), in: Capsule())
                     .padding(8)
             }
-            // Bottom gradient overlay carrying the title and page-progress
-            // indicator — replaces the previous trailing title row.
             .overlay(alignment: .bottom) {
                 LinearGradient(
                     stops: [
@@ -164,7 +171,7 @@ struct ContinueReadingCardDisplay: View {
                     startPoint: .top,
                     endPoint: .bottom
                 )
-                .frame(height: 110)
+                .frame(height: 80)
                 .overlay(alignment: .bottomLeading) {
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 4) {
@@ -177,7 +184,7 @@ struct ContinueReadingCardDisplay: View {
                         .lineLimit(1)
 
                         Text(item.mangaTitle)
-                            .font(.subheadline.weight(.semibold))
+                            .font(.caption.weight(.semibold))
                             .foregroundStyle(.white)
                             .lineLimit(2)
                     }
@@ -185,7 +192,6 @@ struct ContinueReadingCardDisplay: View {
                     .padding(.bottom, 10)
                 }
             }
-            // Progress bar — pinned to the very bottom edge of the card.
             .overlay(alignment: .bottom) {
                 if progressFraction > 0 {
                     GeometryReader { geo in
@@ -193,7 +199,6 @@ struct ContinueReadingCardDisplay: View {
                             Color.white.opacity(0.2)
                             Color.primary
                                 .frame(width: geo.size.width * progressFraction)
-                                .shadow(color: Color.primary.opacity(0.5), radius: 3, x: 0, y: 0)
                         }
                     }
                     .frame(height: 3)

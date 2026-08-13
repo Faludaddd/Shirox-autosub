@@ -2137,29 +2137,38 @@ struct SourcesSettingsPage: View {
         subText: String,
         action: @escaping () -> Void
     ) -> some View {
-        HStack(spacing: 14) {
-            iconView(provider: provider, isLoggedIn: isLoggedIn)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 14) {
+                iconView(provider: provider, isLoggedIn: isLoggedIn)
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(primaryName)
-                    .font(.body.weight(.medium))
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(isLoggedIn ? Color.green : Color.secondary.opacity(0.6))
-                        .frame(width: 7, height: 7)
-                    Text(subText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(primaryName)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(isLoggedIn ? Color.green : Color.secondary.opacity(0.6))
+                            .frame(width: 7, height: 7)
+                        Text(subText)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                 }
-            }
-            Spacer(minLength: 8)
 
-            Button(isLoggedIn ? "Disconnect" : "Connect", action: action)
-                .font(.caption.weight(.semibold))
-                .buttonStyle(.bordered)
-                .tint(isLoggedIn ? .red : .appAccent)
+                Spacer(minLength: 8)
+            }
+
+            HStack {
+                Spacer()
+                Button(isLoggedIn ? "Disconnect" : "Connect", action: action)
+                    .font(.caption.weight(.semibold))
+                    .buttonStyle(.bordered)
+                    .tint(isLoggedIn ? .red : .appAccent)
+            }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
     }
 
     // MARK: - Icon View (with glow border)
@@ -4576,6 +4585,11 @@ struct LoggerSettingsPage: View {
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {
+                    copyAllLogs()
+                } label: {
+                    Image(systemName: "doc.on.doc.fill")
+                }
+                Button {
                     reload()
                 } label: {
                     Image(systemName: "arrow.clockwise")
@@ -4626,6 +4640,26 @@ struct LoggerSettingsPage: View {
     private func clear() {
         Logger.shared.clearLogs()
         entries = []
+    }
+
+    private func copyAllLogs() {
+        #if os(iOS)
+        let allEntries = Logger.shared.getEntries(category: nil)
+        let formatter = DateFormatter()
+        formatter.dateStyle = .short
+        formatter.timeStyle = .medium
+        let formatted = allEntries.map { entry in
+            "[\(entry.type.uppercased())] \(formatter.string(from: entry.timestamp)) — \(entry.message)"
+        }.joined(separator: "\n")
+        UIPasteboard.general.string = formatted
+        Haptics.light()
+        ToastManager.shared.show(
+            title: "Logs Copied",
+            message: "\(allEntries.count) entries copied to clipboard",
+            icon: "checkmark.circle.fill",
+            iconColor: .green
+        )
+        #endif
     }
 }
 

@@ -262,15 +262,9 @@ struct MangaDetailView: View {
                     if !synopsis.isEmpty {
                         synopsisSection(text: synopsis).padding(.top, 16)
                     }
-                    // #131 — Statistics grid mirroring AniListDetailView's
-                    // layout, adapted for manga's field set (Chapters/Volumes
-                    // instead of Episodes/Duration). Only rendered when the
-                    // AniList enrichment is present (module-only detail has
-                    // no statistics data) AND the user hasn't hidden
-                    // statistics via the Appearance toggle.
-                    if let enrich = vm.enrichment, showStatistics {
-                        statisticsSection(media: enrich).padding(.top, 8)
-                    }
+                    // Statistics section removed from the provider source page.
+                    // Statistics are hosted exclusively on the dedicated
+                    // internal AniList manga details page (AniListMangaDetailView).
                     #if os(iOS)
                     readButton(detail)
                         .padding(.horizontal, 16)
