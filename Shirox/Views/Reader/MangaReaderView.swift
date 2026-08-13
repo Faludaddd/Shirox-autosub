@@ -663,7 +663,7 @@ struct MangaReaderView: View {
     /// + warmUpcomingPages that were held during active scrolling.
     private func startScrollSettleTimer() {
         scrollSettleCheck?.invalidate()
-        scrollSettleCheck = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { timer in
+        scrollSettleCheck = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [self] timer in
             if !isActivelyScrolling {
                 timer.invalidate()
                 scrollSettleCheck = nil
