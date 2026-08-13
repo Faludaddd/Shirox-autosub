@@ -201,10 +201,11 @@ struct MangaDetailView: View {
                     onTogglePrivate: existingAniListEntry != nil ? { newValue in
                         existingAniListEntry?.isPrivate = newValue
                         Task {
+                            guard let entry = existingAniListEntry else { return }
                             try? await AniListLibraryService.shared.updateEntry(
-                                mediaId: aid, status: existingAniListEntry?.status,
-                                progress: existingAniListEntry?.progress,
-                                score: existingAniListEntry?.score,
+                                mediaId: aid, status: entry.status,
+                                progress: entry.progress,
+                                score: entry.score,
                                 isPrivate: newValue, type: .manga)
                         }
                     } : nil,
@@ -236,10 +237,11 @@ struct MangaDetailView: View {
                     onTogglePrivate: existingMALEntry != nil ? { newValue in
                         existingMALEntry?.isPrivate = newValue
                         Task {
+                            guard let entry = existingMALEntry else { return }
                             try? await MALMangaLibraryService.shared.updateEntry(
-                                malId: mid, status: existingMALEntry?.status,
-                                progress: existingMALEntry?.progress,
-                                score: existingMALEntry?.score)
+                                malId: mid, status: entry.status,
+                                progress: entry.progress,
+                                score: entry.score)
                         }
                     } : nil,
                     onDelete: existingMALEntry != nil ? {
