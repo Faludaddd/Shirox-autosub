@@ -35,7 +35,7 @@ final class HistoryManager: ObservableObject {
         coverImageURL: String?
     ) {
         let identity = HistoryIdentity(aniListID: aniListID, mediaTitle: mediaTitle, kind: .anime)
-        upsert(identity: identity, progress: episodeNumber, coverImageURL: coverImageURL)
+        upsert(identity: identity, progress: Double(episodeNumber), coverImageURL: coverImageURL)
     }
 
     /// Records a manga read activity. If an entry already exists for this
@@ -151,7 +151,7 @@ struct HistoryEntry: Identifiable, Codable, Hashable {
     }
 
     /// True if this entry matches the given identity (same media, same kind).
-    func matches(identity: HistoryIdentity) -> Bool {
+    fileprivate func matches(identity: HistoryIdentity) -> Bool {
         guard kind == identity.kind else { return false }
         // Anime: prefer aniListID match; fall back to title.
         if kind == .anime {
@@ -199,7 +199,7 @@ struct HistoryEntry: Identifiable, Codable, Hashable {
 
 // MARK: - HistoryIdentity
 
-private struct HistoryIdentity {
+fileprivate struct HistoryIdentity {
     let aniListID: Int?
     let mediaTitle: String
     let kind: HistoryEntry.Kind

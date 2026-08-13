@@ -339,7 +339,7 @@ private struct NotificationSwipeRow: View {
         }
     }
 
-    private var bodyText: some View {
+    private var bodyText: Text {
         switch notif.kind {
         case .airing(let episode, let mediaTitle, _, _):
             return Text("\(mediaTitle ?? "Anime") ").bold() + Text("episode \(episode) aired")
@@ -355,7 +355,7 @@ private struct NotificationSwipeRow: View {
                 return Text(context ?? "A title was updated")
             }
         case .unknown(let context):
-            return Text(context ?? "Notification").foregroundStyle(.secondary)
+            return Text(context ?? "Notification")
         }
     }
 

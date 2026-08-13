@@ -30,7 +30,7 @@ struct UpdatePopupView: View {
         .interactiveDismissDisabled(info.isCritical)
         #if os(iOS)
         .sheet(isPresented: $showShareSheet) {
-            ShareSheet(items: [info.downloadURL.absoluteString])
+            UpdateShareSheet(items: [info.downloadURL.absoluteString])
         }
         .sheet(isPresented: $showWebView) {
             UpdateWebView(url: info.downloadURL)
@@ -303,7 +303,7 @@ struct UpdatePopupView: View {
 // MARK: - Share Sheet
 
 #if os(iOS)
-struct ShareSheet: UIViewControllerRepresentable {
+struct UpdateShareSheet: UIViewControllerRepresentable {
     let items: [Any]
     func makeUIViewController(context: Context) -> UIActivityViewController {
         UIActivityViewController(activityItems: items, applicationActivities: nil)
