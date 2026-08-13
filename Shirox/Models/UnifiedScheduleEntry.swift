@@ -72,6 +72,27 @@ struct UnifiedScheduleEntry: Identifiable, Hashable, Sendable {
     /// entries have no comparable metric from TVMaze, so they default to `0`.
     let popularity: Int
 
+    // MARK: Memberwise init (for synthesizing entries from manga releases)
+
+    init(id: Int, source: ScheduleSource, sourceMediaId: Int, aniListMediaId: Int?,
+         title: String, airingAt: Int, episode: Int, season: Int?,
+         coverImage: String?, format: String?, isStreamingRelease: Bool,
+         genres: [String]?, popularity: Int) {
+        self.id = id
+        self.source = source
+        self.sourceMediaId = sourceMediaId
+        self.aniListMediaId = aniListMediaId
+        self.title = title
+        self.airingAt = airingAt
+        self.episode = episode
+        self.season = season
+        self.coverImage = coverImage
+        self.format = format
+        self.isStreamingRelease = isStreamingRelease
+        self.genres = genres
+        self.popularity = popularity
+    }
+
     // MARK: Init from AniList
 
     init(item: AniListAiringScheduleItem) {

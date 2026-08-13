@@ -1378,7 +1378,7 @@ struct ScheduleView: View {
                 title: media.title.displayTitle,
                 airingAt: Int(today.timeIntervalSince1970),
                 episode: media.episodes ?? 0,
-                season: Optional<Int>.none,
+                season: nil,
                 coverImage: media.coverImage.best,
                 format: media.format,
                 isStreamingRelease: false,
