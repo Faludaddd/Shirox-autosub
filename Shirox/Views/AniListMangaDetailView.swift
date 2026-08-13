@@ -3,11 +3,6 @@ import SwiftUI
 /// AniList-backed manga detail: loads AniList metadata, resolves a manga-module
 /// `SearchItem` (via MangaModuleResolver), then presents MangaDetailView seeded
 /// with the metadata. The manga analog of AniListDetailView (which stays anime).
-///
-/// This is the ORIGINAL source's working implementation — it delegates to
-/// MangaDetailView which handles chapter loading and reader opening. Our
-/// custom layout (hero, statistics, countdown) is layered on top via the
-/// aniListMedia parameter that MangaDetailView receives.
 struct AniListMangaDetailView: View {
     let mediaId: Int
     var preloadedMedia: Media? = nil
@@ -15,6 +10,7 @@ struct AniListMangaDetailView: View {
     @State private var media: Media?
     @State private var resolvedItem: SearchItem?
     @State private var phase: Phase = .loading
+    @EnvironmentObject private var moduleManager: ModuleManager
 
     private enum Phase: Equatable { case loading, ready, noModule, notFound, error(String) }
 
@@ -27,11 +23,6 @@ struct AniListMangaDetailView: View {
     var body: some View {
         Group {
             if let media, let resolvedItem, phase == .ready {
-                // Delegate to the ORIGINAL MangaDetailView which handles:
-                // - Chapter list loading from the module
-                // - Chapter selection → MangaReaderView opening
-                // - Reading progress saving
-                // - Statistics, synopsis, relations
                 MangaDetailView(item: resolvedItem, aniListMedia: media)
             } else if phase == .noModule {
                 ContentUnavailableView("No Manga Module",
@@ -40,7 +31,7 @@ struct AniListMangaDetailView: View {
             } else if phase == .notFound {
                 ContentUnavailableView("Not Found",
                     systemImage: "magnifyingglass",
-                    description: Text("No match for this title in your manga module."))
+                    description: Text("No match for this title in your manga module. Try searching for it directly in the Search tab."))
             } else if case .error(let msg) = phase {
                 ContentUnavailableView("Couldn't Load",
                     systemImage: "exclamationmark.triangle", description: Text(msg))
@@ -62,12 +53,25 @@ struct AniListMangaDetailView: View {
             catch { phase = .error(error.localizedDescription); return }
         }
         guard let media else { phase = .error("No data"); return }
+
+        // Check if any manga module is installed first
+        let hasMangaModule = moduleManager.modules.contains { $0.isManga }
+        guard hasMangaModule else {
+            phase = .noModule
+            return
+        }
+
         #if os(iOS)
+        // Module is installed — try to resolve the title against it
         if let item = await MangaModuleResolver.shared.resolve(title: media.title.searchTitle) {
             resolvedItem = item
             phase = .ready
         } else {
-            phase = ModuleManager.shared.modules.contains { $0.isManga } ? .notFound : .noModule
+            // Module is installed but search returned no results.
+            // This could be a network error, a CF challenge, or the title
+            // genuinely doesn't exist in this module. Show a helpful message
+            // rather than "no module" since the module IS installed.
+            phase = .notFound
         }
         #else
         phase = .noModule

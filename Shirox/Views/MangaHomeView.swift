@@ -558,8 +558,9 @@ private struct MangaSettingsCategoryRow: View {
 
 // MARK: - Manga Reader Settings Page
 //
-// Unique layout: custom card-based UI (NOT a system Form) with reading
-// direction, page layout, zoom, tap zones, transitions, and brightness.
+// Layout: Grid-based visual selector for reading direction (icon tiles),
+// followed by stacked toggle cards for navigation, and a slider section
+// for brightness. Distinct from all other manga settings pages.
 
 private struct MangaReaderSettingsPage: View {
     @AppStorage("manga.readingDirection") private var readingDirection: String = "auto"
@@ -575,104 +576,181 @@ private struct MangaReaderSettingsPage: View {
     @AppStorage("manga.brightnessOverlay") private var brightnessOverlay: Double = 1.0
     @AppStorage("manga.cropMargins") private var cropMargins: Bool = false
 
+    private let directions: [(label: String, icon: String, value: String)] = [
+        ("Auto", "circle.dashed", "auto"),
+        ("Left → Right", "arrow.right.square", "ltr"),
+        ("Right → Left", "arrow.left.square", "rtl"),
+        ("Vertical", "arrow.up.arrow.down.square", "vertical")
+    ]
+
+    private let layouts: [(label: String, icon: String, value: String)] = [
+        ("Single", "rectangle.portrait", "single"),
+        ("Double", "rectangle.split.2x1", "double"),
+        ("Fit Width", "arrow.left.and.right", "fitWidth"),
+        ("Fit Height", "arrow.up.and.down", "fitHeight"),
+        ("Fit Screen", "rectangle.compress.vertical", "fitScreen")
+    ]
+
+    private let transitions: [(label: String, value: String)] = [
+        ("Slide", "slide"), ("Fade", "fade"), ("Instant", "instant")
+    ]
+
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
-                directionCard
-                layoutCard
-                zoomCard
-                tapZonesCard
-                transitionsCard
-                brightnessCard
+            VStack(spacing: 20) {
+                // Direction — grid of icon tiles
+                sectionLabel("Reading Direction")
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                    ForEach(directions, id: \.value) { dir in
+                        directionTile(dir)
+                    }
+                }
+                toggleRow("Invert Horizontal Direction", isOn: $invertHorizontal)
+                toggleRow("Page Gap Between Pages", isOn: $pageGap)
+
+                Divider().padding(.vertical, 4)
+
+                // Layout — horizontal scroll of tiles
+                sectionLabel("Page Layout")
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(layouts, id: \.value) { layout in
+                            layoutTile(layout)
+                        }
+                    }
+                }
+                toggleRow("Crop Page Margins", isOn: $cropMargins)
+                toggleRow("Remember Zoom Per Series", isOn: $rememberZoomPerSeries)
+
+                Divider().padding(.vertical, 4)
+
+                // Navigation — stacked toggles
+                sectionLabel("Navigation")
+                Picker("Tap Zones", selection: $tapZones) {
+                    Text("Screen Edges").tag("edges")
+                    Text("Left/Right Halves").tag("halves")
+                    Text("Disabled").tag("disabled")
+                }
+                toggleRow("Swipe to Navigate", isOn: $swipeToNavigate)
+                toggleRow("Volume Buttons Navigate", isOn: $volumeButtons)
+                toggleRow("Haptic Feedback", isOn: $hapticFeedback)
+
+                Divider().padding(.vertical, 4)
+
+                // Transitions — segmented picker
+                sectionLabel("Page Transitions")
+                Picker("Transition Style", selection: $pageTransition) {
+                    ForEach(transitions, id: \.value) { t in
+                        Text(t.label).tag(t.value)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Divider().padding(.vertical, 4)
+
+                // Brightness — slider with live preview
+                sectionLabel("Reader Brightness")
+                VStack(spacing: 6) {
+                    HStack {
+                        Image(systemName: "sun.min").font(.caption).foregroundStyle(.secondary)
+                        Slider(value: $brightnessOverlay, in: 0.3...1.0, step: 0.05)
+                            .tint(Color.appAccent)
+                        Image(systemName: "sun.max.fill").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Text("\(Int(brightnessOverlay * 100))% — Dims the reader independently of system brightness.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
             }
             .padding(16)
         }
-        .background(bg.ignoresSafeArea())
+        .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .navigationTitle("Reader")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
     }
 
-    private var directionCard: some View {
-        SettingsCard(title: "Reading Direction", icon: "arrow.left.arrow.right") {
-            SettingsPickerRow(title: "Direction", value: $readingDirection, options: [
-                ("Auto (follow source)", "auto"), ("Left to Right", "ltr"),
-                ("Right to Left", "rtl"), ("Vertical (Webtoon)", "vertical")
-            ])
-            SettingsToggleRow(title: "Invert Horizontal", icon: "arrow.left.arrow.right.circle", isOn: $invertHorizontal)
-            SettingsToggleRow(title: "Page Gap Between Pages", icon: "rectangle.split.2x1", isOn: $pageGap)
-        }
+    private func sectionLabel(_ text: String) -> some View {
+        Text(text)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .textCase(.uppercase)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var layoutCard: some View {
-        SettingsCard(title: "Page Layout", icon: "rectangle.on.rectangle") {
-            SettingsPickerRow(title: "Layout", value: $zoomMode, options: [
-                ("Single Page", "single"), ("Double Page Spread", "double"),
-                ("Fit Width", "fitWidth"), ("Fit Height", "fitHeight"), ("Fit Screen", "fitScreen")
-            ])
-            SettingsToggleRow(title: "Crop Page Margins", icon: "crop", isOn: $cropMargins)
-        }
-    }
-
-    private var zoomCard: some View {
-        SettingsCard(title: "Zoom", icon: "plus.magnifyingglass") {
-            SettingsToggleRow(title: "Remember Zoom Per Series", icon: "bookmark.fill", isOn: $rememberZoomPerSeries)
-        }
-    }
-
-    private var tapZonesCard: some View {
-        SettingsCard(title: "Tap Zones & Navigation", icon: "hand.tap.fill") {
-            SettingsPickerRow(title: "Tap Zones", value: $tapZones, options: [
-                ("Screen Edges", "edges"), ("Left/Right Halves", "halves"), ("Disabled", "disabled")
-            ])
-            SettingsToggleRow(title: "Swipe to Navigate", icon: "hand.draw.fill", isOn: $swipeToNavigate)
-            SettingsToggleRow(title: "Volume Buttons Navigate", icon: "speaker.waves.2.fill", isOn: $volumeButtons)
-            SettingsToggleRow(title: "Haptic Feedback", icon: "iphone.radiowaves.left.and.right", isOn: $hapticFeedback)
-        }
-    }
-
-    private var transitionsCard: some View {
-        SettingsCard(title: "Page Transitions", icon: "rectangle.stack") {
-            SettingsPickerRow(title: "Transition Style", value: $pageTransition, options: [
-                ("Slide", "slide"), ("Fade", "fade"), ("Instant", "instant")
-            ])
-        }
-    }
-
-    private var brightnessCard: some View {
-        SettingsCard(title: "Brightness", icon: "sun.max.fill") {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("Reader Brightness")
-                        .font(.subheadline.weight(.medium))
-                    Spacer()
-                    Text("\(Int(brightnessOverlay * 100))%")
-                        .font(.subheadline.weight(.bold).monospacedDigit())
-                        .foregroundStyle(Color.appAccent)
-                }
-                Slider(value: $brightnessOverlay, in: 0.3...1.0, step: 0.05)
-                    .tint(Color.appAccent)
-                Text("Dims the reader independently of system brightness.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+    private func directionTile(_ dir: (label: String, icon: String, value: String)) -> some View {
+        let selected = readingDirection == dir.value
+        return Button {
+            Haptics.light()
+            readingDirection = dir.value
+        } label: {
+            VStack(spacing: 8) {
+                Image(systemName: dir.icon)
+                    .font(.system(size: 28))
+                    .foregroundStyle(selected ? Color.appAccent : .secondary)
+                Text(dir.label)
+                    .font(.caption.weight(selected ? .bold : .medium))
+                    .foregroundStyle(selected ? Color.appAccent : .primary)
             }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(selected ? Color.appAccent.opacity(0.12) : Color(.secondarySystemGroupedBackground))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(selected ? Color.appAccent.opacity(0.5) : Color.clear, lineWidth: 1.5)
+            )
         }
+        .buttonStyle(.plain)
     }
 
-    private var bg: Color {
-        #if os(iOS)
-        return Color(.systemGroupedBackground)
-        #else
-        return Color.black.opacity(0.05)
-        #endif
+    private func layoutTile(_ layout: (label: String, icon: String, value: String)) -> some View {
+        let selected = zoomMode == layout.value
+        return Button {
+            Haptics.light()
+            zoomMode = layout.value
+        } label: {
+            VStack(spacing: 6) {
+                Image(systemName: layout.icon)
+                    .font(.system(size: 24))
+                    .foregroundStyle(selected ? Color.appAccent : .secondary)
+                Text(layout.label)
+                    .font(.caption2.weight(selected ? .bold : .medium))
+                    .foregroundStyle(selected ? Color.appAccent : .primary)
+            }
+            .frame(width: 80, height: 80)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(selected ? Color.appAccent.opacity(0.12) : Color(.secondarySystemGroupedBackground))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(selected ? Color.appAccent.opacity(0.5) : Color.clear, lineWidth: 1.5)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func toggleRow(_ title: String, isOn: Binding<Bool>) -> some View {
+        HStack {
+            Text(title).font(.subheadline)
+            Spacer()
+            Toggle("", isOn: isOn).labelsHidden().tint(Color.appAccent)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10))
     }
 }
 
 // MARK: - Manga Display Settings Page
 //
-// Unique layout: system Form with image quality, background color, page
-// numbers, and data saving for manga images.
+// Layout: Color-swatch picker for background, quality dropdown card,
+// and a toggle group card. Uses a visual color picker instead of a
+// plain Picker, making it distinct from the Reader page.
 
 private struct MangaDisplaySettingsPage: View {
     @AppStorage("manga.imageQuality") private var imageQuality: String = "high"
@@ -682,34 +760,97 @@ private struct MangaDisplaySettingsPage: View {
     @AppStorage("manga.dataSavingCellular") private var dataSavingCellular: Bool = false
     @AppStorage("manga.keepScreenOn") private var keepScreenOn: Bool = true
 
+    private let bgColors: [(label: String, color: Color, value: String)] = [
+        ("Black", .black, "black"),
+        ("Dark Gray", Color(white: 0.2), "gray"),
+        ("White", .white, "white")
+    ]
+
+    private let qualities: [(label: String, value: String)] = [
+        ("High (Recommended)", "high"),
+        ("Medium", "medium"),
+        ("Low (Data Saver)", "low")
+    ]
+
     var body: some View {
-        Form {
-            Section("Image Quality") {
-                Picker("Quality", selection: $imageQuality) {
-                    Text("High (Recommended)").tag("high")
-                    Text("Medium").tag("medium")
-                    Text("Low (Data Saver)").tag("low")
+        ScrollView {
+            VStack(spacing: 20) {
+                // Background — visual color swatches
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Reader Background")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+                    HStack(spacing: 14) {
+                        ForEach(bgColors, id: \.value) { bg in
+                            Button {
+                                Haptics.light()
+                                backgroundColor = bg.value
+                            } label: {
+                                VStack(spacing: 6) {
+                                    Circle()
+                                        .fill(bg.color)
+                                        .frame(width: 44, height: 44)
+                                        .overlay(
+                                            Circle().strokeBorder(
+                                                backgroundColor == bg.value ? Color.appAccent : Color.secondary.opacity(0.3),
+                                                lineWidth: backgroundColor == bg.value ? 3 : 1
+                                            )
+                                        )
+                                        .shadow(color: .black.opacity(0.1), radius: 2, y: 1)
+                                    Text(bg.label)
+                                        .font(.caption2.weight(backgroundColor == bg.value ? .bold : .regular))
+                                        .foregroundStyle(backgroundColor == bg.value ? Color.appAccent : .secondary)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    Text("Independent of the app's overall theme. White is recommended for manga since pages are typically white.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
-                Toggle("Downsample Large Images", isOn: $downsampleImages)
-                Toggle("Data Saving on Cellular", isOn: $dataSavingCellular)
-            }
-            Section("Reader Background") {
-                Picker("Background Color", selection: $backgroundColor) {
-                    Text("Black").tag("black")
-                    Text("Dark Gray").tag("gray")
-                    Text("White").tag("white")
+                .padding(16)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
+
+                // Image Quality — menu picker card
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Image Quality")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+                    Picker("Quality", selection: $imageQuality) {
+                        ForEach(qualities, id: \.value) { q in
+                            Text(q.label).tag(q.value)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .tint(Color.appAccent)
+                    Toggle("Downsample Large Images", isOn: $downsampleImages)
+                        .tint(Color.appAccent)
+                    Toggle("Data Saving on Cellular", isOn: $dataSavingCellular)
+                        .tint(Color.appAccent)
                 }
+                .padding(16)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
+
+                // Display options — compact toggle list
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Display Options")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+                    Toggle("Show Page Numbers", isOn: $showPageNumbers)
+                        .tint(Color.appAccent)
+                    Toggle("Keep Screen Awake", isOn: $keepScreenOn)
+                        .tint(Color.appAccent)
+                }
+                .padding(16)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
             }
-            Section("Display Options") {
-                Toggle("Show Page Numbers", isOn: $showPageNumbers)
-                Toggle("Keep Screen Awake", isOn: $keepScreenOn)
-            }
-            Section {
-                Text("Manga background is independent of the app's overall theme. White backgrounds are recommended for manga since pages are typically white.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            .padding(16)
         }
+        .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .navigationTitle("Display")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
@@ -719,9 +860,9 @@ private struct MangaDisplaySettingsPage: View {
 
 // MARK: - Manga Tracking Settings Page
 //
-// Unique layout: system Form mirroring the anime Library/Tracking settings
-// but scoped to manga progress. AniList sync, edit sync, never reduce
-// progress, prompt to rate.
+// Layout: Two-column status indicator (connected/disconnected) at top,
+// followed by sync option toggles in a card, then progress options in
+// a separate card. Uses a header summary block distinct from Form layout.
 
 private struct MangaTrackingSettingsPage: View {
     @AppStorage("manga.trackOnAniList") private var trackOnAniList: Bool = true
@@ -730,29 +871,69 @@ private struct MangaTrackingSettingsPage: View {
     @AppStorage("manga.promptToRate") private var promptToRate: Bool = true
     @AppStorage("manga.autoMarkRead") private var autoMarkRead: Bool = true
     @AppStorage("manga.defaultSort") private var defaultSort: String = "source"
+    @ObservedObject private var anilistAuth = AniListAuthManager.shared
 
     var body: some View {
-        Form {
-            Section("AniList Sync") {
-                Toggle("Track on AniList", isOn: $trackOnAniList)
-                Toggle("Sync Edits", isOn: $syncEdits)
-                Toggle("Never Reduce Progress", isOn: $neverReduceProgress)
-                Toggle("Prompt to Rate After Finishing", isOn: $promptToRate)
-            }
-            Section("Progress") {
-                Toggle("Auto-Mark Chapters Read", isOn: $autoMarkRead)
-                Picker("Default Library Sort", selection: $defaultSort) {
-                    Text("Source Order").tag("source")
-                    Text("By Title").tag("title")
-                    Text("By Last Read").tag("recent")
+        ScrollView {
+            VStack(spacing: 16) {
+                // Connection status header
+                HStack(spacing: 12) {
+                    Circle()
+                        .fill(anilistAuth.isLoggedIn ? Color.green : Color.gray)
+                        .frame(width: 12, height: 12)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("AniList")
+                            .font(.subheadline.weight(.semibold))
+                        Text(anilistAuth.isLoggedIn ? "Connected as \(anilistAuth.username ?? "user")" : "Not connected")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: "checkmark.seal.fill")
+                        .foregroundStyle(anilistAuth.isLoggedIn ? Color.green : Color.gray.opacity(0.3))
                 }
-            }
-            Section {
+                .padding(16)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
+
+                // Sync options
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Sync Options")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+                    Toggle("Track on AniList", isOn: $trackOnAniList).tint(Color.appAccent)
+                    Toggle("Sync Edits", isOn: $syncEdits).tint(Color.appAccent)
+                    Toggle("Never Reduce Progress", isOn: $neverReduceProgress).tint(Color.appAccent)
+                    Toggle("Prompt to Rate After Finishing", isOn: $promptToRate).tint(Color.appAccent)
+                }
+                .padding(16)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
+
+                // Progress options
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Progress")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+                    Toggle("Auto-Mark Chapters Read", isOn: $autoMarkRead).tint(Color.appAccent)
+                    Picker("Default Library Sort", selection: $defaultSort) {
+                        Text("Source Order").tag("source")
+                        Text("By Title").tag("title")
+                        Text("By Last Read").tag("recent")
+                    }
+                    .tint(Color.appAccent)
+                }
+                .padding(16)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
+
                 Text("These settings only affect manga tracking. Anime tracking settings are completely separate.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
             }
+            .padding(16)
         }
+        .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .navigationTitle("Library & Tracking")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
@@ -762,7 +943,9 @@ private struct MangaTrackingSettingsPage: View {
 
 // MARK: - Manga Notifications Settings Page
 //
-// Unique layout: system Form controlling chapter release notifications.
+// Layout: Toggle cards grouped by notification type (Chapter / In-App / Phone)
+// with a stepper in a separate card. Uses icon-accented header rows distinct
+// from the Display and Tracking pages.
 
 private struct MangaNotificationsSettingsPage: View {
     @AppStorage("manga.chapterNotificationsEnabled") private var chapterNotificationsEnabled: Bool = true
@@ -771,32 +954,96 @@ private struct MangaNotificationsSettingsPage: View {
     @AppStorage("manga.notificationLeadTime") private var notificationLeadTime: Int = 0
 
     var body: some View {
-        Form {
-            Section("Chapter Notifications") {
-                Toggle("New Chapter Alerts", isOn: $chapterNotificationsEnabled)
-                Toggle("In-App Toasts", isOn: $inAppToastsEnabled)
-                Toggle("Phone Notifications", isOn: $phoneNotificationsEnabled)
-            }
-            Section("Timing") {
-                Stepper("Lead Time: \(notificationLeadTime == 0 ? "On Release" : "\(notificationLeadTime)m Before")",
-                        value: $notificationLeadTime, in: 0...60, step: 5)
-            }
-            Section {
-                Text("Notifications for manga chapter releases use the same system as anime episode alerts. Settings here only affect manga — anime notification settings are separate.")
+        ScrollView {
+            VStack(spacing: 16) {
+                // Chapter alerts card
+                notifCard(
+                    icon: "book.badge.clock",
+                    title: "Chapter Release Alerts",
+                    description: "Get notified when new chapters are released for tracked manga.",
+                    toggle: $chapterNotificationsEnabled
+                )
+
+                // In-app toasts card
+                notifCard(
+                    icon: "rectangle.stack.badge.play.fill",
+                    title: "In-App Toasts",
+                    description: "Show a brief toast at the bottom of the screen when a new chapter is detected.",
+                    toggle: $inAppToastsEnabled
+                )
+
+                // Phone notifications card
+                notifCard(
+                    icon: "iphone.radiowaves.left.and.right",
+                    title: "Phone Notifications",
+                    description: "Send system push notifications to your device. Requires notification permission.",
+                    toggle: $phoneNotificationsEnabled
+                )
+
+                // Timing card
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "clock.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.appAccent)
+                        Text("Timing")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .textCase(.uppercase)
+                    }
+                    Stepper("Lead Time: \(notificationLeadTime == 0 ? "On Release" : "\(notificationLeadTime)m Before")",
+                            value: $notificationLeadTime, in: 0...60, step: 5)
+                        .tint(Color.appAccent)
+                    Text("How early to fire the notification before the scheduled release time.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(16)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
+
+                Text("These settings only affect manga notifications. Anime notification settings are separate.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
             }
+            .padding(16)
         }
+        .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .navigationTitle("Notifications")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
     }
+
+    private func notifCard(icon: String, title: String, description: String, toggle: Binding<Bool>) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 20))
+                    .foregroundStyle(Color.appAccent)
+                    .frame(width: 32, height: 32)
+                    .background(Color.appAccent.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                    Text(description)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer()
+                Toggle("", isOn: toggle).labelsHidden().tint(Color.appAccent)
+            }
+        }
+        .padding(16)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
+    }
 }
 
 // MARK: - Manga Data Settings Page
 //
-// Unique layout: system Form for data saving and offline reading.
+// Layout: Data saving toggle with a visual quality indicator bar,
+// preloading stepper with a visual gauge. Distinct from all other pages.
 
 private struct MangaDataSettingsPage: View {
     @AppStorage("manga.dataSavingCellular") private var dataSavingCellular: Bool = false
@@ -804,141 +1051,106 @@ private struct MangaDataSettingsPage: View {
     @AppStorage("manga.downsampleImages") private var downsampleImages: Bool = false
     @AppStorage("manga.imageQuality") private var imageQuality: String = "high"
 
+    private let qualities: [(label: String, value: String, bars: Int)] = [
+        ("Low", "low", 1),
+        ("Medium", "medium", 2),
+        ("High", "high", 3)
+    ]
+
     var body: some View {
-        Form {
-            Section("Data Saving") {
-                Toggle("Data Saving on Cellular", isOn: $dataSavingCellular)
-                Toggle("Downsample Large Images", isOn: $downsampleImages)
-                Picker("Image Quality", selection: $imageQuality) {
-                    Text("High (Recommended)").tag("high")
-                    Text("Medium").tag("medium")
-                    Text("Low (Data Saver)").tag("low")
+        ScrollView {
+            VStack(spacing: 16) {
+                // Data saving toggle
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Data Saving")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+                    Toggle("Data Saving on Cellular", isOn: $dataSavingCellular)
+                        .tint(Color.appAccent)
+                    Text("Loads lower-resolution page images when on cellular connections to reduce data usage.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
+                .padding(16)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
+
+                // Image quality — visual bar indicator
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Image Quality")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+                    HStack(spacing: 10) {
+                        ForEach(qualities, id: \.value) { q in
+                            let selected = imageQuality == q.value
+                            Button {
+                                Haptics.light()
+                                imageQuality = q.value
+                            } label: {
+                                VStack(spacing: 6) {
+                                    HStack(spacing: 3) {
+                                        ForEach(0..<3) { i in
+                                            RoundedRectangle(cornerRadius: 2)
+                                                .fill(i < q.bars ? (selected ? Color.appAccent : Color.secondary.opacity(0.5)) : Color.secondary.opacity(0.15))
+                                                .frame(width: 8, height: CGFloat(10 + i * 8))
+                                        }
+                                    }
+                                    Text(q.label)
+                                        .font(.caption2.weight(selected ? .bold : .regular))
+                                        .foregroundStyle(selected ? Color.appAccent : .primary)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(selected ? Color.appAccent.opacity(0.1) : Color.clear)
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .strokeBorder(selected ? Color.appAccent.opacity(0.4) : Color.secondary.opacity(0.15), lineWidth: 1)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    Toggle("Downsample Large Images", isOn: $downsampleImages)
+                        .tint(Color.appAccent)
+                }
+                .padding(16)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
+
+                // Preloading — stepper with gauge
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Preloading")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+                    HStack {
+                        Stepper("Preload Pages: \(preloadPages)", value: $preloadPages, in: 1...6)
+                            .tint(Color.appAccent)
+                    }
+                    // Visual gauge
+                    HStack(spacing: 4) {
+                        ForEach(1...6, id: \.self) { i in
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(i <= preloadPages ? Color.appAccent.opacity(0.6) : Color.secondary.opacity(0.15))
+                                .frame(height: 6)
+                        }
+                    }
+                    Text("Higher values mean smoother reading but more data usage.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(16)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
             }
-            Section("Preloading") {
-                Stepper("Preload Pages: \(preloadPages)", value: $preloadPages, in: 1...6)
-                Text("Controls how many pages ahead the reader fetches. Higher values mean smoother reading but more data usage.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Section {
-                Text("Manga data saving loads lower-resolution page images on cellular connections, following the same approach as the video Data Saving Mode but scoped to image resolution.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            .padding(16)
         }
+        .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .navigationTitle("Data & Downloads")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
-    }
-}
-
-// MARK: - Manga Settings UI Components
-
-private struct SettingsCard<Content: View>: View {
-    let title: String
-    let icon: String
-    @ViewBuilder let content: Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .textCase(.uppercase)
-            }
-            content
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(cardBg, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-
-    private var cardBg: Color {
-        #if os(iOS)
-        return Color(.secondarySystemGroupedBackground)
-        #else
-        return Color.secondary.opacity(0.15)
-        #endif
-    }
-}
-
-private struct SettingsPickerRow: View {
-    let title: String
-    @Binding var value: String
-    let options: [(String, String)]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.subheadline.weight(.medium))
-            HStack(spacing: 6) {
-                ForEach(options, id: \.1) { option in
-                    let selected = value == option.1
-                    Button {
-                        Haptics.light()
-                        value = option.1
-                    } label: {
-                        Text(option.0)
-                            .font(.caption.weight(selected ? .semibold : .regular))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 7)
-                            .frame(maxWidth: .infinity)
-                            .background(
-                                Capsule().fill(selected ? Color.appAccent.opacity(0.18) : Color.secondary.opacity(0.1))
-                            )
-                            .overlay(
-                                Capsule().strokeBorder(selected ? Color.appAccent.opacity(0.55) : Color.clear, lineWidth: 1)
-                            )
-                            .foregroundStyle(selected ? Color.appAccent : .primary)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-    }
-}
-
-private struct SettingsToggleRow: View {
-    let title: String
-    var icon: String = "checkmark.circle"
-    @Binding var isOn: Bool
-
-    var body: some View {
-        HStack {
-            Image(systemName: icon)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.secondary)
-            Text(title)
-                .font(.subheadline.weight(.medium))
-            Spacer()
-            Toggle("", isOn: $isOn)
-                .labelsHidden()
-                .tint(Color.appAccent)
-        }
-    }
-}
-
-private struct SettingsStepperRow: View {
-    let title: String
-    @Binding var value: Int
-    let range: ClosedRange<Int>
-    var suffix: String = ""
-
-    var body: some View {
-        HStack {
-            Text(title)
-                .font(.subheadline.weight(.medium))
-            Spacer()
-            Stepper("\(value)\(suffix)", value: $value, in: range)
-                .tint(Color.appAccent)
-        }
     }
 }

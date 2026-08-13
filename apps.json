@@ -1,10 +1,10 @@
 {
   "name": "Shirox",
   "identifier": "com.shirox.altstore",
-  "sourceURL": "https://raw.githubusercontent.com/xibrox/Shirox/main/apps.json",
-  "subtitle": "Personal anime library manager for iOS",
-  "description": "Shirox is a free, source-available personal anime library manager for iOS 15+.\n\nOrganize and track your anime collection using community-built modules. AniList integration for library management and discovery.",
-  "website": "https://github.com/xibrox/Shirox",
+  "sourceURL": "https://raw.githubusercontent.com/Faludaddd/Shirox-autosub/main/apps.json",
+  "subtitle": "Personal anime & manga library manager for iOS",
+  "description": "Shirox is a free, source-available personal anime & manga library manager for iOS 15+.\n\nOrganize and track your anime and manga collection using community-built modules. AniList and MyAnimeList integration for library management and discovery. Full Reading Mode for manga with dedicated reader, schedule, and settings.",
+  "website": "https://github.com/Faludaddd/Shirox-autosub",
   "featuredApps": [
     "com.shirox.app"
   ],
@@ -12,10 +12,10 @@
     {
       "name": "Shirox",
       "bundleIdentifier": "com.shirox.app",
-      "developerName": "xibrox",
-      "subtitle": "Personal anime library manager for iOS",
-      "localizedDescription": "Shirox is a free, source-available personal anime library manager for iOS 15+.\n\n• Organize your anime collection with community-built modules\n• AniList integration for library management and discovery\n• Continue Watching: pick up right where you left off\n• Picture-in-Picture and AirPlay support\n• Subtitle support",
-      "iconURL": "https://raw.githubusercontent.com/xibrox/Shirox/main/Shirox/shirox-icon.icon/Assets/白-shiro.png",
+      "developerName": "Faludaddd",
+      "subtitle": "Personal anime & manga library manager for iOS",
+      "localizedDescription": "Shirox is a free, source-available personal anime & manga library manager for iOS 15+.\n\n• Organize your anime and manga collection with community-built modules\n• AniList and MyAnimeList integration for library management and discovery\n• Full Reading Mode for manga with dedicated reader\n• Continue Watching / Continue Reading: pick up right where you left off\n• Picture-in-Picture and AirPlay support\n• Subtitle support\n• Manga schedule with chapter release tracking\n• Unified History system for anime and manga",
+      "iconURL": "https://raw.githubusercontent.com/Faludaddd/Shirox-autosub/main/Shirox/shirox-icon.icon/Assets/白-shiro.png",
       "tintColor": "ef4444",
       "category": "entertainment",
       "screenshots": [],
@@ -27,11 +27,20 @@
       },
       "versions": [
         {
+          "version": "1.5",
+          "buildVersion": "1",
+          "date": "2026-08-13",
+          "localizedDescription": "Restored native SwiftUI toggles, fixed manga module detection, reworked manga settings layouts, fixed update manifest to point to correct fork repo.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 10634374,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.4",
           "buildVersion": "1",
           "date": "2026-08-13",
           "localizedDescription": "Reading Mode for manga, MAL search source, Mark as Private, content safety cleanup, and streamlined IPA-only build pipeline.",
-          "downloadURL": "https://github.com/xibrox/Shirox/releases/download/beta/Shirox.ipa",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
           "size": 10634746,
           "minOSVersion": "15.0"
         },
@@ -40,7 +49,7 @@
           "buildVersion": "107",
           "date": "2026-07-13",
           "localizedDescription": "Long-press the Shirox icon on your Home Screen for instant shortcuts. Jump straight to Search, Downloads, or Library — the app opens right onto the tab you picked, whether it was already running or fully closed. The shortcut icons match the tab bar, so it's a fast way into whatever you use most.",
-          "downloadURL": "https://github.com/xibrox/Shirox/releases/download/beta/Shirox.ipa",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
           "size": 9295044,
           "minOSVersion": "15.0"
         },
@@ -49,53 +58,8 @@
           "buildVersion": "104",
           "date": "2026-07-09",
           "localizedDescription": "Download manga chapters for offline reading — grab a single chapter with one tap, or flip on selection mode to download a whole range in one batch, right from the manga's detail screen. Every chapter row shows live download progress and a checkmark when it's done, and downloaded chapters read completely offline with pages loading straight from your device. The Downloads tab has a new Manga section grouped by source and title, so you can open a saved manga and read it fully offline. Also fixed: deleting a download now cleans up every file it leaves behind, removed downloads no longer redownload themselves after a relaunch, and downloaded episodes recover on their own after the app's been backgrounded.",
-          "downloadURL": "https://github.com/xibrox/Shirox/releases/download/beta/Shirox.ipa",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
           "size": 9289241,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.1.4",
-          "buildVersion": "103",
-          "date": "2026-07-08",
-          "localizedDescription": "The player's options are native menus now — long-press for playback speed, quality, audio track, and source. Liquid Glass covers every control and the glass buttons are reliably tappable. AniList profiles are cached with a proper loading state and a graceful fallback when rate-limited, so they open fast instead of going blank, and the profile header now sits the avatar on the banner edge with your name and follow button beside it.",
-          "downloadURL": "https://github.com/xibrox/Shirox/releases/download/beta/Shirox.ipa",
-          "size": 9212399,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.1.3",
-          "buildVersion": "102",
-          "date": "2026-07-07",
-          "localizedDescription": "Your Library now loads instantly from an on-device cache and keeps working offline. Edits you make without a connection — status, score, and episode or chapter progress — are queued and sync to AniList and MyAnimeList automatically once you're back online. Rate-limited requests retry with backoff instead of failing, the Anime | Manga switch no longer shows the wrong list, and manga chapters always sort in the right order.",
-          "downloadURL": "https://github.com/xibrox/Shirox/releases/download/beta/Shirox.ipa",
-          "size": 9132843,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.1.2",
-          "buildVersion": "101",
-          "date": "2026-07-05",
-          "localizedDescription": "The video player controls get the iOS 26 Liquid Glass look — frosted, translucent buttons — with a thicker, easier-to-grab progress bar. New Liquid Glass Controls toggles in Settings switch the glass off for the player and reader independently. In the manga reader, auto-scroll is now a live speed slider that goes much faster, the play/pause button is always reachable, you can pinch to zoom in vertical mode, and pages load ahead of you so scrolling never stalls.",
-          "downloadURL": "https://github.com/xibrox/Shirox/releases/download/beta/Shirox.ipa",
-          "size": 9151395,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.1.1",
-          "buildVersion": "100",
-          "date": "2026-07-04",
-          "localizedDescription": "Manga now tracks itself. Each manga auto-matches to its AniList entry, and reading chapters updates your progress on AniList, MyAnimeList, and your on-device My Library. A new Anime | Manga switch in the Library tab shows your manga next to your anime, and you can relink a wrong match from the manga's detail screen.",
-          "downloadURL": "https://github.com/xibrox/Shirox/releases/download/beta/Shirox.ipa",
-          "size": 9106413,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.1.0",
-          "buildVersion": "99",
-          "date": "2026-07-04",
-          "localizedDescription": "Read manga with manga modules. Vertical strip or paged reading, no loading screens between chapters, auto-scroll, pinch zoom, and a Continue Reading row on Home that takes you back to your exact spot.",
-          "downloadURL": "https://github.com/xibrox/Shirox/releases/download/beta/Shirox.ipa",
-          "size": 9038062,
           "minOSVersion": "15.0"
         }
       ]
@@ -103,92 +67,20 @@
   ],
   "news": [
     {
-      "title": "New in 1.0.0 - Home Screen quick actions",
-      "identifier": "news-1.0.0-quick-actions",
-      "caption": "Long-press the Shirox app icon to open quick actions right from your Home Screen. Tap Search, Downloads, or Library to jump straight there — the app launches directly onto that tab, whether it was backgrounded or fully closed. The shortcut icons match the tabs, so it's the fastest way into whatever you use most.",
+      "title": "New in 1.5 - Native toggles, manga fixes, update system",
+      "identifier": "news-1.5-toggles-manga-fixes",
+      "caption": "Toggles are back to native SwiftUI switches. Manga module detection fixed so chapters load correctly when a module is installed. Update system now fetches from the correct fork repo. Manga settings tabs reworked with unique layouts.",
       "tintColor": "ef4444",
-      "date": "2026-07-13",
+      "date": "2026-08-13",
       "notify": true,
       "appID": "com.shirox.app"
     },
     {
-      "title": "New in 0.1.5 - Manga downloads & offline reading",
-      "identifier": "news-0.1.5-manga-downloads",
-      "caption": "You can now download manga chapters for offline reading. Tap to download a single chapter, or flip on selection mode to grab a whole range in one batch, right from the manga's detail screen. Every chapter row shows live download progress and a checkmark when it's done, and downloaded chapters read completely offline — the reader loads pages straight from your device, so there are no loading gaps even with no connection. The Downloads tab has a new Manga section that groups everything you've saved by source and title; open a downloaded manga to browse and read it fully offline.\n\nDownloads are tidier too: deleting a download now cleans up every file it leaves behind instead of eating storage, and removed downloads stay removed rather than quietly redownloading the next time you open the app. Downloaded episodes also recover on their own if playback drops after the app's been in the background, handing audio back cleanly instead of staying silent.",
+      "title": "New in 1.4 - Reading Mode & MAL support",
+      "identifier": "news-1.4-reading-mode",
+      "caption": "Full Reading Mode for manga with dedicated home, search, schedule, and settings. MyAnimeList support as a search source. Mark as Private for library entries. Streamlined IPA-only build pipeline.",
       "tintColor": "ef4444",
-      "date": "2026-07-09",
-      "notify": true,
-      "appID": "com.shirox.app"
-    },
-    {
-      "title": "New in 0.1.4 - Player menus & faster profiles",
-      "identifier": "news-0.1.4-player-menus-profiles",
-      "caption": "The player's options open as native menus now: long-press to pick playback speed, quality, audio track, or source without a cramped sheet in the way. Liquid Glass covers every control, and the glass buttons are reliably tappable — no more taps slipping through to the video behind them.\n\nAniList profiles are cached and show a proper loading state, with a graceful fallback when AniList rate-limits, so your profile opens fast and doesn't go blank. The profile header is cleaned up too, with the avatar sitting right on the banner edge and your name and follow button beside it.",
-      "tintColor": "ef4444",
-      "date": "2026-07-08",
-      "notify": true,
-      "appID": "com.shirox.app"
-    },
-    {
-      "title": "New in 0.1.3 - A library that works offline",
-      "identifier": "news-0.1.3-offline-library",
-      "caption": "Your Library now loads instantly from an on-device cache — open the app and your lists are already there, even with no connection. Changes you make while offline (status, score, episode or chapter progress) are queued and sync themselves to AniList and MyAnimeList the moment you're back online, so nothing gets lost.\n\nWhen a provider rate-limits you, requests now retry automatically with backoff instead of failing outright. Also fixed: the Anime | Manga switch occasionally showing the wrong list, and manga chapters now always sort in the right order.",
-      "tintColor": "ef4444",
-      "date": "2026-07-07",
-      "notify": true,
-      "appID": "com.shirox.app"
-    },
-    {
-      "title": "New in 0.1.2 - Liquid Glass player & reader",
-      "identifier": "news-0.1.2-liquid-glass",
-      "caption": "The video player controls now use iOS 26 Liquid Glass: frosted, translucent buttons that pick up the video behind them, with a thicker progress bar that's easier to scrub. Prefer the old solid look? New Liquid Glass Controls toggles in Settings switch it off for the player and the reader independently (shown only on iOS/macOS 26).\n\nThe manga reader's auto-scroll is now a live speed slider instead of a buried preset menu — drag to set exactly how fast, and it goes much faster than before, with play/pause always reachable even when the controls are hidden. Pages now load ahead of you so scrolling never stalls, you can pinch to zoom up to 3x in vertical mode, and the reader buttons are bigger and easier to tap.",
-      "tintColor": "ef4444",
-      "date": "2026-07-05",
-      "notify": true,
-      "appID": "com.shirox.app"
-    },
-    {
-      "title": "New in 0.1.1 - Manga tracking",
-      "identifier": "news-0.1.1-manga-tracking",
-      "caption": "Manga now tracks itself, just like anime. Open a manga and it automatically matches to its AniList entry; as you read, your chapter progress syncs to AniList, MyAnimeList, and your on-device My Library, no buttons to press.\n\nThe Library tab has a new Anime | Manga switch, so your manga sit alongside your anime with the same status, score, and collections. Reading a manga adds it to My Library on its own. If an auto-match ever picks the wrong series, tap the link button on the manga's detail screen to search AniList and relink it, posters and all.",
-      "tintColor": "ef4444",
-      "date": "2026-07-04",
-      "notify": true,
-      "appID": "com.shirox.app"
-    },
-    {
-      "title": "New in 0.1.0 - Manga",
-      "identifier": "news-0.1.0-manga",
-      "caption": "You can now install manga modules and search them from the Search tab, just like anime modules. Every manga has a detail page with cover, tags, synopsis, and a chapter list that remembers what you've read.\n\nThe reader has three modes: vertical strip, paged left-to-right, and paged right-to-left. The next chapter loads ahead of you, so there's no loading screen between chapters. Auto-scroll with adjustable speed, pinch zoom in the paged modes, and the screen stays awake while you read. A new Continue Reading row on Home takes you back to the exact spot you left off.",
-      "tintColor": "ef4444",
-      "date": "2026-07-04",
-      "notify": true,
-      "appID": "com.shirox.app"
-    },
-    {
-      "title": "New in 0.0.94 - My Library holds everything",
-      "identifier": "news-0.0.94-my-library-everything",
-      "caption": "My Library now holds everything, not just anime matched to AniList or MyAnimeList. Titles you watch from streaming modules without a provider match, and your own imported local files, now appear in My Library too. They auto-track as you watch and can be bookmarked by hand, with the same collections, status, and scoring as any other title. Tap an entry to open it: module titles reopen their detail screen, local files resume playback.\n\nFixed: finishing a show now correctly marks it Completed in My Library at the right episode, instead of getting stuck on Watching a couple of episodes short.",
-      "tintColor": "ef4444",
-      "date": "2026-06-22",
-      "notify": true,
-      "appID": "com.shirox.app"
-    },
-    {
-      "title": "New in 0.0.92 - Local Library",
-      "identifier": "news-0.0.92-local-library",
-      "caption": "Track anime without signing into any account. A My Library section lives in the Library tab and works completely on device: bookmark anime, set a status, rate it, and create collections. Auto-tracking keeps your episode progress in sync as you watch, and your scores now survive switching Score Format. Player: a Retry button when buffering stalls, a resume seek fix for HLS, smoother controls, cleaner double-tap feedback, and 2x hold that sticks while you drag. Plus Library search bar and source switcher fixes, and a Local Files promo card on the Modules screen.",
-      "tintColor": "ef4444",
-      "date": "2026-06-20",
-      "notify": true,
-      "appID": "com.shirox.app"
-    },
-    {
-      "title": "New in 0.0.91 - Local Files",
-      "identifier": "news-0.0.91-local-files",
-      "caption": "Play videos straight from your device. Browse to any video in the Files app and watch it in the Shirox player with full controls: AirPlay, PiP, subtitles, and Continue Watching all included. Import your own subtitle files before or during playback.\n\nAlso fixed: the refresh and Edit buttons now appear at the top of the module list in Search, and the Local Files Browse button has a cleaner look.",
-      "tintColor": "ef4444",
-      "date": "2026-06-19",
+      "date": "2026-08-13",
       "notify": true,
       "appID": "com.shirox.app"
     }
