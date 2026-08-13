@@ -1175,8 +1175,13 @@ struct ScheduleView: View {
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                if appMode.mode == .anime {
-                    ToolbarItem(placement: .primaryAction) {
+                // The .toolbar closure uses @ToolbarContentBuilder whose
+                // buildIf is iOS 16+, so we cannot use a conditional `if`
+                // here on iOS 15. Instead, always emit the ToolbarItem and
+                // conditionally show either the settings link (Anime Mode)
+                // or an empty view (Reading Mode has no schedule settings).
+                ToolbarItem(placement: .primaryAction) {
+                    if appMode.mode == .anime {
                         NavigationLink {
                             ScheduleSettingsPage()
                         } label: {
@@ -1184,6 +1189,8 @@ struct ScheduleView: View {
                                 .font(.system(size: 16, weight: .medium))
                                 .foregroundStyle(.primary)
                         }
+                    } else {
+                        EmptyView()
                     }
                 }
             }
