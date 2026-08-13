@@ -519,6 +519,15 @@ struct LibraryView: View {
             }
         }
         Divider()
+        Button {
+            Task { await vm.setPrivate(entry: entry, isPrivate: !entry.isPrivate) }
+        } label: {
+            Label(
+                entry.isPrivate ? "Remove Private" : "Mark as Private",
+                systemImage: entry.isPrivate ? "lock.open.fill" : "lock.fill"
+            )
+        }
+        Divider()
         Button(role: .destructive) {
             Task { await vm.delete(entry: entry) }
         } label: {
@@ -739,6 +748,9 @@ struct LibraryView: View {
                             }
                         }
                     }
+                },
+                onTogglePrivate: { newValue in
+                    Task { await vm.setPrivate(entry: entry, isPrivate: newValue) }
                 },
                 onDelete: {
                     Task {

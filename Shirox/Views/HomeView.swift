@@ -154,9 +154,16 @@ struct HomeView: View {
             .modifier(TransparentNavBarModifier())
             #endif
             .toolbar {
-                // Issue #2 — Notifications and Settings are grouped together
-                // on the trailing side so they're visually adjacent. Both
-                // remain functional and accessible; no duplicates.
+                // Issue #2 — Notifications, Reading Mode, and Settings are
+                // grouped together on the trailing side so they're visually
+                // adjacent. The book icon opens Reading Mode for manga.
+                ToolbarItem(placement: .topBarTrailing) {
+                    NavigationLink(destination: MangaHomeView()) {
+                        Image(systemName: "book.fill")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(.primary)
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink(destination: NotificationsPage()) {
                         Image(systemName: "bell")
@@ -747,24 +754,19 @@ private struct FeaturedCard: View, Equatable {
             } else {
                 GeometryReader { geo in
                     let pageOffset = geo.frame(in: .global).minX
+                    // Prefer the extra-large cover image (highest resolution
+                    // AniList exposes) so the carousel renders sharp even on
+                    // tall iPhone screens. `CachedAsyncImage` (Kingfisher) is
+                    // used instead of SwiftUI's `AsyncImage` because Kingfisher
+                    // decodes via ImageIO with proper downsampling and keeps a
+                    // warm memory+disk cache — eliminating the blurry/pixelated
+                    // look that the stock AsyncImage path produced.
                     let imageURL = media.coverImage.extraLarge ?? media.coverImage.large ?? ""
                     ZStack {
-                        if let url = URL(string: imageURL) {
-                            AsyncImage(url: url) { phase in
-                                if case .success(let img) = phase {
-                                    img.resizable()
-                                        .scaledToFill()
-                                        .frame(width: geo.size.width, height: geo.size.height)
-                                        .clipped()
-                                } else {
-                                    Color.secondary.opacity(0.15)
-                                }
-                            }
+                        CachedAsyncImage(urlString: imageURL)
                             .frame(width: geo.size.width, height: geo.size.height)
+                            .clipped()
                             .offset(x: -pageOffset * 0.25)
-                        } else {
-                            Color.secondary.opacity(0.15)
-                        }
                     }
                 }
                 .clipped()
@@ -1245,15 +1247,14 @@ struct ScheduleView: View {
                             Text(bucket.shortTitle)
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(.secondary)
-                            Spacer()
-                            HStack(spacing: 4) {
-                                Text("\(bucket.entries.count) episode\(bucket.entries.count == 1 ? "" : "s")")
-                                    .font(.subheadline.weight(.bold))
-                                    .foregroundStyle(Color.red)
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(Capsule().fill(Color.red.opacity(0.12)))
+                            Spacer(minLength: 8)
+                            Text("\(bucket.entries.count) episode\(bucket.entries.count == 1 ? "" : "s")")
+                                .font(.subheadline.weight(.bold))
+                                .foregroundStyle(Color.red)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(Capsule().fill(Color.red.opacity(0.12)))
+                                .fixedSize()
                         }
                         ForEach(bucket.entries) { entry in
                             NavigationLink {

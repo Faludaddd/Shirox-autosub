@@ -46,8 +46,15 @@ struct PlayerSubtitleOverlay: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let horizontalPadding: CGFloat = 24
-            let maxTextWidth = proxy.size.width - horizontalPadding * 2
+            // Safe-area-aware horizontal padding so the caption never overflows
+            // past the notch / home indicator in landscape. The available text
+            // width is computed AFTER subtracting both the outer padding and
+            // the inner text padding so multi-line wrapping has the full
+            // visible width to break against.
+            let outerPadding: CGFloat = 16
+            let innerTextHPad: CGFloat = 12
+            let safeLR = proxy.safeAreaInsets.leading + proxy.safeAreaInsets.trailing
+            let availableWidth = max(160, proxy.size.width - safeLR - outerPadding * 2 - innerTextHPad * 2)
             let bottomOffset: CGFloat = 15 + max(0, CGFloat(settings.bottomPadding) - controlsRiseOffset)
             let controlsOffset: CGFloat = showControls ? -min(CGFloat(settings.bottomPadding), controlsRiseOffset) : 0
 
@@ -65,8 +72,8 @@ struct PlayerSubtitleOverlay: View {
                         .multilineTextAlignment(.center)
                         .lineLimit(nil)
                         .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: maxTextWidth)
-                        .padding(.horizontal, 12)
+                        .frame(maxWidth: availableWidth, alignment: .center)
+                        .padding(.horizontal, innerTextHPad)
                         .padding(.vertical, settings.backgroundEnabled ? 6 : 0)
                         .background(
                             settings.backgroundEnabled
@@ -75,11 +82,12 @@ struct PlayerSubtitleOverlay: View {
                         )
                         .padding(.bottom, bottomOffset)
                         .offset(y: controlsOffset)
+                        .frame(maxWidth: .infinity, alignment: .center)
                         .animation(.easeInOut(duration: 0.2), value: showControls)
                         .transition(.identity)
                 }
             }
-            .padding(.horizontal, horizontalPadding)
+            .padding(.horizontal, outerPadding)
             .padding(.leading, proxy.safeAreaInsets.leading)
             .padding(.trailing, proxy.safeAreaInsets.trailing)
         }

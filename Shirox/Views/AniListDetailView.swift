@@ -799,9 +799,33 @@ struct AniListDetailView: View {
     @ViewBuilder
     private func watchButton(media: Media) -> some View {
         let item = continueWatchingItem(for: media)
+        // `total` is the count of episodes that have actually aired. If
+        // `nextAiringEpisode` is set, only episodes BEFORE its number have
+        // aired. If the anime is finished (no nextAiringEpisode), fall back to
+        // the media's declared `episodes` total.
         let total = (media.nextAiringEpisode != nil ? media.nextAiringEpisode!.episode - 1 : nil) ?? media.episodes ?? 0
+        // `rawNext` is the natural next-up episode based on local/remote
+        // progress — episode N+1 after watching N.
         let rawNext = item?.episodeNumber ?? (existingEntry?.progress ?? 0) + 1
-        let nextEp = rawNext > total && total > 0 ? 1 : rawNext
+        // Air-date gating: do NOT advance to an episode that has not aired
+        // yet. If `rawNext` points at (or past) the unaired `nextAiringEpisode`,
+        // clamp to the latest aired episode (`total`) so the watch button
+        // re-plays the latest aired episode instead of jumping to an episode
+        // that has no streams yet. Wrap-around to ep 1 only happens when the
+        // show is complete (no nextAiringEpisode) AND the user has finished
+        // the last episode.
+        let nextEp: Int
+        if total > 0 && rawNext > total {
+            if media.nextAiringEpisode != nil {
+                // Still airing — clamp to latest aired, don't wrap.
+                nextEp = total
+            } else {
+                // Finished show — wrap to ep 1.
+                nextEp = 1
+            }
+        } else {
+            nextEp = max(1, rawNext)
+        }
         let label = item != nil && !item!.streamUrl.isEmpty ? "Continue Ep \(nextEp)" : "Watch Ep \(nextEp)"
 
         Button {
@@ -879,6 +903,9 @@ struct AniListDetailView: View {
         // Anchor on the saved episode href so multi-season flat lists advance to the right
         // season; fall back to number for items saved before episodeHref was recorded.
         var currentHref = item.episodeHref
+        // Capture the next-airing info so the loader can refuse to advance to
+        // an episode that has not actually aired yet.
+        let nextAiring = vm.media?.nextAiringEpisode
         let onWatchNext: WatchNextLoader? = { currentEpNum in
             guard let module = ModuleManager.shared.activeModule, let href = item.detailHref else { return nil }
             let runner = ModuleJSRunner()
@@ -886,6 +913,17 @@ struct AniListDetailView: View {
             let episodes = try await runner.fetchEpisodes(url: href)
             guard !episodes.isEmpty else { return nil }
             guard let nextEp = EpisodeNavigator.next(afterHref: currentHref, orNumber: currentEpNum, in: episodes) else { return nil }
+            // Air-date gate: if AniList says episode `nextAiring.episode` is
+            // the next to air, then any episode with number >= that value has
+            // not aired yet and must NOT be auto-advanced to. The user can
+            // still tap an episode directly from the list — this only blocks
+            // the player's automatic "Next Episode" hand-off.
+            if let airing = nextAiring,
+               let airingAt = airing.airingAt,
+               airingAt > Int(Date().timeIntervalSince1970),
+               Int(nextEp.number) >= airing.episode {
+                return nil
+            }
             let streams = try await runner.fetchStreams(episodeUrl: nextEp.href).sorted { $0.title < $1.title }
             guard !streams.isEmpty else { return nil }
             currentHref = nextEp.href
@@ -1041,10 +1079,12 @@ struct AniListDetailView: View {
     }
 
     // MARK: - Statistics
-    /// #122 — Restored 2-column Statistics grid. Renders a compact grid of
-    /// media metadata (Type, Format, Status, Episodes, Rating, Season,
-    /// Duration, Studio, Source, Premiered) right after the hero/metadata
-    /// sections. Gated by the `showStatistics` AppStorage toggle in
+    /// #122 — Statistics grid renders media metadata as compact cards with no
+    /// icons (per the user's explicit request). Each statistic lives in its own
+    /// bordered pill so the section reads as a structured grid rather than a
+    /// plain text dump. A live countdown card is rendered first when the show
+    /// is still airing so the user can see at a glance when the next episode
+    /// drops. Gated by the `showStatistics` AppStorage toggle in
     /// `AppearanceSettingsPage` so users who prefer a leaner detail page can
     /// hide it.
     @ViewBuilder
@@ -1052,69 +1092,134 @@ struct AniListDetailView: View {
         let items = statisticsItems(for: media)
         return VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 8) {
-                Image(systemName: "chart.bar.fill")
-                    .font(.title3)
-                    .foregroundStyle(Color.appAccent)
                 Text("Statistics")
                     .font(.title3.weight(.bold))
             }
             .padding(.horizontal, 16)
+
+            // Live countdown card — shown only when an upcoming episode exists.
+            if let airing = media.nextAiringEpisode, airing.airingAt.map { $0 > Int(Date().timeIntervalSince1970) } ?? false {
+                nextEpisodeCountdownCard(airing: airing)
+                    .padding(.horizontal, 16)
+            }
+
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
                 ForEach(items, id: \.0) { item in
-                    statisticCard(label: item.0, value: item.1, icon: item.2)
+                    statisticCard(label: item.0, value: item.1)
                 }
             }
             .padding(.horizontal, 16)
         }
     }
 
-    private func statisticsItems(for media: Media) -> [(String, String, String)] {
-        var items: [(String, String, String)] = []
-        items.append(("Type", media.type ?? "Anime", "rectangle.stack"))
-        if let f = media.format, !f.isEmpty { items.append(("Format", f, "film")) }
-        if let s = media.statusDisplay { items.append(("Status", s, "circle.fill")) }
-        if let ep = media.episodes { items.append(("Episodes", "\(ep)", "number")) }
-        if let score = media.averageScore { items.append(("Rating", "\(score)%", "star.fill")) }
-        if let pop = media.popularity { items.append(("Popularity", "\(pop)", "person.3.fill")) }
+    /// Compact live-countdown card. Uses a 1-second `TimelineView` so the
+    /// "Airs In" timer ticks live, matching the behavior of the Schedule
+    /// detail view's big countdown.
+    @ViewBuilder
+    private func nextEpisodeCountdownCard(airing: MediaAiringEpisode) -> some View {
+        TimelineView(.periodic(from: Date(), by: 1)) { _ in
+            let now = Int(Date().timeIntervalSince1970)
+            let remaining = (airing.airingAt ?? 0) - now
+            let display = formatCountdown(seconds: remaining)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("Next Episode")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+                    Spacer()
+                    Text("EP \(airing.episode)")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(Color.red)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(Color.red.opacity(0.12)))
+                }
+                Text(display)
+                    .font(.system(size: 26, weight: .heavy, design: .rounded))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let ts = airing.airingAt, ts > 0 {
+                    Text(airDateShort(ts: ts))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.red.opacity(0.08))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Color.red.opacity(0.18), lineWidth: 0.6)
+            )
+        }
+    }
+
+    private func formatCountdown(seconds: Int) -> String {
+        if seconds <= 0 { return "Aired" }
+        let days = seconds / 86400
+        let hours = (seconds % 86400) / 3600
+        let mins = (seconds % 3600) / 60
+        let secs = seconds % 60
+        if days > 0 { return "in \(days)d \(hours)h \(mins)m \(secs)s" }
+        if hours > 0 { return "in \(hours)h \(mins)m \(secs)s" }
+        if mins > 0 { return "in \(mins)m \(secs)s" }
+        return "in \(secs)s"
+    }
+
+    private func airDateShort(ts: Int) -> String {
+        let date = Date(timeIntervalSince1970: TimeInterval(ts))
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .short
+        return f.string(from: date)
+    }
+
+    private func statisticsItems(for media: Media) -> [(String, String)] {
+        var items: [(String, String)] = []
+        items.append(("Type", media.type ?? "Anime"))
+        if let f = media.format, !f.isEmpty { items.append(("Format", f)) }
+        if let s = media.statusDisplay { items.append(("Status", s)) }
+        if let ep = media.episodes { items.append(("Episodes", "\(ep)")) }
+        if let score = media.averageScore { items.append(("Rating", "\(score)%")) }
+        if let pop = media.popularity { items.append(("Popularity", "\(pop)")) }
         let seasonStr = [media.season?.capitalized, media.seasonYear.map { String($0) }].compactMap { $0 }.joined(separator: " ")
-        if !seasonStr.isEmpty { items.append(("Season", seasonStr, "calendar")) }
-        if let dur = media.duration { items.append(("Duration", "\(dur) min", "clock")) }
-        if let studio = media.mainStudioName, !studio.isEmpty { items.append(("Studio", studio, "building.2.fill")) }
-        if let source = media.sourceDisplay { items.append(("Source", source, "books.vertical.fill")) }
-        if let aired = media.airDateRange, !aired.isEmpty { items.append(("Premiered", aired, "sparkles")) }
-        if let country = media.countryOfOrigin, !country.isEmpty { items.append(("Country", country, "globe")) }
+        if !seasonStr.isEmpty { items.append(("Season", seasonStr)) }
+        if let dur = media.duration { items.append(("Duration", "\(dur) min")) }
+        if let studio = media.mainStudioName, !studio.isEmpty { items.append(("Studio", studio)) }
+        if let source = media.sourceDisplay { items.append(("Source", source)) }
+        if let aired = media.airDateRange, !aired.isEmpty { items.append(("Premiered", aired)) }
+        if let country = media.countryOfOrigin, !country.isEmpty { items.append(("Country", country)) }
         return items
     }
 
     @ViewBuilder
-    private func statisticCard(label: String, value: String, icon: String) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Color.appAccent)
-                .frame(width: 24, height: 24)
-                .background(Color.appAccent.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(label)
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .textCase(.uppercase)
-                Text(value)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 0)
+    private func statisticCard(label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+            Text(value)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.secondary.opacity(0.05))
+                .fill(Color.secondary.opacity(0.06))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.secondary.opacity(0.06), lineWidth: 0.5)
+                .strokeBorder(Color.secondary.opacity(0.1), lineWidth: 0.5)
         )
     }
 

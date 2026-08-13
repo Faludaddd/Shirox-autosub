@@ -895,6 +895,203 @@ final class AniListService {
         return media
     }
 
+    // MARK: - Manga discovery
+    //
+    // Mirror of the anime discovery endpoints but with `type: MANGA`. Used by
+    // `MangaHomeView` to populate its trending / popular / top-rated / latest
+    // shelves. Each query selects the same field set as `mangaDetail` minus
+    // the relations edges (the shelves don't render relations) so a shelf tap
+    // can navigate to `AniListMangaDetailView` with enough metadata to render
+    // the hero immediately while the full detail is fetched in the background.
+
+    func mangaTrending() async throws -> [AniListMedia] {
+        let query = """
+        query {
+          Page(page: 1, perPage: 20) {
+            media(type: MANGA, sort: TRENDING_DESC, isAdult: false) {
+              id
+              idMal
+              title { romaji english native }
+              coverImage { large extraLarge }
+              bannerImage
+              description(asHtml: false)
+              chapters
+              volumes
+              status
+              averageScore
+              popularity
+              genres
+              format
+              source
+              countryOfOrigin
+              season
+              seasonYear
+              startDate { year month day }
+            }
+          }
+        }
+        """
+        return try await fetchPage(query: query)
+    }
+
+    func mangaPopular() async throws -> [AniListMedia] {
+        let query = """
+        query {
+          Page(page: 1, perPage: 20) {
+            media(type: MANGA, sort: POPULARITY_DESC, isAdult: false) {
+              id
+              idMal
+              title { romaji english native }
+              coverImage { large extraLarge }
+              bannerImage
+              description(asHtml: false)
+              chapters
+              volumes
+              status
+              averageScore
+              popularity
+              genres
+              format
+              source
+              countryOfOrigin
+              season
+              seasonYear
+              startDate { year month day }
+            }
+          }
+        }
+        """
+        return try await fetchPage(query: query)
+    }
+
+    func mangaTopRated() async throws -> [AniListMedia] {
+        let query = """
+        query {
+          Page(page: 1, perPage: 20) {
+            media(type: MANGA, sort: SCORE_DESC, isAdult: false) {
+              id
+              idMal
+              title { romaji english native }
+              coverImage { large extraLarge }
+              bannerImage
+              description(asHtml: false)
+              chapters
+              volumes
+              status
+              averageScore
+              popularity
+              genres
+              format
+              source
+              countryOfOrigin
+              season
+              seasonYear
+              startDate { year month day }
+            }
+          }
+        }
+        """
+        return try await fetchPage(query: query)
+    }
+
+    /// New releases — manga with the most recent `startDate` (newest first).
+    /// Useful for a "Latest" shelf on the manga home page. AniList doesn't
+    /// expose an `UPDATED_AT_DESC` for media directly, but `ID_DESC` gives
+    /// roughly the newest entries (AniList IDs are monotonic by creation time).
+    func mangaLatest() async throws -> [AniListMedia] {
+        let query = """
+        query {
+          Page(page: 1, perPage: 20) {
+            media(type: MANGA, sort: ID_DESC, isAdult: false) {
+              id
+              idMal
+              title { romaji english native }
+              coverImage { large extraLarge }
+              bannerImage
+              description(asHtml: false)
+              chapters
+              volumes
+              status
+              averageScore
+              popularity
+              genres
+              format
+              source
+              countryOfOrigin
+              season
+              seasonYear
+              startDate { year month day }
+            }
+          }
+        }
+        """
+        return try await fetchPage(query: query)
+    }
+
+    /// Free-text manga search used by the manga tab's search bar. Returns the
+    /// same field set as `mangaTrending` so results can be tapped through to
+    /// the manga detail page without an extra network call.
+    func mangaSearch(keyword: String) async throws -> [AniListMedia] {
+        let trimmed = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
+        var query = """
+        query {
+          Page(page: 1, perPage: 25) {
+            media(type: MANGA, sort: POPULARITY_DESC, isAdult: false) {
+              id
+              idMal
+              title { romaji english native }
+              coverImage { large extraLarge }
+              bannerImage
+              description(asHtml: false)
+              chapters
+              volumes
+              status
+              averageScore
+              popularity
+              genres
+              format
+              source
+              countryOfOrigin
+              season
+              seasonYear
+              startDate { year month day }
+            }
+          }
+        }
+        """
+        var variables: [String: Any] = [:]
+        if !trimmed.isEmpty {
+            query = """
+            query ($search: String) {
+              Page(page: 1, perPage: 25) {
+                media(search: $search, type: MANGA, sort: SEARCH_MATCH, isAdult: false) {
+                  id
+                  idMal
+                  title { romaji english native }
+                  coverImage { large extraLarge }
+                  bannerImage
+                  description(asHtml: false)
+                  chapters
+                  volumes
+                  status
+                  averageScore
+                  popularity
+                  genres
+                  format
+                  source
+                  countryOfOrigin
+                  season
+                  seasonYear
+                  startDate { year month day }
+                }
+              }
+            }
+            """
+            variables["search"] = trimmed
+        }
+        return try await fetchPage(query: query, variables: variables)
+    }
+
     // MARK: - Private helpers
 
     private func fetchPage(query: String, variables: [String: Any] = [:]) async throws -> [AniListMedia] {

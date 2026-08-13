@@ -7,6 +7,11 @@ struct LibraryEntryEditSheet: View {
     var onDelete: (() -> Void)? = nil
     var scoreFormatOverride: ScoreFormat? = nil
     var progressUnit: String = "episode"
+    /// Optional callback fired when the user toggles the "Mark as Private"
+    /// switch in the edit sheet. When nil, the private toggle is hidden —
+    /// this keeps the sheet backwards-compatible with call sites that don't
+    /// support the flag.
+    var onTogglePrivate: ((Bool) -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var anilistAuth = AniListAuthManager.shared
@@ -14,6 +19,7 @@ struct LibraryEntryEditSheet: View {
     @State private var status: MediaListStatus
     @State private var progress: Int
     @State private var score: Double
+    @State private var isPrivate: Bool
     @State private var showDeleteConfirmation = false
     @State private var showNewCollection = false
     @State private var newCollectionName = ""
@@ -33,15 +39,18 @@ struct LibraryEntryEditSheet: View {
          scoreFormatOverride: ScoreFormat? = nil,
          progressUnit: String = "episode",
          onSave: @escaping (MediaListStatus, Int, Double) -> Void,
-         onDelete: (() -> Void)? = nil) {
+         onDelete: (() -> Void)? = nil,
+         onTogglePrivate: ((Bool) -> Void)? = nil) {
         self.entry = entry
         self.media = media
         self.onSave = onSave
         self.onDelete = onDelete
         self.scoreFormatOverride = scoreFormatOverride
         self.progressUnit = progressUnit
+        self.onTogglePrivate = onTogglePrivate
         _status = State(initialValue: entry?.status ?? .planning)
         _progress = State(initialValue: entry?.progress ?? 0)
+        _isPrivate = State(initialValue: entry?.isPrivate ?? false)
         // Local entries convert from their canonical score into the active format;
         // provider entries (override nil) fall back to their stored account score.
         _score = State(initialValue: entry?.displayScore(in: scoreFormatOverride ?? .point10) ?? 0)
@@ -78,6 +87,32 @@ struct LibraryEntryEditSheet: View {
 
                 Section("Score") {
                     ScoreInputView(score: $score, format: scoreFormat)
+                }
+
+                if onTogglePrivate != nil {
+                    Section {
+                        Toggle(isOn: $isPrivate) {
+                            HStack {
+                                Image(systemName: isPrivate ? "lock.fill" : "lock.open")
+                                    .foregroundStyle(isPrivate ? .red : .secondary)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Mark as Private")
+                                        .font(.subheadline.weight(.medium))
+                                    Text(isPrivate
+                                         ? "Hidden from your public profile and social feeds."
+                                         : "Hide this entry from your public profile and social feeds.")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                        }
+                        .onChange(of: isPrivate) { newValue in
+                            onTogglePrivate?(newValue)
+                        }
+                    } header: {
+                        Text("Privacy")
+                    }
                 }
 
                 if scoreFormatOverride != nil {

@@ -242,6 +242,39 @@ final class LibraryViewModel: ObservableObject {
         }
     }
 
+    /// Toggles the private flag on a library entry. For AniList entries the
+    /// flag is pushed to the server via the `private` field on
+    /// `SaveMediaListEntry`; for MAL and local-only entries the flag is
+    /// persisted in-app only (MAL's API has no private flag for anime/manga
+    /// list entries). The optimistic update keeps the UI snappy and rolls
+    /// back on failure.
+    func setPrivate(entry: LibraryEntry, isPrivate: Bool) async {
+        if let index = allEntries.firstIndex(where: { $0.media.uniqueId == entry.media.uniqueId }) {
+            allEntries[index].isPrivate = isPrivate
+            cache[currentKey] = allEntries
+            applyFilter()
+        }
+        // Only AniList can push the flag to the server. MAL/local entries
+        // keep the flag in this VM's local snapshot — it survives until the
+        // next full reload from the server, at which point the flag reverts
+        // (MAL doesn't return it). That's an acceptable trade-off vs. not
+        // having the feature at all on those providers.
+        guard entry.media.provider == .anilist else { return }
+        do {
+            try await AniListLibraryService.shared.updateEntry(
+                mediaId: entry.media.id,
+                status: entry.status,
+                progress: entry.progress,
+                score: entry.score > 0 ? entry.score : nil,
+                type: mediaType == .manga ? .manga : .anime,
+                isPrivate: isPrivate)
+        } catch {
+            self.error = error.localizedDescription
+            cache[currentKey] = nil
+            await load()
+        }
+    }
+
     func delete(entry: LibraryEntry) async {
         allEntries.removeAll { $0.media.uniqueId == entry.media.uniqueId }
         cache[currentKey] = allEntries   // keep the optimistic removal across key switches

@@ -134,6 +134,14 @@ struct LibraryEntry: Identifiable, Codable, Sendable {
     /// Non-nil for on-device-only titles (module-scraped / imported file); routes tap-to-open.
     /// nil for AniList/MAL-matched entries — existing persisted JSON decodes unchanged.
     var localSource: LocalSource? = nil
+    /// `true` when the user has marked this entry as private. For AniList
+    /// entries this maps to the `private` flag on `SaveMediaListEntry` —
+    /// private entries are hidden from the user's public profile and from
+    /// social feeds. For MAL/local entries the flag is persisted locally
+    /// only (MAL's API exposes `is_rewatching` but not a true private flag,
+    /// so we keep the state in-app). Defaults to false so existing decoded
+    /// JSON stays valid.
+    var isPrivate: Bool = false
 
     /// The score to show/edit in `format`. Local entries convert from their
     /// canonical value; provider entries fall back to `score` (their account

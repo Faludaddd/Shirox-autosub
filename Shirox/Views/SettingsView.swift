@@ -3747,8 +3747,9 @@ struct SubtitleSettingsPage: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.appAccent)
+            .buttonStyle(.bordered)
+            .tint(.accentColor)
+            .controlSize(.large)
 
             Text("Opens a fullscreen, landscape-only preview that renders the caption at its true playback size — no scaling.")
                 .font(.caption)
@@ -3841,10 +3842,15 @@ struct LandscapeSubtitlePreview: View {
 
     var body: some View {
         GeometryReader { proxy in
-            // Issue #9 — Clamp caption width to 92% of screen width so text
-            // never overflows off-screen in landscape, even if the user's
-            // subtitleMaxWidth slider is set to 100%.
-            let captionMaxWidth = min(proxy.size.width * (subtitleMaxWidth / 100.0), proxy.size.width * 0.92)
+            // Issue #9 — Clamp caption width to 90% of screen width MINUS the
+            // safe-area insets so text never overflows off-screen in landscape,
+            // even if the user's subtitleMaxWidth slider is set to 100%. The
+            // outer VStack is also given explicit safe-area horizontal padding
+            // so the caption's centered frame can never be pushed past either
+            // edge by the safe area.
+            let safeLR = proxy.safeAreaInsets.leading + proxy.safeAreaInsets.trailing
+            let usableWidth = max(160, proxy.size.width - safeLR)
+            let captionMaxWidth = min(usableWidth * (subtitleMaxWidth / 100.0), usableWidth * 0.9)
             let bottomInset = max(proxy.size.height * 0.08, 48)
             ZStack(alignment: .top) {
                 // #114 (bug fix) — Real anime backdrop. The SubtitleSettingsPage
@@ -3880,20 +3886,18 @@ struct LandscapeSubtitlePreview: View {
 
                     Spacer()
 
-                    // Caption rendered at TRUE font size (no scaling). All of
-                    // the user-selected style settings (color, stroke,
-                    // background, weight, design, opacity, line spacing,
-                    // shadow) are applied so the preview matches playback 1:1.
-                    // #114 extension — Apply the user's vertical offset so the
-                    // landscape preview matches the inline preview's caption
-                    // position. Positive offset pushes down (closer to / past
-                    // the default bottom inset), negative lifts toward the top.
+                    // Caption rendered at TRUE font size (no scaling). The
+                    // frame is explicitly capped to `captionMaxWidth` (already
+                    // safe-area-aware) and centered. The outer padding is
+                    // applied to the parent VStack so the caption sits squarely
+                    // in the visible area regardless of notch / home indicator.
                     captionText
-                        .frame(maxWidth: captionMaxWidth)
-                        .padding(.horizontal, 16)
+                        .frame(maxWidth: captionMaxWidth, alignment: .center)
                         .padding(.bottom, bottomInset)
                         .offset(y: -subtitleVerticalOffset * 0.8)
+                        .frame(maxWidth: .infinity, alignment: .center)
                 }
+                .padding(.horizontal, max(16, safeLR / 2))
 
                 // Subtle helper text just above the caption so the user
                 // understands what they're looking at.
@@ -3907,6 +3911,7 @@ struct LandscapeSubtitlePreview: View {
             }
             .foregroundStyle(.white)
         }
+        .ignoresSafeArea(edges: [.top, .bottom])
         .statusBarHidden()
         .onAppear {
             // Borrow the player presenter's orientation-lock machinery so the

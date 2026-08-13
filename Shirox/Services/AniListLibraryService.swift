@@ -163,9 +163,9 @@ final class AniListLibraryService {
 
     // MARK: - Update entry
 
-    func updateEntry(mediaId: Int, status: MediaListStatus, progress: Int, score: Double? = nil, repeat repeatCount: Int? = nil, type: MediaListType = .anime) async throws {
+    func updateEntry(mediaId: Int, status: MediaListStatus, progress: Int, score: Double? = nil, repeat repeatCount: Int? = nil, type: MediaListType = .anime, isPrivate: Bool? = nil) async throws {
         do {
-            try await rawUpdateEntry(mediaId: mediaId, status: status, progress: progress, score: score, repeat: repeatCount, type: type)
+            try await rawUpdateEntry(mediaId: mediaId, status: status, progress: progress, score: score, repeat: repeatCount, type: type, isPrivate: isPrivate)
         } catch {
             guard PendingWriteQueue.isTransient(error) else { throw error }
             await PendingWriteQueue.shared.enqueue(PendingWrite(
@@ -175,10 +175,10 @@ final class AniListLibraryService {
         }
     }
 
-    func rawUpdateEntry(mediaId: Int, status: MediaListStatus, progress: Int, score: Double? = nil, repeat repeatCount: Int? = nil, type: MediaListType = .anime) async throws {
+    func rawUpdateEntry(mediaId: Int, status: MediaListStatus, progress: Int, score: Double? = nil, repeat repeatCount: Int? = nil, type: MediaListType = .anime, isPrivate: Bool? = nil) async throws {
         let mutation = """
-        mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $score: Float, $repeat: Int) {
-          SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, score: $score, repeat: $repeat) {
+        mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $score: Float, $repeat: Int, $private: Boolean) {
+          SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, score: $score, repeat: $repeat, private: $private) {
             id
           }
         }
@@ -190,6 +190,7 @@ final class AniListLibraryService {
         ]
         if let score { variables["score"] = score }
         if let repeatCount { variables["repeat"] = repeatCount }
+        if let isPrivate { variables["private"] = isPrivate }
         _ = try await post(query: mutation, variables: variables)
     }
 

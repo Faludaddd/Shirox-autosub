@@ -1155,9 +1155,11 @@ struct SourcesPickerSheet: View {
         providerManager.orderedProviders.first?.providerType
     }
 
-    /// #132 — Only AniList is surfaced in the Search picker. When other
-    /// providers are ready for search, add them to this list.
-    private var searchableProviders: [ProviderType] { [.anilist] }
+    /// Searchable providers — both AniList and MAL are surfaced. MAL is
+    /// functional for keyword search and basic client-side filters; advanced
+    /// filters that MAL's API doesn't support are silently skipped on the
+    /// MAL path (see `SearchViewModel.applyMALClientFilters`).
+    private var searchableProviders: [ProviderType] { [.anilist, .mal] }
 
     var body: some View {
         NavigationStack {
@@ -1272,21 +1274,22 @@ struct SourcesPickerSheet: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - Coming Soon Card (#132)
-    // Explains why only AniList is shown. Keeps the user informed that
-    // other providers exist but aren't ready for search yet.
+    // MARK: - Info Card
+    // Tells the user about provider coverage so they know which features each
+    // source supports.
     private var comingSoonCard: some View {
         VStack(spacing: 8) {
-            Image(systemName: "hourglass.circle")
+            Image(systemName: "info.circle")
                 .font(.system(size: 22))
                 .foregroundStyle(.secondary)
-            Text("More sources coming soon")
+            Text("About Sources")
                 .font(.caption.weight(.semibold))
-            Text("MyAnimeList and other providers will appear here once search and filters support them. For now, AniList powers all search, filters, and library sync.")
+            Text("AniList supports full search filters. MAL supports keyword search with client-side filtering for genres, year, season, format, and status. Connect a source in Settings → Sources to enable it here.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 12)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.vertical, 16)
         .frame(maxWidth: .infinity)

@@ -123,12 +123,24 @@ struct NotificationsView: View {
                     .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    // Swipe-LEFT reveals the Close button (does NOT auto-dismiss
+                    // — the user must tap Close to actually remove the row).
+                    // A leading swipe action is also provided as an alternate
+                    // discoverable dismiss gesture.
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                         Button(role: .destructive) {
-                            withAnimation { vm.removeNotification(notif) }
+                            dismissNotification(notif)
                         } label: {
-                            Label("Close", systemImage: "xmark")
+                            Label("Close", systemImage: "xmark.circle.fill")
                         }
+                    }
+                    .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                        Button {
+                            dismissNotification(notif)
+                        } label: {
+                            Label("Dismiss", systemImage: "trash")
+                        }
+                        .tint(.gray)
                     }
                 }
             }
@@ -138,6 +150,17 @@ struct NotificationsView: View {
     }
 
     // MARK: - Row
+
+    /// Removes a notification with animation, ensures the underlying
+    /// `ProfileViewModel.removeNotification(_:)` runs (which persists the
+    /// deletion), and triggers a light haptic so the user gets feedback that
+    /// the swipe-then-tap gesture actually committed.
+    private func dismissNotification(_ notif: ProviderNotification) {
+        Haptics.light()
+        withAnimation(.easeInOut(duration: 0.25)) {
+            vm.removeNotification(notif)
+        }
+    }
 
     @ViewBuilder
     private func notificationIcon(_ notif: ProviderNotification) -> some View {
