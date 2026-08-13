@@ -49,7 +49,10 @@ struct HomeView: View {
                     animeHomeContent
                 }
             }
-            .navigationTitle(appMode.mode == .reading ? "Reading" : "")
+            // No title bar in Reading Mode — the manga home uses the same
+            // transparent, full-bleed layout as the anime home. The
+            // mode-toggle icon in the toolbar is the only chrome.
+            .navigationTitle("")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             .modifier(TransparentNavBarModifier())
@@ -75,7 +78,11 @@ struct HomeView: View {
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink(destination: SettingsView()) {
+                    // Mode-aware settings: Reading Mode opens the manga
+                    // settings, Anime Mode opens the anime settings. The two
+                    // settings systems are fully separate — changing one
+                    // never affects the other.
+                    NavigationLink(destination: appMode.mode == .reading ? AnyView(MangaSettingsView()) : AnyView(SettingsView())) {
                         Image(systemName: "gearshape")
                             .font(.system(size: 18, weight: .medium))
                             .foregroundStyle(.primary)
@@ -286,6 +293,11 @@ struct HomeView: View {
 
 struct FeaturedCarousel: View {
     let items: [Media]
+    /// `true` when the carousel is being shown in Reading Mode. Drives the
+    /// action button label ("Read" vs "Watch") and the navigation destination
+    /// (`AniListMangaDetailView` vs `AniListDetailView`) so the carousel's
+    /// wording and behavior always match the active mode.
+    var isManga: Bool = false
     // `selectedTab` starts in the *middle* rotation of a `displayCount * 3`
     // page window so the user can swipe freely in both directions. A bounded
     // window (previously 2000) keeps the TabView cheap; an edge-reset in
@@ -440,11 +452,15 @@ struct FeaturedCarousel: View {
                         }
 
                         NavigationLink {
-                            AniListDetailView(mediaId: currentMedia.id, preloadedMedia: currentMedia)
+                            if isManga {
+                                AniListMangaDetailView(mediaId: currentMedia.id, preloadedMedia: currentMedia)
+                            } else {
+                                AniListDetailView(mediaId: currentMedia.id, preloadedMedia: currentMedia)
+                            }
                         } label: {
                             HStack(spacing: 6) {
-                                Image(systemName: "play.fill").font(.caption.weight(.bold))
-                                Text("Watch").font(.subheadline.weight(.semibold))
+                                Image(systemName: isManga ? "book.fill" : "play.fill").font(.caption.weight(.bold))
+                                Text(isManga ? "Read" : "Watch").font(.subheadline.weight(.semibold))
                             }
                             .foregroundStyle(.primary)
                             .frame(width: 130, height: 38)
@@ -610,11 +626,15 @@ private struct MacFeaturedCarousel: View {
                                 }
 
                                 NavigationLink {
-                                    AniListDetailView(mediaId: media.id, preloadedMedia: media)
+                                    if isManga {
+                                        AniListMangaDetailView(mediaId: media.id, preloadedMedia: media)
+                                    } else {
+                                        AniListDetailView(mediaId: media.id, preloadedMedia: media)
+                                    }
                                 } label: {
                                     HStack(spacing: 6) {
-                                        Image(systemName: "play.fill").font(.footnote.weight(.semibold))
-                                        Text("Watch").fontWeight(.semibold)
+                                        Image(systemName: isManga ? "book.fill" : "play.fill").font(.footnote.weight(.semibold))
+                                        Text(isManga ? "Read" : "Watch").fontWeight(.semibold)
                                             .lineLimit(1)
                                     }
                                     .foregroundStyle(platformBackground)
@@ -1112,6 +1132,12 @@ struct ScheduleView: View {
     @State private var entries: [UnifiedScheduleEntry] = []
     @State private var isLoading = false
     @State private var loadError: String?
+    @ObservedObject private var appMode = AppModeManager.shared
+
+    // Manga schedule state — populated when appMode.mode == .reading.
+    @State private var mangaReleases: [Media] = []
+    @State private var isLoadingManga = false
+    @State private var mangaLoadError: String?
 
     // All three preferences are bound to the persisted defaults edited in
     // `ScheduleSettingsPage` — changes there propagate live into the schedule
@@ -1142,44 +1168,32 @@ struct ScheduleView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if isLoading && entries.isEmpty {
-                    scheduleLoadingView
-                } else if let loadError = loadError, entries.isEmpty {
-                    ContentUnavailableView(
-                        "Couldn't Load",
-                        systemImage: "wifi.slash",
-                        description: Text(loadError)
-                    )
-                    .toolbar {
-                        ToolbarItem(placement: .primaryAction) {
-                            Button("Retry") { Task { await load() } }
-                        }
-                    }
-                } else if entries.isEmpty {
-                    ContentUnavailableView(
-                        "Nothing Airing",
-                        systemImage: "calendar.badge.exclamationmark",
-                        description: Text("No episodes in the next \(windowDays) day\(windowDays == 1 ? "" : "s") for this mode.")
-                    )
+                if appMode.mode == .reading {
+                    mangaScheduleContent
                 } else {
-                    scheduleContent
+                    animeScheduleContent
                 }
             }
             #if os(iOS)
             .background(Color(.systemBackground))
             #endif
-            .navigationTitle("Schedule")
+            .navigationTitle(appMode.mode == .reading ? "Releases" : "Schedule")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    NavigationLink {
-                        ScheduleSettingsPage()
-                    } label: {
-                        Image(systemName: "gearshape")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(.primary)
+                // Only show the anime schedule settings gear in Anime Mode.
+                // Reading Mode's schedule is a simpler release feed and has
+                // no settings to configure.
+                if appMode.mode == .anime {
+                    ToolbarItem(placement: .primaryAction) {
+                        NavigationLink {
+                            ScheduleSettingsPage()
+                        } label: {
+                            Image(systemName: "gearshape")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(.primary)
+                        }
                     }
                 }
             }
@@ -1191,12 +1205,123 @@ struct ScheduleView: View {
                     onToggleNotification: { toggleNotification(for: entry) }
                 )
             }
-            .task { await load() }
-            .refreshable { await load() }
+            .task {
+                if appMode.mode == .reading {
+                    await loadMangaReleases()
+                } else {
+                    await load()
+                }
+            }
+            .refreshable {
+                if appMode.mode == .reading {
+                    await loadMangaReleases()
+                } else {
+                    await load()
+                }
+            }
             .onChange(of: mode) { _ in Task { await load() } }
             .onChange(of: windowDays) { _ in Task { await load() } }
             .onChange(of: useUTC) { _ in resetCalendarToToday() }
+            .onChange(of: appMode.mode) { newMode in
+                if newMode == .reading {
+                    Task { await loadMangaReleases() }
+                } else {
+                    Task { await load() }
+                }
+            }
         }
+    }
+
+    // MARK: - Anime Schedule Content
+
+    @ViewBuilder
+    private var animeScheduleContent: some View {
+        if isLoading && entries.isEmpty {
+            scheduleLoadingView
+        } else if let loadError = loadError, entries.isEmpty {
+            ContentUnavailableView(
+                "Couldn't Load",
+                systemImage: "wifi.slash",
+                description: Text(loadError)
+            )
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Retry") { Task { await load() } }
+                }
+            }
+        } else if entries.isEmpty {
+            ContentUnavailableView(
+                "Nothing Airing",
+                systemImage: "calendar.badge.exclamationmark",
+                description: Text("No episodes in the next \(windowDays) day\(windowDays == 1 ? "" : "s") for this mode.")
+            )
+        } else {
+            scheduleContent
+        }
+    }
+
+    // MARK: - Manga Release Schedule Content
+    //
+    // Manga equivalent of the anime Schedule tab. AniList has no chapter-
+    // airing API, so we fetch RELEASING manga sorted by UPDATED_AT_DESC and
+    // present them as a flat "recently updated" feed grouped into Today /
+    // This Week / Earlier buckets. Each card shows the cover, title, chapter
+    // count, and a "Updated" timestamp. Tapping pushes the manga detail page.
+
+    @ViewBuilder
+    private var mangaScheduleContent: some View {
+        if isLoadingManga && mangaReleases.isEmpty {
+            ProgressView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if let err = mangaLoadError, mangaReleases.isEmpty {
+            ContentUnavailableView(
+                "Couldn't Load",
+                systemImage: "wifi.slash",
+                description: Text(err)
+            )
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Retry") { Task { await loadMangaReleases() } }
+                }
+            }
+        } else if mangaReleases.isEmpty {
+            ContentUnavailableView(
+                "No Recent Releases",
+                systemImage: "book.closed",
+                description: Text("No recently-updated manga found right now.")
+            )
+        } else {
+            ScrollView {
+                LazyVStack(spacing: 14) {
+                    ForEach(mangaReleases, id: \.uniqueId) { media in
+                        NavigationLink {
+                            AniListMangaDetailView(mediaId: media.id, preloadedMedia: media)
+                        } label: {
+                            MangaReleaseCard(media: media)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 24)
+            }
+        }
+    }
+
+    // MARK: - Manga Releases Load
+
+    private func loadMangaReleases() async {
+        guard mangaReleases.isEmpty else { return }
+        isLoadingManga = true
+        mangaLoadError = nil
+        do {
+            let raw = try await AniListService.shared.mangaReleaseSchedule()
+            mangaReleases = raw.map { AniListProvider.shared.mapMangaMedia($0) }
+        } catch {
+            mangaLoadError = error.localizedDescription
+        }
+        isLoadingManga = false
     }
 
     // MARK: - Content
@@ -1840,6 +1965,89 @@ struct ScheduleView: View {
 }
 
 // MARK: - Schedule Card
+
+/// One row in the manga release schedule. Shows cover, title, chapter/volume
+/// count, format badge, and a "Recently updated" indicator. Tapping pushes
+/// the manga detail page. Mirrors the anime ScheduleCard's visual language
+/// (poster + badges + metadata row) so the two schedule tabs read as
+/// parallel surfaces.
+private struct MangaReleaseCard: View {
+    let media: Media
+
+    private var formatBadgeColor: Color {
+        switch (media.format ?? "").uppercased() {
+        case "MANGA":  return .green
+        case "NOVEL":  return .orange
+        case "ONE_SHOT": return .pink
+        case "DOUJINSHI": return .teal
+        default:        return .gray
+        }
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            CachedAsyncImage(urlString: media.coverImage.extraLarge ?? media.coverImage.large ?? "")
+                .frame(width: 56, height: 80)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.1)))
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(media.title.displayTitle)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(2)
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 6) {
+                    if let chapters = media.episodes {
+                        Text("Ch \(chapters)")
+                            .font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.secondary.opacity(0.18), in: Capsule())
+                            .fixedSize()
+                    }
+                    if let format = media.format, !format.isEmpty {
+                        Text(format.replacingOccurrences(of: "_", with: " "))
+                            .font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(formatBadgeColor.opacity(0.22), in: Capsule())
+                            .foregroundStyle(formatBadgeColor)
+                            .fixedSize()
+                    }
+                    if let score = media.averageScore {
+                        HStack(spacing: 3) {
+                            Image(systemName: "star.fill").font(.system(size: 9))
+                            Text("\(score)%")
+                        }
+                        .font(.caption2.weight(.semibold))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.yellow.opacity(0.18), in: Capsule())
+                        .foregroundStyle(.yellow)
+                        .fixedSize()
+                    }
+                }
+
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                    Text("Recently updated")
+                        .font(.caption2.weight(.medium))
+                }
+                .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 4)
+        }
+        .padding(12)
+        .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5)
+        )
+    }
+}
 
 /// One row in the schedule list. Shows poster, title, EP badge, colored format badge,
 /// source badge, countdown, air-time capsule, and a notification bell. Long-press for a

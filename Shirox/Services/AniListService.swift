@@ -1031,6 +1031,46 @@ final class AniListService {
         return try await fetchPage(query: query)
     }
 
+    /// Manga "release schedule" — AniList has no chapter-airing API like the
+    /// anime airingSchedules, so we synthesize a schedule from RELEASING
+    /// manga sorted by `UPDATED_AT_DESC` (most recently updated first). Each
+    /// returned title represents a manga that has a new chapter out recently.
+    /// The MangaReleaseSchedule view groups these by day (today / yesterday /
+    /// earlier-this-week / earlier) and shows chapter/volume counts where
+    /// available. This is the manga equivalent of the anime Schedule tab.
+    ///
+    /// `limit` caps the number of results (default 50, ~2 pages of 25).
+    func mangaReleaseSchedule(limit: Int = 50) async throws -> [AniListMedia] {
+        let perPage = min(max(limit, 10), 50)
+        let query = """
+        query {
+          Page(page: 1, perPage: \(perPage)) {
+            media(type: MANGA, status: RELEASING, sort: UPDATED_AT_DESC, isAdult: false) {
+              id
+              idMal
+              title { romaji english native }
+              coverImage { large extraLarge }
+              bannerImage
+              description(asHtml: false)
+              chapters
+              volumes
+              status
+              averageScore
+              popularity
+              genres
+              format
+              source
+              countryOfOrigin
+              season
+              seasonYear
+              startDate { year month day }
+            }
+          }
+        }
+        """
+        return try await fetchPage(query: query)
+    }
+
     /// Free-text manga search used by the manga tab's search bar. Returns the
     /// same field set as `mangaTrending` so results can be tapped through to
     /// the manga detail page without an extra network call.
