@@ -1,5 +1,8 @@
 #if os(iOS)
 import SwiftUI
+import Combine
+import Foundation
+import UIKit
 
 /// Custom download detail view — opened when the user taps a download row
 /// (in-progress, failed, or completed) in the Downloads tab. Shows a large
