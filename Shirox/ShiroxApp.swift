@@ -152,22 +152,6 @@ extension Color {
     }
 }
 
-// MARK: - Hex Color Extension
-
-extension UIColor {
-    /// Initializes a UIColor from a hex string (e.g. "#FF6B6B" or "FF6B6B").
-    /// Returns nil for invalid input.
-    convenience init?(hex: String) {
-        var cleaned = hex.trimmingCharacters(in: .whitespacesAndNewlines)
-        if cleaned.hasPrefix("#") { cleaned.removeFirst() }
-        guard cleaned.count == 6, let value = UInt32(cleaned, radix: 16) else { return nil }
-        let r = CGFloat((value >> 16) & 0xFF) / 255.0
-        let g = CGFloat((value >> 8) & 0xFF) / 255.0
-        let b = CGFloat(value & 0xFF) / 255.0
-        self.init(red: r, green: g, blue: b, alpha: 1.0)
-    }
-}
-
 @main
 struct ShiroxApp: App {
 #if os(iOS)
