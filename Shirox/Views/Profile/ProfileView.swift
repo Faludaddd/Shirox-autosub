@@ -183,8 +183,8 @@ struct ProfileView: View {
                 Text("Retry")
                     .font(.subheadline.weight(.semibold))
                     .padding(.horizontal, 18).padding(.vertical, 8)
-                    .background(Color.accentColor)
-                    .foregroundStyle(.white)
+                    .background(Color.appAccent)
+                    .foregroundStyle(Color.appAccentForeground)
                     .clipShape(Capsule())
             }
         }
@@ -226,7 +226,7 @@ struct ProfileView: View {
                         .aspectRatio(contentMode: .fill)
                 } else {
                     LinearGradient(
-                        colors: [Color.accentColor.opacity(0.35), Color.accentColor.opacity(0.10)],
+                        colors: [Color.appAccent.opacity(0.35), Color.appAccent.opacity(0.10)],
                         startPoint: .top, endPoint: .bottom
                     )
                 }
@@ -312,8 +312,8 @@ struct ProfileView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
             .frame(minWidth: 90)
-            .background(vm.user?.isFollowing == true ? Color.primary.opacity(0.1) : Color.accentColor)
-            .foregroundStyle(vm.user?.isFollowing == true ? Color.primary : Color.white)
+            .background(vm.user?.isFollowing == true ? Color.primary.opacity(0.1) : Color.appAccent)
+            .foregroundStyle(vm.user?.isFollowing == true ? Color.primary : Color.appAccentForeground)
             .clipShape(Capsule())
         }
         .disabled(vm.isTogglingFollow)

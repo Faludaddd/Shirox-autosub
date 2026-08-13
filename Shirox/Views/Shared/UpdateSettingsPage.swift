@@ -172,7 +172,7 @@ struct UpdateSettingsPage: View {
             HStack(spacing: 8) {
                 if manager.isChecking {
                     ProgressView()
-                        .tint(.white)
+                        .tint(Color.appAccentForeground)
                 } else {
                     Image(systemName: "arrow.clockwise")
                         .font(.system(size: 15, weight: .bold))
@@ -180,16 +180,12 @@ struct UpdateSettingsPage: View {
                 Text(manager.isChecking ? "Checking…" : "Check Now")
                     .font(.subheadline.weight(.semibold))
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(Color.appAccentForeground)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 13)
             .background(
                 RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .fill(Color.accentColor)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.15), lineWidth: 0.5)
+                    .fill(Color.appAccent)
             )
         }
         .buttonStyle(.plain)

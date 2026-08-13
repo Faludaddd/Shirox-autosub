@@ -760,9 +760,9 @@ private struct ProvidersSettingsSection: View {
                                 manager.selectProvider(provider.providerType)
                             }
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(Color.accentColor)
+                            .foregroundStyle(Color.appAccent)
                             .padding(.horizontal, 8).padding(.vertical, 3)
-                            .background(Color.accentColor.opacity(0.1), in: Capsule())
+                            .background(Color.appAccent.opacity(0.1), in: Capsule())
                             .buttonStyle(.plain)
                         }
                         #if os(iOS)

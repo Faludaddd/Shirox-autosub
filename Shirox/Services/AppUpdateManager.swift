@@ -28,7 +28,7 @@ final class AppUpdateManager: ObservableObject {
     /// Notification Center alongside airing/follow notifications.
     @Published var updateNotificationId: String?
 
-    private let manifestURL = URL(string: "https://raw.githubusercontent.com/Faludaddd/Shirox-autosub/main/apps.json")!
+    private let manifestURL = URL(string: "https://raw.githubusercontent.com/xibrox/Shirox/main/apps.json")!
 
     /// AppStorage-backed user preferences for the update system. All keys
     /// are prefixed `update.` so they live in their own namespace and never

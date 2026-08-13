@@ -134,6 +134,29 @@ extension Color {
         #endif
     }
 
+    /// The foreground color to use ON TOP of a `Color.appAccent` solid fill.
+    /// When a custom accent hex is set, the foreground is white (most custom
+    /// accents are saturated colors that need white text). When falling back
+    /// to `UIColor.label` (near-black in light mode, near-white in dark mode),
+    /// the foreground is the system background (white in light, black in dark)
+    /// so the text is always readable against the accent fill.
+    static var appAccentForeground: Color {
+        let hex = UserDefaults.standard.string(forKey: "accentColorHex") ?? ""
+        let trimmed = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            // Custom accent color → white text on top (custom accents are
+            // typically saturated enough for white to be readable).
+            return .white
+        }
+        // Default: accent is UIColor.label (near-black in light, near-white in
+        // dark). Foreground must be the inverse → systemBackground.
+        #if canImport(UIKit)
+        return Color(UIColor.systemBackground)
+        #else
+        return Color.black
+        #endif
+    }
+
     static var scheduleSelectedPill: Color {
         Color.red
     }

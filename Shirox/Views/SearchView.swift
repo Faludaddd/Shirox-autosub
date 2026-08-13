@@ -470,7 +470,7 @@ struct SearchView: View {
                     .foregroundStyle(.primary)
                 if providerManager.orderedProviders.first?.providerType != .anilist {
                     Circle()
-                        .fill(.tint)
+                        .fill(Color.appAccent)
                         .frame(width: 8, height: 8)
                         .offset(x: 2, y: -2)
                 }
@@ -492,7 +492,7 @@ struct SearchView: View {
                     .foregroundStyle(.primary)
                 if !vm.filters.isEmpty {
                     Circle()
-                        .fill(.tint)
+                        .fill(Color.appAccent)
                         .frame(width: 10, height: 10)
                         .offset(x: 2, y: -2)
                 }

@@ -22,7 +22,7 @@ struct LibraryFilterLabel: View {
                     .overlay(alignment: .topTrailing) {
                         if isActive {
                             Circle()
-                                .fill(Color.accentColor)
+                                .fill(Color.appAccent)
                                 .frame(width: 9, height: 9)
                                 .offset(x: 1, y: -1)
                         }
