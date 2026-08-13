@@ -1369,16 +1369,16 @@ struct ScheduleView: View {
         let cal = calendar
         let today = cal.startOfDay(for: Date())
 
-        let entries = mangaReleases.map { media in
+        let entries: [UnifiedScheduleEntry] = mangaReleases.map { media in
             UnifiedScheduleEntry(
                 id: media.id,
-                source: .anime,
+                source: ScheduleSource.anime,
                 sourceMediaId: media.id,
                 aniListMediaId: media.id,
                 title: media.title.displayTitle,
                 airingAt: Int(today.timeIntervalSince1970),
                 episode: media.episodes ?? 0,
-                season: nil,
+                season: Optional<Int>.none,
                 coverImage: media.coverImage.best,
                 format: media.format,
                 isStreamingRelease: false,
