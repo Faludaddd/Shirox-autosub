@@ -4,6 +4,7 @@ struct HomeView: View {
     @StateObject private var vm = HomeViewModel()
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
     @ObservedObject private var mangaProgress = MangaProgressManager.shared
+    @ObservedObject private var appMode = AppModeManager.shared
     // #111 — Observing AniListAuthManager here lets HomeView re-render the
     // Continue Watching section's signed-out prompt card the moment the user
     // completes (or signs out of) AniList auth, without needing a manual reload.
@@ -39,130 +40,32 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if vm.isLoading && vm.trending.isEmpty {
-                    ProgressView()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let error = vm.error, vm.trending.isEmpty {
-                    ContentUnavailableView(
-                        "Couldn't Load",
-                        systemImage: "wifi.slash",
-                        description: Text(error)
+                if appMode.mode == .reading {
+                    MangaHomeContent(
+                        progressManager: mangaProgress,
+                        anilistAuth: anilistAuth
                     )
-                    .toolbar {
-                        ToolbarItem(placement: .primaryAction) {
-                            Button("Retry") { Task { await vm.reload() } }
-                        }
-                    }
                 } else {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 24) {
-                            // ────────────────────────────────────────────────────────
-                            // 1. HERO — Full-bleed featured carousel.
-                            //    The ONLY hero element on the page; everything below it
-                            //    is supporting content (grid + continue watching).
-                            // ────────────────────────────────────────────────────────
-                            if !vm.trending.isEmpty {
-                                FeaturedCarousel(items: vm.trending)
-                            }
-
-                            // ────────────────────────────────────────────────────────
-                            // 2. CONTINUE WATCHING / READING — horizontal strips
-                            //    directly under the hero carousel. Kept iOS-only; on
-                            //    tvOS/macOS these resume cards don't render.
-                            // ────────────────────────────────────────────────────────
-                            #if os(iOS)
-                            if !continueWatching.items.isEmpty {
-                                ContinueWatchingSection(items: continueWatching.items, navTarget: $cwNavTarget)
-                            } else if !anilistAuth.isLoggedIn {
-                                // #111 — When the user has no Continue Watching
-                                // items AND is signed out, surface a sign-in
-                                // prompt card in the same slot so the section
-                                // isn't just invisible. Tapping the button pushes
-                                // SourcesSettingsPage, where the user can connect
-                                // AniList (and MAL) — once authed + watched, the
-                                // real ContinueWatchingSection takes over here.
-                                ContinueWatchingSignInPrompt()
-                            }
-                            if !mangaProgress.items.isEmpty {
-                                ContinueReadingSection(items: mangaProgress.items, readerContext: $readerContext)
-                            }
-                            #endif
-
-                            // ────────────────────────────────────────────────────────
-                            // 3. BROWSE CATEGORIES — Issue #5. Two layouts, controlled
-                            //    by `browseCategoriesGridLayout`:
-                            //      • Default (setting OFF): horizontal carousels
-                            //      • Alternate (setting ON): 2-column grid of tiles
-                            //    The grid layout (currently shown) is now the NON-
-                            //    default — it only appears when the setting is ON.
-                            // ────────────────────────────────────────────────────────
-                            if browseCategoriesGridLayout {
-                                browseCategoriesGrid
-                            } else {
-                                AnimeSection(title: "This Season", items: vm.seasonal, category: .seasonal)
-                                AnimeSection(title: "Trending Now", items: vm.trending, category: .trending)
-                                AnimeSection(title: "All-Time Popular", items: vm.popular, category: .popular)
-                                AnimeSection(title: "Top Rated", items: vm.topRated, category: .topRated)
-                                AnimeSection(title: "Recently Completed", items: vm.recentlyCompleted, category: .popular)
-                                AnimeSection(title: "Upcoming", items: vm.upcoming, category: .trending)
-                            }
-
-                            Spacer().frame(height: 28)
-                        }
-                    }
-                    .refreshable {
-                        // #96 — Light haptic when the user pulls to refresh.
-                        Haptics.light()
-                        // #98 — toggle the custom refresh overlay while the reload is in
-                        // flight. `defer` guarantees the overlay clears even if a task throws.
-                        isRefreshing = true
-                        defer { isRefreshing = false }
-                        await withTaskGroup(of: Void.self) { group in
-                            group.addTask { await vm.reload() }
-                            group.addTask {
-                                // Sequential: both sync funcs mutate the same CW store across
-                                // await points, so running them concurrently could clobber items.
-                                await ContinueWatchingManager.shared.syncWithAniList()
-                                await ContinueWatchingManager.shared.syncWithMAL()
-                            }
-                        }
-                    }
-                    .coordinateSpace(name: "homeScroll")
-                    // #98 — overlay the custom branded refresh control at the top of the
-                    // scroll view. Applied OUTSIDE `.ignoresSafeArea` so the overlay lands
-                    // below the status bar / notch, not under it. The control is only
-                    // rendered while `isRefreshing` is true, so the resting state is clean.
-                    .overlay(alignment: .top) {
-                        if isRefreshing {
-                            CustomRefreshControl(isRefreshing: $isRefreshing)
-                                .padding(.vertical, 6)
-                                .padding(.horizontal, 16)
-                                .frame(maxWidth: .infinity)
-                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                                .padding(.horizontal, 80)
-                                .transition(.opacity.combined(with: .move(edge: .top)))
-                                .zIndex(100)
-                        }
-                    }
-                    .animation(.easeInOut(duration: 0.25), value: isRefreshing)
-                    .ignoresSafeArea(edges: .top)
+                    animeHomeContent
                 }
             }
-            .navigationTitle("")
+            .navigationTitle(appMode.mode == .reading ? "Reading" : "")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             .modifier(TransparentNavBarModifier())
-            #endif
             .toolbar {
-                // Issue #2 — Notifications, Reading Mode, and Settings are
-                // grouped together on the trailing side so they're visually
-                // adjacent. The book icon opens Reading Mode for manga.
+                // Mode-toggle icon — the ONLY way to switch between Anime and
+                // Reading Mode. No back button. The icon reflects the
+                // OPPOSITE mode so the user knows what tapping will do.
                 ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink(destination: MangaHomeView()) {
-                        Image(systemName: "book.fill")
+                    Button {
+                        appMode.toggle()
+                    } label: {
+                        Image(systemName: appMode.mode.toggleIcon)
                             .font(.system(size: 18, weight: .medium))
                             .foregroundStyle(.primary)
                     }
+                    .accessibilityLabel(appMode.mode.toggleAccessibilityLabel)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink(destination: NotificationsPage()) {
@@ -182,23 +85,102 @@ struct HomeView: View {
                     ProviderMenuButton()
                 }
             }
+            #endif
             // Outside the ScrollView: the hidden NavigationLink that performs the push.
             .continueWatchingNavigation($cwNavTarget)
-            // Requirement #3 — Top search icon removed. The only search entry
-            // point is the bottom search tab (AniList-only).
             #if os(iOS)
             .fullScreenCover(item: $readerContext) { ctx in
                 MangaReaderView(context: ctx)
             }
             #endif
         }
-        .task { await vm.load() }
+        .task {
+            if appMode.mode == .anime { await vm.load() }
+        }
         .onAppear {
             #if os(iOS)
             PlayerPresenter.shared.resetToAppOrientation()
-            // Reclaim local-file copies left by cancelled picks or finished/removed items.
             ContinueWatchingManager.shared.pruneOrphanedLocalImports()
             #endif
+        }
+    }
+
+    // MARK: - Anime Home Content
+
+    @ViewBuilder
+    private var animeHomeContent: some View {
+        Group {
+            if vm.isLoading && vm.trending.isEmpty {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let error = vm.error, vm.trending.isEmpty {
+                ContentUnavailableView(
+                    "Couldn't Load",
+                    systemImage: "wifi.slash",
+                    description: Text(error)
+                )
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Retry") { Task { await vm.reload() } }
+                    }
+                }
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        if !vm.trending.isEmpty {
+                            FeaturedCarousel(items: vm.trending)
+                        }
+                        #if os(iOS)
+                        if !continueWatching.items.isEmpty {
+                            ContinueWatchingSection(items: continueWatching.items, navTarget: $cwNavTarget)
+                        } else if !anilistAuth.isLoggedIn {
+                            ContinueWatchingSignInPrompt()
+                        }
+                        if !mangaProgress.items.isEmpty {
+                            ContinueReadingSection(items: mangaProgress.items, readerContext: $readerContext)
+                        }
+                        #endif
+                        if browseCategoriesGridLayout {
+                            browseCategoriesGrid
+                        } else {
+                            AnimeSection(title: "This Season", items: vm.seasonal, category: .seasonal)
+                            AnimeSection(title: "Trending Now", items: vm.trending, category: .trending)
+                            AnimeSection(title: "All-Time Popular", items: vm.popular, category: .popular)
+                            AnimeSection(title: "Top Rated", items: vm.topRated, category: .topRated)
+                            AnimeSection(title: "Recently Completed", items: vm.recentlyCompleted, category: .popular)
+                            AnimeSection(title: "Upcoming", items: vm.upcoming, category: .trending)
+                        }
+                        Spacer().frame(height: 28)
+                    }
+                }
+                .refreshable {
+                    Haptics.light()
+                    isRefreshing = true
+                    defer { isRefreshing = false }
+                    await withTaskGroup(of: Void.self) { group in
+                        group.addTask { await vm.reload() }
+                        group.addTask {
+                            await ContinueWatchingManager.shared.syncWithAniList()
+                            await ContinueWatchingManager.shared.syncWithMAL()
+                        }
+                    }
+                }
+                .coordinateSpace(name: "homeScroll")
+                .overlay(alignment: .top) {
+                    if isRefreshing {
+                        CustomRefreshControl(isRefreshing: $isRefreshing)
+                            .padding(.vertical, 6)
+                            .padding(.horizontal, 16)
+                            .frame(maxWidth: .infinity)
+                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .padding(.horizontal, 80)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                            .zIndex(100)
+                    }
+                }
+                .animation(.easeInOut(duration: 0.25), value: isRefreshing)
+                .ignoresSafeArea(edges: .top)
+            }
         }
     }
 

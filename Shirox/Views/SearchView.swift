@@ -7,6 +7,7 @@ struct SearchView: View {
     @StateObject private var history = SearchHistoryManager()
     @EnvironmentObject private var moduleManager: ModuleManager
     @ObservedObject private var providerManager = ProviderManager.shared
+    @ObservedObject private var appMode = AppModeManager.shared
     // #90 — Sources picker (custom card sheet) replaces the old Modules toolbar button.
     @State private var showSources = false
     @State private var showFilters = false
@@ -29,6 +30,12 @@ struct SearchView: View {
 
     private var isLocalModule: Bool { moduleManager.activeModule?.isLocalPlayback == true }
     private var isJellyfinModule: Bool { moduleManager.activeModule?.isJellyfin == true }
+
+    /// True when the app is in Reading Mode. Search filters its content
+    /// accordingly: manga-only results in Reading Mode, anime-only results
+    /// in Anime Mode. The same SearchView instance is reused across both
+    /// modes — no duplicate search system.
+    private var isMangaMode: Bool { appMode.mode == .reading }
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -65,7 +72,7 @@ struct SearchView: View {
         NavigationStack {
             mainContent
                 .background(SearchActivationObserver { vm.clearResults() })
-                .navigationTitle("Search")
+                .navigationTitle(isMangaMode ? "Search Manga" : "Search")
                 .toolbar {
                     // Sources picker — only when not using a local/Jellyfin
                     // module (those don't use the provider system).
@@ -87,7 +94,7 @@ struct SearchView: View {
                 .modifier(ConditionalSearchable(enabled: !isLocalModule && !isJellyfinModule, text: $vm.query))
                 .onSubmit(of: .search) {
                     history.add(vm.query)
-                    vm.search(usingModule: usingModule)
+                    vm.search(usingModule: usingModule, isMangaMode: isMangaMode)
                 }
                 .onChangeOf(vm.query) { new in
                     if new.isEmpty {
@@ -102,22 +109,31 @@ struct SearchView: View {
                             try? await Task.sleep(nanoseconds: 500_000_000)
                             guard !Task.isCancelled else { return }
                             await MainActor.run {
-                                vm.search(usingModule: usingModule)
+                                vm.search(usingModule: usingModule, isMangaMode: isMangaMode)
                             }
                         }
                     }
                 }
                 .onChangeOf(moduleManager.moduleReadyId) { newId in
                     guard !vm.query.isEmpty, newId != nil else { return }
-                    vm.search(usingModule: true)
+                    vm.search(usingModule: true, isMangaMode: isMangaMode)
                 }
                 .onChangeOf(moduleManager.activeModule) { newModule in
                     guard !vm.query.isEmpty, newModule == nil else { return }
-                    vm.search(usingModule: false)
+                    vm.search(usingModule: false, isMangaMode: isMangaMode)
                 }
                 .onChangeOf(providerManager.orderedProviders.first?.providerType) {
                     guard !vm.query.isEmpty, !usingModule else { return }
-                    vm.search(usingModule: false)
+                    vm.search(usingModule: false, isMangaMode: isMangaMode)
+                }
+                // Mode switch: clear results and re-search if a query is
+                // pending. The result set is mode-specific (anime vs manga)
+                // so a stale cross-mode result set must never persist.
+                .onChangeOf(appMode.mode) { _ in
+                    vm.clearResults()
+                    if !vm.query.isEmpty {
+                        vm.search(usingModule: usingModule, isMangaMode: isMangaMode)
+                    }
                 }
         }
         .adaptiveSheet(isPresented: $showSources) {
@@ -131,9 +147,10 @@ struct SearchView: View {
             SearchFilterSheet(
                 filters: $vm.filters,
                 currentResultCount: vm.resultCount,
-                hasSearched: vm.hasSearched
+                hasSearched: vm.hasSearched,
+                isMangaMode: isMangaMode
             ) {
-                vm.search(usingModule: usingModule)
+                vm.search(usingModule: usingModule, isMangaMode: isMangaMode)
             }
             // #100 — Liquid-glass backdrop for the modal sheet.
             .background(.ultraThinMaterial)
@@ -165,12 +182,12 @@ struct SearchView: View {
             if vm.query.isEmpty && !history.queries.isEmpty {
                 historyView
             } else {
-                // Issue #3 — Search always uses AniList directly. Remove any
-                // indication that search is coming from an internal module.
+                // Mode-aware empty state. In Reading Mode the search only
+                // returns manga; in Anime Mode it only returns anime.
                 emptyStateView(
-                    icon: "magnifyingglass",
-                    title: "Search Anime",
-                    subtitle: "Find any anime via AniList"
+                    icon: isMangaMode ? "book" : "magnifyingglass",
+                    title: isMangaMode ? "Search Manga" : "Search Anime",
+                    subtitle: isMangaMode ? "Find any manga via AniList" : "Find any anime via AniList"
                 )
             }
         } else if vm.isLoading {
@@ -330,7 +347,16 @@ struct SearchView: View {
                 if !vm.aniListResults.isEmpty {
                     ForEach(vm.aniListResults) { media in
                         NavigationLink {
-                            AniListDetailView(mediaId: media.id, preloadedMedia: media)
+                            // Mode-aware destination: manga detail in Reading
+                            // Mode, anime detail in Anime Mode. Even if a
+                            // title exists as both anime and manga, the
+                            // destination follows the active mode so anime
+                            // results never appear in Reading Mode.
+                            if isMangaMode {
+                                AniListMangaDetailView(mediaId: media.id, preloadedMedia: media)
+                            } else {
+                                AniListDetailView(mediaId: media.id, preloadedMedia: media)
+                            }
                         } label: {
                             AniListCardView(media: media)
                                 .equatable()
@@ -340,7 +366,7 @@ struct SearchView: View {
                 } else {
                     ForEach(vm.moduleResults) { item in
                         NavigationLink {
-                            if moduleManager.activeModule?.isManga == true {
+                            if moduleManager.activeModule?.isManga == true || isMangaMode {
                                 MangaDetailView(item: item)
                             } else {
                                 DetailView(item: item)
@@ -522,6 +548,7 @@ struct SearchFilterSheet: View {
     @Binding var filters: AniListService.SearchFilters
     let currentResultCount: Int
     let hasSearched: Bool
+    var isMangaMode: Bool = false
     let onApply: () -> Void
 
     @Environment(\.dismiss) private var dismiss

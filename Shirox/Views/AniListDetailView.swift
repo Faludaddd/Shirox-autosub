@@ -1210,11 +1210,11 @@ struct AniListDetailView: View {
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.secondary.opacity(0.06))
+                .fill(Color.secondary.opacity(0.08))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.secondary.opacity(0.1), lineWidth: 0.5)
+                .strokeBorder(Color.primary.opacity(0.22), lineWidth: 1.2)
         )
     }
 

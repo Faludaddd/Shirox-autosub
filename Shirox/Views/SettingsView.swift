@@ -3734,7 +3734,7 @@ struct SubtitleSettingsPage: View {
         .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    // MARK: - Test in Landscape Button (#114)
+    // MARK: - Test in Landscape Button
 
     private var testInLandscapeButton: some View {
         #if os(iOS)
@@ -3742,20 +3742,32 @@ struct SubtitleSettingsPage: View {
             Button {
                 showLandscapePreview = true
             } label: {
-                Label("Test in Landscape", systemImage: "rectangle.landscape.rotate")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
+                HStack(spacing: 8) {
+                    Image(systemName: "rectangle.landscape.rotate")
+                        .font(.system(size: 17, weight: .semibold))
+                    Text("Test in Landscape")
+                        .font(.headline)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 13)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.secondary.opacity(0.15))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.18), lineWidth: 0.8)
+                )
+                .foregroundStyle(.primary)
             }
-            .buttonStyle(.bordered)
-            .tint(.accentColor)
-            .controlSize(.large)
+            .buttonStyle(.plain)
 
             Text("Opens a fullscreen, landscape-only preview that renders the caption at its true playback size — no scaling.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
+                .fixedSize(horizontal: false, vertical: true)
         }
         #else
         EmptyView()
@@ -3799,27 +3811,29 @@ private extension View {
     }
 }
 
-// MARK: - Landscape Subtitle Preview (#114)
+// MARK: - Landscape Subtitle Preview
 
 #if os(iOS)
 /// Fullscreen, landscape-only preview that renders the configured subtitle
-/// style at its true playback size.
+/// style at its true playback size, with the caption guaranteed to remain
+/// fully inside the visible frame.
 ///
-/// The inline "Live Preview" card in `SubtitleSettingsPage` scales the caption
-/// down by 50% so it fits inside a 180pt-tall card — that's enough to check
-/// color/stroke choices, but it hides the real on-screen proportions. This
-/// view borrows `PlayerPresenter`'s orientation-lock machinery to rotate the
-/// device into landscape exactly like real playback, then draws the caption
-/// with no scaling so the user can judge readability at the genuine size.
-///
-/// #114 (bug fix) — Now renders the actual anime backdrop (banner/cover) URL
-/// passed in from `SubtitleSettingsPage` behind the caption, instead of the
-/// previous flat dark gradient. The backdrop is darkened with a 45% black
-/// overlay so the caption stays readable regardless of the artwork's
-/// brightness, matching real playback where subtitles overlay the video.
+/// Design goals (reworked from the ground up):
+///   1. The caption is anchored to the bottom-center of the visible picture
+///      area, mirroring real playback where subtitles sit in the lower-middle
+///      band of the video frame.
+///   2. The caption's max width is computed from the VISIBLE frame (the
+///      GeometryReader proxy size, which already excludes safe areas when
+///      the view does NOT ignore them) minus a horizontal margin on each
+///      side. This guarantees long sentences wrap inside the frame instead
+///      of running off either edge.
+///   3. The caption is wrapped in a `ViewThatFits` so it can shrink its font
+///      size if needed to fit the available height, preventing vertical
+///      overflow on very tall captions.
+///   4. A dismiss button is pinned to the top-trailing corner so the user
+///      is never trapped.
 struct LandscapeSubtitlePreview: View {
     /// Optional anime artwork (banner or cover URL) shown behind the caption.
-    /// Nil falls back to the dark gradient placeholder.
     var backdropImageURL: String? = nil
 
     @AppStorage("subtitleTextColor") private var subtitleTextColor: String = "white"
@@ -3833,8 +3847,6 @@ struct LandscapeSubtitlePreview: View {
     @AppStorage("subtitleLineSpacing") private var subtitleLineSpacing: Double = 1.0
     @AppStorage("subtitleMaxWidth") private var subtitleMaxWidth: Double = 90
     @AppStorage("subtitleShadowOffset") private var subtitleShadowOffset: Double = 2
-    // #114 extension — Mirror the vertical-offset key so the landscape preview
-    // honors the same slider the user just dragged in the inline preview.
     @AppStorage("subtitleVerticalOffset") private var subtitleVerticalOffset: Double = 0
 
     @Environment(\.dismiss) private var dismiss
@@ -3842,28 +3854,32 @@ struct LandscapeSubtitlePreview: View {
 
     var body: some View {
         GeometryReader { proxy in
-            // Issue #9 — Clamp caption width to 90% of screen width MINUS the
-            // safe-area insets so text never overflows off-screen in landscape,
-            // even if the user's subtitleMaxWidth slider is set to 100%. The
-            // outer VStack is also given explicit safe-area horizontal padding
-            // so the caption's centered frame can never be pushed past either
-            // edge by the safe area.
-            let safeLR = proxy.safeAreaInsets.leading + proxy.safeAreaInsets.trailing
-            let usableWidth = max(160, proxy.size.width - safeLR)
-            let captionMaxWidth = min(usableWidth * (subtitleMaxWidth / 100.0), usableWidth * 0.9)
-            let bottomInset = max(proxy.size.height * 0.08, 48)
-            ZStack(alignment: .top) {
-                // #114 (bug fix) — Real anime backdrop. The SubtitleSettingsPage
-                // fetches a trending title on appear and passes its banner/cover
-                // URL here. We render it aspect-fill across the whole frame so
-                // the caption sits on top of actual anime art, just like real
-                // playback. A 45% black overlay guarantees caption legibility
-                // regardless of the artwork's brightness.
+            // The proxy.size is the VISIBLE frame (after safe-area insets are
+            // applied) because we do NOT call .ignoresSafeArea on this view.
+            // That means: caption width computed from proxy.size.width can
+            // never extend past the safe-area boundary.
+            let visibleWidth = proxy.size.width
+            let visibleHeight = proxy.size.height
+            // Horizontal margin on each side of the caption. 24pt keeps the
+            // caption clear of the notch / home indicator in landscape.
+            let sideMargin: CGFloat = 24
+            // Caption max width: the user's subtitleMaxWidth slider (a
+            // percentage of the visible width), clamped to a hard 92% so a
+            // 100% setting still leaves breathing room on both sides.
+            let userWidth = visibleWidth * min(max(subtitleMaxWidth, 50) / 100.0, 0.92)
+            let captionMaxWidth = min(userWidth, visibleWidth - sideMargin * 2)
+            // Bottom padding positions the caption in the lower-middle band.
+            // 14% of visible height keeps it above the home indicator on most
+            // devices while still feeling "bottom-anchored".
+            let bottomPadding = max(visibleHeight * 0.14, 56)
+
+            ZStack(alignment: .bottom) {
+                // Backdrop fills the entire visible frame.
                 backdropView
 
-                VStack(spacing: 0) {
-                    // Top bar with Done button — always reachable so the user
-                    // is never trapped in the preview.
+                // Top bar with Done button — pinned to the top, never traps
+                // the user.
+                VStack {
                     HStack {
                         Label("Landscape Preview", systemImage: "rectangle.landscape.rotate")
                             .font(.subheadline.weight(.semibold))
@@ -3883,51 +3899,47 @@ struct LandscapeSubtitlePreview: View {
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 10)
-
                     Spacer()
-
-                    // Caption rendered at TRUE font size (no scaling). The
-                    // frame is explicitly capped to `captionMaxWidth` (already
-                    // safe-area-aware) and centered. The outer padding is
-                    // applied to the parent VStack so the caption sits squarely
-                    // in the visible area regardless of notch / home indicator.
-                    captionText
-                        .frame(maxWidth: captionMaxWidth, alignment: .center)
-                        .padding(.bottom, bottomInset)
-                        .offset(y: -subtitleVerticalOffset * 0.8)
-                        .frame(maxWidth: .infinity, alignment: .center)
                 }
-                .padding(.horizontal, max(16, safeLR / 2))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
-                // Subtle helper text just above the caption so the user
-                // understands what they're looking at.
+                // Caption — bottom-anchored, centered, width-capped.
+                // ViewThatFits tries the user's chosen font size first; if
+                // the caption is too tall to fit (e.g. a very long sentence
+                // on a small landscape height), it steps down to smaller
+                // sizes so the text always remains fully visible.
+                ViewThatFits(in: .vertical) {
+                    captionText(fontSize: CGFloat(subtitleFontSize))
+                        .frame(maxWidth: captionMaxWidth, alignment: .center)
+                    captionText(fontSize: CGFloat(subtitleFontSize) * 0.85)
+                        .frame(maxWidth: captionMaxWidth, alignment: .center)
+                    captionText(fontSize: CGFloat(subtitleFontSize) * 0.7)
+                        .frame(maxWidth: captionMaxWidth, alignment: .center)
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.bottom, bottomPadding)
+                .offset(y: -subtitleVerticalOffset * 0.8)
+
+                // Helper text above the caption.
                 VStack {
                     Spacer()
                     Text("Caption shown at actual playback size")
                         .font(.caption2)
                         .foregroundStyle(.white.opacity(0.4))
-                        .padding(.bottom, bottomInset + 76)
+                        .padding(.bottom, bottomPadding + 76)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .foregroundStyle(.white)
         }
-        .ignoresSafeArea(edges: [.top, .bottom])
         .statusBarHidden()
         .onAppear {
-            // Borrow the player presenter's orientation-lock machinery so the
-            // preview rotates into landscape exactly like real playback does.
-            // The lock is also consulted by the AppDelegate's
-            // `supportedInterfaceOrientationsFor:` so iOS will allow the
-            // rotation.
             #if !targetEnvironment(macCatalyst)
             PlayerPresenter.shared.updateOrientationLock(.landscape, shouldRotate: true)
             hasAppliedLandscapeLock = true
             #endif
         }
         .onDisappear {
-            // Always restore portrait on dismiss, even if onAppear failed —
-            // leaving the app stuck in landscape after closing the preview
-            // would be a regression.
             #if !targetEnvironment(macCatalyst)
             if hasAppliedLandscapeLock {
                 PlayerPresenter.shared.updateOrientationLock(.portrait, shouldRotate: true)
@@ -3938,41 +3950,30 @@ struct LandscapeSubtitlePreview: View {
 
     // MARK: - Backdrop
 
-    /// The backdrop behind the caption. When `backdropImageURL` is present,
-    /// renders the anime artwork aspect-fill across the whole frame with a
-    /// 45% black overlay for caption legibility (matching real playback where
-    /// subtitles overlay video). When absent (network failed / no trending
-    /// title yet), falls back to the original dark gradient placeholder.
     @ViewBuilder
     private var backdropView: some View {
-        if let urlString = backdropImageURL, !urlString.isEmpty, let url = URL(string: urlString) {
-            ZStack {
-                // Aspect-fill the artwork so the whole landscape frame is
-                // covered, just like a real video frame. SwiftUI's built-in
-                // AsyncImage is used (not CachedAsyncImage) because we need
-                // the phase closure to fall back to the gradient placeholder
-                // while the image loads or if it fails.
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    case .failure, .empty:
-                        // While loading or if the URL fails, show the gradient
-                        // placeholder so the preview never shows a black void.
-                        gradientPlaceholder
-                    @unknown default:
-                        gradientPlaceholder
+        GeometryReader { geo in
+            if let urlString = backdropImageURL, !urlString.isEmpty, let url = URL(string: urlString) {
+                ZStack {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        case .failure, .empty:
+                            gradientPlaceholder
+                        @unknown default:
+                            gradientPlaceholder
+                        }
                     }
+                    Color.black.opacity(0.45)
                 }
-                // Darken the artwork so white captions stay readable.
-                Color.black.opacity(0.45)
+                .frame(width: geo.size.width, height: geo.size.height)
+                .clipped()
+            } else {
+                gradientPlaceholder
             }
-            .ignoresSafeArea()
-        } else {
-            gradientPlaceholder
-                .ignoresSafeArea()
         }
     }
 
@@ -3989,15 +3990,13 @@ struct LandscapeSubtitlePreview: View {
 
     // MARK: - Caption
 
-    private var captionText: some View {
+    /// Builds the caption Text with a specific font size. Called by
+    /// ViewThatFits with stepped-down sizes so the caption always fits.
+    private func captionText(fontSize: CGFloat) -> some View {
         let resolvedStrokeWidth: Double = (subtitleStrokeColor == "none") ? 0 : subtitleStrokeWidth
-        // SwiftUI's `Text.lineSpacing(_:)` adds extra *points* between lines,
-        // not a multiplier. Convert the user-facing 1.0–2.0 multiplier to an
-        // additive point value scaled by font size so 1.0 = default spacing
-        // and 2.0 = roughly double.
         let lineSpacingPoints = CGFloat((subtitleLineSpacing - 1.0) * subtitleFontSize * 0.5)
         return Text("The journey of a thousand miles begins with a single step.")
-            .font(.system(size: CGFloat(subtitleFontSize),
+            .font(.system(size: fontSize,
                           weight: subtitleBoldText ? .bold : .regular,
                           design: resolvedFontDesign))
             .foregroundStyle(resolvedTextColor.opacity(subtitleTextOpacity))
@@ -4021,6 +4020,7 @@ struct LandscapeSubtitlePreview: View {
                     radius: max(CGFloat(subtitleShadowOffset), 0),
                     x: 0,
                     y: max(CGFloat(subtitleShadowOffset) / 2.0, 0))
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     // MARK: - Resolved values

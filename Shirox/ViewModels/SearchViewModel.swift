@@ -39,7 +39,7 @@ final class SearchViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
-    func search(usingModule: Bool) {
+    func search(usingModule: Bool, isMangaMode: Bool = false) {
         let q = query.trimmingCharacters(in: .whitespaces)
         if q.isEmpty && filters.isEmpty { clearResults(); return }
         searchTask?.cancel()
@@ -52,7 +52,7 @@ final class SearchViewModel: ObservableObject {
         searchTask = Task {
             // Cache hit short-circuits the network entirely. A fresh hit also
             // suppresses the loading spinner so re-issued searches feel instant.
-            let key = cacheKey(query: q, usingModule: usingModule)
+            let key = cacheKey(query: q, usingModule: usingModule, isMangaMode: isMangaMode)
             if let hit = resultCache[key],
                Date().timeIntervalSince(hit.storedAt) <= cacheTTL,
                !Task.isCancelled {
@@ -102,10 +102,16 @@ final class SearchViewModel: ObservableObject {
                     // Provider path. AniList has a full filter API; MAL's
                     // public search endpoint only accepts a query string, so
                     // filters are applied client-side after fetching when the
-                    // active provider is MAL.
+                    // active provider is MAL. Manga mode forces the AniList
+                    // manga endpoints regardless of the active provider.
                     let activeProvider = ProviderManager.shared.orderedProviders.first?.providerType ?? .anilist
                     let res: [Media]
-                    if activeProvider == .mal {
+                    if isMangaMode {
+                        // Manga mode: always use AniList MANGA endpoints so
+                        // anime results never appear in Reading Mode.
+                        let mangaMedia = try await AniListService.shared.mangaSearch(keyword: q)
+                        res = mangaMedia.map { AniListProvider.shared.mapMangaMedia($0) }
+                    } else if activeProvider == .mal {
                         let raw = try await MALProvider.shared.search(q)
                         res = applyMALClientFilters(raw)
                     } else if filters.isEmpty {
@@ -139,16 +145,18 @@ final class SearchViewModel: ObservableObject {
 
     /// Builds a cache key that uniquely identifies a search result set:
     /// query + filters + active source (module id for module searches,
-    /// primary provider type for AniList/MAL searches). Provider/module
-    /// switches therefore never return a stale foreign-source cache entry.
-    private func cacheKey(query: String, usingModule: Bool) -> String {
+    /// primary provider type for AniList/MAL searches) + mode. Provider/module
+    /// switches and mode switches therefore never return a stale foreign
+    /// cache entry.
+    private func cacheKey(query: String, usingModule: Bool, isMangaMode: Bool) -> String {
         var source: String
         if usingModule {
             source = "module:" + (ModuleManager.shared.activeModule?.id ?? "?")
         } else {
             source = "provider:" + (ProviderManager.shared.orderedProviders.first?.providerType.rawValue ?? "?")
         }
-        return "\(source)|\(query.lowercased())|\(filters.effectiveSort)|\(filters.year ?? 0)|\(filters.season ?? "")|\(filters.format ?? "")|\(filters.status ?? "")|\(filters.genres.joined(separator: ","))|\(filters.studio ?? "")|\(filters.source ?? "")|\(filters.minEpisodes ?? 0)|\(filters.maxEpisodes ?? 0)"
+        let mode = isMangaMode ? "manga" : "anime"
+        return "\(source)|\(mode)|\(query.lowercased())|\(filters.effectiveSort)|\(filters.year ?? 0)|\(filters.season ?? "")|\(filters.format ?? "")|\(filters.status ?? "")|\(filters.genres.joined(separator: ","))|\(filters.studio ?? "")|\(filters.source ?? "")|\(filters.minEpisodes ?? 0)|\(filters.maxEpisodes ?? 0)"
     }
 
     /// Manga modules use the Luna contract (raw-object returns); everything

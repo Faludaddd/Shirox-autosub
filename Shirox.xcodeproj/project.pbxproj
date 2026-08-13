@@ -645,6 +645,10 @@
 		49018AF1B1824E1BBB4FBF2F /* MangaHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F913A366E28436E9B132B7B /* MangaHomeView.swift */; };
 		1CAC259234054464BCC1E60C /* MangaHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F913A366E28436E9B132B7B /* MangaHomeView.swift */; };
 		AE5D7AE099454F4DBFFA1406 /* MangaHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F913A366E28436E9B132B7B /* MangaHomeView.swift */; };
+		9EE290864CBC47F394FC0115 /* AppModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 180EA8BB63D54E6BBFCE8E9A /* AppModeManager.swift */; };
+		73E828E8CEDC4F4FADE37960 /* AppModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 180EA8BB63D54E6BBFCE8E9A /* AppModeManager.swift */; };
+		BAAA0A4B15404C19805883A1 /* AppModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 180EA8BB63D54E6BBFCE8E9A /* AppModeManager.swift */; };
+		D9AE76341D1B4FF99675633F /* AppModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 180EA8BB63D54E6BBFCE8E9A /* AppModeManager.swift */; };
 
 /* End PBXBuildFile section */
 
@@ -896,6 +900,7 @@
                 ACCF2A92A85C4B4BA8E11E55 /* app-logo.png */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = image.png; path = app-logo.png; sourceTree = "<group>"; };
 		4E540997BA864448B082B725 /* SettingsSearchIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSearchIndex.swift; sourceTree = "<group>"; };
 		9F913A366E28436E9B132B7B /* MangaHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MangaHomeView.swift; sourceTree = "<group>"; };
+		180EA8BB63D54E6BBFCE8E9A /* AppModeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModeManager.swift; sourceTree = "<group>"; };
 
 /* End PBXFileReference section */
 
@@ -1066,6 +1071,7 @@
                                 4071A0ACA228C759CA67D5A0 /* QuickActions.swift */,
                                 08ACB6FE07C044C1B7F17A79 /* EpisodeNotificationManager.swift */,
                                 2EBB2ADA20A14B00AF5D265F /* WesternScheduleService.swift */,
+				180EA8BB63D54E6BBFCE8E9A /* AppModeManager.swift */,
                         );
                         path = Services;
                         sourceTree = "<group>";
@@ -1542,6 +1548,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 D13549A1608449AF9EBDE353 /* CustomRefreshControl.swift in Sources */,
 				01A20920D09146A29404813E /* SettingsSearchIndex.swift in Sources */,
 				AE5D7AE099454F4DBFFA1406 /* MangaHomeView.swift in Sources */,
+				D9AE76341D1B4FF99675633F /* AppModeManager.swift in Sources */,
                         );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -1740,6 +1747,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 4ECDE91B709E40C4B7131936 /* CustomRefreshControl.swift in Sources */,
 				2E0E8A3882B1417499E1D5FA /* SettingsSearchIndex.swift in Sources */,
 				1CAC259234054464BCC1E60C /* MangaHomeView.swift in Sources */,
+				BAAA0A4B15404C19805883A1 /* AppModeManager.swift in Sources */,
                         );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -1939,6 +1947,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 77C010496C1B48E08ACD3FEB /* CustomRefreshControl.swift in Sources */,
 				CE8BECC8DB5A46128FE0F71F /* SettingsSearchIndex.swift in Sources */,
 				49018AF1B1824E1BBB4FBF2F /* MangaHomeView.swift in Sources */,
+				73E828E8CEDC4F4FADE37960 /* AppModeManager.swift in Sources */,
                         );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -2138,6 +2147,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 32DA168EE48448DE9CB5FBB2 /* CustomRefreshControl.swift in Sources */,
 				9FC65E10AF3F4044AA31F0E7 /* SettingsSearchIndex.swift in Sources */,
 				9E2601C92E784D40961B5E9A /* MangaHomeView.swift in Sources */,
+				9EE290864CBC47F394FC0115 /* AppModeManager.swift in Sources */,
                         );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
