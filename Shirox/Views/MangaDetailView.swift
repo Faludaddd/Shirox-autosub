@@ -285,9 +285,7 @@ struct MangaDetailView: View {
                     }
                     // Statistics section: only shown when opened from the
                     // AniList manga detail page (aniListMedia != nil), NOT on
-                    // the provider source page. This matches the user's
-                    // requirement that statistics live exclusively on the
-                    // internal AniList details page.
+                    // the provider source page.
                     if let media = aniListMedia, showStatistics {
                         statisticsSection(media: media)
                             .padding(.top, 4)

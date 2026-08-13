@@ -5,14 +5,14 @@ import SwiftUI
 
 /// Where a Continue Reading context-menu item wants to navigate.
 enum ContinueReadingNavTarget {
-    case detail(mangaHref: String, mangaTitle: String, coverImage: String, moduleId: String?, aniListID: Int?)
+    case detail(mangaTitle: String, coverImage: String, aniListID: Int?)
     case anilist(Int)
 }
 
 @ViewBuilder
 private func crNavDestination(_ target: ContinueReadingNavTarget) -> some View {
     switch target {
-    case let .detail(_, mangaTitle, coverImage, _, aniListID):
+    case let .detail(mangaTitle, coverImage, aniListID):
         if let aid = aniListID {
             AniListMangaDetailView(mediaId: aid)
         } else {
@@ -27,10 +27,6 @@ private func crNavDestination(_ target: ContinueReadingNavTarget) -> some View {
 
 extension View {
     /// Drives Continue Reading context-menu navigation from the parent view.
-    /// Attach outside the ScrollView. Uses `navigationDestinationCompat`,
-    /// which pushes via a hidden `NavigationLink` on iOS (the app's
-    /// `NavigationStack` is really a `NavigationView`, which ignores
-    /// `navigationDestination(...)`).
     func continueReadingNavigation(_ target: Binding<ContinueReadingNavTarget?>) -> some View {
         self.navigationDestinationCompat(item: target) { crNavDestination($0) }
     }
@@ -78,10 +74,8 @@ struct ContinueReadingSection: View {
                             Button {
                                 let match = MangaMatchManager.shared.cachedMatch(mangaHref: item.mangaHref)
                                 navTarget = .detail(
-                                    mangaHref: item.mangaHref,
                                     mangaTitle: item.mangaTitle,
                                     coverImage: item.coverImage,
-                                    moduleId: item.moduleId,
                                     aniListID: match?.aniListID
                                 )
                             } label: {

@@ -120,17 +120,6 @@ struct MangaReaderView: View {
     // caused visible hitches while scrolling)
     @State private var saveTask: Task<Void, Never>?
 
-    // Deferred chapter-prepare: prepareUpcomingChapter() appends pages to the
-    // strip, which changes the LazyVStack content size. If this runs while the
-    // user is actively scrolling (especially scrolling UP), the content-size
-    // change shifts page frames, the onPreferenceChange handler recalculates
-    // currentPage, which re-fires onChangeOf(currentPage), which calls
-    // prepareUpcomingChapter again — a feedback loop that feels like the reader
-    // is "teleporting" to other pages. By deferring strip mutations until the
-    // scroll settles, scrolling up stays smooth and linear.
-    @State private var deferredChapterPrepare = false
-    @State private var scrollSettleCheck: Timer?
-
     init(context: ReaderContext) {
         self.context = context
         _displayedChapterIndex = State(initialValue: min(max(context.chapterIndex, 0), context.chapters.count - 1))
@@ -140,13 +129,6 @@ struct MangaReaderView: View {
 
     private var mode: MangaReadingMode { MangaReadingMode(rawValue: modeRaw) ?? .vertical }
     private var isRTL: Bool { mode == .pagedRTL }
-
-    /// True while the user's finger is on the screen or the scroll is still
-    /// decelerating. Used to defer strip mutations (prepareUpcomingChapter)
-    /// that would shift page frames and cause a teleporting feedback loop.
-    private var isActivelyScrolling: Bool {
-        verticalScrollView?.isDragging == true || verticalScrollView?.isDecelerating == true
-    }
 
     private var displayedChapter: MangaChapter { context.chapters[displayedChapterIndex] }
     private var hasNextChapter: Bool { displayedChapterIndex + 1 < context.chapters.count }
@@ -204,15 +186,14 @@ struct MangaReaderView: View {
         .onChangeOf(currentPage) { page in
             updateDisplayedChapter(for: page)
             scheduleSave()
-            if isActivelyScrolling {
-                // Don't modify the strip while the user is dragging/
-                // decelerating — see deferredChapterPrepare comment above.
-                deferredChapterPrepare = true
-                startScrollSettleTimer()
-            } else {
-                prepareUpcomingChapter()
-                warmUpcomingPages(around: page)
-            }
+            // Don't call prepareUpcomingChapter() or warmUpcomingPages() here —
+            // they mutate the strip (append pages) which changes the LazyVStack
+            // content size, shifts page frames, and triggers a feedback loop
+            // that feels like the reader "teleports" to other pages when
+            // scrolling up. updateDisplayedChapter already calls
+            // prepareUpcomingChapter when the chapter actually changes, which
+            // is sufficient. Page warming is handled by the LazyVStack's
+            // onAppear per page (ReaderPageView caches via Kingfisher).
         }
         .onChangeOf(modeRaw) { _ in
             // Mode switch: rebuild the strip for the displayed chapter at the
@@ -235,7 +216,6 @@ struct MangaReaderView: View {
         .onDisappear {
             UIApplication.shared.isIdleTimerDisabled = false
             saveTask?.cancel()
-            scrollSettleCheck?.invalidate()
             performSave()
             verticalResumeTarget = nil   // stop a pending settle loop
             isSettling = false
@@ -647,33 +627,8 @@ struct MangaReaderView: View {
             }
         }
         displayedChapterIndex = item.chapterIdx
-        // Don't mutate the strip while the user is actively scrolling — the
-        // content-size change shifts page frames and causes a teleporting
-        // feedback loop. Defer until the scroll settles.
-        if isActivelyScrolling {
-            deferredChapterPrepare = true
-            startScrollSettleTimer()
-        } else {
-            prepareUpcomingChapter()
-        }
-    }
-
-    /// Polls the scroll view's drag/decelerate state every 0.15s. When the
-    /// scroll settles (both false), fires any deferred prepareUpcomingChapter
-    /// + warmUpcomingPages that were held during active scrolling.
-    private func startScrollSettleTimer() {
-        scrollSettleCheck?.invalidate()
-        scrollSettleCheck = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [self] timer in
-            if !isActivelyScrolling {
-                timer.invalidate()
-                scrollSettleCheck = nil
-                if deferredChapterPrepare {
-                    deferredChapterPrepare = false
-                    prepareUpcomingChapter()
-                    warmUpcomingPages(around: currentPage)
-                }
-            }
-        }
+        // Entered a new chapter — keep the strip one chapter ahead.
+        prepareUpcomingChapter()
     }
 
     /// Prev/next navigation. When the target chapter is already stitched into
