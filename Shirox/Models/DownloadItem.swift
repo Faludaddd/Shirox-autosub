@@ -37,23 +37,6 @@ struct DownloadItem: Identifiable, Codable {
     var progress: Double
     var error: String?
 
-    // Download speed / ETA tracking (transient — not persisted to the manifest;
-    // populated live by the URLSession delegate while downloading, nil otherwise).
-    // Optional so old manifests without these keys decode without error.
-    var bytesDownloaded: Int64? = nil
-    var totalBytes: Int64? = nil
-    var startedAt: Date? = nil
-    var lastSpeedBytesPerSec: Double? = nil
-
-    /// ETA in seconds, computed from current speed and remaining bytes.
-    /// Nil when speed or total bytes are unknown.
-    var estimatedSecondsRemaining: Double? {
-        guard let speed = lastSpeedBytesPerSec, speed > 0,
-              let total = totalBytes, let downloaded = bytesDownloaded,
-              total > downloaded else { return nil }
-        return Double(total - downloaded) / speed
-    }
-
     // File Info
     var fileName: String? // Points to the .mp4 or .m3u8 file
     var relativeSubtitlePath: String?

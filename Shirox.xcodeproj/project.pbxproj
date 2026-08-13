@@ -87,7 +87,6 @@
                 121D9B832FCA5619000FF9B4 /* DetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4A22FCA397700C9BA56 /* DetailViewModel.swift */; };
                 121D9B842FCA5619000FF9B4 /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4A32FCA397700C9BA56 /* HomeViewModel.swift */; };
                 121D9B852FCA5623000FF9B4 /* DownloadsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4AD2FCA397700C9BA56 /* DownloadsView.swift */; };
-                ABCD00022FCA5623000FF9B4 /* DownloadDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCD00012FCA397700C9BA56 /* DownloadDetailView.swift */; };
                 121D9B862FCA5623000FF9B4 /* BatchDownloadModulePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4A82FCA397700C9BA56 /* BatchDownloadModulePickerView.swift */; };
                 121D9B872FCA5623000FF9B4 /* DownloadRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4AB2FCA397700C9BA56 /* DownloadRowView.swift */; };
                 121D9B882FCA5623000FF9B4 /* BatchDownloadStreamPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4A92FCA397700C9BA56 /* BatchDownloadStreamPickerView.swift */; };
@@ -200,7 +199,6 @@
                 1279E5172FCA397700C9BA56 /* CloudflareBypassSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4CD2FCA397700C9BA56 /* CloudflareBypassSheetView.swift */; };
                 1279E5182FCA397700C9BA56 /* UserNotification.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4762FCA397700C9BA56 /* UserNotification.swift */; };
                 1279E5192FCA397700C9BA56 /* DownloadsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4AD2FCA397700C9BA56 /* DownloadsView.swift */; };
-                ABCD00032FCA397700C9BA56 /* DownloadDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCD00012FCA397700C9BA56 /* DownloadDetailView.swift */; };
                 1279E51A2FCA397700C9BA56 /* Color+SystemBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4CE2FCA397700C9BA56 /* Color+SystemBackground.swift */; };
                 1279E51B2FCA397700C9BA56 /* StreamPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4E52FCA397700C9BA56 /* StreamPickerView.swift */; };
                 1279E51C2FCA397700C9BA56 /* AniListService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E47E2FCA397700C9BA56 /* AniListService.swift */; };
@@ -320,7 +318,6 @@
                 1279E5902FCA397700C9BA56 /* CloudflareBypassSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4CD2FCA397700C9BA56 /* CloudflareBypassSheetView.swift */; };
                 1279E5912FCA397700C9BA56 /* UserNotification.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4762FCA397700C9BA56 /* UserNotification.swift */; };
                 1279E5922FCA397700C9BA56 /* DownloadsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4AD2FCA397700C9BA56 /* DownloadsView.swift */; };
-                ABCD00042FCA397700C9BA56 /* DownloadDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCD00012FCA397700C9BA56 /* DownloadDetailView.swift */; };
                 1279E5932FCA397700C9BA56 /* Color+SystemBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4CE2FCA397700C9BA56 /* Color+SystemBackground.swift */; };
                 1279E5942FCA397700C9BA56 /* StreamPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4E52FCA397700C9BA56 /* StreamPickerView.swift */; };
                 1279E5952FCA397700C9BA56 /* AniListService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E47E2FCA397700C9BA56 /* AniListService.swift */; };
@@ -772,7 +769,6 @@
                 1279E4AB2FCA397700C9BA56 /* DownloadRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadRowView.swift; sourceTree = "<group>"; };
                 1279E4AC2FCA397700C9BA56 /* DownloadStreamPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadStreamPickerView.swift; sourceTree = "<group>"; };
                 1279E4AD2FCA397700C9BA56 /* DownloadsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadsView.swift; sourceTree = "<group>"; };
-                ABCD00012FCA397700C9BA56 /* DownloadDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadDetailView.swift; sourceTree = "<group>"; };
                 1279E4AF2FCA397700C9BA56 /* LibraryEntryEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryEntryEditSheet.swift; sourceTree = "<group>"; };
                 1279E4B12FCA397700C9BA56 /* AirPlayButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirPlayButton.swift; sourceTree = "<group>"; };
                 1279E4B22FCA397700C9BA56 /* CastOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CastOverlayView.swift; sourceTree = "<group>"; };
@@ -1147,7 +1143,6 @@
                                 1279E4AB2FCA397700C9BA56 /* DownloadRowView.swift */,
                                 1279E4AC2FCA397700C9BA56 /* DownloadStreamPickerView.swift */,
                                 1279E4AD2FCA397700C9BA56 /* DownloadsView.swift */,
-                                ABCD00012FCA397700C9BA56 /* DownloadDetailView.swift */,
                         );
                         path = Downloads;
                         sourceTree = "<group>";
@@ -1629,7 +1624,6 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 121D9B602FCA5612000FF9B4 /* AniListLibraryService.swift in Sources */,
                                 121D9B612FCA5612000FF9B4 /* JSEngine+Streams.swift in Sources */,
                                 121D9B852FCA5623000FF9B4 /* DownloadsView.swift in Sources */,
-                                ABCD00022FCA5623000FF9B4 /* DownloadDetailView.swift in Sources */,
                                 121D9B862FCA5623000FF9B4 /* BatchDownloadModulePickerView.swift in Sources */,
                                 121D9B872FCA5623000FF9B4 /* DownloadRowView.swift in Sources */,
                                 121D9B882FCA5623000FF9B4 /* BatchDownloadStreamPickerView.swift in Sources */,
@@ -1880,7 +1874,6 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 1279E5172FCA397700C9BA56 /* CloudflareBypassSheetView.swift in Sources */,
                                 1279E5182FCA397700C9BA56 /* UserNotification.swift in Sources */,
                                 1279E5192FCA397700C9BA56 /* DownloadsView.swift in Sources */,
-                                ABCD00032FCA397700C9BA56 /* DownloadDetailView.swift in Sources */,
                                 1279E51A2FCA397700C9BA56 /* Color+SystemBackground.swift in Sources */,
                                 1279E51B2FCA397700C9BA56 /* StreamPickerView.swift in Sources */,
                                 1279E51C2FCA397700C9BA56 /* AniListService.swift in Sources */,
@@ -2089,7 +2082,6 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 1279E5902FCA397700C9BA56 /* CloudflareBypassSheetView.swift in Sources */,
                                 1279E5912FCA397700C9BA56 /* UserNotification.swift in Sources */,
                                 1279E5922FCA397700C9BA56 /* DownloadsView.swift in Sources */,
-                                ABCD00042FCA397700C9BA56 /* DownloadDetailView.swift in Sources */,
                                 1279E5932FCA397700C9BA56 /* Color+SystemBackground.swift in Sources */,
                                 1279E5942FCA397700C9BA56 /* StreamPickerView.swift in Sources */,
                                 1279E5952FCA397700C9BA56 /* AniListService.swift in Sources */,

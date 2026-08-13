@@ -956,20 +956,6 @@ extension DownloadManager: URLSessionDownloadDelegate {
                 if totalBytesExpectedToWrite > 0 {
                     let p = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
                     items[idx].progress = p
-                    items[idx].bytesDownloaded = totalBytesWritten
-                    items[idx].totalBytes = totalBytesExpectedToWrite
-                    if items[idx].startedAt == nil {
-                        items[idx].startedAt = Date()
-                    }
-                    // Rolling speed estimate: bytes written so far / elapsed seconds.
-                    // Smoother than per-callback delta (which spikes/stalls on
-                    // bursty CDNs) and good enough for an ETA display.
-                    if let start = items[idx].startedAt {
-                        let elapsed = Date().timeIntervalSince(start)
-                        if elapsed > 0.5 {  // avoid div-by-zero and early noise
-                            items[idx].lastSpeedBytesPerSec = Double(totalBytesWritten) / elapsed
-                        }
-                    }
                     objectWillChange.send()
                 }
             }
