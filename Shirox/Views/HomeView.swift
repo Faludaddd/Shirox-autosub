@@ -1174,7 +1174,19 @@ struct ScheduleView: View {
             .navigationTitle(appMode.mode == .reading ? "Releases" : "Schedule")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { scheduleToolbar }
+            .toolbar {
+                if appMode.mode == .anime {
+                    ToolbarItem(placement: .primaryAction) {
+                        NavigationLink {
+                            ScheduleSettingsPage()
+                        } label: {
+                            Image(systemName: "gearshape")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(.primary)
+                        }
+                    }
+                }
+            }
             #endif
             .navigationDestinationCompat(item: $detailEntry) { entry in
                 ScheduleDetailView(
@@ -1199,21 +1211,6 @@ struct ScheduleView: View {
             mangaScheduleContent
         } else {
             animeScheduleContent
-        }
-    }
-
-    @ToolbarContentBuilder
-    private var scheduleToolbar: some ToolbarContent {
-        if appMode.mode == .anime {
-            ToolbarItem(placement: .primaryAction) {
-                NavigationLink {
-                    ScheduleSettingsPage()
-                } label: {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.primary)
-                }
-            }
         }
     }
 
