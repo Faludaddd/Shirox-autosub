@@ -9,7 +9,7 @@ PBXFileReference, it prints a "skip" message and exits without modifying the
 project.
 
 It mirrors the layout used by the existing loose resource
-(`Shirox/Resources/adult_hosts.txt`):
+(`Shirox/Resources/restricted_hosts.txt`):
   - One PBXFileReference (shared across targets) with
     `lastKnownFileType = image.png`.
   - One PBXBuildFile entry per app target (iOS, tvOS, macOS). Skipped for the

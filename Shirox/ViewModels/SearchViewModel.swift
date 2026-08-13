@@ -89,7 +89,7 @@ final class SearchViewModel: ObservableObject {
                     if !Task.isCancelled {
                         var seen = Set<String>()
                         let deduped = res.filter { seen.insert($0.href).inserted }
-                        let filtered = await NSFWContentFilter.shared.filter(deduped, keyword: q)
+                        let filtered = await ContentSafetyFilter.shared.filter(deduped, keyword: q)
                         moduleResults = filtered
                         aniListResults = []
                         resultCache[key] = CacheEntry(

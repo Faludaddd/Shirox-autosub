@@ -104,7 +104,7 @@ final class AniListService {
         var endDateAfter: String? = nil        // "YYYYMMDD" — only titles that ended on/after this date.
         var endDateBefore: String? = nil       // "YYYYMMDD" — only titles that ended on/before this date.
         var onlyHasEpisodes: Bool = false       // When true, requires `episodes` > 0 (filters out TBA/announcement titles).
-        var hideAdult: Bool = true              // Hardcoded true in the query regardless, but exposed so the sheet can show the lock state.
+        var hideRestricted: Bool = true        // Hardcoded true in the query regardless, but exposed so the sheet can show the lock state.
 
         static let defaultSort = "SEARCH_MATCH"
         static let empty = SearchFilters()
@@ -171,7 +171,8 @@ final class AniListService {
         if let endDateAfter = filters.endDateAfter, !endDateAfter.isEmpty { variables["endDate_greater"] = endDateAfter }
         if let endDateBefore = filters.endDateBefore, !endDateBefore.isEmpty { variables["endDate_lesser"] = endDateBefore }
 
-        // isAdult is hardcoded to false — adult content is never included in search results.
+        // `isAdult: false` is a contract of the AniList GraphQL API and is
+        // required to exclude restricted titles from search results.
         var mediaArgs = ["type: ANIME", "sort: $sort", "isAdult: false"]
         if !effectiveKeyword.isEmpty { mediaArgs.append("search: $search") }
         if filters.year != nil { mediaArgs.append("seasonYear: $seasonYear") }
@@ -297,12 +298,14 @@ final class AniListService {
         return try await fetchPage(query: query, variables: ["search": keyword])
     }
 
-    /// Normalized set of adult (`isAdult: true`) anime title variants + synonyms
-    /// matching `keyword`. Used by NSFWContentFilter to screen module results.
-    func searchAdultTitles(keyword: String) async throws -> Set<String> {
-        struct AdultPage: Decodable { let Page: AdultContent }
-        struct AdultContent: Decodable { let media: [AdultMedia] }
-        struct AdultMedia: Decodable {
+    /// Normalized set of restricted anime title variants + synonyms matching
+    /// `keyword`. Used by `ContentSafetyFilter` to screen module results.
+    /// The `isAdult: true` GraphQL parameter is a contract of the AniList
+    /// API and is required to identify the titles this filter must remove.
+    func searchRestrictedTitles(keyword: String) async throws -> Set<String> {
+        struct RestrictedPage: Decodable { let Page: RestrictedContent }
+        struct RestrictedContent: Decodable { let media: [RestrictedMedia] }
+        struct RestrictedMedia: Decodable {
             let title: AniListTitle
             let synonyms: [String]?
         }
@@ -317,14 +320,14 @@ final class AniListService {
         }
         """
         let data = try await post(query: query, variables: ["search": keyword])
-        let response = try JSONDecoder().decode(GraphQLResponse<AdultPage>.self, from: data)
+        let response = try JSONDecoder().decode(GraphQLResponse<RestrictedPage>.self, from: data)
         var result = Set<String>()
         for media in response.data?.Page.media ?? [] {
             let variants: [String?] = [media.title.romaji, media.title.english, media.title.native]
                 + (media.synonyms ?? []).map(Optional.some)
             for raw in variants {
                 guard let raw, !raw.isEmpty else { continue }
-                let norm = NSFWContentFilter.normalize(raw)
+                let norm = ContentSafetyFilter.normalize(raw)
                 if !norm.isEmpty { result.insert(norm) }
             }
         }

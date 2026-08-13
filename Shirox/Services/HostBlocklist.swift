@@ -1,9 +1,9 @@
 import Foundation
 
-/// App-scoped blocklist of adult hosts. Enforced at every request chokepoint the app
-/// controls (fetchv2 bridges, WKWebView scrapers, Cloudflare bypass, player). This is a
-/// deliberate alternative to a system hosts file / DNS reconfiguration, which would be
-/// system-wide.
+/// App-scoped blocklist of restricted hosts. Enforced at every request
+/// chokepoint the app controls (fetchv2 bridges, WKWebView scrapers,
+/// Cloudflare bypass, player). This is a deliberate alternative to a system
+/// hosts file / DNS reconfiguration, which would be system-wide.
 final class HostBlocklist {
     nonisolated(unsafe) static let shared = HostBlocklist()
 
@@ -14,9 +14,9 @@ final class HostBlocklist {
 
     // MARK: - Pure decision logic (testable)
 
-    /// Parses a hosts-file (`0.0.0.0 host` / `127.0.0.1 host`) or bare-host list into a
-    /// normalized lowercase set. Skips comments, blank lines, `localhost`, and tokens
-    /// without a dot.
+    /// Parses a hosts-file (`0.0.0.0 host` / `127.0.0.1 host`) or bare-host
+    /// list into a normalized lowercase set. Skips comments, blank lines,
+    /// `localhost`, and tokens without a dot.
     static func parse(_ contents: String) -> Set<String> {
         var result = Set<String>()
         contents.enumerateLines { line, _ in
@@ -32,8 +32,9 @@ final class HostBlocklist {
         return result
     }
 
-    /// True if `host` exactly matches, or is a subdomain of, any entry in `set`.
-    /// Only checks suffixes with ≥2 labels so a stray bare-TLD entry can't over-block.
+    /// True if `host` exactly matches, or is a subdomain of, any entry in
+    /// `set`. Only checks suffixes with ≥2 labels so a stray bare-TLD entry
+    /// can't over-block.
     static func isHostBlocked(_ host: String, in set: Set<String>) -> Bool {
         let labels = host.lowercased().split(separator: ".").map(String.init)
         guard labels.count >= 2 else { return set.contains(host.lowercased()) }
@@ -53,11 +54,12 @@ final class HostBlocklist {
         return Self.isHostBlocked(host, in: hosts)
     }
 
-    /// Loads the bundled snapshot once, off the main thread. Safe to call at launch.
+    /// Loads the bundled snapshot once, off the main thread. Safe to call at
+    /// launch.
     func loadIfNeeded() {
         guard !isLoaded else { return }
         DispatchQueue.global(qos: .utility).async { [weak self] in
-            guard let url = Bundle.main.url(forResource: "adult_hosts", withExtension: "txt"),
+            guard let url = Bundle.main.url(forResource: "restricted_hosts", withExtension: "txt"),
                   let contents = try? String(contentsOf: url, encoding: .utf8) else {
                 DispatchQueue.main.async { self?.isLoaded = true }   // fail-open if missing
                 return

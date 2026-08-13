@@ -1,124 +1,109 @@
-# shamelessly copied from https://github.com/cranci1/Luna/blob/main/.github/workflows/build.yml
-
 name: Build and upload nightly
 
 on:
- push:
-   branches:
-     - main
+  push:
+    branches:
+      - main
 
 env:
- FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
- build-ios:
-   name: Build iOS IPA
-   runs-on: macos-26
-   permissions:
-     contents: write
-   steps:
-     - name: Checkout repository
-       uses: actions/checkout@v6
+  build-ios:
+    name: Build iOS IPA
+    runs-on: macos-26
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
-     - name: Bump build version
-       run: |
-         # Auto-increment the build version on every CI run so each IPA
-         # has a unique, increasing version number. Uses the GitHub run
-         # number as the build version — it's monotonically increasing
-         # across all pushes to main, so every build is distinguishable.
-         BUILD_NUM="${{ github.run_number }}"
-         MARKETING_VER=$(date -u +'%Y.%-m.%-d')
-         echo "Setting CURRENT_PROJECT_VERSION=$BUILD_NUM and MARKETING_VERSION=$MARKETING_VER"
-         sed -i '' "s/CURRENT_PROJECT_VERSION = [0-9]*/CURRENT_PROJECT_VERSION = $BUILD_NUM/g" Shirox.xcodeproj/project.pbxproj
-         sed -i '' "s/MARKETING_VERSION = [0-9.]*/MARKETING_VERSION = $MARKETING_VER/g" Shirox.xcodeproj/project.pbxproj
-         echo "## Build Version" >> $GITHUB_STEP_SUMMARY
-         echo "**Marketing version:** $MARKETING_VER" >> $GITHUB_STEP_SUMMARY
-         echo "**Build number:** $BUILD_NUM (GitHub run #${{ github.run_number }})" >> $GITHUB_STEP_SUMMARY
+      - name: Bump version sequentially
+        run: |
+          # Sequential version bumping: read the current MARKETING_VERSION from
+          # the pbxproj, increment the minor component (1.4 → 1.5 → 1.6 → …),
+          # and write it back. The build number uses the GitHub run_number so
+          # every build is uniquely identifiable. The bumped MARKETING_VERSION
+          # is committed back to main so the next run sees the new value.
+          CURRENT_VER=$(grep -m1 'MARKETING_VERSION' Shirox.xcodeproj/project.pbxproj | sed -E 's/.*MARKETING_VERSION = ([0-9.]+);.*/\1/')
+          echo "Current MARKETING_VERSION: $CURRENT_VER"
 
-     - name: Make build script executable
-       run: chmod +x ./buildipa.sh
+          # Split on '.' and increment the minor component. Supports both
+          # major.minor (1.4) and major.minor.patch (1.4.0) — the patch is
+          # dropped on bump so the result is always major.minor.
+          MAJOR=$(echo "$CURRENT_VER" | cut -d. -f1)
+          MINOR=$(echo "$CURRENT_VER" | cut -d. -f2)
+          MAJOR=${MAJOR:-1}
+          MINOR=${MINOR:-0}
+          NEW_MINOR=$((MINOR + 1))
+          NEW_VER="$MAJOR.$NEW_MINOR"
+          BUILD_NUM="${{ github.run_number }}"
 
-     - name: Build iOS IPA
-       id: build_ipa
-       run: ./buildipa.sh
+          echo "New MARKETING_VERSION: $NEW_VER"
+          echo "Build number: $BUILD_NUM"
 
-     # #116 — Publish the IPA to the beta release IMMEDIATELY after a successful
-     # build. This step is `if: always()` with an explicit file-existence guard,
-     # so the IPA is uploaded on EVERY successful build even if the later
-     # artifact-upload or apps.json steps fail. Order matters: the release
-     # upload happens *before* anything else that could fail, so there is no
-     # prior-step dependency that can prevent the IPA from being published.
-     - name: Upload IPA to beta release
-       if: always()
-       env:
-         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-       run: |
-         if [ ! -f build/Shirox.ipa ]; then
-           echo "build/Shirox.ipa not found — build step did not produce an IPA. Skipping release upload."
-           exit 0
-         fi
-         gh release create beta --title "beta" --notes "Latest nightly build" 2>/dev/null || true
-         gh release upload beta build/Shirox.ipa --clobber
+          sed -i '' "s/MARKETING_VERSION = [0-9.]*/MARKETING_VERSION = $NEW_VER/g" Shirox.xcodeproj/project.pbxproj
+          sed -i '' "s/CURRENT_PROJECT_VERSION = [0-9]*/CURRENT_PROJECT_VERSION = $BUILD_NUM/g" Shirox.xcodeproj/project.pbxproj
 
-     # Artifact upload is a convenience for the Actions UI / debugging. It is
-     # non-critical: if it fails the IPA is still available via the beta
-     # release above, so we let it fail without failing the whole job.
-     - name: Upload IPA artifact
-       continue-on-error: true
-       uses: actions/upload-artifact@v7
-       with:
-         name: Shirox-Nightly-IPA
-         path: build/Shirox.ipa
+          echo "## Build Version" >> $GITHUB_STEP_SUMMARY
+          echo "**Marketing version:** $NEW_VER" >> $GITHUB_STEP_SUMMARY
+          echo "**Build number:** $BUILD_NUM (GitHub run #${{ github.run_number }})" >> $GITHUB_STEP_SUMMARY
 
-     # apps.json metadata refresh is also non-critical — the release already
-     # exists with the IPA attached by this point. Continue-on-error keeps a
-     # bad git push (e.g. race with another run) from turning the run red.
-     - name: Update apps.json
-       continue-on-error: true
-       env:
-         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-       run: |
-         IPA_SIZE=$(wc -c < build/Shirox.ipa | tr -d ' ')
-         BUILD_DATE=$(date -u +%Y-%m-%d)
-         jq --argjson size "$IPA_SIZE" --arg date "$BUILD_DATE" \
-           '.apps[0].versions[0].size = $size | .apps[0].versions[0].date = $date' \
-           apps.json > apps.json.tmp && mv apps.json.tmp apps.json
-         git config user.name "github-actions[bot]"
-         git config user.email "github-actions[bot]@users.noreply.github.com"
-         git add apps.json
-         git diff --cached --quiet || (git commit -m "chore: update apps.json [skip ci]" && git push origin HEAD:main)
+          # Persist the version bump so the next run picks up from $NEW_VER.
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Shirox.xcodeproj/project.pbxproj
+          git diff --cached --quiet || (git commit -m "chore: bump version to $NEW_VER [skip ci]" && git push)
 
- build-catalyst:
-   name: Build Mac Catalyst DMG
-   runs-on: macos-26
-   permissions:
-     contents: write
-   steps:
-     - name: Checkout repository
-       uses: actions/checkout@v6
+      - name: Make build script executable
+        run: chmod +x ./buildipa.sh
 
-     - name: Bump build version
-       run: |
-         BUILD_NUM="${{ github.run_number }}"
-         MARKETING_VER=$(date -u +'%Y.%-m.%-d')
-         sed -i '' "s/CURRENT_PROJECT_VERSION = [0-9]*/CURRENT_PROJECT_VERSION = $BUILD_NUM/g" Shirox.xcodeproj/project.pbxproj
-         sed -i '' "s/MARKETING_VERSION = [0-9.]*/MARKETING_VERSION = $MARKETING_VER/g" Shirox.xcodeproj/project.pbxproj
+      - name: Build iOS IPA
+        id: build_ipa
+        run: ./buildipa.sh
 
-     - name: Make build script executable
-       run: chmod +x ./buildcatalyst.sh
+      # Publish the IPA to the beta release IMMEDIATELY after a successful
+      # build. `if: always()` plus an explicit file-existence guard means the
+      # IPA is uploaded on EVERY successful build, even if later steps fail.
+      - name: Upload IPA to beta release
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ ! -f build/Shirox.ipa ]; then
+            echo "build/Shirox.ipa not found — build step did not produce an IPA. Skipping release upload."
+            exit 0
+          fi
+          gh release create beta --title "beta" --notes "Latest nightly build" 2>/dev/null || true
+          gh release upload beta build/Shirox.ipa --clobber
 
-     - name: Build Mac Catalyst DMG
-       run: ./buildcatalyst.sh
+      # Artifact upload is a convenience for the Actions UI / debugging. It is
+      # non-critical: if it fails the IPA is still available via the beta
+      # release above, so we let it fail without failing the whole job.
+      - name: Upload IPA artifact
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: Shirox-Nightly-IPA
+          path: build/Shirox.ipa
 
-     - name: Upload Catalyst DMG
-       uses: actions/upload-artifact@v7
-       with:
-         name: Shirox-Nightly-Catalyst-DMG
-         path: build/Shirox-Catalyst.dmg
-
-     - name: Upload Catalyst DMG to beta release
-       env:
-         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-       run: |
-         gh release create beta --title "beta" --notes "Latest nightly build" 2>/dev/null || true
-         gh release upload beta build/Shirox-Catalyst.dmg --clobber
+      # apps.json metadata refresh is also non-critical — the release already
+      # exists with the IPA attached by this point. Continue-on-error keeps a
+      # bad git push (e.g. race with another run) from turning the run red.
+      - name: Update apps.json
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          IPA_SIZE=$(wc -c < build/Shirox.ipa | tr -d ' ')
+          BUILD_DATE=$(date -u +%Y-%m-%d)
+          jq --argjson size "$IPA_SIZE" --arg date "$BUILD_DATE" \
+            '.apps[0].versions[0].size = $size | .apps[0].versions[0].date = $date' \
+            apps.json > apps.json.tmp && mv apps.json.tmp apps.json
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add apps.json
+          git diff --cached --quiet || (git commit -m "chore: update apps.json [skip ci]" && git push origin HEAD:main)

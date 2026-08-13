@@ -27,10 +27,10 @@
       },
       "versions": [
         {
-          "version": "1.0.3",
-          "buildVersion": "108",
-          "date": "2026-08-12",
-          "localizedDescription": "Stability improvements and bug fixes.",
+          "version": "1.4",
+          "buildVersion": "1",
+          "date": "2026-08-13",
+          "localizedDescription": "Reading Mode for manga, MAL search source, Mark as Private, content safety cleanup, and streamlined IPA-only build pipeline.",
           "downloadURL": "https://github.com/xibrox/Shirox/releases/download/beta/Shirox.ipa",
           "size": 10406602,
           "minOSVersion": "15.0"

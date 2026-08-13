@@ -1,6 +1,6 @@
-# Adult host blocklist for Shirox — porn-only.
+# Restricted host blocklist for Shirox.
 # Source: https://raw.githubusercontent.com/Sinfonietta/hostfiles/master/pornography-hosts
-# Regenerate with scripts/fetch_adult_hosts.sh
+# Regenerate with scripts/fetch_restricted_hosts.sh
 0.0.0.0 rahaporn.commanhwax.top
 0.0.0.0 www.rahaporn.com
 0.0.0.0 007angels.com
