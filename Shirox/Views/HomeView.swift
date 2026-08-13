@@ -310,7 +310,21 @@ struct FeaturedCarousel: View {
     @State private var didSetup = false
     @Environment(\.horizontalSizeClass) private var sizeClass
 
-    private var realItems: [Media] { items.prefix(8).map { $0 } }
+    private var realItems: [Media] {
+        // Filter out short films, specials, and other obscure content that
+        // shouldn't appear in the featured carousel. Only include TV series
+        // and movies with meaningful popularity scores.
+        items.filter { media in
+            // Exclude titles with "Short Film" or "Short" in the name
+            let title = media.title.displayTitle.lowercased()
+            if title.contains("short film") || title.contains("short movie") { return false }
+            // Exclude MUSIC format
+            if let format = media.format, format == "MUSIC" { return false }
+            // Exclude titles with very low popularity (likely obscure)
+            if let pop = media.popularity, pop < 1000 { return false }
+            return true
+        }.prefix(8).map { $0 }
+    }
     private var displayCount: Int { realItems.count }
 
     /// Three rotations of `displayCount` — enough headroom in both swipe

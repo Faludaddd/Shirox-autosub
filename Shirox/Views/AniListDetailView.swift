@@ -411,6 +411,15 @@ struct AniListDetailView: View {
                     onSave: { status, progress, score in
                         handleLibraryEdit(media: media, status: status, progress: progress, score: score, alsoUpdateMAL: shouldSyncMAL)
                     },
+                    onTogglePrivate: { newValue in
+                        Task {
+                            try? await AniListLibraryService.shared.updateEntry(
+                                mediaId: media.id, status: existingEntry?.status ?? .current,
+                                progress: existingEntry?.progress ?? 0,
+                                score: existingEntry?.score ?? 0,
+                                type: .anime, isPrivate: newValue)
+                        }
+                    },
                     onDelete: existingEntry != nil ? {
                         guard let entry = existingEntry else { return }
                         let entryId = entry.id
