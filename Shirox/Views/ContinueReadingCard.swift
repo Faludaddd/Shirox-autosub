@@ -12,13 +12,12 @@ enum ContinueReadingNavTarget {
 @ViewBuilder
 private func crNavDestination(_ target: ContinueReadingNavTarget) -> some View {
     switch target {
-    case let .detail(mangaHref, mangaTitle, coverImage, moduleId, aniListID):
+    case let .detail(_, mangaTitle, coverImage, _, aniListID):
         if let aid = aniListID {
             AniListMangaDetailView(mediaId: aid)
         } else {
             MangaDetailView(
-                item: SearchItem(title: mangaTitle, image: coverImage, href: mangaHref),
-                moduleId: moduleId
+                item: SearchItem(title: mangaTitle, image: coverImage, href: "")
             )
         }
     case .anilist(let id):

@@ -1,6 +1,5 @@
 #if os(iOS)
 import SwiftUI
-import UniformTypeIdentifiers
 
 /// Custom download detail view — opened when the user taps a download row
 /// (in-progress, failed, or completed) in the Downloads tab. Shows a large
@@ -253,15 +252,12 @@ struct DownloadDetailView: View {
 
     private func shareFile(_ url: URL) {
         Haptics.light()
-        // Present the iOS share sheet / Files app integration. On iOS this
-        // opens the system share sheet which includes "Save to Files" as an
-        // option — the standard way to "find" a file in the Files app.
+        // Present the iOS share sheet which includes "Save to Files" — the
+        // standard way to "find" a file in the Files app on iOS.
         guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
               let root = scene.windows.first?.rootViewController else { return }
-        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.item])
-        picker.url = url
-        picker.shouldShowFileExtensions = true
-        root.present(picker, animated: true)
+        let activityVC = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        root.present(activityVC, animated: true)
     }
 
     // MARK: - Formatting
