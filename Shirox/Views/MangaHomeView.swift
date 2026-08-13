@@ -17,7 +17,6 @@ struct MangaHomeContent: View {
     @ObservedObject var anilistAuth: AniListAuthManager
     @StateObject private var vm = MangaHomeViewModel()
     @State private var readerContext: ReaderContext?
-    @State private var crNavTarget: ContinueReadingNavTarget?
 
     var body: some View {
         Group {
@@ -51,7 +50,7 @@ struct MangaHomeContent: View {
                         //    slot so the layout reads identically across modes.
                         #if os(iOS)
                         if !progressManager.items.isEmpty {
-                            ContinueReadingSection(items: progressManager.items, readerContext: $readerContext, navTarget: $crNavTarget)
+                            ContinueReadingSection(items: progressManager.items, readerContext: $readerContext)
                         }
                         #endif
 
@@ -75,7 +74,6 @@ struct MangaHomeContent: View {
         .fullScreenCover(item: $readerContext) { ctx in
             MangaReaderView(context: ctx)
         }
-        .continueReadingNavigation($crNavTarget)
         #endif
     }
 }
@@ -741,7 +739,6 @@ private struct MangaReaderSettingsPage: View {
             Text(title).font(.subheadline)
             Spacer()
             Toggle("", isOn: isOn).labelsHidden().tint(Color.appAccent)
-                .glowEffect(isOn: isOn.wrappedValue)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -831,10 +828,8 @@ private struct MangaDisplaySettingsPage: View {
                     .tint(Color.appAccent)
                     Toggle("Downsample Large Images", isOn: $downsampleImages)
                         .tint(Color.appAccent)
-                        .glowEffect(isOn: downsampleImages)
                     Toggle("Data Saving on Cellular", isOn: $dataSavingCellular)
                         .tint(Color.appAccent)
-                        .glowEffect(isOn: dataSavingCellular)
                 }
                 .padding(16)
                 .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
@@ -847,10 +842,8 @@ private struct MangaDisplaySettingsPage: View {
                         .textCase(.uppercase)
                     Toggle("Show Page Numbers", isOn: $showPageNumbers)
                         .tint(Color.appAccent)
-                        .glowEffect(isOn: showPageNumbers)
                     Toggle("Keep Screen Awake", isOn: $keepScreenOn)
                         .tint(Color.appAccent)
-                        .glowEffect(isOn: keepScreenOn)
                 }
                 .padding(16)
                 .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
@@ -928,13 +921,9 @@ private struct MangaTrackingSettingsPage: View {
                         .foregroundStyle(.secondary)
                         .textCase(.uppercase)
                     Toggle("Track on AniList", isOn: $trackOnAniList).tint(Color.appAccent)
-                        .glowEffect(isOn: trackOnAniList)
                     Toggle("Sync Edits", isOn: $syncEdits).tint(Color.appAccent)
-                        .glowEffect(isOn: syncEdits)
                     Toggle("Never Reduce Progress", isOn: $neverReduceProgress).tint(Color.appAccent)
-                        .glowEffect(isOn: neverReduceProgress)
                     Toggle("Prompt to Rate After Finishing", isOn: $promptToRate).tint(Color.appAccent)
-                        .glowEffect(isOn: promptToRate)
                 }
                 .padding(16)
                 .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
@@ -946,7 +935,6 @@ private struct MangaTrackingSettingsPage: View {
                         .foregroundStyle(.secondary)
                         .textCase(.uppercase)
                     Toggle("Auto-Mark Chapters Read", isOn: $autoMarkRead).tint(Color.appAccent)
-                        .glowEffect(isOn: autoMarkRead)
                     Picker("Default Library Sort", selection: $defaultSort) {
                         Text("Source Order").tag("source")
                         Text("By Title").tag("title")
@@ -1115,7 +1103,6 @@ private struct MangaNotificationsSettingsPage: View {
                 }
                 Spacer()
                 Toggle("", isOn: toggle).labelsHidden().tint(Color.appAccent)
-                    .glowEffect(isOn: toggle.wrappedValue)
             }
         }
         .padding(16)
@@ -1151,7 +1138,6 @@ private struct MangaDataSettingsPage: View {
                         .textCase(.uppercase)
                     Toggle("Data Saving on Cellular", isOn: $dataSavingCellular)
                         .tint(Color.appAccent)
-                        .glowEffect(isOn: dataSavingCellular)
                     Text("Loads lower-resolution page images when on cellular connections to reduce data usage.")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
@@ -1200,7 +1186,6 @@ private struct MangaDataSettingsPage: View {
                     }
                     Toggle("Downsample Large Images", isOn: $downsampleImages)
                         .tint(Color.appAccent)
-                        .glowEffect(isOn: downsampleImages)
                 }
                 .padding(16)
                 .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
@@ -1214,7 +1199,6 @@ private struct MangaDataSettingsPage: View {
                     HStack {
                         Stepper("Preload Pages: \(preloadPages)", value: $preloadPages, in: 1...6)
                             .tint(Color.appAccent)
-                            .onChange(of: preloadPages) { _ in Haptics.light() }
                     }
                     // Visual gauge
                     HStack(spacing: 4) {
