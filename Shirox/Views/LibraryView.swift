@@ -749,9 +749,6 @@ struct LibraryView: View {
                         }
                     }
                 },
-                onTogglePrivate: { newValue in
-                    Task { await vm.setPrivate(entry: entry, isPrivate: newValue) }
-                },
                 onDelete: {
                     Task {
                         await vm.delete(entry: entry)
@@ -766,6 +763,9 @@ struct LibraryView: View {
                             }
                         }
                     }
+                },
+                onTogglePrivate: { newValue in
+                    Task { await vm.setPrivate(entry: entry, isPrivate: newValue) }
                 }
             )
         }

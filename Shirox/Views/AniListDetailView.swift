@@ -813,19 +813,14 @@ struct AniListDetailView: View {
         // re-plays the latest aired episode instead of jumping to an episode
         // that has no streams yet. Wrap-around to ep 1 only happens when the
         // show is complete (no nextAiringEpisode) AND the user has finished
-        // the last episode.
-        let nextEp: Int
-        if total > 0 && rawNext > total {
-            if media.nextAiringEpisode != nil {
-                // Still airing — clamp to latest aired, don't wrap.
-                nextEp = total
-            } else {
-                // Finished show — wrap to ep 1.
-                nextEp = 1
+        // the last episode. Computed in an immediately-invoked closure so the
+        // if/else doesn't get interpreted as a @ViewBuilder branch.
+        let nextEp: Int = {
+            if total > 0 && rawNext > total {
+                return media.nextAiringEpisode != nil ? total : 1
             }
-        } else {
-            nextEp = max(1, rawNext)
-        }
+            return max(1, rawNext)
+        }()
         let label = item != nil && !item!.streamUrl.isEmpty ? "Continue Ep \(nextEp)" : "Watch Ep \(nextEp)"
 
         Button {
