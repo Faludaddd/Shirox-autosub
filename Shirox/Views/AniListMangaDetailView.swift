@@ -234,7 +234,7 @@ struct AniListMangaDetailView: View {
             items.append(("Format", format.replacingOccurrences(of: "_", with: " ").capitalized))
         }
         if let status = media.statusDisplay { items.append(("Status", status)) }
-        if let chapters = media.chapters { items.append(("Chapters", "\(chapters)")) }
+        if let chapters = media.episodes { items.append(("Chapters", "\(chapters)")) }
         if let volumes = media.volumes { items.append(("Volumes", "\(volumes)")) }
         if let score = media.averageScore { items.append(("Rating", "\(score)%")) }
         if let pop = media.popularity, pop > 0 { items.append(("Popularity", "\(pop)")) }

@@ -12,14 +12,16 @@ enum ContinueReadingNavTarget {
 private func crNavDestination(_ target: ContinueReadingNavTarget) -> some View {
     switch target {
     case let .detail(mangaHref, mangaTitle, coverImage, moduleId):
-        // Select the correct module before pushing the source page,
-        // matching how anime's View Details works.
-        if let module = ModuleManager.shared.modules.first(where: { $0.id == moduleId }) {
-            ModuleManager.shared.selectModule(module)
-        }
         MangaDetailView(
             item: SearchItem(title: mangaTitle, image: coverImage, href: mangaHref)
         )
+        .onAppear {
+            // Select the correct module before the source page loads,
+            // matching how anime's View Details works.
+            if let module = ModuleManager.shared.modules.first(where: { $0.id == moduleId }) {
+                ModuleManager.shared.selectModule(module)
+            }
+        }
     case .anilist(let id):
         AniListMangaDetailView(mediaId: id)
     }
