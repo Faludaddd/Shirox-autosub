@@ -213,6 +213,12 @@ struct MangaDetailView: View {
                     }
                 }
             },
+            onDelete: existingAniListEntry != nil ? {
+                if let entryId = existingAniListEntry?.id {
+                    existingAniListEntry = nil
+                    Task { try? await AniListLibraryService.shared.deleteEntry(entryId: entryId) }
+                }
+            } : nil,
             onTogglePrivate: { newValue in
                 Task {
                     try? await AniListLibraryService.shared.updateEntry(
@@ -222,13 +228,7 @@ struct MangaDetailView: View {
                         score: existingAniListEntry?.score ?? 0,
                         type: .manga, isPrivate: newValue)
                 }
-            },
-            onDelete: existingAniListEntry != nil ? {
-                if let entryId = existingAniListEntry?.id {
-                    existingAniListEntry = nil
-                    Task { try? await AniListLibraryService.shared.deleteEntry(entryId: entryId) }
-                }
-            } : nil)
+            })
         .adaptivePresentationDetents([.medium, .large])
     }
 
@@ -248,14 +248,14 @@ struct MangaDetailView: View {
                     }
                 }
             },
-            onTogglePrivate: { newValue in
-                // MAL API has no private field — store in-app only.
-                existingMALEntry?.isPrivate = newValue
-            },
             onDelete: existingMALEntry != nil ? {
                 existingMALEntry = nil
                 Task { try? await MALMangaLibraryService.shared.deleteEntry(malId: mid) }
-            } : nil)
+            } : nil,
+            onTogglePrivate: { newValue in
+                // MAL API has no private field — store in-app only.
+                existingMALEntry?.isPrivate = newValue
+            })
         .adaptivePresentationDetents([.medium, .large])
     }
 
