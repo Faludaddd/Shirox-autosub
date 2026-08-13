@@ -4,21 +4,22 @@ import SwiftUI
 // MARK: - Continue Reading context-menu navigation
 
 enum ContinueReadingNavTarget {
-    case detail(mangaTitle: String, coverImage: String, aniListID: Int?)
+    case detail(mangaHref: String, mangaTitle: String, coverImage: String, moduleId: String)
     case anilist(Int)
 }
 
 @ViewBuilder
 private func crNavDestination(_ target: ContinueReadingNavTarget) -> some View {
     switch target {
-    case let .detail(mangaTitle, coverImage, aniListID):
-        if let aid = aniListID {
-            AniListMangaDetailView(mediaId: aid)
-        } else {
-            MangaDetailView(
-                item: SearchItem(title: mangaTitle, image: coverImage, href: "")
-            )
+    case let .detail(mangaHref, mangaTitle, coverImage, moduleId):
+        // Select the correct module before pushing the source page,
+        // matching how anime's View Details works.
+        if let module = ModuleManager.shared.modules.first(where: { $0.id == moduleId }) {
+            ModuleManager.shared.selectModule(module)
         }
+        MangaDetailView(
+            item: SearchItem(title: mangaTitle, image: coverImage, href: mangaHref)
+        )
     case .anilist(let id):
         AniListMangaDetailView(mediaId: id)
     }
@@ -61,14 +62,14 @@ struct ContinueReadingSection: View {
                             )
                         }
                         .buttonStyle(.plain)
-                        .frame(width: 160)
+                        .frame(width: 110)
                         .contextMenu {
                             Button {
-                                let match = MangaMatchManager.shared.cachedMatch(mangaHref: item.mangaHref)
                                 navTarget = .detail(
+                                    mangaHref: item.mangaHref,
                                     mangaTitle: item.mangaTitle,
                                     coverImage: item.coverImage,
-                                    aniListID: match?.aniListID
+                                    moduleId: item.moduleId
                                 )
                             } label: {
                                 Label("View Details", systemImage: "info.circle")
@@ -170,9 +171,10 @@ struct ContinueReadingCardDisplay: View {
     }
 
     var body: some View {
-        // 16:9 horizontal card matching ContinueWatchingCard's format.
+        // 2:3 vertical poster card (manga-specific layout, distinct from
+        // anime's 16:9 horizontal ContinueWatchingCard).
         Color.clear
-            .aspectRatio(16/9, contentMode: .fit)
+            .aspectRatio(2/3, contentMode: .fit)
             .overlay(
                 CachedAsyncImage(urlString: item.coverImage)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -180,13 +182,13 @@ struct ContinueReadingCardDisplay: View {
             )
             .overlay(alignment: .topLeading) {
                 Text(item.chapterName)
-                    .font(.caption2.weight(.bold))
+                    .font(.system(size: 9, weight: .bold))
                     .foregroundStyle(.white)
                     .lineLimit(1)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
                     .background(Color.black.opacity(0.55), in: Capsule())
-                    .padding(8)
+                    .padding(6)
             }
             .overlay(alignment: .bottom) {
                 LinearGradient(
@@ -197,14 +199,14 @@ struct ContinueReadingCardDisplay: View {
                     startPoint: .top,
                     endPoint: .bottom
                 )
-                .frame(height: 80)
+                .frame(height: 100)
                 .overlay(alignment: .bottomLeading) {
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 4) {
                             Image(systemName: "book.fill")
                                 .font(.system(size: 8, weight: .bold))
                             Text(progressLabel)
-                                .font(.caption2.weight(.medium))
+                                .font(.system(size: 9, weight: .medium))
                         }
                         .foregroundStyle(.white.opacity(0.85))
                         .lineLimit(1)
@@ -214,8 +216,8 @@ struct ContinueReadingCardDisplay: View {
                             .foregroundStyle(.white)
                             .lineLimit(2)
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.bottom, 10)
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 8)
                 }
             }
             .overlay(alignment: .bottom) {

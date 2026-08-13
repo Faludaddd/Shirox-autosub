@@ -249,6 +249,7 @@ final class LibraryViewModel: ObservableObject {
     /// list entries). The optimistic update keeps the UI snappy and rolls
     /// back on failure.
     func setPrivate(entry: LibraryEntry, isPrivate: Bool) async {
+        let oldValue = entry.isPrivate
         if let index = allEntries.firstIndex(where: { $0.media.uniqueId == entry.media.uniqueId }) {
             allEntries[index].isPrivate = isPrivate
             cache[currentKey] = allEntries
@@ -270,8 +271,15 @@ final class LibraryViewModel: ObservableObject {
                 isPrivate: isPrivate)
         } catch {
             self.error = error.localizedDescription
-            cache[currentKey] = nil
-            await load()
+            // Revert just this entry's isPrivate — don't do a full reload
+            // (which would reset every entry and make the edit sheet's state
+            // go stale relative to the VM). Both the toggle and long-press
+            // read from allEntries, so reverting here keeps them in sync.
+            if let index = allEntries.firstIndex(where: { $0.media.uniqueId == entry.media.uniqueId }) {
+                allEntries[index].isPrivate = oldValue
+                cache[currentKey] = allEntries
+                applyFilter()
+            }
         }
     }
 

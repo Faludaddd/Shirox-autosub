@@ -116,7 +116,7 @@ struct SearchView: View {
                 }
                 .onChangeOf(moduleManager.moduleReadyId) { newId in
                     guard !vm.query.isEmpty, newId != nil else { return }
-                    vm.search(usingModule: true, isMangaMode: isMangaMode)
+                    vm.search(usingModule: usingModule, isMangaMode: isMangaMode)
                 }
                 .onChangeOf(moduleManager.activeModule) { newModule in
                     guard !vm.query.isEmpty, newModule == nil else { return }

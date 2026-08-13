@@ -473,10 +473,14 @@ struct FeaturedCarousel: View {
                         } label: {
                             HStack(spacing: 6) {
                                 Image(systemName: isManga ? "book.fill" : "play.fill").font(.caption.weight(.bold))
-                                Text(isManga ? "Start Reading" : "Watch").font(.subheadline.weight(.semibold))
+                                Text(isManga ? "Start Reading" : "Watch")
+                                    .font(.subheadline.weight(.semibold))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.7)
                             }
                             .foregroundStyle(.primary)
-                            .frame(width: 130, height: 38)
+                            .frame(height: 38)
+                            .padding(.horizontal, 16)
                             .background(.ultraThinMaterial, in: Capsule())
                             .overlay(Capsule().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
                         }
@@ -651,7 +655,8 @@ private struct MacFeaturedCarousel: View {
                                             .lineLimit(1)
                                     }
                                     .foregroundStyle(platformBackground)
-                                    .frame(width: 110, height: 36)
+                                    .frame(height: 36)
+                                    .padding(.horizontal, 14)
                                     .background(Color.primary, in: RoundedRectangle(cornerRadius: 10))
                                 }
                                 .buttonStyle(.plain)

@@ -11,6 +11,7 @@ struct AniListRawEntry {
     let updatedAt: Int?
     let customListName: String?
     let `repeat`: Int
+    let isPrivate: Bool
 }
 
 final class AniListLibraryService {
@@ -32,6 +33,7 @@ final class AniListLibraryService {
                 status
                 progress
                 score
+                private
                 updatedAt
                 media {
                   id
@@ -73,6 +75,7 @@ final class AniListLibraryService {
                 let status: MediaListStatus
                 let progress: Int
                 let score: Double
+                let `private`: Bool?
                 let updatedAt: Int?
                 let media: AniListMedia
             }
@@ -94,7 +97,8 @@ final class AniListLibraryService {
                     score: raw.score,
                     updatedAt: raw.updatedAt,
                     customListName: customName,
-                    repeat: 0
+                    repeat: 0,
+                    isPrivate: raw.private ?? false
                 ))
             }
         }
@@ -113,6 +117,7 @@ final class AniListLibraryService {
             progress
             score
             repeat
+            private
             updatedAt
             media {
               id
@@ -144,6 +149,7 @@ final class AniListLibraryService {
                 let progress: Int
                 let score: Double
                 let `repeat`: Int
+                let `private`: Bool?
                 let updatedAt: Int?
                 let media: AniListMedia
             }
@@ -151,7 +157,7 @@ final class AniListLibraryService {
         }
 
         guard let raw = try JSONDecoder().decode(Response.self, from: data).data?.MediaList else { return nil }
-        return AniListRawEntry(id: raw.id, media: raw.media, status: raw.status, progress: raw.progress, score: raw.score, updatedAt: raw.updatedAt, customListName: nil, repeat: raw.repeat)
+        return AniListRawEntry(id: raw.id, media: raw.media, status: raw.status, progress: raw.progress, score: raw.score, updatedAt: raw.updatedAt, customListName: nil, repeat: raw.repeat, isPrivate: raw.private ?? false)
     }
 
     // MARK: - Fetch list (by status, kept for compatibility)
