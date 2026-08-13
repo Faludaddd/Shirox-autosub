@@ -198,6 +198,16 @@ struct MangaDetailView: View {
                             }
                         }
                     },
+                    onTogglePrivate: { newValue in
+                        Task {
+                            try? await AniListLibraryService.shared.updateEntry(
+                                mediaId: aid,
+                                status: existingAniListEntry?.status ?? .current,
+                                progress: existingAniListEntry?.progress ?? 0,
+                                score: existingAniListEntry?.score ?? 0,
+                                type: .manga, isPrivate: newValue)
+                        }
+                    },
                     onDelete: existingAniListEntry != nil ? {
                         if let entryId = existingAniListEntry?.id {
                             existingAniListEntry = nil
@@ -222,6 +232,10 @@ struct MangaDetailView: View {
                                     from: entry, media: editorMedia(provider: .mal, id: mid, detail: detail))
                             }
                         }
+                    },
+                    onTogglePrivate: { newValue in
+                        // MAL API has no private field — store in-app only.
+                        existingMALEntry?.isPrivate = newValue
                     },
                     onDelete: existingMALEntry != nil ? {
                         existingMALEntry = nil
@@ -262,9 +276,13 @@ struct MangaDetailView: View {
                     if !synopsis.isEmpty {
                         synopsisSection(text: synopsis).padding(.top, 16)
                     }
-                    // Statistics section removed from the provider source page.
-                    // Statistics are hosted exclusively on the dedicated
-                    // internal AniList manga details page (AniListMangaDetailView).
+                    // Statistics section: shown only when opened from the
+                    // AniList manga detail page (aniListMedia != nil), NOT on
+                    // the bare provider source page.
+                    if let media = aniListMedia, showStatistics {
+                        statisticsSection(media: media)
+                            .padding(.top, 4)
+                    }
                     #if os(iOS)
                     readButton(detail)
                         .padding(.horizontal, 16)
