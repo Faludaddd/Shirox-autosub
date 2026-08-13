@@ -84,7 +84,7 @@ import Combine
             return
         }
 
-        Logger.shared.log("[CW] save inprog: ep=\(item.episodeNumber) watched=\(item.watchedSeconds)/\(item.totalSeconds) title=\(item.mediaTitle]", type: "Debug")
+        Logger.shared.log("[CW] save inprog: ep=\(item.episodeNumber) watched=\(item.watchedSeconds)/\(item.totalSeconds) title=\(item.mediaTitle)", type: "Debug")
         newItems.insert(item, at: 0)
         if newItems.count > maxItems { newItems = Array(newItems.prefix(maxItems)) }
         items = newItems
