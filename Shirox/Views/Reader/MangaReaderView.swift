@@ -186,8 +186,11 @@ struct MangaReaderView: View {
         .onChangeOf(currentPage) { page in
             updateDisplayedChapter(for: page)
             scheduleSave()
-            prepareUpcomingChapter()
-            warmUpcomingPages(around: page)
+            // Removed prepareUpcomingChapter() and warmUpcomingPages() from
+            // here — they mutated the strip during active scrolling, causing
+            // a feedback loop that teleported to other pages when scrolling
+            // up. updateDisplayedChapter already calls prepareUpcomingChapter
+            // when the chapter actually changes, which is sufficient.
         }
         .onChangeOf(modeRaw) { _ in
             // Mode switch: rebuild the strip for the displayed chapter at the
