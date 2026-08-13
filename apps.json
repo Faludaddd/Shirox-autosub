@@ -32,7 +32,7 @@
           "date": "2026-08-13",
           "localizedDescription": "Restored native SwiftUI toggles, fixed manga module detection, reworked manga settings layouts, fixed update manifest to point to correct fork repo.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 10634374,
+          "size": 10657675,
           "minOSVersion": "15.0"
         },
         {
