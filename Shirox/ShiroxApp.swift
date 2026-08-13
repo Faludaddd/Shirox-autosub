@@ -152,6 +152,59 @@ extension Color {
     }
 }
 
+// MARK: - Grey Glass Toggle Style
+//
+// A custom ToggleStyle with a grey (not white) capsule fill and optional
+// glow effect. Uses the same Color.glowEnabled / Color.glowIntensity logic
+// that the previous GlowingToggleStyle used, but the base fill is grey
+// instead of white so the toggle is always visible in both light and dark
+// mode. The thumb is still a white circle. This is NOT draggable — it
+// uses tap to toggle, matching native SwiftUI Toggle behavior.
+struct GreyGlassToggleStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack {
+            configuration.label
+            Spacer()
+            ZStack {
+                Capsule()
+                    .fill(Color.secondary.opacity(0.25))
+                    .frame(width: 51, height: 31)
+                    .overlay(
+                        Capsule()
+                            .fill(configuration.isOn
+                                  ? Color.appAccent.opacity(0.3)
+                                  : Color.clear)
+                    )
+                    .overlay(
+                        Capsule()
+                            .strokeBorder(
+                                configuration.isOn
+                                ? Color.appAccent.opacity(0.5)
+                                : Color.secondary.opacity(0.3),
+                                lineWidth: 0.5
+                            )
+                    )
+                    .shadow(
+                        color: configuration.isOn && Color.glowEnabled
+                            ? Color.appAccent.opacity(Color.glowIntensity * 0.6) : .clear,
+                        radius: configuration.isOn && Color.glowEnabled
+                            ? CGFloat(18 * Color.glowIntensity) : 0
+                    )
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: 27, height: 27)
+                    .shadow(color: .black.opacity(0.15), radius: 2, x: 0, y: 1)
+                    .offset(x: configuration.isOn ? 10 : -10)
+            }
+            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: configuration.isOn)
+            .onTapGesture {
+                configuration.isOn.toggle()
+                Haptics.light()
+            }
+        }
+    }
+}
+
 @main
 struct ShiroxApp: App {
 #if os(iOS)
@@ -208,6 +261,7 @@ struct ShiroxApp: App {
             RootTabView()
                 .environmentObject(moduleManager)
                 .tint(accentColor)
+                .toggleStyle(GreyGlassToggleStyle())
                 .preferredColorScheme(colorScheme)
                 // Requirement #2 — Appearance changes must NOT reset navigation
                 // or rebuild the view tree. The previous `.id(...)` modifier
@@ -433,44 +487,41 @@ private struct RootTabView: View {
                 }
                 .tabViewStyle(.sidebarAdaptable)
                 .tint(.appAccent)
-                .animation(.easeInOut(duration: 0.25), value: selectedTab)
+                .smoothTabSwitch(value: selectedTab)
                 .glassTabBarBackground()
                 #endif
             } else {
                 TabView(selection: $selectedTab) {
                     HomeView()
-                        .transition(.opacity)
+                        .smoothTabSwitch(value: selectedTab)
                         .tabItem { Label("Home", systemImage: "house.fill") }
                         .tag(0)
                     LibraryView()
-                        .transition(.opacity)
+                        .smoothTabSwitch(value: selectedTab)
                         .tabItem { Label("Library", systemImage: "books.vertical.fill") }
                         .tag(1)
                     #if os(iOS)
                     DownloadsView()
-                        .transition(.opacity)
+                        .smoothTabSwitch(value: selectedTab)
                         .tabItem { Label("Downloads", systemImage: "arrow.down.circle.fill") }
                         .tag(2)
                     #endif
                     // Requirement #3 — Bottom search bar (AniList-only).
                     SearchView()
-                        .transition(.opacity)
+                        .smoothTabSwitch(value: selectedTab)
                         .tabItem { Label("Search", systemImage: "magnifyingglass") }
                         .tag(3)
                     // Requirement #6 — Schedule tab (where Settings was).
                     ScheduleView()
-                        .transition(.opacity)
+                        .smoothTabSwitch(value: selectedTab)
                         .tabItem { Label("Schedule", systemImage: "calendar") }
                         .tag(4)
                 }
                 .tint(.appAccent)
-                // #126 — Performance Mode skips the tab-switch fade so tab
-                // changes are instant on older devices.
-                .animation(.easeInOut(duration: 0.25), value: selectedTab)
                 .glassTabBarBackground()
             }
         }
-        .animation(.easeInOut(duration: 0.25), value: selectedTab)
+        .smoothTabSwitch(value: selectedTab)
         // #96 — Selection haptic whenever the user switches tabs.
         .onChange(of: selectedTab) { _ in Haptics.selection() }
         .onOpenURL { url in
