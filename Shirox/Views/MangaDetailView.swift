@@ -198,17 +198,6 @@ struct MangaDetailView: View {
                             }
                         }
                     },
-                    onTogglePrivate: existingAniListEntry != nil ? { newValue in
-                        existingAniListEntry?.isPrivate = newValue
-                        Task {
-                            guard let entry = existingAniListEntry else { return }
-                            try? await AniListLibraryService.shared.updateEntry(
-                                mediaId: aid, status: entry.status,
-                                progress: entry.progress,
-                                score: entry.score,
-                                isPrivate: newValue, type: .manga)
-                        }
-                    } : nil,
                     onDelete: existingAniListEntry != nil ? {
                         if let entryId = existingAniListEntry?.id {
                             existingAniListEntry = nil
@@ -234,16 +223,6 @@ struct MangaDetailView: View {
                             }
                         }
                     },
-                    onTogglePrivate: existingMALEntry != nil ? { newValue in
-                        existingMALEntry?.isPrivate = newValue
-                        Task {
-                            guard let entry = existingMALEntry else { return }
-                            try? await MALMangaLibraryService.shared.updateEntry(
-                                malId: mid, status: entry.status,
-                                progress: entry.progress,
-                                score: entry.score)
-                        }
-                    } : nil,
                     onDelete: existingMALEntry != nil ? {
                         existingMALEntry = nil
                         Task { try? await MALMangaLibraryService.shared.deleteEntry(malId: mid) }
@@ -283,13 +262,9 @@ struct MangaDetailView: View {
                     if !synopsis.isEmpty {
                         synopsisSection(text: synopsis).padding(.top, 16)
                     }
-                    // Statistics section: only shown when opened from the
-                    // AniList manga detail page (aniListMedia != nil), NOT on
-                    // the provider source page.
-                    if let media = aniListMedia, showStatistics {
-                        statisticsSection(media: media)
-                            .padding(.top, 4)
-                    }
+                    // Statistics section removed from the provider source page.
+                    // Statistics are hosted exclusively on the dedicated
+                    // internal AniList manga details page (AniListMangaDetailView).
                     #if os(iOS)
                     readButton(detail)
                         .padding(.horizontal, 16)

@@ -18,11 +18,7 @@ struct ToggleGlow: ViewModifier {
     }
 }
 
-extension View {
-    /// Applies a glow shadow when `isOn` is true. Must be on `View` (not `Toggle`)
-    /// because modifiers like `.tint()` return `some View`, not `Toggle` — so the
-    /// call chain `Toggle(...).tint(...).glowEffect(...)` requires `glowEffect` to
-    /// be available on `some View`.
+extension Toggle {
     func glowEffect(isOn: Bool) -> some View {
         modifier(ToggleGlow(isOn: isOn))
     }

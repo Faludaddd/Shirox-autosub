@@ -109,13 +109,40 @@ struct DownloadsView: View {
 
     // MARK: - Body
 
-    /// Builds a DownloadDetailView for any DownloadItem — the custom download
-    /// manager detail with circular progress ring, ETA, speed, and find-file.
-    /// This replaces the old behavior of tapping a download row and landing on
-    /// the anime's DetailView (which showed no download-specific information).
+    /// Builds a DetailView destination for any DownloadItem — used by in-progress,
+    /// failed, and completed rows so tapping any of them opens the anime's detail
+    /// page. Uses the snapshot from the store when available; otherwise backfills a
+    /// minimal snapshot from the DownloadItem's own fields so the DetailView always
+    /// has something to render offline.
     @ViewBuilder
-    private func downloadDetailDestination(for item: DownloadItem) -> some View {
-        DownloadDetailView(item: item)
+    private func detailDestination(for item: DownloadItem) -> some View {
+        let moduleId = item.moduleId ?? ""
+        let snap = DownloadedMediaSnapshotStore.shared
+            .snapshot(mediaTitle: item.mediaTitle, moduleId: moduleId)
+            ?? DownloadedMediaSnapshotStore.shared.backfill(
+                mediaTitle: item.mediaTitle,
+                moduleId: moduleId,
+                items: [item]
+            )
+        let posterURLString: String = snap.posterFile
+            .map { DownloadedMediaSnapshotStore.shared.localFileURL(in: snap, relative: $0).absoluteString }
+            ?? item.imageUrl
+        let detailHref = item.detailHref ?? ""
+        DetailView(
+            item: SearchItem(title: snap.mediaTitle, image: posterURLString, href: detailHref),
+            offlineSnapshot: snap,
+            moduleId: moduleId,
+            aniListID: snap.aniListID
+        )
+        .task {
+            // One-shot auto-upgrade for snapshots written by the pre-v2 enrichment
+            // pipeline. Fire-and-forget — the view renders whatever's on disk now and
+            // re-renders when the upgrade persists.
+            if snap.schemaVersion < DownloadedMediaSnapshot.currentSchemaVersion {
+                await DownloadedMediaSnapshotStore.shared
+                    .reenrichIfStale(mediaKey: snap.mediaKey)
+            }
+        }
     }
 
     var body: some View {
@@ -129,13 +156,13 @@ struct DownloadsView: View {
                     )
                 } else {
                     List {
-                        // Downloading / Pending — tappable, opens the custom
-                        // download detail view with ETA and progress ring.
+                        // Downloading / Pending — tappable so the user can jump into the
+                        // anime's detail page to see all downloads for it in one place.
                         if !inProgress.isEmpty {
                             Section("Downloading") {
                                 ForEach(inProgress) { item in
                                     NavigationLink {
-                                        downloadDetailDestination(for: item)
+                                        detailDestination(for: item)
                                     } label: {
                                         DownloadProgressRow(item: item)
                                     }
@@ -200,13 +227,13 @@ struct DownloadsView: View {
                             }
                         }
 
-                        // Failed — tappable, opens the custom download detail
-                        // view with error info and retry button.
+                        // Failed — also tappable so the user can retry from the detail
+                        // page or inspect what failed.
                         if !failed.isEmpty {
                             Section("Failed") {
                                 ForEach(failed) { item in
                                     NavigationLink {
-                                        downloadDetailDestination(for: item)
+                                        detailDestination(for: item)
                                     } label: {
                                         DownloadProgressRow(item: item)
                                     }

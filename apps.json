@@ -27,21 +27,12 @@
       },
       "versions": [
         {
-          "version": "1.10",
-          "buildVersion": "1",
-          "date": "2026-08-14",
-          "localizedDescription": "Fixed manga reader scroll-up teleporting by removing strip mutations from the page-change handler. Added Statistics section to AniList manga detail page. Wired Mark as Private toggle on manga edit entry (AniList + MAL). Applied ToggleGlow to all manga settings toggles. Added haptics to Preload Pages stepper. Fixed Continue Reading context menu: View Details routes to AniListMangaDetailView, View on AniList opens in-app page.",
-          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 10669076,
-          "minOSVersion": "15.0"
-        },
-        {
           "version": "1.9",
           "buildVersion": "1",
-          "date": "2026-08-13",
+          "date": "2026-08-14",
           "localizedDescription": "Fixed Downloads tab: tapping an in-progress or failed download now opens the anime's detail page instead of doing nothing. The offline episode list now shows all download states (downloading, pending, failed, completed) with the right badge on each row, so you can see at a glance what's still in progress. Batch downloads from the module detail page now correctly save the detail href so the offline detail view can re-enrich artwork and metadata later.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 10674302,
+          "size": 10657649,
           "minOSVersion": "15.0"
         },
         {
@@ -84,15 +75,6 @@
     }
   ],
   "news": [
-    {
-      "title": "New in 1.10 - Reader scroll fix, custom download manager, manga stats",
-      "identifier": "news-1.10-reader-downloads-stats",
-      "caption": "Manga reader no longer teleports when scrolling up. Tapping a download opens a custom detail view with circular progress ring, ETA, speed, and Find File button. Manga AniList detail page now shows Statistics. Mark as Private works on manga edit entry. Toggle glow restored on all manga settings toggles.",
-      "tintColor": "ef4444",
-      "date": "2026-08-14",
-      "notify": true,
-      "appID": "com.shirox.app"
-    },
     {
       "title": "New in 1.9 - Downloads tab tap-to-open fix",
       "identifier": "news-1.9-downloads-fix",

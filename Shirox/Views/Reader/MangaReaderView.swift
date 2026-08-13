@@ -186,14 +186,8 @@ struct MangaReaderView: View {
         .onChangeOf(currentPage) { page in
             updateDisplayedChapter(for: page)
             scheduleSave()
-            // Don't call prepareUpcomingChapter() or warmUpcomingPages() here —
-            // they mutate the strip (append pages) which changes the LazyVStack
-            // content size, shifts page frames, and triggers a feedback loop
-            // that feels like the reader "teleports" to other pages when
-            // scrolling up. updateDisplayedChapter already calls
-            // prepareUpcomingChapter when the chapter actually changes, which
-            // is sufficient. Page warming is handled by the LazyVStack's
-            // onAppear per page (ReaderPageView caches via Kingfisher).
+            prepareUpcomingChapter()
+            warmUpcomingPages(around: page)
         }
         .onChangeOf(modeRaw) { _ in
             // Mode switch: rebuild the strip for the displayed chapter at the
