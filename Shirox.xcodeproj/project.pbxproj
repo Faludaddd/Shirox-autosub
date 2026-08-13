@@ -637,50 +637,50 @@
                 AE0E0074652F42FF99D98593 /* app-logo.png in Resources */ = {isa = PBXBuildFile; fileRef = ACCF2A92A85C4B4BA8E11E55 /* app-logo.png */; };
                 41ECBA699CB9404AAE84293C /* app-logo.png in Resources */ = {isa = PBXBuildFile; fileRef = ACCF2A92A85C4B4BA8E11E55 /* app-logo.png */; };
                 3C2CD6ABFBD54C04B88011A9 /* app-logo.png in Resources */ = {isa = PBXBuildFile; fileRef = ACCF2A92A85C4B4BA8E11E55 /* app-logo.png */; };
-		9FC65E10AF3F4044AA31F0E7 /* SettingsSearchIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E540997BA864448B082B725 /* SettingsSearchIndex.swift */; };
-		CE8BECC8DB5A46128FE0F71F /* SettingsSearchIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E540997BA864448B082B725 /* SettingsSearchIndex.swift */; };
-		2E0E8A3882B1417499E1D5FA /* SettingsSearchIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E540997BA864448B082B725 /* SettingsSearchIndex.swift */; };
-		01A20920D09146A29404813E /* SettingsSearchIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E540997BA864448B082B725 /* SettingsSearchIndex.swift */; };
-		9E2601C92E784D40961B5E9A /* MangaHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F913A366E28436E9B132B7B /* MangaHomeView.swift */; };
-		49018AF1B1824E1BBB4FBF2F /* MangaHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F913A366E28436E9B132B7B /* MangaHomeView.swift */; };
-		1CAC259234054464BCC1E60C /* MangaHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F913A366E28436E9B132B7B /* MangaHomeView.swift */; };
-		AE5D7AE099454F4DBFFA1406 /* MangaHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F913A366E28436E9B132B7B /* MangaHomeView.swift */; };
-		9EE290864CBC47F394FC0115 /* AppModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 180EA8BB63D54E6BBFCE8E9A /* AppModeManager.swift */; };
-		73E828E8CEDC4F4FADE37960 /* AppModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 180EA8BB63D54E6BBFCE8E9A /* AppModeManager.swift */; };
-		BAAA0A4B15404C19805883A1 /* AppModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 180EA8BB63D54E6BBFCE8E9A /* AppModeManager.swift */; };
-		D9AE76341D1B4FF99675633F /* AppModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 180EA8BB63D54E6BBFCE8E9A /* AppModeManager.swift */; };
-		9B9E10BF51174701A886E01E /* AppUpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB80077A4D92485BBE75B22E /* AppUpdateManager.swift */; };
-		99B13F351A134812AD75DA49 /* AppUpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB80077A4D92485BBE75B22E /* AppUpdateManager.swift */; };
-		AF2335D043404C4E97C5932A /* AppUpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB80077A4D92485BBE75B22E /* AppUpdateManager.swift */; };
-		753C771E5776493EA7C838DF /* AppUpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB80077A4D92485BBE75B22E /* AppUpdateManager.swift */; };
-		D87FB5B29B0A4DE59A88A058 /* HistoryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A70A5ACBBFA0410391A8C9F6 /* HistoryManager.swift */; };
-		D847E8CD8DA6404781337E38 /* HistoryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A70A5ACBBFA0410391A8C9F6 /* HistoryManager.swift */; };
-		C2E5D4EA9DF6453B98F51FBA /* HistoryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A70A5ACBBFA0410391A8C9F6 /* HistoryManager.swift */; };
-		6463DD5F742F4F18BB4A3665 /* HistoryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A70A5ACBBFA0410391A8C9F6 /* HistoryManager.swift */; };
-		50A1F4F7258D49B0BD7460D2 /* UpdatePopupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D49C555B4254095BB55B993 /* UpdatePopupView.swift */; };
-		C9A3590B21B64B25B5304AF7 /* UpdatePopupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D49C555B4254095BB55B993 /* UpdatePopupView.swift */; };
-		7C4DB59480FD4A69B93F1D1E /* UpdatePopupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D49C555B4254095BB55B993 /* UpdatePopupView.swift */; };
-		404051D2676B4B82B5A868F8 /* UpdatePopupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D49C555B4254095BB55B993 /* UpdatePopupView.swift */; };
-		A85A090582534E02B19833B9 /* LibraryHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B7FE5D7DC524A62A71C54FB /* LibraryHistoryView.swift */; };
-		EB13BA31A6924FC499DBBB5B /* LibraryHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B7FE5D7DC524A62A71C54FB /* LibraryHistoryView.swift */; };
-		941EEFF3DBCD4FAC8BE6656D /* LibraryHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B7FE5D7DC524A62A71C54FB /* LibraryHistoryView.swift */; };
-		1D84E3B0273F4A46B71F2792 /* LibraryHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B7FE5D7DC524A62A71C54FB /* LibraryHistoryView.swift */; };
-		DAC3DA3DD95340D59BD252F5 /* AnimationModifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C1B57D4AEDB48F28A04789C /* AnimationModifiers.swift */; };
-		EA34B90AC60145C4A8C6242D /* AnimationModifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C1B57D4AEDB48F28A04789C /* AnimationModifiers.swift */; };
-		E1B10668B38B4DB88334F074 /* AnimationModifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C1B57D4AEDB48F28A04789C /* AnimationModifiers.swift */; };
-		F135E86415974AFE8ED112C9 /* AnimationModifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C1B57D4AEDB48F28A04789C /* AnimationModifiers.swift */; };
-		26189BEE0F8F4FAB9E9C5AB8 /* UpdateSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC6D003A0C9444AA11E160A /* UpdateSettingsPage.swift */; };
-		9BCF00416DE84CB9A8088F4F /* UpdateSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC6D003A0C9444AA11E160A /* UpdateSettingsPage.swift */; };
-		3D5DA029D839461FACF798E4 /* UpdateSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC6D003A0C9444AA11E160A /* UpdateSettingsPage.swift */; };
-		9A797EBA7D674B10A694B790 /* UpdateSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC6D003A0C9444AA11E160A /* UpdateSettingsPage.swift */; };
-		89061193CC71490F90A410AD /* MangaModuleManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB817FD6F25142E088911D9D /* MangaModuleManager.swift */; };
-		6F6ED9108A8045CA8A658101 /* MangaModuleManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB817FD6F25142E088911D9D /* MangaModuleManager.swift */; };
-		4145AC4354274872A2D0CC00 /* MangaModuleManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB817FD6F25142E088911D9D /* MangaModuleManager.swift */; };
-		C7CF9F91BDE745B987437E5E /* MangaModuleManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB817FD6F25142E088911D9D /* MangaModuleManager.swift */; };
-		87EE82E06AD94040BB9C5986 /* ToggleGlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A15090D8B47044D285B51DCF /* ToggleGlow.swift */; };
-		A16180FB70044D67A99A2BFA /* ToggleGlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A15090D8B47044D285B51DCF /* ToggleGlow.swift */; };
-		F9145A12960F440BAC6A4556 /* ToggleGlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A15090D8B47044D285B51DCF /* ToggleGlow.swift */; };
-		499662116A2E43978193A47E /* ToggleGlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A15090D8B47044D285B51DCF /* ToggleGlow.swift */; };
+                9FC65E10AF3F4044AA31F0E7 /* SettingsSearchIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E540997BA864448B082B725 /* SettingsSearchIndex.swift */; };
+                CE8BECC8DB5A46128FE0F71F /* SettingsSearchIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E540997BA864448B082B725 /* SettingsSearchIndex.swift */; };
+                2E0E8A3882B1417499E1D5FA /* SettingsSearchIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E540997BA864448B082B725 /* SettingsSearchIndex.swift */; };
+                01A20920D09146A29404813E /* SettingsSearchIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E540997BA864448B082B725 /* SettingsSearchIndex.swift */; };
+                9E2601C92E784D40961B5E9A /* MangaHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F913A366E28436E9B132B7B /* MangaHomeView.swift */; };
+                49018AF1B1824E1BBB4FBF2F /* MangaHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F913A366E28436E9B132B7B /* MangaHomeView.swift */; };
+                1CAC259234054464BCC1E60C /* MangaHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F913A366E28436E9B132B7B /* MangaHomeView.swift */; };
+                AE5D7AE099454F4DBFFA1406 /* MangaHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F913A366E28436E9B132B7B /* MangaHomeView.swift */; };
+                9EE290864CBC47F394FC0115 /* AppModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 180EA8BB63D54E6BBFCE8E9A /* AppModeManager.swift */; };
+                73E828E8CEDC4F4FADE37960 /* AppModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 180EA8BB63D54E6BBFCE8E9A /* AppModeManager.swift */; };
+                BAAA0A4B15404C19805883A1 /* AppModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 180EA8BB63D54E6BBFCE8E9A /* AppModeManager.swift */; };
+                D9AE76341D1B4FF99675633F /* AppModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 180EA8BB63D54E6BBFCE8E9A /* AppModeManager.swift */; };
+                9B9E10BF51174701A886E01E /* AppUpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB80077A4D92485BBE75B22E /* AppUpdateManager.swift */; };
+                99B13F351A134812AD75DA49 /* AppUpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB80077A4D92485BBE75B22E /* AppUpdateManager.swift */; };
+                AF2335D043404C4E97C5932A /* AppUpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB80077A4D92485BBE75B22E /* AppUpdateManager.swift */; };
+                753C771E5776493EA7C838DF /* AppUpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB80077A4D92485BBE75B22E /* AppUpdateManager.swift */; };
+                D87FB5B29B0A4DE59A88A058 /* HistoryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A70A5ACBBFA0410391A8C9F6 /* HistoryManager.swift */; };
+                D847E8CD8DA6404781337E38 /* HistoryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A70A5ACBBFA0410391A8C9F6 /* HistoryManager.swift */; };
+                C2E5D4EA9DF6453B98F51FBA /* HistoryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A70A5ACBBFA0410391A8C9F6 /* HistoryManager.swift */; };
+                6463DD5F742F4F18BB4A3665 /* HistoryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A70A5ACBBFA0410391A8C9F6 /* HistoryManager.swift */; };
+                50A1F4F7258D49B0BD7460D2 /* UpdatePopupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D49C555B4254095BB55B993 /* UpdatePopupView.swift */; };
+                C9A3590B21B64B25B5304AF7 /* UpdatePopupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D49C555B4254095BB55B993 /* UpdatePopupView.swift */; };
+                7C4DB59480FD4A69B93F1D1E /* UpdatePopupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D49C555B4254095BB55B993 /* UpdatePopupView.swift */; };
+                404051D2676B4B82B5A868F8 /* UpdatePopupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D49C555B4254095BB55B993 /* UpdatePopupView.swift */; };
+                A85A090582534E02B19833B9 /* LibraryHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B7FE5D7DC524A62A71C54FB /* LibraryHistoryView.swift */; };
+                EB13BA31A6924FC499DBBB5B /* LibraryHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B7FE5D7DC524A62A71C54FB /* LibraryHistoryView.swift */; };
+                941EEFF3DBCD4FAC8BE6656D /* LibraryHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B7FE5D7DC524A62A71C54FB /* LibraryHistoryView.swift */; };
+                1D84E3B0273F4A46B71F2792 /* LibraryHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B7FE5D7DC524A62A71C54FB /* LibraryHistoryView.swift */; };
+                DAC3DA3DD95340D59BD252F5 /* AnimationModifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C1B57D4AEDB48F28A04789C /* AnimationModifiers.swift */; };
+                EA34B90AC60145C4A8C6242D /* AnimationModifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C1B57D4AEDB48F28A04789C /* AnimationModifiers.swift */; };
+                E1B10668B38B4DB88334F074 /* AnimationModifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C1B57D4AEDB48F28A04789C /* AnimationModifiers.swift */; };
+                F135E86415974AFE8ED112C9 /* AnimationModifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C1B57D4AEDB48F28A04789C /* AnimationModifiers.swift */; };
+                26189BEE0F8F4FAB9E9C5AB8 /* UpdateSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC6D003A0C9444AA11E160A /* UpdateSettingsPage.swift */; };
+                9BCF00416DE84CB9A8088F4F /* UpdateSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC6D003A0C9444AA11E160A /* UpdateSettingsPage.swift */; };
+                3D5DA029D839461FACF798E4 /* UpdateSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC6D003A0C9444AA11E160A /* UpdateSettingsPage.swift */; };
+                9A797EBA7D674B10A694B790 /* UpdateSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC6D003A0C9444AA11E160A /* UpdateSettingsPage.swift */; };
+                89061193CC71490F90A410AD /* MangaModuleManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB817FD6F25142E088911D9D /* MangaModuleManager.swift */; };
+                6F6ED9108A8045CA8A658101 /* MangaModuleManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB817FD6F25142E088911D9D /* MangaModuleManager.swift */; };
+                4145AC4354274872A2D0CC00 /* MangaModuleManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB817FD6F25142E088911D9D /* MangaModuleManager.swift */; };
+                C7CF9F91BDE745B987437E5E /* MangaModuleManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB817FD6F25142E088911D9D /* MangaModuleManager.swift */; };
+                87EE82E06AD94040BB9C5986 /* ToggleGlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A15090D8B47044D285B51DCF /* ToggleGlow.swift */; };
+                A16180FB70044D67A99A2BFA /* ToggleGlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A15090D8B47044D285B51DCF /* ToggleGlow.swift */; };
+                F9145A12960F440BAC6A4556 /* ToggleGlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A15090D8B47044D285B51DCF /* ToggleGlow.swift */; };
+                499662116A2E43978193A47E /* ToggleGlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A15090D8B47044D285B51DCF /* ToggleGlow.swift */; };
 
 /* End PBXBuildFile section */
 
@@ -930,17 +930,17 @@
                 CB9A6134C59C4A32B8003889 /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
                 7B960C6896464EEC9886FA2B /* CustomRefreshControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomRefreshControl.swift; sourceTree = "<group>"; };
                 ACCF2A92A85C4B4BA8E11E55 /* app-logo.png */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = image.png; path = app-logo.png; sourceTree = "<group>"; };
-		4E540997BA864448B082B725 /* SettingsSearchIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSearchIndex.swift; sourceTree = "<group>"; };
-		9F913A366E28436E9B132B7B /* MangaHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MangaHomeView.swift; sourceTree = "<group>"; };
-		180EA8BB63D54E6BBFCE8E9A /* AppModeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModeManager.swift; sourceTree = "<group>"; };
-		BB80077A4D92485BBE75B22E /* AppUpdateManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdateManager.swift; sourceTree = "<group>"; };
-		A70A5ACBBFA0410391A8C9F6 /* HistoryManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryManager.swift; sourceTree = "<group>"; };
-		5D49C555B4254095BB55B993 /* UpdatePopupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdatePopupView.swift; sourceTree = "<group>"; };
-		2B7FE5D7DC524A62A71C54FB /* LibraryHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryHistoryView.swift; sourceTree = "<group>"; };
-		0C1B57D4AEDB48F28A04789C /* AnimationModifiers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationModifiers.swift; sourceTree = "<group>"; };
-		7BC6D003A0C9444AA11E160A /* UpdateSettingsPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateSettingsPage.swift; sourceTree = "<group>"; };
-		FB817FD6F25142E088911D9D /* MangaModuleManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MangaModuleManager.swift; sourceTree = "<group>"; };
-		A15090D8B47044D285B51DCF /* ToggleGlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToggleGlow.swift; sourceTree = "<group>"; };
+                4E540997BA864448B082B725 /* SettingsSearchIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSearchIndex.swift; sourceTree = "<group>"; };
+                9F913A366E28436E9B132B7B /* MangaHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MangaHomeView.swift; sourceTree = "<group>"; };
+                180EA8BB63D54E6BBFCE8E9A /* AppModeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModeManager.swift; sourceTree = "<group>"; };
+                BB80077A4D92485BBE75B22E /* AppUpdateManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdateManager.swift; sourceTree = "<group>"; };
+                A70A5ACBBFA0410391A8C9F6 /* HistoryManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryManager.swift; sourceTree = "<group>"; };
+                5D49C555B4254095BB55B993 /* UpdatePopupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdatePopupView.swift; sourceTree = "<group>"; };
+                2B7FE5D7DC524A62A71C54FB /* LibraryHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryHistoryView.swift; sourceTree = "<group>"; };
+                0C1B57D4AEDB48F28A04789C /* AnimationModifiers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationModifiers.swift; sourceTree = "<group>"; };
+                7BC6D003A0C9444AA11E160A /* UpdateSettingsPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateSettingsPage.swift; sourceTree = "<group>"; };
+                FB817FD6F25142E088911D9D /* MangaModuleManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MangaModuleManager.swift; sourceTree = "<group>"; };
+                A15090D8B47044D285B51DCF /* ToggleGlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToggleGlow.swift; sourceTree = "<group>"; };
 
 /* End PBXFileReference section */
 
@@ -1111,10 +1111,10 @@
                                 4071A0ACA228C759CA67D5A0 /* QuickActions.swift */,
                                 08ACB6FE07C044C1B7F17A79 /* EpisodeNotificationManager.swift */,
                                 2EBB2ADA20A14B00AF5D265F /* WesternScheduleService.swift */,
-				180EA8BB63D54E6BBFCE8E9A /* AppModeManager.swift */,
-				BB80077A4D92485BBE75B22E /* AppUpdateManager.swift */,
-				A70A5ACBBFA0410391A8C9F6 /* HistoryManager.swift */,
-				FB817FD6F25142E088911D9D /* MangaModuleManager.swift */,
+                                180EA8BB63D54E6BBFCE8E9A /* AppModeManager.swift */,
+                                BB80077A4D92485BBE75B22E /* AppUpdateManager.swift */,
+                                A70A5ACBBFA0410391A8C9F6 /* HistoryManager.swift */,
+                                FB817FD6F25142E088911D9D /* MangaModuleManager.swift */,
                         );
                         path = Services;
                         sourceTree = "<group>";
@@ -1156,7 +1156,7 @@
                                 3D6742C550B97293CCFDC834 /* LibraryCollapsingHeader.swift */,
                                 A88804D3B352FD28723122E3 /* NotificationBadge.swift */,
                                 DE497D28BD37BD64210898B9 /* ManageCollectionsView.swift */,
-				2B7FE5D7DC524A62A71C54FB /* LibraryHistoryView.swift */,
+                                2B7FE5D7DC524A62A71C54FB /* LibraryHistoryView.swift */,
                         );
                         path = Library;
                         sourceTree = "<group>";
@@ -1223,10 +1223,11 @@
                                 1ED5C58C75D046CCB3CEEE12 /* ToastSystem.swift */,
                                 CB9A6134C59C4A32B8003889 /* Haptics.swift */,
                                 7B960C6896464EEC9886FA2B /* CustomRefreshControl.swift */,
-				4E540997BA864448B082B725 /* SettingsSearchIndex.swift */,
-				5D49C555B4254095BB55B993 /* UpdatePopupView.swift */,
-				0C1B57D4AEDB48F28A04789C /* AnimationModifiers.swift */,
-				7BC6D003A0C9444AA11E160A /* UpdateSettingsPage.swift */,
+                                4E540997BA864448B082B725 /* SettingsSearchIndex.swift */,
+                                5D49C555B4254095BB55B993 /* UpdatePopupView.swift */,
+                                0C1B57D4AEDB48F28A04789C /* AnimationModifiers.swift */,
+                                7BC6D003A0C9444AA11E160A /* UpdateSettingsPage.swift */,
+                                A15090D8B47044D285B51DCF /* ToggleGlow.swift */,
                         );
                         path = Shared;
                         sourceTree = "<group>";
@@ -1264,7 +1265,7 @@
                                 A709F7C9E219866F599F64D7 /* MangaDetailView.swift */,
                                 260EB4F88FB4092DF0B4EC76 /* ContinueReadingCard.swift */,
                                 411CE099883B23D8BFF554F8 /* AniListMangaDetailView.swift */,
-				9F913A366E28436E9B132B7B /* MangaHomeView.swift */,
+                                9F913A366E28436E9B132B7B /* MangaHomeView.swift */,
                         );
                         path = Views;
                         sourceTree = "<group>";
@@ -1593,17 +1594,17 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 895B393387144BA2B7146905 /* ToastSystem.swift in Sources */,
                                 57BF5714069E486B97AA8FBF /* Haptics.swift in Sources */,
                                 D13549A1608449AF9EBDE353 /* CustomRefreshControl.swift in Sources */,
-				01A20920D09146A29404813E /* SettingsSearchIndex.swift in Sources */,
-				AE5D7AE099454F4DBFFA1406 /* MangaHomeView.swift in Sources */,
-				D9AE76341D1B4FF99675633F /* AppModeManager.swift in Sources */,
-				753C771E5776493EA7C838DF /* AppUpdateManager.swift in Sources */,
-				6463DD5F742F4F18BB4A3665 /* HistoryManager.swift in Sources */,
-				404051D2676B4B82B5A868F8 /* UpdatePopupView.swift in Sources */,
-				1D84E3B0273F4A46B71F2792 /* LibraryHistoryView.swift in Sources */,
-				F135E86415974AFE8ED112C9 /* AnimationModifiers.swift in Sources */,
-				9A797EBA7D674B10A694B790 /* UpdateSettingsPage.swift in Sources */,
-				C7CF9F91BDE745B987437E5E /* MangaModuleManager.swift in Sources */,
-				499662116A2E43978193A47E /* ToggleGlow.swift in Sources */,
+                                01A20920D09146A29404813E /* SettingsSearchIndex.swift in Sources */,
+                                AE5D7AE099454F4DBFFA1406 /* MangaHomeView.swift in Sources */,
+                                D9AE76341D1B4FF99675633F /* AppModeManager.swift in Sources */,
+                                753C771E5776493EA7C838DF /* AppUpdateManager.swift in Sources */,
+                                6463DD5F742F4F18BB4A3665 /* HistoryManager.swift in Sources */,
+                                404051D2676B4B82B5A868F8 /* UpdatePopupView.swift in Sources */,
+                                1D84E3B0273F4A46B71F2792 /* LibraryHistoryView.swift in Sources */,
+                                F135E86415974AFE8ED112C9 /* AnimationModifiers.swift in Sources */,
+                                9A797EBA7D674B10A694B790 /* UpdateSettingsPage.swift in Sources */,
+                                C7CF9F91BDE745B987437E5E /* MangaModuleManager.swift in Sources */,
+                                499662116A2E43978193A47E /* ToggleGlow.swift in Sources */,
                         );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -1800,17 +1801,17 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 F600445A08244B5095556D9D /* ToastSystem.swift in Sources */,
                                 7F79015A0ABA4261AA83F778 /* Haptics.swift in Sources */,
                                 4ECDE91B709E40C4B7131936 /* CustomRefreshControl.swift in Sources */,
-				2E0E8A3882B1417499E1D5FA /* SettingsSearchIndex.swift in Sources */,
-				1CAC259234054464BCC1E60C /* MangaHomeView.swift in Sources */,
-				BAAA0A4B15404C19805883A1 /* AppModeManager.swift in Sources */,
-				AF2335D043404C4E97C5932A /* AppUpdateManager.swift in Sources */,
-				C2E5D4EA9DF6453B98F51FBA /* HistoryManager.swift in Sources */,
-				7C4DB59480FD4A69B93F1D1E /* UpdatePopupView.swift in Sources */,
-				941EEFF3DBCD4FAC8BE6656D /* LibraryHistoryView.swift in Sources */,
-				E1B10668B38B4DB88334F074 /* AnimationModifiers.swift in Sources */,
-				3D5DA029D839461FACF798E4 /* UpdateSettingsPage.swift in Sources */,
-				4145AC4354274872A2D0CC00 /* MangaModuleManager.swift in Sources */,
-				F9145A12960F440BAC6A4556 /* ToggleGlow.swift in Sources */,
+                                2E0E8A3882B1417499E1D5FA /* SettingsSearchIndex.swift in Sources */,
+                                1CAC259234054464BCC1E60C /* MangaHomeView.swift in Sources */,
+                                BAAA0A4B15404C19805883A1 /* AppModeManager.swift in Sources */,
+                                AF2335D043404C4E97C5932A /* AppUpdateManager.swift in Sources */,
+                                C2E5D4EA9DF6453B98F51FBA /* HistoryManager.swift in Sources */,
+                                7C4DB59480FD4A69B93F1D1E /* UpdatePopupView.swift in Sources */,
+                                941EEFF3DBCD4FAC8BE6656D /* LibraryHistoryView.swift in Sources */,
+                                E1B10668B38B4DB88334F074 /* AnimationModifiers.swift in Sources */,
+                                3D5DA029D839461FACF798E4 /* UpdateSettingsPage.swift in Sources */,
+                                4145AC4354274872A2D0CC00 /* MangaModuleManager.swift in Sources */,
+                                F9145A12960F440BAC6A4556 /* ToggleGlow.swift in Sources */,
                         );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -2008,17 +2009,17 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 EA699B91BC6B4BCF8B325D40 /* ToastSystem.swift in Sources */,
                                 A059508F65B7400595DF13C4 /* Haptics.swift in Sources */,
                                 77C010496C1B48E08ACD3FEB /* CustomRefreshControl.swift in Sources */,
-				CE8BECC8DB5A46128FE0F71F /* SettingsSearchIndex.swift in Sources */,
-				49018AF1B1824E1BBB4FBF2F /* MangaHomeView.swift in Sources */,
-				73E828E8CEDC4F4FADE37960 /* AppModeManager.swift in Sources */,
-				99B13F351A134812AD75DA49 /* AppUpdateManager.swift in Sources */,
-				D847E8CD8DA6404781337E38 /* HistoryManager.swift in Sources */,
-				C9A3590B21B64B25B5304AF7 /* UpdatePopupView.swift in Sources */,
-				EB13BA31A6924FC499DBBB5B /* LibraryHistoryView.swift in Sources */,
-				EA34B90AC60145C4A8C6242D /* AnimationModifiers.swift in Sources */,
-				9BCF00416DE84CB9A8088F4F /* UpdateSettingsPage.swift in Sources */,
-				6F6ED9108A8045CA8A658101 /* MangaModuleManager.swift in Sources */,
-				A16180FB70044D67A99A2BFA /* ToggleGlow.swift in Sources */,
+                                CE8BECC8DB5A46128FE0F71F /* SettingsSearchIndex.swift in Sources */,
+                                49018AF1B1824E1BBB4FBF2F /* MangaHomeView.swift in Sources */,
+                                73E828E8CEDC4F4FADE37960 /* AppModeManager.swift in Sources */,
+                                99B13F351A134812AD75DA49 /* AppUpdateManager.swift in Sources */,
+                                D847E8CD8DA6404781337E38 /* HistoryManager.swift in Sources */,
+                                C9A3590B21B64B25B5304AF7 /* UpdatePopupView.swift in Sources */,
+                                EB13BA31A6924FC499DBBB5B /* LibraryHistoryView.swift in Sources */,
+                                EA34B90AC60145C4A8C6242D /* AnimationModifiers.swift in Sources */,
+                                9BCF00416DE84CB9A8088F4F /* UpdateSettingsPage.swift in Sources */,
+                                6F6ED9108A8045CA8A658101 /* MangaModuleManager.swift in Sources */,
+                                A16180FB70044D67A99A2BFA /* ToggleGlow.swift in Sources */,
                         );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -2216,17 +2217,17 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 05EE7CC248EF4889882F5264 /* ToastSystem.swift in Sources */,
                                 FB3055616FBE4A399FAA8A5D /* Haptics.swift in Sources */,
                                 32DA168EE48448DE9CB5FBB2 /* CustomRefreshControl.swift in Sources */,
-				9FC65E10AF3F4044AA31F0E7 /* SettingsSearchIndex.swift in Sources */,
-				9E2601C92E784D40961B5E9A /* MangaHomeView.swift in Sources */,
-				9EE290864CBC47F394FC0115 /* AppModeManager.swift in Sources */,
-				9B9E10BF51174701A886E01E /* AppUpdateManager.swift in Sources */,
-				D87FB5B29B0A4DE59A88A058 /* HistoryManager.swift in Sources */,
-				50A1F4F7258D49B0BD7460D2 /* UpdatePopupView.swift in Sources */,
-				A85A090582534E02B19833B9 /* LibraryHistoryView.swift in Sources */,
-				DAC3DA3DD95340D59BD252F5 /* AnimationModifiers.swift in Sources */,
-				26189BEE0F8F4FAB9E9C5AB8 /* UpdateSettingsPage.swift in Sources */,
-				89061193CC71490F90A410AD /* MangaModuleManager.swift in Sources */,
-				87EE82E06AD94040BB9C5986 /* ToggleGlow.swift in Sources */,
+                                9FC65E10AF3F4044AA31F0E7 /* SettingsSearchIndex.swift in Sources */,
+                                9E2601C92E784D40961B5E9A /* MangaHomeView.swift in Sources */,
+                                9EE290864CBC47F394FC0115 /* AppModeManager.swift in Sources */,
+                                9B9E10BF51174701A886E01E /* AppUpdateManager.swift in Sources */,
+                                D87FB5B29B0A4DE59A88A058 /* HistoryManager.swift in Sources */,
+                                50A1F4F7258D49B0BD7460D2 /* UpdatePopupView.swift in Sources */,
+                                A85A090582534E02B19833B9 /* LibraryHistoryView.swift in Sources */,
+                                DAC3DA3DD95340D59BD252F5 /* AnimationModifiers.swift in Sources */,
+                                26189BEE0F8F4FAB9E9C5AB8 /* UpdateSettingsPage.swift in Sources */,
+                                89061193CC71490F90A410AD /* MangaModuleManager.swift in Sources */,
+                                87EE82E06AD94040BB9C5986 /* ToggleGlow.swift in Sources */,
                         );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
