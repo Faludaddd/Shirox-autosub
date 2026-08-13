@@ -2099,7 +2099,9 @@ private struct MangaScheduleCard: View {
                     .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
 
-                // Badges — chapter count, format, source
+                // Badges — chapter count + format only (one tag per metadata
+                // type; no duplicate badges). The "Manga" source badge is
+                // omitted since the entire schedule is manga-only.
                 HStack(spacing: 6) {
                     if entry.episode > 0 {
                         Text("Ch \(entry.episode)")
@@ -2119,14 +2121,6 @@ private struct MangaScheduleCard: View {
                             .foregroundStyle(formatBadgeColor)
                             .fixedSize()
                     }
-
-                    Text("Manga")
-                        .font(.caption2.weight(.semibold))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.purple.opacity(0.18), in: Capsule())
-                        .foregroundStyle(.purple)
-                        .fixedSize()
                 }
 
                 // Countdown + time capsule
@@ -2148,89 +2142,6 @@ private struct MangaScheduleCard: View {
                     .foregroundStyle(.secondary)
                     .fixedSize()
                 }
-            }
-
-            Spacer(minLength: 4)
-        }
-        .padding(12)
-        .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5)
-        )
-    }
-}
-
-/// One row in the manga release schedule. Shows cover, title, chapter/volume
-/// count, format badge, and a "Recently updated" indicator. Tapping pushes
-/// the manga detail page. Mirrors the anime ScheduleCard's visual language
-/// (poster + badges + metadata row) so the two schedule tabs read as
-/// parallel surfaces.
-private struct MangaReleaseCard: View {
-    let media: Media
-
-    private var formatBadgeColor: Color {
-        switch (media.format ?? "").uppercased() {
-        case "MANGA":  return .green
-        case "NOVEL":  return .orange
-        case "ONE_SHOT": return .pink
-        case "DOUJINSHI": return .teal
-        default:        return .gray
-        }
-    }
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            CachedAsyncImage(urlString: media.coverImage.extraLarge ?? media.coverImage.large ?? "")
-                .frame(width: 56, height: 80)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.1)))
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text(media.title.displayTitle)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(2)
-                    .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                HStack(spacing: 6) {
-                    if let chapters = media.episodes {
-                        Text("Ch \(chapters)")
-                            .font(.caption2.weight(.semibold))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.secondary.opacity(0.18), in: Capsule())
-                            .fixedSize()
-                    }
-                    if let format = media.format, !format.isEmpty {
-                        Text(format.replacingOccurrences(of: "_", with: " "))
-                            .font(.caption2.weight(.semibold))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(formatBadgeColor.opacity(0.22), in: Capsule())
-                            .foregroundStyle(formatBadgeColor)
-                            .fixedSize()
-                    }
-                    if let score = media.averageScore {
-                        HStack(spacing: 3) {
-                            Image(systemName: "star.fill").font(.system(size: 9))
-                            Text("\(score)%")
-                        }
-                        .font(.caption2.weight(.semibold))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.yellow.opacity(0.18), in: Capsule())
-                        .foregroundStyle(.yellow)
-                        .fixedSize()
-                    }
-                }
-
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 10, weight: .semibold))
-                    Text("Recently updated")
-                        .font(.caption2.weight(.medium))
-                }
-                .foregroundStyle(.secondary)
             }
 
             Spacer(minLength: 4)
