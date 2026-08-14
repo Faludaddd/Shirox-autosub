@@ -632,7 +632,7 @@ struct NotificationsHistoryView: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Notification").font(.subheadline)
-                            Text(notif.createdAt.formatted(date: .abbreviated, time: .standard))
+                            Text(Date(timeIntervalSince1970: TimeInterval(notif.createdAt)).formatted(date: .abbreviated, time: .standard))
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
