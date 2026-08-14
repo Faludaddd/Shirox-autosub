@@ -159,7 +159,6 @@ struct HomeView: View {
                         Spacer().frame(height: 28)
                     }
                 }
-                .scrollBounceBehavior(.basedOnSize, axes: .vertical)  // item 4: disable upward bounce
                 .refreshable {
                     Haptics.light()
                     isRefreshing = true
