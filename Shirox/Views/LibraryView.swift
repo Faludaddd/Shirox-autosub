@@ -1271,10 +1271,10 @@ private struct LibraryRowView: View {
                     Text("\(avg)%")
                         .font(.system(size: 10, weight: .bold))
                 }
-                .foregroundStyle(.blue)
+                .foregroundStyle(Color.appAccent)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
-                .background(Color.blue.opacity(0.12), in: Capsule())
+                .background(Color.appAccent.opacity(0.12), in: Capsule())
             }
             if entry.isPrivate {
                 HStack(spacing: 3) {

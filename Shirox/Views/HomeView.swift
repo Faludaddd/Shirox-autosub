@@ -275,7 +275,7 @@ struct HomeView: View {
             // titles and gradients are distinct so the grid reads as 6 entries.
             BrowseGridItem(
                 title: "Recently Completed", category: .popular, iconName: "checkmark.seal.fill",
-                gradientColors: [Color.blue.opacity(0.6), Color.cyan.opacity(0.5)],
+                gradientColors: [Color.appAccent.opacity(0.6), Color.appAccent.opacity(0.35)],
                 count: vm.recentlyCompleted.count,
                 imageURL: vm.recentlyCompleted.first?.coverImage.best
             ),

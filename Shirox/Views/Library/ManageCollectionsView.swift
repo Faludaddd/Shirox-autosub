@@ -164,7 +164,7 @@ struct ManageCollectionsView: View {
             } label: {
                 Label("Rename", systemImage: "pencil")
             }
-            .tint(.blue)
+            .tint(Color.appAccent)
         }
         #endif
         .contextMenu {

@@ -138,7 +138,7 @@ struct ThumbnailEpisodeRow: View {
                             switch state {
                             case .completed:
                                 Image(systemName: "arrow.down.circle.fill")
-                                    .foregroundStyle(.blue)
+                                    .foregroundStyle(Color.appAccent)
                             case .downloading:
                                 ProgressView().controlSize(.small)
                             case .pending:

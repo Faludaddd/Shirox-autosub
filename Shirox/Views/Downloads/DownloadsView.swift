@@ -375,10 +375,10 @@ private struct DownloadProgressRow: View {
                         } label: {
                             Label("Retry", systemImage: "arrow.clockwise")
                                 .font(.caption2.bold())
-                                .foregroundStyle(.blue)
+                                .foregroundStyle(Color.appAccent)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
-                                .background(Color.blue.opacity(0.1), in: RoundedRectangle(cornerRadius: 4))
+                                .background(Color.appAccent.opacity(0.1), in: RoundedRectangle(cornerRadius: 4))
                         }
                         .buttonStyle(.plain)
                     }
@@ -439,9 +439,9 @@ private struct MangaDownloadProgressRow: View {
                         Spacer()
                         Button { MangaDownloadManager.shared.retry(item) } label: {
                             Label("Retry", systemImage: "arrow.clockwise")
-                                .font(.caption2.bold()).foregroundStyle(.blue)
+                                .font(.caption2.bold()).foregroundStyle(Color.appAccent)
                                 .padding(.horizontal, 8).padding(.vertical, 4)
-                                .background(Color.blue.opacity(0.1), in: RoundedRectangle(cornerRadius: 4))
+                                .background(Color.appAccent.opacity(0.1), in: RoundedRectangle(cornerRadius: 4))
                         }
                         .buttonStyle(.plain)
                     }

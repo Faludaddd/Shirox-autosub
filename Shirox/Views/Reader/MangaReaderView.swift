@@ -182,7 +182,22 @@ struct MangaReaderView: View {
             chrome
         }
         .statusBar(hidden: !chromeVisible)
-        .task { await loadChapter(displayedChapterIndex) }
+        .task {
+            // **Batch 12 fix**: ensure the module that originally resolved
+            // this manga is the active one before fetching pages. The
+            // reader is opened with a `context.moduleId` pinning the module
+            // that was active when the user tapped "Read" — but if the user
+            // later switched modules (or the active module got swapped by
+            // another flow), `JSEngine.shared.mangaImages(url:)` would run
+            // against the wrong module and fail with "Function not found".
+            // Switching here guarantees the right module is loaded.
+            if let pinned = context.moduleId.isEmpty ? nil : context.moduleId,
+               ModuleManager.shared.activeModule?.id != pinned,
+               let module = ModuleManager.shared.modules.first(where: { $0.id == pinned }) {
+                _ = await ModuleManager.shared.selectAndAwaitReady(module)
+            }
+            await loadChapter(displayedChapterIndex)
+        }
         .onChangeOf(currentPage) { page in
             updateDisplayedChapter(for: page)
             scheduleSave()

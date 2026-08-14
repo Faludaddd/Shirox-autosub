@@ -135,7 +135,7 @@ struct LibraryEntryEditSheet: View {
                                 } label: {
                                     Label("Rename", systemImage: "pencil")
                                 }
-                                .tint(.blue)
+                                .tint(Color.appAccent)
                             }
                             #endif
                             .contextMenu {

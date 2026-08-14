@@ -37,6 +37,9 @@ struct NotificationsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showHistory = false
     @State private var showClearConfirmation = false
+    /// Layout toggle: list (default, full row per notification) or grid
+    /// (2×2 compact cards). Persists across launches.
+    @AppStorage("notificationsGridLayout") private var isGridLayout = false
 
     var body: some View {
         NavigationStack {
@@ -54,7 +57,7 @@ struct NotificationsView: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
-                // History + Clear-all both on leading, well-separated.
+                // History + Clear-all + Layout toggle on leading.
                 // Done on trailing by itself — no overlap.
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
@@ -68,6 +71,16 @@ struct NotificationsView: View {
                         showClearConfirmation = true
                     } label: {
                         Image(systemName: "trash")
+                    }
+                    .disabled(vm.notifications.isEmpty)
+                }
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        Haptics.selection()
+                        withAnimation(.easeInOut(duration: 0.2)) { isGridLayout.toggle() }
+                    } label: {
+                        // Icon shows the layout you'll switch TO.
+                        Image(systemName: isGridLayout ? "list.bullet" : "square.grid.2x2")
                     }
                     .disabled(vm.notifications.isEmpty)
                 }
@@ -143,52 +156,99 @@ struct NotificationsView: View {
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if vm.notifications.isEmpty {
             ContentUnavailableView("No Notifications", systemImage: "bell.slash")
+        } else if isGridLayout {
+            // 2×2 grid layout — compact visual cards. Posters/avatars are
+            // the dominant element; text is condensed to 2 lines + type.
+            gridContent
         } else {
             // Standard List with swipeActions for swipe-to-close (item 16).
             // Swipe left reveals a Close button; swipe right also dismisses.
-            List {
+            listContent
+        }
+    }
+
+    @ViewBuilder
+    private var listContent: some View {
+        List {
+            ForEach(vm.notifications) { notif in
+                NotificationRowContent(
+                    notif: notif,
+                    isTappable: isTappable(notif),
+                    onTap: { handleTap(notif) }
+                )
+                .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+                .contextMenu {
+                    if isTappable(notif) {
+                        Button { handleTap(notif) } label: {
+                            Label("View Details", systemImage: "info.circle")
+                        }
+                    }
+                    Button { dismissNotification(notif) } label: {
+                        Label("Dismiss", systemImage: "xmark.circle")
+                    }
+                    Button(role: .destructive) { dismissNotification(notif) } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    Button(role: .destructive) {
+                        dismissNotification(notif)
+                    } label: {
+                        Label("Close", systemImage: "xmark.circle.fill")
+                    }
+                }
+                .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                    Button {
+                        dismissNotification(notif)
+                    } label: {
+                        Label("Dismiss", systemImage: "hand.raised.fill")
+                    }
+                    .tint(.orange)
+                }
+            }
+        }
+        .listStyle(.plain)
+        .refreshable { await vm.loadNotifications() }
+    }
+
+    /// 2×2 grid layout. Each notification is a compact card: large poster
+    /// (or avatar or icon) on top, type chip + 2-line body + timestamp
+    /// below. Designed for visual scanning when the user has many
+    /// notifications. Long-press dismisses via contextMenu (swipe actions
+    /// aren't available outside a List).
+    @ViewBuilder
+    private var gridContent: some View {
+        ScrollView {
+            let columns = [
+                GridItem(.flexible(), spacing: 10),
+                GridItem(.flexible(), spacing: 10)
+            ]
+            LazyVGrid(columns: columns, spacing: 10) {
                 ForEach(vm.notifications) { notif in
-                    NotificationRowContent(
+                    NotificationGridCard(
                         notif: notif,
                         isTappable: isTappable(notif),
-                        onTap: { handleTap(notif) }
+                        onTap: { handleTap(notif) },
+                        onClose: { dismissNotification(notif) }
                     )
-                    .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
                     .contextMenu {
                         if isTappable(notif) {
                             Button { handleTap(notif) } label: {
                                 Label("View Details", systemImage: "info.circle")
                             }
                         }
-                        Button { dismissNotification(notif) } label: {
-                            Label("Dismiss", systemImage: "xmark.circle")
-                        }
                         Button(role: .destructive) { dismissNotification(notif) } label: {
                             Label("Delete", systemImage: "trash")
                         }
                     }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button(role: .destructive) {
-                            dismissNotification(notif)
-                        } label: {
-                            Label("Close", systemImage: "xmark.circle.fill")
-                        }
-                    }
-                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                        Button {
-                            dismissNotification(notif)
-                        } label: {
-                            Label("Dismiss", systemImage: "hand.raised.fill")
-                        }
-                        .tint(.orange)
-                    }
                 }
             }
-            .listStyle(.plain)
-            .refreshable { await vm.loadNotifications() }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
         }
+        .refreshable { await vm.loadNotifications() }
     }
 
     // MARK: - Tap Handling
@@ -433,47 +493,47 @@ private struct NotificationRowContent: View {
             case .avatar(let url):
                 ZStack(alignment: .bottomTrailing) {
                     CachedAsyncImage(urlString: url)
-                        .frame(width: 64, height: 64)
+                        .frame(width: 72, height: 72)
                         .clipShape(Circle())
                         .overlay(
                             Circle().strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
                         )
                     Image(systemName: symbol)
-                        .font(.system(size: 11, weight: .bold))
+                        .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(.white)
-                        .frame(width: 22, height: 22)
+                        .frame(width: 24, height: 24)
                         .background(Circle().fill(color))
                         .overlay(Circle().strokeBorder(.white, lineWidth: 2))
                         .offset(x: 4, y: 4)
                 }
-                .frame(width: 70, height: 70)
+                .frame(width: 78, height: 78)
             case .cover(let url):
                 ZStack(alignment: .bottomTrailing) {
                     CachedAsyncImage(urlString: url)
                         .aspectRatio(2/3, contentMode: .fill)
-                        .frame(width: 64, height: 96)
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .frame(width: 72, height: 108)
+                        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            RoundedRectangle(cornerRadius: 9, style: .continuous)
                                 .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
                         )
                         .shadow(color: .black.opacity(0.25), radius: 3, x: 0, y: 2)
                     Image(systemName: symbol)
-                        .font(.system(size: 11, weight: .bold))
+                        .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(.white)
-                        .frame(width: 22, height: 22)
+                        .frame(width: 24, height: 24)
                         .background(Circle().fill(color))
                         .overlay(Circle().strokeBorder(.white, lineWidth: 2))
                         .offset(x: 4, y: 4)
                 }
-                .frame(width: 70, height: 100)
+                .frame(width: 78, height: 112)
             }
         } else {
             // Plain icon notification — bigger circle for stronger visual.
             Image(systemName: symbol)
-                .font(.system(size: 22, weight: .bold))
+                .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(.white)
-                .frame(width: 56, height: 56)
+                .frame(width: 60, height: 60)
                 .background(Circle().fill(color))
                 .overlay(Circle().strokeBorder(Color.primary.opacity(0.1), lineWidth: 1))
                 .shadow(color: color.opacity(0.35), radius: 5, x: 0, y: 2)
@@ -686,3 +746,189 @@ private func historyBodyText(for notif: ProviderNotification) -> String {
         return context ?? "Notification"
     }
 }
+
+// MARK: - Notification Grid Card (2×2 grid layout)
+
+/// Compact card for the 2×2 grid layout. Poster/avatar/icon fills the top
+/// of the card; type chip + 2-line body + timestamp sit below. Tap opens
+/// detail (if tappable); long-press shows context menu with Delete.
+private struct NotificationGridCard: View {
+    let notif: ProviderNotification
+    let isTappable: Bool
+    let onTap: () -> Void
+    let onClose: () -> Void
+
+    private var accentColor: Color {
+        NotificationSwipeRow.iconAndColor(for: notif).1
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            poster
+                .allowsHitTesting(false)
+
+            VStack(alignment: .leading, spacing: 4) {
+                typeChip
+                bodyText
+                    .font(.system(size: 12, weight: .medium))
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .foregroundStyle(.primary)
+
+                HStack(spacing: 4) {
+                    Image(systemName: "clock")
+                        .font(.system(size: 8, weight: .semibold))
+                    Text(notif.createdAt.toTimeAgo())
+                        .font(.system(size: 10, weight: .medium))
+                }
+                .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 8)
+            .padding(.bottom, 10)
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.primary.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 2)
+        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .onTapGesture { onTap() }
+    }
+
+    @ViewBuilder
+    private var poster: some View {
+        let (symbol, color) = NotificationSwipeRow.iconAndColor(for: notif)
+        if let iconImage = notif.kind.iconImage {
+            switch iconImage {
+            case .avatar(let url):
+                ZStack(alignment: .bottomTrailing) {
+                    CachedAsyncImage(urlString: url)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 120)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .overlay(
+                            Circle()
+                                .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
+                                .frame(width: 60, height: 60)
+                                .padding(.bottom, 12)
+                        )
+                    // Avatar shown as a circle on top of a colored banner.
+                }
+                .frame(height: 120)
+                .overlay(alignment: .center) {
+                    CachedAsyncImage(urlString: url)
+                        .frame(width: 64, height: 64)
+                        .clipShape(Circle())
+                        .overlay(Circle().strokeBorder(.white, lineWidth: 2))
+                        .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 1)
+                }
+                .overlay(alignment: .topTrailing) {
+                    Image(systemName: symbol)
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 22, height: 22)
+                        .background(Circle().fill(color))
+                        .overlay(Circle().strokeBorder(.white, lineWidth: 2))
+                        .padding(8)
+                }
+                .background(
+                    LinearGradient(
+                        colors: [color.opacity(0.3), color.opacity(0.1)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                )
+            case .cover(let url):
+                ZStack(alignment: .bottomTrailing) {
+                    CachedAsyncImage(urlString: url)
+                        .aspectRatio(2/3, contentMode: .fill)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 140)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
+                        )
+                        .shadow(color: .black.opacity(0.25), radius: 3, x: 0, y: 2)
+                    Image(systemName: symbol)
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 22, height: 22)
+                        .background(Circle().fill(color))
+                        .overlay(Circle().strokeBorder(.white, lineWidth: 2))
+                        .padding(6)
+                }
+                .frame(height: 140)
+            }
+        } else {
+            // Plain icon notification — colored banner with the icon.
+            ZStack {
+                LinearGradient(
+                    colors: [color.opacity(0.35), color.opacity(0.1)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                Image(systemName: symbol)
+                    .font(.system(size: 36, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+            .frame(height: 120)
+        }
+    }
+
+    @ViewBuilder
+    private var typeChip: some View {
+        let (symbol, color) = NotificationSwipeRow.iconAndColor(for: notif)
+        HStack(spacing: 3) {
+            Image(systemName: symbol)
+                .font(.system(size: 8, weight: .bold))
+            Text(typeLabel)
+                .font(.system(size: 9, weight: .bold))
+                .textCase(.uppercase)
+        }
+        .foregroundStyle(color)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(color.opacity(0.15), in: Capsule())
+    }
+
+    private var typeLabel: String {
+        switch notif.kind {
+        case .airing: return "Airing"
+        case .following: return "Follow"
+        case .activityMessage: return "Message"
+        case .activityReply: return "Reply"
+        case .activityMention: return "Mention"
+        case .activityLike: return "Like"
+        case .mediaChange: return "Update"
+        case .unknown: return "Notice"
+        }
+    }
+
+    private var bodyText: Text {
+        switch notif.kind {
+        case .airing(let episode, let mediaTitle, _, _):
+            return Text("\(mediaTitle ?? "Anime") ").bold() + Text("ep \(episode) aired")
+        case .following(_, let userName, _):
+            return Text(userName ?? "Someone").bold() + Text(" followed you")
+        case .activityMessage(_, let context, _), .activityReply(_, let context, _),
+             .activityMention(_, let context, _), .activityLike(_, let context, _):
+            return Text(context ?? "Activity")
+        case .mediaChange(let title, let context, _, _):
+            if let title, !title.isEmpty {
+                return Text(title).bold() + Text(" \(context ?? "updated")")
+            } else {
+                return Text(context ?? "Updated")
+            }
+        case .unknown(let context):
+            return Text(context ?? "Notification")
+        }
+    }
+}
+

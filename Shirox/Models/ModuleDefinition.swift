@@ -23,7 +23,42 @@ struct ModuleDefinition: Codable, Identifiable, Equatable {
 
     var isLocalPlayback: Bool { supportsLocalPlayback == true }
     var isJellyfin: Bool { supportsJellyfin == true }
-    var isManga: Bool { type == "mangas" || type == "manga" }
+
+    /// True for any module that serves manga or novel content (not anime).
+    ///
+    /// **Why a contains-check, not an exact match:** module manifests use a
+    /// mix of type strings across registries — cufiy.net uses `"mangas"` and
+    /// `"novels"`, Luna-style manifests sometimes use `"manga"`, and some
+    /// community modules use compound types like `"manga/novels"`. The
+    /// previous exact-match (`type == "mangas" || type == "manga"`) missed
+    /// `"novels"` entirely, so novel modules installed via the Manga Module
+    /// Store were silently classified as anime modules — appearing under
+    /// Anime Settings and never being picked up by the manga reading flow.
+    ///
+    /// We also explicitly exclude the known anime-ish types (`"anime"`,
+    /// `"movies/shows"`, `"shows"`, `"live/tv"`, `"vod/livestream"`) so a
+    /// compound type like `"anime/movies"` is never mis-classified as manga
+    /// just because it might contain the substring "manga" via some future
+    /// naming oddity.
+    var isManga: Bool {
+        let t = type.lowercased()
+        // Short-circuit: exact anime types are never manga.
+        let animeTypes: Set<String> = [
+            "anime", "movies/shows", "shows", "live/tv", "vod/livestream",
+            "movies/shows/anime", "anime/movies", "anime/movies/shows",
+            "anime/shows/movies", "shows/movies", "shows/movies/anime",
+            "movies", "tv", "live"
+        ]
+        if animeTypes.contains(t) { return false }
+        // Positive match: anything containing "manga" or "novel".
+        return t.contains("manga") || t.contains("novel")
+    }
+
+    /// True for novel-type modules specifically (a subset of `isManga`).
+    /// Used to fine-tune UI labels ("Read" vs "Read Chapter") if needed.
+    var isNovel: Bool {
+        type.lowercased().contains("novel")
+    }
 
     private enum CodingKeys: String, CodingKey {
         case sourceName, iconUrl, author, version, baseUrl, searchBaseUrl,
