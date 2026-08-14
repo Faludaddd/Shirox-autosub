@@ -124,7 +124,16 @@ final class AniListAuthManager: NSObject, ObservableObject {
         Logger.shared.log("[AniList] got token, fetching viewer", type: "Debug")
         saveToken(token)
         isLoggedIn = true
-        Task { await fetchViewer() }
+        Task {
+            await fetchViewer()
+            // Rebuild Continue Watching from server data so it's not empty
+            // after a fresh install + re-login. Without this, CW only
+            // populates on next app launch or pull-to-refresh.
+            #if os(iOS)
+            await ContinueWatchingManager.shared.syncWithAniList()
+            await ContinueWatchingManager.shared.syncWithMAL()
+            #endif
+        }
     }
 
     func logout() {

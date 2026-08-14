@@ -774,15 +774,28 @@ private struct FeaturedCard: View, Equatable {
             } else {
                 GeometryReader { geo in
                     let pageOffset = geo.frame(in: .global).minX
-                    // Prefer the extra-large cover image (highest resolution
-                    // AniList exposes) so the carousel renders sharp even on
-                    // tall iPhone screens. `CachedAsyncImage` (Kingfisher) is
-                    // used instead of SwiftUI's `AsyncImage` because Kingfisher
-                    // decodes via ImageIO with proper downsampling and keeps a
-                    // warm memory+disk cache — eliminating the blurry/pixelated
-                    // look that the stock AsyncImage path produced.
-                    let imageURL = media.coverImage.extraLarge ?? media.coverImage.large ?? ""
+                    // Use fanart (landscape banner) instead of the portrait
+                    // cover image — the cover is only ~230px wide and gets
+                    // upscaled ~6× on iPhone, causing severe blur. The fanart
+                    // is a full-width landscape image that matches the card's
+                    // aspect ratio. Falls back to bannerImage, then cover.
+                    let imageURL = media.bannerImage
+                        ?? media.coverImage.extraLarge
+                        ?? media.coverImage.large
+                        ?? ""
                     ZStack {
+                        // Blurred background layer — fills edges during swipe-up
+                        // parallax so black never shows through.
+                        CachedAsyncImage(urlString: imageURL)
+                            .frame(width: geo.size.width * 1.2, height: geo.size.height * 1.2)
+                            .blur(radius: 35)
+                            .overlay(
+                                LinearGradient(
+                                    colors: [.clear, .black.opacity(0.5)],
+                                    startPoint: .center, endPoint: .bottom
+                                )
+                            )
+                        // Sharp foreground image
                         CachedAsyncImage(urlString: imageURL)
                             .frame(width: geo.size.width, height: geo.size.height)
                             .clipped()
@@ -909,14 +922,9 @@ private struct AnimeSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(title)
-                        .font(.title2.weight(.heavy))
-                        .tracking(0.3)
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.primary)
-                        .frame(width: 36, height: 3)
-                }
+                Text(title)
+                    .font(.title2.weight(.heavy))
+                    .tracking(0.3)
                 Spacer()
                 NavigationLink {
                     BrowseView(category: category)

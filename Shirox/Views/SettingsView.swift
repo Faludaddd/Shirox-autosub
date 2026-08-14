@@ -926,7 +926,10 @@ struct AppearanceSettingsPage: View {
                     .foregroundStyle(.secondary)
             }
             Section("Motion") {
-                Toggle("Reduce Motion", isOn: $reduceMotion)
+                // Reduce Motion removed — the setting was inert (only consumer
+                // was AnimatedBackgroundView which is never instantiated).
+                // The system's own accessibilityReduceMotion is respected
+                // automatically by SwiftUI.
             }
             // Issue #5 — Browse Categories layout toggle + statistics toggle.
             Section {
@@ -964,7 +967,7 @@ struct AppearanceSettingsPage: View {
                 Button("Reset to Default", role: .destructive) {
                     appearanceMode = "system"
                     accentColorHex = ""
-                    reduceMotion = false
+                    // reduceMotion removed
                     glowEnabled = true
                     glowIntensity = 0.5
                     showStatistics = true
@@ -2222,15 +2225,27 @@ struct ModulesSettingsPage: View {
     @State private var moduleURL = ""
     @State private var isAddingModule = false
     @FocusState private var isTextFieldFocused: Bool
+    /// When `.manga`, the installed list and store are filtered to manga-only
+    /// modules. When `nil` (default, anime context), all modules are shown.
+    var mediaType: ModuleMediaType? = nil
+
+    enum ModuleMediaType { case manga }
+
+    private var filteredModules: [ModuleDefinition] {
+        switch mediaType {
+        case .manga: return moduleManager.modules.filter { $0.isManga }
+        case nil: return moduleManager.modules
+        }
+    }
 
     var body: some View {
         Form {
             Section("Installed Modules") {
-                if moduleManager.modules.isEmpty {
+                if filteredModules.isEmpty {
                     Text("No modules installed. Add one below or browse the store.")
                         .font(.caption).foregroundStyle(.secondary)
                 } else {
-                    ForEach(moduleManager.modules) { module in
+                    ForEach(filteredModules) { module in
                         HStack(spacing: 12) {
                             AsyncImage(url: URL(string: module.iconUrl ?? "")) { phase in
                                 if case .success(let img) = phase { img.resizable().scaledToFill() }
@@ -2349,7 +2364,7 @@ struct ModulesSettingsPage: View {
         .environment(\.editMode, .constant(.active))
         #endif
         .background {
-            NavigationLink(destination: ModuleStorePage().environmentObject(moduleManager), isActive: $showModuleStore) {
+            NavigationLink(destination: ModuleStorePage(mediaType: mediaType).environmentObject(moduleManager), isActive: $showModuleStore) {
                 EmptyView()
             }
             .opacity(0)
@@ -2385,8 +2400,9 @@ struct ModuleStorePage: View {
     @State private var moduleURL = ""
     @State private var isInstalling = false
     /// #130 — Layout toggle. Grid (default, 3-column) or list (1-column row).
-    /// Persisted so the user's choice survives re-opening the store.
     @AppStorage("moduleStoreLayout") private var layout: ModuleStoreLayout = .grid
+    /// When `.manga`, the store filters to manga-type modules only.
+    var mediaType: ModulesSettingsPage.ModuleMediaType? = nil
 
     /// #133 — cufiy.net Sora Module Library JSON endpoint. This is the
     /// authoritative, structured source for the full module listing — every
@@ -2584,8 +2600,16 @@ struct ModuleStorePage: View {
     }
 
     private var filteredModules: [StoreModuleItem] {
-        if searchText.isEmpty { return storeModules }
-        return storeModules.filter { $0.name.lowercased().contains(searchText.lowercased()) }
+        var result = storeModules
+        // Filter by media type when in manga context
+        if mediaType == .manga {
+            result = result.filter { item in
+                let type = (item.type ?? "").lowercased()
+                return type.contains("manga")
+            }
+        }
+        if searchText.isEmpty { return result }
+        return result.filter { $0.name.lowercased().contains(searchText.lowercased()) }
     }
 
     private func isModuleInstalled(_ mod: StoreModuleItem) -> Bool {

@@ -57,10 +57,8 @@ struct MangaHomeContent: View {
 
                         // 3. BROWSE — manga shelves, same horizontal-strip
                         //    pattern as the anime home's AnimeSection.
-                        MangaSection(title: "Trending Manga", items: vm.trending, icon: "flame.fill")
-                        MangaSection(title: "All-Time Popular", items: vm.popular, icon: "star.fill")
-                        MangaSection(title: "Top Rated", items: vm.topRated, icon: "trophy.fill")
-                        MangaSection(title: "Latest Releases", items: vm.latest, icon: "sparkles")
+                        MangaSection(title: "Trending Manga", items: vm.trending)
+                        MangaSection(title: "All-Time Popular", items: vm.popular)
 
                         Spacer().frame(height: 28)
                     }
@@ -117,19 +115,12 @@ final class MangaHomeViewModel: ObservableObject {
 struct MangaSection: View {
     let title: String
     let items: [Media]
-    var icon: String = "book.fill"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Text(title)
-                    .font(.title3.weight(.bold))
-                Spacer()
-            }
-            .padding(.horizontal, 16)
+            Text(title)
+                .font(.title3.weight(.bold))
+                .padding(.horizontal, 16)
 
             if items.isEmpty {
                 Text("No titles available.")
@@ -173,6 +164,19 @@ struct MangaPosterCard: View, Equatable {
                 .frame(maxWidth: .infinity)
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.1)))
+                .overlay(alignment: .topTrailing) {
+                    if let score = media.averageScore {
+                        Label("\(score)%", systemImage: "star.fill")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(.yellow)
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(.black.opacity(0.55), in: Capsule())
+                            .padding(6)
+                    }
+                }
 
             Text(media.title.displayTitle)
                 .font(.caption.weight(.semibold))
@@ -467,7 +471,7 @@ struct MangaSettingsView: View {
                     MangaSettingsCategoryRow(icon: "person.crop.circle.badge.checkmark", title: "Sources", subtitle: "AniList, MyAnimeList, accounts")
                 }
                 NavigationLink {
-                    ModulesSettingsPage()
+                    ModulesSettingsPage(mediaType: .manga)
                 } label: {
                     MangaSettingsCategoryRow(icon: "puzzlepiece.extension.fill", title: "Modules", subtitle: "Manga sources, store, install")
                 }
@@ -784,31 +788,38 @@ private struct MangaDisplaySettingsPage: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                         .textCase(.uppercase)
-                    HStack(spacing: 14) {
+                    HStack(spacing: 24) {
                         ForEach(bgColors, id: \.value) { bg in
+                            let isSelected = backgroundColor == bg.value
                             Button {
                                 Haptics.light()
                                 backgroundColor = bg.value
                             } label: {
-                                VStack(spacing: 6) {
-                                    Circle()
-                                        .fill(bg.color)
-                                        .frame(width: 44, height: 44)
-                                        .overlay(
-                                            Circle().strokeBorder(
-                                                backgroundColor == bg.value ? Color.appAccent : Color.secondary.opacity(0.3),
-                                                lineWidth: backgroundColor == bg.value ? 3 : 1
-                                            )
-                                        )
-                                        .shadow(color: .black.opacity(0.1), radius: 2, y: 1)
+                                VStack(spacing: 8) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(bg.color)
+                                            .frame(width: 64, height: 64)
+                                            .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
+                                        if isSelected {
+                                            Circle()
+                                                .strokeBorder(Color.appAccent, lineWidth: 3)
+                                                .frame(width: 72, height: 72)
+                                        }
+                                    }
                                     Text(bg.label)
-                                        .font(.caption2.weight(backgroundColor == bg.value ? .bold : .regular))
-                                        .foregroundStyle(backgroundColor == bg.value ? Color.appAccent : .secondary)
+                                        .font(.caption.weight(isSelected ? .bold : .regular))
+                                        .foregroundStyle(isSelected ? Color.appAccent : .secondary)
                                 }
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel("Reader background \(bg.label)")
+                            .accessibilityValue(isSelected ? "Selected" : "Not selected")
+                            .accessibilityAddTraits(isSelected ? .isSelected : [])
                         }
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
                     Text("Independent of the app's overall theme. White is recommended for manga since pages are typically white.")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
@@ -1040,7 +1051,7 @@ private struct MangaNotificationsSettingsPage: View {
             VStack(spacing: 16) {
                 // Chapter alerts card
                 notifCard(
-                    icon: "book.badge.clock",
+                    icon: "bell.badge",
                     title: "Chapter Release Alerts",
                     description: "Get notified when new chapters are released for tracked manga.",
                     toggle: $chapterNotificationsEnabled

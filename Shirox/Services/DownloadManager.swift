@@ -831,6 +831,13 @@ final class DownloadManager: NSObject, ObservableObject {
                     iconColor: .green
                 )
             }
+            // Switch to the Downloads tab so the user lands in the downloads
+            // context (not the anime detail page) when a download completes.
+            #if os(iOS)
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: .switchToDownloadsTab, object: nil)
+            }
+            #endif
             processQueue()
         }
     }
@@ -1039,3 +1046,8 @@ extension DownloadManager: URLSessionDownloadDelegate {
     }
 }
 #endif
+
+// MARK: - Notification names
+extension Notification.Name {
+    static let switchToDownloadsTab = Notification.Name("SwitchToDownloadsTab")
+}

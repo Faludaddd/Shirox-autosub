@@ -385,6 +385,12 @@ private struct MacSidebarView: View {
 private struct RootTabView: View {
     @EnvironmentObject private var moduleManager: ModuleManager
     @ObservedObject private var cfManager = CloudflareBypassManager.shared
+    // Appearance settings — read here via @AppStorage so the view re-renders
+    // when the user changes accent color or glow in Appearance settings,
+    // propagating the new Color.appAccent / glow values to all child views.
+    @AppStorage("accentColorHex") private var accentColorHex = ""
+    @AppStorage("glowEnabled") private var glowEnabled = true
+    @AppStorage("glowIntensity") private var glowIntensity: Double = 0.5
     #if os(iOS)
     @ObservedObject private var playerPresenter = PlayerPresenter.shared
     @ObservedObject private var quickActions = QuickActionManager.shared
@@ -497,6 +503,11 @@ private struct RootTabView: View {
         .smoothTabSwitch(value: selectedTab)
         // #96 — Selection haptic whenever the user switches tabs.
         .onChange(of: selectedTab) { _ in Haptics.selection() }
+        .onReceive(NotificationCenter.default.publisher(for: .switchToDownloadsTab)) { _ in
+            #if os(iOS)
+            selectedTab = 2
+            #endif
+        }
         .onOpenURL { url in
             guard url.scheme == "shirox" else { return }
             AniListAuthManager.shared.handleCallback(url: url)

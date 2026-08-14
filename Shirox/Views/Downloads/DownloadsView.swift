@@ -348,6 +348,7 @@ private struct DownloadProgressRow: View {
                     HStack(spacing: 8) {
                         ProgressView(value: item.progress)
                             .tint(.accentColor)
+                            .frame(maxWidth: .infinity, minHeight: 6)
                         Text("\(Int(item.progress * 100))%")
                             .font(.system(size: 10, weight: .bold, design: .monospaced))
                             .foregroundStyle(.secondary)
