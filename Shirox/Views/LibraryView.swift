@@ -893,7 +893,6 @@ struct LibraryView: View {
                     .frame(height: 168)
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .shadow(color: .black.opacity(0.25), radius: 5, x: 0, y: 3)
-                    .interpolation(.high)
             }
             .overlay(alignment: .topLeading) {
                 Circle()
@@ -1290,7 +1289,6 @@ private struct LibraryRowView: View {
                 CachedAsyncImage(urlString: entry.media.coverImage.best ?? "")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipped()
-                    .interpolation(.high)
             )
             .overlay(alignment: .bottom) {
                 LinearGradient(
