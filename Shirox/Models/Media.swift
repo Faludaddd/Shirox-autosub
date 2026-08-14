@@ -245,7 +245,7 @@ extension String {
                 .replacingOccurrences(of: "&#", with: "")
                 .replacingOccurrences(of: "x", with: "")
                 .replacingOccurrences(of: ";", with: "")
-            if let scalar = UInt32(hex ? numStr : String(Int(numStr) ?? 0), base: hex ? 16 : 10),
+            if let scalar = UInt32(hex ? numStr : String(Int(numStr) ?? 0), radix: hex ? 16 : 10),
                let char = Unicode.Scalar(scalar) {
                 result = result.replacingCharacters(in: range, with: String(char))
             } else {

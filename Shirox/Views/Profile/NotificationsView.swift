@@ -616,8 +616,12 @@ struct NotificationsHistoryView: View {
                     List {
                         ForEach(vm.notificationHistory) { notif in
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(notif.kind.context ?? "Notification")
-                                    .font(.subheadline)
+                                Text(NotificationSwipeRow.iconAndColor(for: notif).0)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                                Text(notif.createdAt.toTimeAgo())
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
                                 Text(notif.createdAt.formatted(date: .abbreviated, time: .standard))
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
