@@ -325,6 +325,7 @@ struct MangaDetailView: View {
                     .offset(y: imageY)
             }
             .frame(height: 420)
+            .ignoresSafeArea(edges: .top)
             .mask(alignment: .bottom) { Rectangle().frame(height: 420 + 2000) }
 
             LinearGradient(

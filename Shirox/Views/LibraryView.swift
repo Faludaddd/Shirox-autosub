@@ -41,6 +41,7 @@ struct LibraryView: View {
     @State private var showNotifications = false
     @StateObject private var profileVM = ProfileViewModel()
     @State private var searchText = ""
+    @AppStorage("libraryGridLayout") private var isGridLayout = false
     @AppStorage("librarySortOrder") private var sortOrderRaw: String = LibrarySortOrder.score.rawValue
     @AppStorage("librarySortAscending") private var sortAscending = false
     @AppStorage("localScoreFormat") private var localScoreFormatRaw: String = ScoreFormat.point10Decimal.rawValue
@@ -450,6 +451,15 @@ struct LibraryView: View {
     @ToolbarContentBuilder
     private var libraryToolbar: some ToolbarContent {
         ToolbarItem(placement: toolbarItemPlacement[0]) {
+            #if os(iOS)
+            Button {
+                isGridLayout.toggle()
+            } label: {
+                Image(systemName: isGridLayout ? "list.bullet" : "square.grid.2x2")
+                    .font(.system(size: 17, weight: .medium))
+            }
+        }
+        ToolbarItem(placement: toolbarItemPlacement[0]) {
             sortMenu
         }
         ToolbarItem(placement: toolbarItemPlacement[1]) {
@@ -675,6 +685,21 @@ struct LibraryView: View {
     }
 
     private var entriesList: some View {
+        Group {
+            if isGridLayout {
+                libraryGridView
+            } else {
+                libraryListView
+            }
+        }
+        .refreshable {
+            async let count: Void = refreshUnreadCountIfNeeded()
+            await vm.refresh()
+            await count
+        }
+    }
+
+    private var libraryListView: some View {
         List {
             #if os(iOS)
             LibrarySourceSwitcher(selected: vm.source) { vm.selectSource($0) }
@@ -695,10 +720,72 @@ struct LibraryView: View {
             }
         }
         .listStyle(.plain)
-        .refreshable {
-            async let count: Void = refreshUnreadCountIfNeeded()
-            await vm.refresh()
-            await count
+    }
+
+    // MARK: - Grid View (item 6)
+    private var libraryGridView: some View {
+        ScrollView {
+            // Pin the filter controls above the grid
+            VStack(spacing: 0) {
+                #if os(iOS)
+                LibrarySourceSwitcher(selected: vm.source) { vm.selectSource($0) }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                mediaTypeSegment
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
+                filterCapsuleRow
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
+                    .padding(.bottom, 8)
+                #endif
+
+                let columns = [GridItem(.adaptive(minimum: 100), spacing: 12)]
+                LazyVGrid(columns: columns, spacing: 16) {
+                    ForEach(displayedEntries, id: \.media.id) { entry in
+                        NavigationLink {
+                            rowDestination(entry)
+                        } label: {
+                            libraryGridCard(entry)
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu {
+                            libraryContextMenu(for: entry)
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 30)
+            }
+        }
+    }
+
+    private func libraryGridCard(_ entry: LibraryEntry) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            CachedAsyncImage(urlString: entry.media.coverImage.best ?? "")
+                .aspectRatio(2/3, contentMode: .fill)
+                .frame(maxWidth: .infinity)
+                .frame(height: 150)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(alignment: .topTrailing) {
+                    if let score = entry.media.averageScore {
+                        Text("\(score)%")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(.yellow)
+                            .padding(.horizontal, 6).padding(.vertical, 3)
+                            .background(.black.opacity(0.55), in: Capsule())
+                            .padding(4)
+                    }
+                }
+            Text(entry.media.title.displayTitle)
+                .font(.caption.weight(.semibold))
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+            if entry.progress > 0 {
+                Text("\(entry.progress) ep")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 

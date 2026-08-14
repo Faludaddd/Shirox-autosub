@@ -111,6 +111,7 @@ struct AniListMangaDetailView: View {
             .padding(.bottom, 30)
         }
         .coordinateSpace(name: "mangaAnilistScroll")
+        .ignoresSafeArea(edges: .top)
     }
 
     // MARK: - Hero

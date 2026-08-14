@@ -466,7 +466,7 @@ struct FeaturedCarousel: View {
 
                         NavigationLink {
                             if isManga {
-                                AniListMangaDetailView(mediaId: currentMedia.id, preloadedMedia: currentMedia, autoStartReading: true)
+                                AniListMangaDetailView(mediaId: currentMedia.id, preloadedMedia: currentMedia)
                             } else {
                                 AniListDetailView(mediaId: currentMedia.id, preloadedMedia: currentMedia)
                             }
@@ -1375,11 +1375,44 @@ struct ScheduleView: View {
                         }
                         ForEach(bucket.entries) { entry in
                             NavigationLink {
-                                AniListMangaDetailView(mediaId: entry.aniListMediaId ?? entry.sourceMediaId, preloadedMedia: nil)
+                                ScheduleDetailView(
+                                    entry: entry,
+                                    useUTC: useUTC,
+                                    isNotificationOn: scheduledIds.contains(entry.id),
+                                    onToggleNotification: { toggleNotification(for: entry) }
+                                )
                             } label: {
                                 MangaScheduleCard(entry: entry, useUTC: useUTC)
                             }
                             .buttonStyle(.plain)
+                            .contextMenu {
+                                Button {
+                                    addToLibrary(entry, status: .planning)
+                                } label: {
+                                    Label("Add to Planning", systemImage: "bookmark")
+                                }
+                                Button {
+                                    addToLibrary(entry, status: .current)
+                                } label: {
+                                    Label("Add to Reading", systemImage: "book.circle")
+                                }
+                                Divider()
+                                Button {
+                                    detailEntry = entry
+                                } label: {
+                                    Label("View Details", systemImage: "info.circle")
+                                }
+                                Button {
+                                    #if os(iOS)
+                                    let mediaId = entry.aniListMediaId ?? entry.sourceMediaId
+                                    if let url = URL(string: "https://anilist.co/manga/\(mediaId)") {
+                                        UIApplication.shared.open(url)
+                                    }
+                                    #endif
+                                } label: {
+                                    Label("View on AniList", systemImage: "safari")
+                                }
+                            }
                         }
                     }
                     .padding(.horizontal, 16)
