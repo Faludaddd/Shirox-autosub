@@ -163,11 +163,44 @@ struct MangaSection: View {
                             }
                             .buttonStyle(CardPressStyle())
                             .contextMenu {
-                                Button { } label: {
-                                    Label("Add to Planning", systemImage: "plus.circle")
+                                Button {
+                                    Task {
+                                        try? await AniListLibraryService.shared.updateEntry(
+                                            mediaId: media.id, status: .planning, progress: 0, score: nil, type: .manga)
+                                    }
+                                } label: {
+                                    Label("Add to Planning", systemImage: "bookmark")
                                 }
-                                Button { } label: {
-                                    Label("Share", systemImage: "square.and.arrow.up")
+                                Button {
+                                    Task {
+                                        try? await AniListLibraryService.shared.updateEntry(
+                                            mediaId: media.id, status: .current, progress: 0, score: nil, type: .manga)
+                                    }
+                                } label: {
+                                    Label("Add to Reading", systemImage: "book.circle")
+                                }
+                                Button {
+                                    Task {
+                                        try? await AniListLibraryService.shared.updateEntry(
+                                            mediaId: media.id, status: .completed, progress: 0, score: nil, type: .manga)
+                                    }
+                                } label: {
+                                    Label("Mark as Completed", systemImage: "checkmark.circle")
+                                }
+                                Divider()
+                                NavigationLink {
+                                    AniListMangaDetailView(mediaId: media.id, preloadedMedia: media)
+                                } label: {
+                                    Label("View Details", systemImage: "info.circle")
+                                }
+                                Button {
+                                    #if os(iOS)
+                                    if let url = URL(string: "https://anilist.co/manga/\(media.id)") {
+                                        UIApplication.shared.open(url)
+                                    }
+                                    #endif
+                                } label: {
+                                    Label("View on AniList", systemImage: "safari")
                                 }
                             }
                         }

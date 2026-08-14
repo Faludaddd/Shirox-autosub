@@ -774,12 +774,8 @@ private struct FeaturedCard: View, Equatable {
             } else {
                 GeometryReader { geo in
                     let pageOffset = geo.frame(in: .global).minX
-                    let imageURL = media.bannerImage
-                        ?? media.coverImage.extraLarge
-                        ?? media.coverImage.large
-                        ?? ""
+                    let imageURL = media.coverImage.extraLarge ?? media.coverImage.large ?? ""
                     CachedAsyncImage(urlString: imageURL)
-                        .aspectRatio(contentMode: .fill)
                         .frame(width: geo.size.width, height: geo.size.height)
                         .clipped()
                         .offset(x: -pageOffset * 0.25)
@@ -948,17 +944,38 @@ private struct AnimeSection: View {
                                         mediaId: media.id, status: .planning, progress: 0, score: nil)
                                 }
                             } label: {
-                                Label("Add to Planning", systemImage: "plus.circle")
+                                Label("Add to Planning", systemImage: "bookmark")
+                            }
+                            Button {
+                                Task {
+                                    try? await AniListLibraryService.shared.updateEntry(
+                                        mediaId: media.id, status: .current, progress: 0, score: nil)
+                                }
+                            } label: {
+                                Label("Add to Watching", systemImage: "play.circle")
+                            }
+                            Button {
+                                Task {
+                                    try? await AniListLibraryService.shared.updateEntry(
+                                        mediaId: media.id, status: .completed, progress: 0, score: nil)
+                                }
+                            } label: {
+                                Label("Mark as Completed", systemImage: "checkmark.circle")
+                            }
+                            Divider()
+                            NavigationLink {
+                                AniListDetailView(mediaId: media.id, preloadedMedia: media)
+                            } label: {
+                                Label("View Details", systemImage: "info.circle")
                             }
                             Button {
                                 #if os(iOS)
-                                let av = UIActivityViewController(activityItems: [media.title.displayTitle], applicationActivities: nil)
-                                guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                                      let root = scene.windows.first?.rootViewController else { return }
-                                root.present(av, animated: true)
+                                if let url = URL(string: "https://anilist.co/anime/\(media.id)") {
+                                    UIApplication.shared.open(url)
+                                }
                                 #endif
                             } label: {
-                                Label("Share", systemImage: "square.and.arrow.up")
+                                Label("View on AniList", systemImage: "safari")
                             }
                         }
                     }

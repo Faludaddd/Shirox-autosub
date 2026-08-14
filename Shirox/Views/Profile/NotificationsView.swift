@@ -93,7 +93,9 @@ struct NotificationsView: View {
         }
         .task { if vm.notifications.isEmpty { await vm.loadNotifications() } }
         #if os(iOS)
-        .adaptivePresentationDetents([.medium, .large])
+        // Full-height sheet — medium detent constrains the List and prevents
+        // swipe gestures from registering properly.
+        .adaptivePresentationDetents([.large])
 
         #else
 
