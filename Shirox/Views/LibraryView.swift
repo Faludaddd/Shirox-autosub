@@ -194,19 +194,20 @@ struct LibraryView: View {
                 }
             }
         } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "arrow.up.arrow.down")
-                    .font(.system(size: 12, weight: .semibold))
-                Text(sortOrder.rawValue)
-                    .font(.system(size: 13, weight: .semibold))
-                    .lineLimit(1)
-                Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
-                    .font(.system(size: 9, weight: .bold))
-            }
-            .foregroundStyle(.primary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(Capsule().fill(Color.secondary.opacity(0.12)))
+            // Uses the shared LibraryPillContent so the sort menu matches
+            // the status filter chip exactly — same height, icon size,
+            // text size, chevron. The two sit side-by-side in the filter
+            // row and used to drift in size; now they share one style.
+            LibraryPillContent(
+                systemImage: "arrow.up.arrow.down",
+                text: sortOrder.rawValue,
+                showChevron: true,
+                isSelected: false,
+                accentColor: .appAccent
+            )
+            .padding(.horizontal, LibraryDS.pillHorizontalPadding)
+            .padding(.vertical, LibraryDS.pillVerticalPadding)
+            .background(Capsule().fill(LibraryDS.pillIdleFill))
         }
         .menuIndicator(.hidden)
     }
@@ -314,31 +315,28 @@ struct LibraryView: View {
         }
     }
 
-    /// Inline filter chip — compact pill with icon, label, chevron, accent
-    /// dot when active.
+    /// Inline filter chip — uses the shared LibraryPillContent so it matches
+    /// the sort menu exactly. Accent-tinted when active, neutral otherwise.
     @ViewBuilder
     private var statusFilterChip: some View {
         Menu { statusMenuContent } label: {
-            HStack(spacing: 5) {
-                Image(systemName: "line.3.horizontal.decrease")
-                    .font(.system(size: 12, weight: .semibold))
-                Text(vm.selectedCustomList ?? vm.selectedStatus.displayName(for: vm.mediaType))
-                    .font(.system(size: 13, weight: .semibold))
-                    .lineLimit(1)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 9, weight: .bold))
-            }
-            .foregroundStyle(isStatusFilterActive ? Color.appAccent : .primary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
+            LibraryPillContent(
+                systemImage: "line.3.horizontal.decrease",
+                text: vm.selectedCustomList ?? vm.selectedStatus.displayName(for: vm.mediaType),
+                showChevron: true,
+                isSelected: isStatusFilterActive,
+                accentColor: .appAccent
+            )
+            .padding(.horizontal, LibraryDS.pillHorizontalPadding)
+            .padding(.vertical, LibraryDS.pillVerticalPadding)
             .background(
                 Capsule().fill(isStatusFilterActive
-                    ? Color.appAccent.opacity(0.15)
-                    : Color.secondary.opacity(0.12))
+                    ? LibraryDS.pillSelectedFill()
+                    : LibraryDS.pillIdleFill)
             )
             .overlay(
                 Capsule().strokeBorder(
-                    isStatusFilterActive ? Color.appAccent.opacity(0.4) : Color.clear,
+                    isStatusFilterActive ? LibraryDS.pillSelectedBorder() : Color.clear,
                     lineWidth: 1
                 )
             )
@@ -348,9 +346,11 @@ struct LibraryView: View {
 
     // MARK: - Header segments (redesigned)
 
-    /// Top-level Library / History segment. New design: a single rounded bar
-    /// with a sliding indicator behind the selected pill. Tapping History
-    /// pushes it onto the navigation stack (so it gets a system back button).
+    /// Top-level Library / History segment. Single rounded bar with a
+    /// sliding indicator behind the selected pill. Both pills share one
+    /// material background for a cleaner "tab bar" look. Uses LibraryDS
+    /// tokens so the pill height/padding matches every other pill on the
+    /// screen.
     @ViewBuilder private var viewModeSegment: some View {
         HStack(spacing: 4) {
             ForEach(LibraryViewMode.allCases) { mode in
@@ -363,14 +363,15 @@ struct LibraryView: View {
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: mode.icon)
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.system(size: LibraryDS.pillIconSize, weight: .bold))
                         Text(mode.label)
-                            .font(.subheadline.weight(.semibold))
+                            .font(LibraryDS.pillFont)
                             .lineLimit(1)
                     }
                     .fixedSize(horizontal: true, vertical: false)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
+                    .frame(height: LibraryDS.controlHeight - 2 * LibraryDS.pillVerticalPadding)
+                    .padding(.vertical, LibraryDS.pillVerticalPadding)
                     .background(
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
                             .fill(selected ? Color.primary.opacity(0.13) : Color.clear)
@@ -382,14 +383,15 @@ struct LibraryView: View {
         }
         .padding(4)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: LibraryDS.cardCornerRadius, style: .continuous)
                 .fill(Color.secondary.opacity(0.1))
         )
     }
 
-    /// Anime | Manga capsule pills.
+    /// Anime | Manga capsule pills. Uses LibraryPill + LibraryPillContent
+    /// so the height/icon/text match every other pill in the header.
     @ViewBuilder private var mediaTypeSegment: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: LibraryDS.controlSpacing) {
             mediaTypePill(title: "Anime", systemImage: "tv", kind: .anime)
             mediaTypePill(title: "Manga", systemImage: "book", kind: .manga)
             Spacer()
@@ -399,32 +401,24 @@ struct LibraryView: View {
     @ViewBuilder
     private func mediaTypePill(title: String, systemImage: String, kind: MediaKind) -> some View {
         let selected = vm.mediaType == kind
-        Button {
+        LibraryPill(isSelected: selected, accentColor: .appAccent) {
             Haptics.selection()
             withAnimation(.easeInOut(duration: 0.18)) { vm.selectMediaType(kind) }
         } label: {
-            HStack(spacing: 5) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 12, weight: .semibold))
-                    .frame(width: 14, height: 14)
-                Text(title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .lineLimit(1)
-            }
-            .fixedSize(horizontal: true, vertical: false)
-            .padding(.horizontal, 11).padding(.vertical, 6)
-            .background(Capsule().fill(selected ? Color.appAccent.opacity(0.18) : Color.secondary.opacity(0.1)))
-            .overlay(Capsule().strokeBorder(selected ? Color.appAccent.opacity(0.5) : Color.clear, lineWidth: 1))
-            .foregroundStyle(selected ? Color.appAccent : .primary)
+            LibraryPillContent(
+                systemImage: systemImage,
+                text: title,
+                isSelected: selected,
+                accentColor: .appAccent
+            )
         }
-        .buttonStyle(.plain)
     }
 
-    /// New unified filter row: status chip + sort menu + grid/list toggle on
-    /// a single row.
+    /// Unified filter row: status chip + sort menu + grid/list toggle.
+    /// All three share LibraryDS tokens so they line up perfectly.
     @ViewBuilder
     private var filterCapsuleRow: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: LibraryDS.controlSpacing) {
             statusFilterChip
             sortMenu
             Spacer(minLength: 0)
@@ -432,20 +426,14 @@ struct LibraryView: View {
         }
     }
 
-    /// Inline grid/list toggle button.
+    /// Inline grid/list toggle button. Uses LibraryIconButton so its size
+    /// and background match the pill row visually.
     @ViewBuilder
     private var gridListToggleInline: some View {
-        Button {
+        LibraryIconButton(systemImage: isGridLayout ? "list.bullet" : "square.grid.2x2") {
             Haptics.selection()
             withAnimation(.easeInOut(duration: 0.2)) { isGridLayout.toggle() }
-        } label: {
-            Image(systemName: isGridLayout ? "list.bullet" : "square.grid.2x2")
-                .font(.system(size: 13, weight: .semibold))
-                .frame(width: 30, height: 30)
-                .background(Circle().fill(Color.secondary.opacity(0.12)))
-                .foregroundStyle(.primary)
         }
-        .buttonStyle(.plain)
     }
 
     /// Hidden programmatic link for manga rows.
@@ -732,29 +720,27 @@ struct LibraryView: View {
     // MARK: - List View (redesigned — clean card list with sectioned status)
 
     /// Redesigned list layout. Switched from List to ScrollView+LazyVStack so
-    /// we have full control over row insets, spacing, and hit areas (List's
-    /// row hit area extends edge-to-edge and intercepts taps meant for
-    /// overlay controls — the core poster-touch bug). Cards now have
-    /// consistent 12pt horizontal padding and 8pt vertical spacing.
+    /// we have full control over row insets, spacing, and hit areas. Spacing
+    /// values come from LibraryDS so the list and grid feel like one design.
     private var libraryListView: some View {
         ScrollView {
-            VStack(spacing: 18) {
+            VStack(spacing: LibraryDS.sectionSpacing) {
                 // When the status filter is a single specific status or a
                 // custom list, show a flat list. Otherwise, group by status
                 // with section headers.
                 if isStatusFilterActive || vm.selectedCustomList != nil {
-                    LazyVStack(spacing: 8) {
+                    LazyVStack(spacing: LibraryDS.listCardSpacing) {
                         ForEach(displayedEntries, id: \.media.id) { entry in
                             entryRow(entry)
                         }
                     }
-                    .padding(.horizontal, 14)
+                    .padding(.horizontal, LibraryDS.containerHorizontalPadding)
                 } else {
                     ForEach(groupedEntries, id: \.0) { status, entries in
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: LibraryDS.listCardSpacing) {
                             statusSectionHeader(status, count: entries.count)
-                                .padding(.horizontal, 14)
-                            LazyVStack(spacing: 8) {
+                                .padding(.horizontal, LibraryDS.containerHorizontalPadding)
+                            LazyVStack(spacing: LibraryDS.listCardSpacing) {
                                 ForEach(entries, id: \.media.id) { entry in
                                     entryRow(entry)
                                 }
@@ -768,6 +754,7 @@ struct LibraryView: View {
     }
 
     /// Section header for grouped list: colored dot + status name + count.
+    /// Uses LibraryDS.sectionHeaderFont for consistent typography.
     @ViewBuilder
     private func statusSectionHeader(_ status: MediaListStatus, count: Int) -> some View {
         HStack(spacing: 8) {
@@ -775,7 +762,7 @@ struct LibraryView: View {
                 .fill(statusAccentColor(status))
                 .frame(width: 8, height: 8)
             Text(status.displayName(for: vm.mediaType))
-                .font(.system(size: 15, weight: .bold))
+                .font(LibraryDS.sectionHeaderFont)
                 .foregroundStyle(.primary)
             Text("\(count)")
                 .font(.system(size: 12, weight: .semibold))
@@ -793,7 +780,7 @@ struct LibraryView: View {
     private var libraryGridView: some View {
         ScrollView {
             VStack(spacing: 0) {
-                let columns = [GridItem(.adaptive(minimum: 108), spacing: 14)]
+                let columns = [GridItem(.adaptive(minimum: 108), spacing: LibraryDS.gridSpacing)]
                 LazyVGrid(columns: columns, spacing: 18) {
                     ForEach(displayedEntries, id: \.media.id) { entry in
                         LibraryGridCard(
@@ -806,7 +793,7 @@ struct LibraryView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 14)
+                .padding(.horizontal, LibraryDS.containerHorizontalPadding)
                 .padding(.top, 12)
                 .padding(.bottom, 30)
             }
@@ -841,7 +828,7 @@ struct LibraryView: View {
             // Tapping History pushes LibraryHistoryView onto the navigation stack
             // so it gets a system back button (consistent with the rest of the app).
             viewModeSegment
-                .padding(.horizontal, 14)
+                .padding(.horizontal, LibraryDS.containerHorizontalPadding)
                 .padding(.top, 6)
                 .padding(.bottom, 6)
 
@@ -898,15 +885,15 @@ struct LibraryView: View {
             // the entries (not inside the ScrollView) so the controls stay
             // reachable. This is the fix for the old design where the
             // controls scrolled away with the list.
-            VStack(spacing: 8) {
+            VStack(spacing: LibraryDS.controlSpacing) {
                 LibrarySourceSwitcher(selected: vm.source) { vm.selectSource($0) }
-                HStack(spacing: 8) {
+                HStack(spacing: LibraryDS.controlSpacing) {
                     mediaTypeSegment
                     Spacer(minLength: 0)
                 }
                 filterCapsuleRow
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, LibraryDS.containerHorizontalPadding)
             .padding(.top, 4)
             .padding(.bottom, 8)
             .background(
@@ -1107,15 +1094,15 @@ private struct LibraryRowView: View {
             cardBody
         }
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.primary.opacity(0.04))
+            RoundedRectangle(cornerRadius: LibraryDS.cardCornerRadius, style: .continuous)
+                .fill(LibraryDS.cardFill)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.07), lineWidth: 1)
+            RoundedRectangle(cornerRadius: LibraryDS.cardCornerRadius, style: .continuous)
+                .strokeBorder(LibraryDS.cardBorder, lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 2)
-        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: LibraryDS.cardCornerRadius, style: .continuous))
         .onTapGesture { onTapRow() }
     }
 
@@ -1367,7 +1354,7 @@ private struct LibraryGridCard: View {
         // Tap target = visible card only. The contentShape is a rounded
         // rectangle matching the card's bounds so taps in the grid gap
         // don't trigger a card open.
-        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: LibraryDS.posterCornerRadius, style: .continuous))
         .onTapGesture { onTap() }
     }
 

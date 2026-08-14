@@ -233,7 +233,15 @@ struct AniListDetailView: View {
                 .padding(.bottom, 24)
         }
         #if os(iOS)
-        .toolbar { ToolbarItem(placement: .topBarTrailing) { editToolbarButton } }
+        .toolbar {
+            // Module selector — sits next to the Add-to-Library / Edit pencil.
+            // Anime pages only show anime modules; the menu's Settings entry
+            // deep-links into ModulesSettingsPage (anime context).
+            ToolbarItem(placement: .topBarTrailing) {
+                ModuleSelectorMenu(mediaType: .anime)
+            }
+            ToolbarItem(placement: .topBarTrailing) { editToolbarButton }
+        }
         #endif
         .navigationDestinationCompat(item: $sequelMediaId) { id in
             AniListDetailView(mediaId: id)

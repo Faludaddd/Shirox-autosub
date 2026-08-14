@@ -677,6 +677,14 @@
                 F9145A12960F440BAC6A4556 /* ToggleGlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A15090D8B47044D285B51DCF /* ToggleGlow.swift */; };
                 499662116A2E43978193A47E /* ToggleGlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A15090D8B47044D285B51DCF /* ToggleGlow.swift */; };
 
+		7C0C6605ED1F492BB9DFF5C2 /* LibraryDesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2578024E3A4D4BDD8A604C2C /* LibraryDesignSystem.swift */; };
+		995B9032301847B689999977 /* LibraryDesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2578024E3A4D4BDD8A604C2C /* LibraryDesignSystem.swift */; };
+		07DD4D5C2BBD44819992CE6E /* LibraryDesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2578024E3A4D4BDD8A604C2C /* LibraryDesignSystem.swift */; };
+		7F4F2D7382E74A0CBB8868A1 /* LibraryDesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2578024E3A4D4BDD8A604C2C /* LibraryDesignSystem.swift */; };
+		F68950F5BF8543B59C2CA4A6 /* ModuleSelectorMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71A75A1C89CB4572A122815F /* ModuleSelectorMenu.swift */; };
+		F424A5B457A54915804DA4B0 /* ModuleSelectorMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71A75A1C89CB4572A122815F /* ModuleSelectorMenu.swift */; };
+		F27E4771D4E145CDAFEAAF42 /* ModuleSelectorMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71A75A1C89CB4572A122815F /* ModuleSelectorMenu.swift */; };
+		D31F3AE1550D4325907AE96E /* ModuleSelectorMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71A75A1C89CB4572A122815F /* ModuleSelectorMenu.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -936,6 +944,8 @@
                 FB817FD6F25142E088911D9D /* MangaModuleManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MangaModuleManager.swift; sourceTree = "<group>"; };
                 A15090D8B47044D285B51DCF /* ToggleGlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToggleGlow.swift; sourceTree = "<group>"; };
 
+		2578024E3A4D4BDD8A604C2C /* LibraryDesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryDesignSystem.swift; sourceTree = "<group>"; };
+		71A75A1C89CB4572A122815F /* ModuleSelectorMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleSelectorMenu.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1152,6 +1162,8 @@
                                 A88804D3B352FD28723122E3 /* NotificationBadge.swift */,
                                 DE497D28BD37BD64210898B9 /* ManageCollectionsView.swift */,
                                 2B7FE5D7DC524A62A71C54FB /* LibraryHistoryView.swift */,
+			2578024E3A4D4BDD8A604C2C /* LibraryDesignSystem.swift */,
+			71A75A1C89CB4572A122815F /* ModuleSelectorMenu.swift */,
                         );
                         path = Library;
                         sourceTree = "<group>";
@@ -1596,6 +1608,8 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 9A797EBA7D674B10A694B790 /* UpdateSettingsPage.swift in Sources */,
                                 C7CF9F91BDE745B987437E5E /* MangaModuleManager.swift in Sources */,
                                 499662116A2E43978193A47E /* ToggleGlow.swift in Sources */,
+			7C0C6605ED1F492BB9DFF5C2 /* LibraryDesignSystem.swift in Sources */,
+			F68950F5BF8543B59C2CA4A6 /* ModuleSelectorMenu.swift in Sources */,
                         );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -2238,7 +2252,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
                                 CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
                                 CODE_SIGN_STYLE = Automatic;
-                                CURRENT_PROJECT_VERSION = 158;
+                                CURRENT_PROJECT_VERSION = 159;
                                 ENABLE_PREVIEWS = YES;
                                 ENABLE_USER_SCRIPT_SANDBOXING = YES;
                                 GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -2255,7 +2269,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "@executable_path/Frameworks",
                                 );
                                 LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                                MARKETING_VERSION = 1.23;
+                                MARKETING_VERSION = 1.27;
                                 PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
                                 PRODUCT_NAME = "$(TARGET_NAME)";
                                 SDKROOT = appletvos;
@@ -2276,7 +2290,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
                                 CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
                                 CODE_SIGN_STYLE = Automatic;
-                                CURRENT_PROJECT_VERSION = 158;
+                                CURRENT_PROJECT_VERSION = 159;
                                 ENABLE_PREVIEWS = YES;
                                 ENABLE_USER_SCRIPT_SANDBOXING = YES;
                                 GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -2289,7 +2303,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "@executable_path/Frameworks",
                                 );
                                 LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                                MARKETING_VERSION = 1.23;
+                                MARKETING_VERSION = 1.27;
                                 PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
                                 PRODUCT_NAME = "$(TARGET_NAME)";
                                 SDKROOT = appletvos;
@@ -2396,7 +2410,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
                                 CODE_SIGN_IDENTITY = "Apple Development";
                                 CODE_SIGN_STYLE = Automatic;
-                                CURRENT_PROJECT_VERSION = 158;
+                                CURRENT_PROJECT_VERSION = 159;
                                 DEVELOPMENT_TEAM = JRMTH65Z3H;
                                 ENABLE_TESTABILITY = YES;
                                 INFOPLIST_FILE = Shirox/Info.plist;
@@ -2405,7 +2419,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "$(inherited)",
                                         "@executable_path/Frameworks",
                                 );
-                                MARKETING_VERSION = 1.23;
+                                MARKETING_VERSION = 1.27;
                                 PRODUCT_NAME = Shirox;
                                 PROVISIONING_PROFILE_SPECIFIER = "";
                                 SDKROOT = iphoneos;
@@ -2441,7 +2455,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                         buildSettings = {
                                 ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
                                 COMBINE_HIDPI_IMAGES = YES;
-                                CURRENT_PROJECT_VERSION = 158;
+                                CURRENT_PROJECT_VERSION = 159;
                                 DEAD_CODE_STRIPPING = YES;
                                 INFOPLIST_FILE = Shirox/Info.plist;
                                 INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
@@ -2450,7 +2464,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "@executable_path/../Frameworks",
                                 );
                                 MACOSX_DEPLOYMENT_TARGET = 14.0;
-                                MARKETING_VERSION = 1.23;
+                                MARKETING_VERSION = 1.27;
                                 PRODUCT_NAME = Shirox;
                                 SDKROOT = macosx;
                                 SUPPORTS_MACCATALYST = NO;
@@ -2467,7 +2481,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
                                 CODE_SIGN_IDENTITY = "Apple Development";
                                 CODE_SIGN_STYLE = Automatic;
-                                CURRENT_PROJECT_VERSION = 158;
+                                CURRENT_PROJECT_VERSION = 159;
                                 DEVELOPMENT_TEAM = JRMTH65Z3H;
                                 INFOPLIST_FILE = Shirox/Info.plist;
                                 INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
@@ -2475,7 +2489,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "$(inherited)",
                                         "@executable_path/Frameworks",
                                 );
-                                MARKETING_VERSION = 1.23;
+                                MARKETING_VERSION = 1.27;
                                 PRODUCT_NAME = Shirox;
                                 PROVISIONING_PROFILE_SPECIFIER = "";
                                 SDKROOT = iphoneos;
@@ -2556,7 +2570,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                         buildSettings = {
                                 ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
                                 COMBINE_HIDPI_IMAGES = YES;
-                                CURRENT_PROJECT_VERSION = 158;
+                                CURRENT_PROJECT_VERSION = 159;
                                 DEAD_CODE_STRIPPING = YES;
                                 INFOPLIST_FILE = Shirox/Info.plist;
                                 INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
@@ -2565,7 +2579,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "@executable_path/../Frameworks",
                                 );
                                 MACOSX_DEPLOYMENT_TARGET = 14.0;
-                                MARKETING_VERSION = 1.23;
+                                MARKETING_VERSION = 1.27;
                                 PRODUCT_NAME = Shirox;
                                 SDKROOT = macosx;
                                 SUPPORTS_MACCATALYST = NO;

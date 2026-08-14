@@ -64,7 +64,7 @@ struct LibrarySourceSwitcher: View {
             HStack(spacing: 6) {
                 if isLocal {
                     Image(systemName: "books.vertical.fill")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: LibraryDS.pillIconSize, weight: .semibold))
                         .frame(width: 16, height: 16)
                 } else if let iconURL {
                     CachedAsyncImage(urlString: iconURL)
@@ -72,14 +72,15 @@ struct LibrarySourceSwitcher: View {
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                 }
                 Text(title)
-                    .font(.subheadline.weight(.semibold))
+                    .font(LibraryDS.pillFont)
                     .lineLimit(1)
             }
             .fixedSize(horizontal: true, vertical: false)
-            .padding(.horizontal, 12).padding(.vertical, 7)
-            .background(Capsule().fill(selected ? Color.primary.opacity(0.12) : Color.secondary.opacity(0.08)))
-            .overlay(Capsule().strokeBorder(selected ? Color.primary.opacity(0.3) : Color.clear, lineWidth: 1))
-            .foregroundStyle(selected ? Color.primary : .secondary)
+            .padding(.horizontal, LibraryDS.pillHorizontalPadding)
+            .padding(.vertical, LibraryDS.pillVerticalPadding)
+            .background(Capsule().fill(selected ? LibraryDS.pillSelectedFill() : LibraryDS.pillIdleFill))
+            .overlay(Capsule().strokeBorder(selected ? LibraryDS.pillSelectedBorder() : Color.clear, lineWidth: 1))
+            .foregroundStyle(selected ? Color.appAccent : .primary)
         }
         .buttonStyle(.plain)
     }

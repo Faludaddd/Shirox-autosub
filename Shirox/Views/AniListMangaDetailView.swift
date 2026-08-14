@@ -75,6 +75,14 @@ struct AniListMangaDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundHidden()
         .tint(.primary)
+        .toolbar {
+            // Module selector — manga modules only. Sits in the trailing
+            // toolbar so it's reachable while reading. The menu's Settings
+            // entry deep-links into ModulesSettingsPage(mediaType: .manga).
+            ToolbarItem(placement: .topBarTrailing) {
+                ModuleSelectorMenu(mediaType: .manga)
+            }
+        }
         #endif
     }
 

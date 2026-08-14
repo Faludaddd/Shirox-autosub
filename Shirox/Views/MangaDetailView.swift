@@ -104,6 +104,12 @@ struct MangaDetailView: View {
         }
         #endif
         .toolbar {
+            // Module selector — manga modules only. Sits next to the match
+            // button so the user can switch manga sources without leaving
+            // the detail page.
+            ToolbarItem(placement: .primaryAction) {
+                ModuleSelectorMenu(mediaType: .manga)
+            }
             ToolbarItem(placement: .primaryAction) {
                 if vm.detail != nil && offlineChapters == nil { matchToolbarButton }
             }

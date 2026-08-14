@@ -23,14 +23,28 @@ jobs:
 
       - name: Set build version
         run: |
-          # Keep MARKETING_VERSION at 1.4 (manually controlled). Only the
-          # build number (CURRENT_PROJECT_VERSION) auto-increments via
-          # github.run_number so every build is uniquely identifiable.
+          # **Source of truth for MARKETING_VERSION is the VERSION file in the
+          # repo root.** The previous workflow hardcoded "1.4" in the comment
+          # and only bumped CURRENT_PROJECT_VERSION from github.run_number —
+          # so MARKETING_VERSION got stuck at whatever was last manually
+          # edited in project.pbxproj (1.23 since v1.23, never bumped again).
+          #
+          # Now: read VERSION, set both MARKETING_VERSION and
+          # CURRENT_PROJECT_VERSION in project.pbxproj. To bump the displayed
+          # version, edit VERSION and push — no other steps required.
+          if [ ! -f VERSION ]; then
+            echo "VERSION file missing — falling back to 1.0"
+            MARKETING="1.0"
+          else
+            MARKETING=$(tr -d '[:space:]' < VERSION)
+            echo "Read MARKETING_VERSION=$MARKETING from VERSION file"
+          fi
           BUILD_NUM="${{ github.run_number }}"
-          echo "Setting CURRENT_PROJECT_VERSION=$BUILD_NUM (MARKETING_VERSION stays at 1.4)"
+          echo "Setting MARKETING_VERSION=$MARKETING, CURRENT_PROJECT_VERSION=$BUILD_NUM"
+          sed -i '' "s/MARKETING_VERSION = [0-9.]*/MARKETING_VERSION = $MARKETING/g" Shirox.xcodeproj/project.pbxproj
           sed -i '' "s/CURRENT_PROJECT_VERSION = [0-9]*/CURRENT_PROJECT_VERSION = $BUILD_NUM/g" Shirox.xcodeproj/project.pbxproj
           echo "## Build Version" >> $GITHUB_STEP_SUMMARY
-          echo "**Marketing version:** 1.4" >> $GITHUB_STEP_SUMMARY
+          echo "**Marketing version:** $MARKETING" >> $GITHUB_STEP_SUMMARY
           echo "**Build number:** $BUILD_NUM (GitHub run #${{ github.run_number }})" >> $GITHUB_STEP_SUMMARY
 
       - name: Make build script executable

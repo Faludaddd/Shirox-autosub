@@ -689,6 +689,12 @@ struct DetailView: View {
     #if os(iOS)
     @ToolbarContentBuilder
     private var detailToolbar: some ToolbarContent {
+        // Module selector — anime modules only. Sits next to the Add-to-Library
+        // button so the user can switch anime sources without leaving the
+        // detail page.
+        ToolbarItem(placement: .topBarTrailing) {
+            ModuleSelectorMenu(mediaType: .anime)
+        }
         ToolbarItem(placement: .topBarTrailing) {
             let aniListLoggedIn = AniListAuthManager.shared.isLoggedIn
             let malLoggedIn = malAuth.isLoggedIn
