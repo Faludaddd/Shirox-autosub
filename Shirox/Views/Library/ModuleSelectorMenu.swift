@@ -77,13 +77,16 @@ struct ModuleSelectorMenu: View {
                             HStack {
                                 moduleLabel(module)
                                 if activeModuleForType?.id == module.id {
-                                    // Clear Apple-style selected indicator:
-                                    // a filled checkmark circle in the
-                                    // accent color. Updates immediately
-                                    // when the user switches modules
-                                    // because the label reads from
-                                    // @ObservedObject moduleManager.
-                                    Image(systemName: "checkmark.circle.fill")
+                                    // Star indicator INSIDE the dropdown,
+                                    // directly next to the active module's
+                                    // name. Filled star in the accent color
+                                    // — Apple-like, immediately scannable.
+                                    // Only the currently-selected module
+                                    // gets the star; switching modules
+                                    // moves it instantly because the label
+                                    // reads from @ObservedObject
+                                    // moduleManager.
+                                    Image(systemName: "star.fill")
                                         .foregroundStyle(Color.appAccent)
                                 }
                             }

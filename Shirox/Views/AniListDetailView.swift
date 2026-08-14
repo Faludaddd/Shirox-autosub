@@ -681,13 +681,17 @@ struct AniListDetailView: View {
                 }
 
                 // Characters + Recommendations — directly below the synopsis.
-                // Both sections fetch from AniList via CharactersSection /
-                // RecommendationsSection (best-effort; hidden if no data).
-                CharactersSection(mediaId: media.id, isManga: false)
+                // Data is preloaded from the VM's `load()` call (a single
+                // AniList fetch that includes characters + recommendations),
+                // so these sections render immediately without a second
+                // network call.
+                CharactersSection(mediaId: media.id, isManga: false,
+                                  preloaded: vm.characters)
                     .frame(maxWidth: .infinity)
                     .padding(.top, 16)
 
-                RecommendationsSection(mediaId: media.id, isManga: false)
+                RecommendationsSection(mediaId: media.id, isManga: false,
+                                       preloaded: vm.recommendations)
                     .frame(maxWidth: .infinity)
                     .padding(.top, 8)
 

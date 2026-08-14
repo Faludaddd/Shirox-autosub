@@ -32,6 +32,11 @@ struct AniListMangaDetailView: View {
     @State private var readerContext: ReaderContext?
     @State private var match: MangaMatch?
     @State private var enrichment: Media?
+    /// Preloaded characters + recommendations from the raw AniList manga
+    /// fetch — passed to CharactersSection / RecommendationsSection so they
+    /// render without a second network call.
+    @State private var preloadedCharacters: [AniListCharacterEdge] = []
+    @State private var preloadedRecommendations: [AniListRecommendation] = []
     @AppStorage("showStatistics") private var showStatistics = true
     @EnvironmentObject private var moduleManager: ModuleManager
     @Environment(\.dismiss) private var dismiss
@@ -122,11 +127,14 @@ struct AniListMangaDetailView: View {
                         .padding(.top, 16)
                 }
                 // Characters + Recommendations — directly below the synopsis.
-                // Both sections fetch from AniList (manga detail query doesn't
-                // include them, so the sections fetch fresh). Hidden if empty.
-                CharactersSection(mediaId: media.id, isManga: true)
+                // Data is preloaded from the resolve() call's raw AniList
+                // fetch, so these sections render without a second network
+                // call. Hidden if empty.
+                CharactersSection(mediaId: media.id, isManga: true,
+                                  preloaded: preloadedCharacters)
                     .padding(.top, 16)
-                RecommendationsSection(mediaId: media.id, isManga: true)
+                RecommendationsSection(mediaId: media.id, isManga: true,
+                                       preloaded: preloadedRecommendations)
                     .padding(.top, 8)
                 if let edges = media.relations?.edges {
                     let mangaRelations = edges.filter { $0.node.isManga }
@@ -550,6 +558,15 @@ struct AniListMangaDetailView: View {
             catch { phase = .error(error.localizedDescription); return }
         }
         guard media != nil else { phase = .error("No data"); return }
+
+        // Fetch raw AniList manga for characters + recommendations.
+        // Best-effort: don't fail the whole page if this secondary fetch
+        // errors. Uses the manga endpoint (includes characters + recs as
+        // of the latest query update).
+        if let raw = try? await AniListService.shared.mangaDetail(id: mediaId) {
+            preloadedCharacters = raw.characters?.edges ?? []
+            preloadedRecommendations = raw.recommendations?.nodes ?? []
+        }
 
         // Load library entry if logged in
         if AniListAuthManager.shared.isLoggedIn {

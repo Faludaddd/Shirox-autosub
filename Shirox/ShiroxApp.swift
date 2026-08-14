@@ -277,6 +277,10 @@ struct ShiroxApp: App {
             RootTabView()
                 .environmentObject(moduleManager)
                 .tint(accentColor)
+                // App-wide glow toggle style — every Toggle in the app
+                // inherits the glow effect without per-call-site modifiers.
+                // See GlowToggleStyle.swift for the implementation.
+                .withGlowToggles()
                 .preferredColorScheme(colorScheme)
                 // Requirement #2 — Appearance changes must NOT reset navigation
                 // or rebuild the view tree. The previous `.id(...)` modifier

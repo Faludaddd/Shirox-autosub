@@ -7,6 +7,12 @@ final class AniListDetailViewModel: ObservableObject {
     @Published var isLoading = true
     @Published var error: String?
 
+    /// Raw AniList characters + recommendations, fetched alongside `media`
+    /// so `CharactersSection` / `RecommendationsSection` can render without
+    /// a second network call. nil when not yet loaded or fetch failed.
+    @Published var characters: [AniListCharacterEdge] = []
+    @Published var recommendations: [AniListRecommendation] = []
+
     // Stream picker state
     @Published var showStreamPicker = false
     @Published var selectedEpisodeNumber: Int?
@@ -52,6 +58,13 @@ final class AniListDetailViewModel: ObservableObject {
                     media?.bannerImage = fanart
                 }
             }
+            // Fetch raw AniList media for characters + recommendations.
+            // Best-effort: don't fail the whole load if this secondary
+            // fetch errors. Uses the anime endpoint (the VM is anime-only).
+            if let raw = try? await AniListService.shared.detail(id: id) {
+                characters = raw.characters?.edges ?? []
+                recommendations = raw.recommendations?.nodes ?? []
+            }
         } catch {
             self.error = error.localizedDescription
         }
@@ -60,7 +73,126 @@ final class AniListDetailViewModel: ObservableObject {
 
     func watchEpisode(_ number: Int) {
         selectedEpisodeNumber = number
-        showStreamPicker = true
+        // Auto-resolve using the active anime module — no module-selection
+        // sheet. Only fall back to the picker if there's no active module
+        // or the active module fails to resolve streams.
+        Task { await autoResolveWithActiveModule(episode: number) }
+    }
+
+    /// Auto-resolves streams for `episode` using the currently-active anime
+    /// module, WITHOUT showing the ModuleStreamPickerView. This is the fix
+    /// for "tapping Watch Anime opens another selection UI" — the user
+    /// already picked a module via the toolbar module selector, so we
+    /// should just use it. Falls back to the picker sheet only when there
+    /// is no active anime module or the resolution genuinely fails.
+    private func autoResolveWithActiveModule(episode: Int) async {
+        // Need a media title to search.
+        guard let media else {
+            showStreamPicker = true
+            return
+        }
+
+        // Find an anime module to use. Prefer the active module if it's an
+        // anime module; otherwise the first installed anime module.
+        let manager = ModuleManager.shared
+        let activeAnimeModule: ModuleDefinition? = {
+            if let active = manager.activeModule, !active.isManga { return active }
+            return manager.modules.first { !$0.isManga }
+        }()
+
+        guard let module = activeAnimeModule else {
+            // No anime module installed — show the picker so the user sees
+            // the empty state and can install one.
+            showStreamPicker = true
+            return
+        }
+
+        // Ensure the chosen module is the active one (loads its JS).
+        if manager.activeModule?.id != module.id {
+            _ = await manager.selectAndAwaitReady(module)
+        }
+
+        // Use the same ModuleJSRunner path as ModuleStreamRow, but drive
+        // it directly instead of presenting a row UI.
+        let runner = ModuleJSRunner()
+        let searchTitle = ModuleSearchAliasManager.shared.getAlias(
+            mediaId: media.id, animeTitle: media.title.searchTitle, moduleId: module.id
+        ) ?? media.title.searchTitle
+
+        do {
+            // Load the module's JS into the runner first.
+            try await runner.load(module: module)
+
+            // 1. Search the module for the title.
+            var results = try await runner.search(keyword: searchTitle)
+            if results.isEmpty {
+                try? await Task.sleep(nanoseconds: 800_000_000)
+                if Task.isCancelled { return }
+                results = try await runner.search(keyword: searchTitle)
+            }
+            guard !results.isEmpty else {
+                showStreamPicker = true
+                return
+            }
+            // Pick the best-ranked result (same logic as ModuleStreamRow).
+            let ordered = SearchResultMatcher.ranked(
+                query: media.title.searchTitle, items: results, title: { $0.title })
+            let match = ordered.first!
+
+            // 2. Fetch episodes for the matched result.
+            var episodes = try await runner.fetchEpisodes(url: match.href)
+            if episodes.isEmpty {
+                try? await Task.sleep(nanoseconds: 800_000_000)
+                if Task.isCancelled { return }
+                episodes = try await runner.fetchEpisodes(url: match.href)
+            }
+            guard !episodes.isEmpty else {
+                showStreamPicker = true
+                return
+            }
+
+            // 3. Match the target episode (same logic as ModuleStreamRow).
+            let offset = await SeasonChainMapper.shared.resolveOffset(
+                anchorAniListID: media.id, anchorMALID: nil) ?? 0
+            let targetDouble = Double(episode)
+            let matched: EpisodeLink? = {
+                if let exact = episodes.first(where: { $0.number == targetDouble }) { return exact }
+                if let rounded = episodes.first(where: { round($0.number) == targetDouble }) { return rounded }
+                if offset > 0 {
+                    let offsetTarget = Double(episode + offset)
+                    if let off = episodes.first(where: { $0.number == offsetTarget }) { return off }
+                }
+                return nil
+            }()
+            guard let matched else {
+                showStreamPicker = true
+                return
+            }
+
+            // 4. Fetch streams for the matched episode.
+            let streams = try await runner.fetchStreams(episodeUrl: matched.href)
+            guard !streams.isEmpty else {
+                showStreamPicker = true
+                return
+            }
+
+            // 5. Hand off to the existing onStreamsLoaded path — if there's
+            // exactly one stream, it auto-plays; if multiple, the final
+            // stream picker shows (quality picker, NOT module picker).
+            let sorted = streams.sorted { $0.title < $1.title }
+            // Remember the alias + href for next time.
+            ModuleSearchAliasManager.shared.setLastSearchResultHref(
+                mediaId: media.id, animeTitle: media.title.searchTitle,
+                moduleId: module.id, href: match.href)
+            onStreamsLoaded(sorted, selectedStream: nil, episodeHref: match.href,
+                            availableCount: episodes.count, actualEpisodeHref: matched.href)
+        } catch {
+            // Resolution failed (network, module error, etc.) — fall back
+            // to the picker so the user can try another module manually.
+            if !ProviderManager.isCancellationError(error) {
+                showStreamPicker = true
+            }
+        }
     }
 
     func dismissModulePicker() {
