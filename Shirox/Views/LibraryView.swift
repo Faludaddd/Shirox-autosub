@@ -450,8 +450,8 @@ struct LibraryView: View {
 
     @ToolbarContentBuilder
     private var libraryToolbar: some ToolbarContent {
+        #if os(iOS)
         ToolbarItem(placement: toolbarItemPlacement[0]) {
-            #if os(iOS)
             Button {
                 isGridLayout.toggle()
             } label: {
@@ -459,6 +459,7 @@ struct LibraryView: View {
                     .font(.system(size: 17, weight: .medium))
             }
         }
+        #endif
         ToolbarItem(placement: toolbarItemPlacement[0]) {
             sortMenu
         }
