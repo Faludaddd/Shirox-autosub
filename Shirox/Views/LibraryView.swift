@@ -32,6 +32,19 @@ enum LibraryViewMode: String, CaseIterable, Identifiable {
     }
 }
 
+/// Accent color per list status. Used as the left-edge stripe + chip background
+/// in the new card layout so users can scan the list by status at a glance.
+private func statusAccentColor(_ status: MediaListStatus) -> Color {
+    switch status {
+    case .current:   return .blue
+    case .planning:  return .purple
+    case .completed: return .green
+    case .dropped:   return .red
+    case .paused:    return .orange
+    case .repeating: return .teal
+    }
+}
+
 struct LibraryView: View {
     @StateObject private var vm = LibraryViewModel()
     @ObservedObject private var anilistAuth = AniListAuthManager.shared
@@ -148,6 +161,16 @@ struct LibraryView: View {
         return entries
     }
 
+    /// Entries grouped by status for the new sectioned list layout.
+    /// Only the statuses present in the current filter are returned, in the
+    /// user's preferred order. Empty groups are skipped.
+    private var groupedEntries: [(MediaListStatus, [LibraryEntry])] {
+        let groups = Dictionary(grouping: displayedEntries, by: { $0.status })
+        return orderedStatuses
+            .filter { groups[$0]?.isEmpty == false }
+            .map { ($0, groups[$0] ?? []) }
+    }
+
     var body: some View {
         // `libraryContent` is the single, always-present NavigationStack child so the
         // `.searchable` bar stays attached to the navigation bar across push/pop (matching
@@ -184,13 +207,21 @@ struct LibraryView: View {
                 }
             }
         } label: {
-            HStack(spacing: 3) {
+            HStack(spacing: 4) {
                 Image(systemName: "arrow.up.arrow.down")
-                    .font(.subheadline)
+                    .font(.system(size: 12, weight: .semibold))
+                Text(sortOrder.rawValue)
+                    .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(1)
                 Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
-                    .font(.caption)
+                    .font(.system(size: 9, weight: .bold))
             }
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(Capsule().fill(Color.secondary.opacity(0.12)))
         }
+        .menuIndicator(.hidden)
     }
 
     // MARK: - Login prompt
@@ -297,68 +328,84 @@ struct LibraryView: View {
         }
     }
 
+    /// Inline filter chip — new design: compact pill with icon, label, chevron,
+    /// accent dot when active. Replaces the old `LibraryFilterLabel` capsule.
     @ViewBuilder
-    private func statusFilterMenu() -> some View {
+    private var statusFilterChip: some View {
         Menu { statusMenuContent } label: {
-            LibraryFilterLabel(
-                systemImage: "line.3.horizontal.decrease",
-                text: vm.selectedCustomList ?? vm.selectedStatus.displayName(for: vm.mediaType),
-                isActive: isStatusFilterActive,
-                collapsed: false
+            HStack(spacing: 5) {
+                Image(systemName: "line.3.horizontal.decrease")
+                    .font(.system(size: 12, weight: .semibold))
+                Text(vm.selectedCustomList ?? vm.selectedStatus.displayName(for: vm.mediaType))
+                    .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 9, weight: .bold))
+            }
+            .foregroundStyle(isStatusFilterActive ? Color.appAccent : .primary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(
+                Capsule().fill(isStatusFilterActive
+                    ? Color.appAccent.opacity(0.15)
+                    : Color.secondary.opacity(0.12))
+            )
+            .overlay(
+                Capsule().strokeBorder(
+                    isStatusFilterActive ? Color.appAccent.opacity(0.4) : Color.clear,
+                    lineWidth: 1
+                )
             )
         }
         .menuIndicator(.hidden)
-        .foregroundStyle(.primary)
-        .buttonStyle(.plain)
     }
 
-    @ViewBuilder
-    private var filterCapsuleRow: some View {
-        HStack {
-            statusFilterMenu()
-            Spacer()
-        }
-    }
+    // MARK: - Header segments (redesigned)
 
-    /// Anime | Manga capsule pills, matching `LibrarySourceSwitcher`'s pill style.
-    @ViewBuilder private var mediaTypeSegment: some View {
-        HStack(spacing: 8) {
-            mediaTypePill(title: "Anime", systemImage: "tv", kind: .anime)
-            mediaTypePill(title: "Manga", systemImage: "book", kind: .manga)
-            Spacer()
-        }
-        .padding(.vertical, 8)
-    }
-
-    /// Top-level Library / History segment. Two capsule pills the user can
-    /// tap to switch between the tracked-list view and the activity-history
-    /// view. Matches the visual language of `mediaTypeSegment`.
+    /// Top-level Library / History segment. New design: a single rounded bar with
+    /// a sliding indicator behind the selected pill, both pills share one material
+    /// background for a cleaner "tab bar" look.
     @ViewBuilder private var viewModeSegment: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 4) {
             ForEach(LibraryViewMode.allCases) { mode in
                 let selected = libraryViewMode == mode
                 Button {
                     Haptics.selection()
-                    withAnimation(.easeInOut(duration: 0.2)) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         libraryViewMode = mode
                     }
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: mode.icon)
-                            .font(.system(size: 13, weight: .semibold))
-                            .frame(width: 16, height: 16)
+                            .font(.system(size: 13, weight: .bold))
                         Text(mode.label)
                             .font(.subheadline.weight(.semibold))
                             .lineLimit(1)
                     }
                     .fixedSize(horizontal: true, vertical: false)
-                    .padding(.horizontal, 14).padding(.vertical, 8)
-                    .background(Capsule().fill(selected ? Color.primary.opacity(0.12) : Color.secondary.opacity(0.08)))
-                    .overlay(Capsule().strokeBorder(selected ? Color.primary.opacity(0.3) : Color.clear, lineWidth: 1))
-                    .foregroundStyle(selected ? Color.primary : .secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(selected ? Color.primary.opacity(0.13) : Color.clear)
+                    )
+                    .foregroundStyle(selected ? Color.primary : Color.secondary)
                 }
                 .buttonStyle(.plain)
             }
+        }
+        .padding(4)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.secondary.opacity(0.1))
+        )
+    }
+
+    /// Anime | Manga capsule pills, matching `LibrarySourceSwitcher`'s pill style.
+    @ViewBuilder private var mediaTypeSegment: some View {
+        HStack(spacing: 6) {
+            mediaTypePill(title: "Anime", systemImage: "tv", kind: .anime)
+            mediaTypePill(title: "Manga", systemImage: "book", kind: .manga)
             Spacer()
         }
     }
@@ -366,20 +413,57 @@ struct LibraryView: View {
     @ViewBuilder
     private func mediaTypePill(title: String, systemImage: String, kind: MediaKind) -> some View {
         let selected = vm.mediaType == kind
-        Button { vm.selectMediaType(kind) } label: {
-            HStack(spacing: 6) {
+        Button {
+            Haptics.selection()
+            withAnimation(.easeInOut(duration: 0.18)) { vm.selectMediaType(kind) }
+        } label: {
+            HStack(spacing: 5) {
                 Image(systemName: systemImage)
-                    .font(.system(size: 13, weight: .semibold))
-                    .frame(width: 16, height: 16)
+                    .font(.system(size: 12, weight: .semibold))
+                    .frame(width: 14, height: 14)
                 Text(title)
-                    .font(.subheadline.weight(.semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .lineLimit(1)
             }
             .fixedSize(horizontal: true, vertical: false)
-            .padding(.horizontal, 12).padding(.vertical, 7)
-            .background(Capsule().fill(selected ? Color.primary.opacity(0.12) : Color.secondary.opacity(0.08)))
-            .overlay(Capsule().strokeBorder(selected ? Color.primary.opacity(0.3) : Color.clear, lineWidth: 1))
-            .foregroundStyle(selected ? Color.primary : .secondary)
+            .padding(.horizontal, 11).padding(.vertical, 6)
+            .background(Capsule().fill(selected ? Color.appAccent.opacity(0.18) : Color.secondary.opacity(0.1)))
+            .overlay(Capsule().strokeBorder(selected ? Color.appAccent.opacity(0.5) : Color.clear, lineWidth: 1))
+            .foregroundStyle(selected ? Color.appAccent : .primary)
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// New unified filter row: status chip + sort menu on a single row.
+    /// Replaces the old `filterCapsuleRow` (which only had status) by also surfacing
+    /// the sort menu inline so users don't have to dig into the toolbar.
+    @ViewBuilder
+    private var filterCapsuleRow: some View {
+        HStack(spacing: 8) {
+            statusFilterChip
+            sortMenu
+            Spacer(minLength: 0)
+            if isGridLayout {
+                gridListToggleInline
+            } else {
+                gridListToggleInline
+            }
+        }
+    }
+
+    /// Inline grid/list toggle button — same icon as the toolbar item but presented
+    /// inline so the toolbar slot can be reused (still kept on toolbar too for parity).
+    @ViewBuilder
+    private var gridListToggleInline: some View {
+        Button {
+            Haptics.selection()
+            withAnimation(.easeInOut(duration: 0.2)) { isGridLayout.toggle() }
+        } label: {
+            Image(systemName: isGridLayout ? "list.bullet" : "square.grid.2x2")
+                .font(.system(size: 13, weight: .semibold))
+                .frame(width: 30, height: 30)
+                .background(Circle().fill(Color.secondary.opacity(0.12)))
+                .foregroundStyle(.primary)
         }
         .buttonStyle(.plain)
     }
@@ -459,28 +543,23 @@ struct LibraryView: View {
             }
         }
         #endif
-        ToolbarItem(placement: toolbarItemPlacement[0]) {
-            sortMenu
-        }
         ToolbarItem(placement: toolbarItemPlacement[1]) {
             if isActiveProviderAuthenticated {
-                HStack(spacing: 10) {
-                    Button {
-                        showProfile = true
-                    } label: {
-                        HStack(spacing: 6) {
-                            if let url = activeAvatarURL {
-                                CachedAsyncImage(urlString: url)
-                                    .frame(width: 28, height: 28)
-                                    .clipShape(Circle())
-                            }
-                            Text(displayUsername)
-                                .font(.subheadline.weight(.medium))
-                                .layoutPriority(1)
+                Button {
+                    showProfile = true
+                } label: {
+                    HStack(spacing: 6) {
+                        if let url = activeAvatarURL {
+                            CachedAsyncImage(urlString: url)
+                                .frame(width: 28, height: 28)
+                                .clipShape(Circle())
                         }
+                        Text(displayUsername)
+                            .font(.subheadline.weight(.medium))
+                            .layoutPriority(1)
                     }
-                    .buttonStyle(.plain)
                 }
+                .buttonStyle(.plain)
                 .padding(.horizontal, 8)
             } else {
                 Button("Sign In") {
@@ -540,8 +619,9 @@ struct LibraryView: View {
                 navigableRow(entry)
             }
         }
-        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+        .listRowInsets(EdgeInsets(top: 6, leading: 14, bottom: 6, trailing: 14))
         .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
         #if !os(tvOS)
         .swipeActions(edge: .leading, allowsFullSwipe: true) {
             Button {
@@ -687,49 +767,102 @@ struct LibraryView: View {
         }
     }
 
+    // MARK: - List View (sectioned by status, redesigned cards)
+
     private var libraryListView: some View {
         List {
             #if os(iOS)
-            LibrarySourceSwitcher(selected: vm.source) { vm.selectSource($0) }
-                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 6, trailing: 16))
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-            mediaTypeSegment
-                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 6, trailing: 16))
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-            filterCapsuleRow
-                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 8, trailing: 16))
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
+            // Pinned header controls — sit above the entries as the first row.
+            headerControlsRow
             #endif
-            ForEach(displayedEntries, id: \.media.id) { entry in
-                entryRow(entry)
+            // When the status filter is a single specific status, show a flat list.
+            // Otherwise, group by status with section headers.
+            if isStatusFilterActive && vm.selectedCustomList == nil && vm.selectedStatus != .current {
+                ForEach(displayedEntries, id: \.media.id) { entry in
+                    entryRow(entry)
+                }
+            } else if vm.selectedCustomList != nil {
+                ForEach(displayedEntries, id: \.media.id) { entry in
+                    entryRow(entry)
+                }
+            } else {
+                ForEach(groupedEntries, id: \.0) { status, entries in
+                    Section {
+                        ForEach(entries, id: \.media.id) { entry in
+                            entryRow(entry)
+                        }
+                    } header: {
+                        statusSectionHeader(status, count: entries.count)
+                    }
+                }
             }
         }
         .listStyle(.plain)
     }
 
-    // MARK: - Grid View (item 6)
+    /// Inline header controls for the iOS list. Pinned at the top of the list so
+    /// source switching, media type, and filters stay reachable. New design: stacked
+    /// vertically with breathing room instead of cramped into one row.
+    @ViewBuilder
+    private var headerControlsRow: some View {
+        VStack(spacing: 8) {
+            LibrarySourceSwitcher(selected: vm.source) { vm.selectSource($0) }
+            HStack(spacing: 8) {
+                mediaTypeSegment
+                Spacer(minLength: 0)
+            }
+            filterCapsuleRow
+        }
+        .padding(.vertical, 4)
+        .listRowInsets(EdgeInsets(top: 6, leading: 14, bottom: 8, trailing: 14))
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
+    }
+
+    /// Section header for grouped list: colored dot + status name + count.
+    @ViewBuilder
+    private func statusSectionHeader(_ status: MediaListStatus, count: Int) -> some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(statusAccentColor(status))
+                .frame(width: 8, height: 8)
+            Text(status.displayName(for: vm.mediaType))
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(.primary)
+            Text("\(count)")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 2)
+                .background(Capsule().fill(Color.secondary.opacity(0.15)))
+            Spacer()
+        }
+        .padding(.vertical, 4)
+        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
+        .listRowBackground(Color.clear)
+    }
+
+    // MARK: - Grid View (bigger posters, score + progress overlay)
+
     private var libraryGridView: some View {
         ScrollView {
-            // Pin the filter controls above the grid
             VStack(spacing: 0) {
                 #if os(iOS)
-                LibrarySourceSwitcher(selected: vm.source) { vm.selectSource($0) }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                mediaTypeSegment
-                    .padding(.horizontal, 16)
-                    .padding(.top, 4)
-                filterCapsuleRow
-                    .padding(.horizontal, 16)
-                    .padding(.top, 4)
-                    .padding(.bottom, 8)
+                VStack(spacing: 8) {
+                    LibrarySourceSwitcher(selected: vm.source) { vm.selectSource($0) }
+                    HStack(spacing: 8) {
+                        mediaTypeSegment
+                        Spacer(minLength: 0)
+                    }
+                    filterCapsuleRow
+                }
+                .padding(.horizontal, 14)
+                .padding(.top, 6)
+                .padding(.bottom, 10)
                 #endif
 
-                let columns = [GridItem(.adaptive(minimum: 100), spacing: 12)]
-                LazyVGrid(columns: columns, spacing: 16) {
+                let columns = [GridItem(.adaptive(minimum: 108), spacing: 14)]
+                LazyVGrid(columns: columns, spacing: 18) {
                     ForEach(displayedEntries, id: \.media.id) { entry in
                         NavigationLink {
                             rowDestination(entry)
@@ -742,36 +875,94 @@ struct LibraryView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 14)
                 .padding(.bottom, 30)
             }
         }
     }
 
+    /// New grid card: bigger poster (2:3), score badge top-right, status dot top-left,
+    /// progress bar overlay at the bottom of the poster, title + episode count below.
+    @ViewBuilder
     private func libraryGridCard(_ entry: LibraryEntry) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            CachedAsyncImage(urlString: entry.media.coverImage.best ?? "")
-                .aspectRatio(2/3, contentMode: .fill)
-                .frame(maxWidth: .infinity)
-                .frame(height: 150)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .overlay(alignment: .topTrailing) {
-                    if let score = entry.media.averageScore {
+            ZStack {
+                CachedAsyncImage(urlString: entry.media.coverImage.best ?? "")
+                    .aspectRatio(2/3, contentMode: .fill)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 168)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .shadow(color: .black.opacity(0.25), radius: 5, x: 0, y: 3)
+                    .interpolation(.high)
+            }
+            .overlay(alignment: .topLeading) {
+                Circle()
+                    .fill(statusAccentColor(entry.status))
+                    .frame(width: 10, height: 10)
+                    .padding(6)
+                    .background(Circle().fill(.black.opacity(0.45)))
+                    .padding(6)
+            }
+            .overlay(alignment: .topTrailing) {
+                if let score = entry.media.averageScore {
+                    HStack(spacing: 2) {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 8, weight: .bold))
                         Text("\(score)%")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(.yellow)
-                            .padding(.horizontal, 6).padding(.vertical, 3)
-                            .background(.black.opacity(0.55), in: Capsule())
-                            .padding(4)
+                            .font(.system(size: 10, weight: .bold))
                     }
+                    .foregroundStyle(.yellow)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(.black.opacity(0.55), in: Capsule())
+                    .padding(6)
                 }
+            }
+            .overlay(alignment: .bottom) {
+                if let total = entry.media.episodes, total > 0, entry.progress > 0 {
+                    GeometryReader { proxy in
+                        let ratio = min(1.0, Double(entry.progress) / Double(total))
+                        ZStack(alignment: .leading) {
+                            Rectangle()
+                                .fill(.white.opacity(0.2))
+                                .frame(height: 3)
+                            Rectangle()
+                                .fill(Color.appAccent)
+                                .frame(width: proxy.size.width * ratio, height: 3)
+                        }
+                    }
+                    .frame(height: 3)
+                    .clipShape(RoundedRectangle(cornerRadius: 2))
+                    .padding(.horizontal, 0)
+                    .padding(.bottom, 0)
+                }
+            }
+            .overlay(alignment: .bottomLeading) {
+                if entry.progress > 0 {
+                    let label = entry.media.isManga ? "Ch \(entry.progress)" : "Ep \(entry.progress)"
+                    Text(label)
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(.black.opacity(0.55), in: Capsule())
+                        .padding(6)
+                }
+            }
+
             Text(entry.media.title.displayTitle)
-                .font(.caption.weight(.semibold))
+                .font(.system(size: 12, weight: .semibold))
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
-            if entry.progress > 0 {
-                Text("\(entry.progress) ep")
-                    .font(.caption2)
+                .foregroundStyle(.primary)
+
+            if let total = entry.media.episodes, total > 0 {
+                Text("\(entry.progress) / \(total) \(entry.media.isManga ? "ch" : "ep")")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.secondary)
+            } else if entry.progress > 0 {
+                Text("\(entry.progress) \(entry.media.isManga ? "ch" : "ep")")
+                    .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.secondary)
             }
         }
@@ -781,12 +972,11 @@ struct LibraryView: View {
 
     private var libraryContentBase: some View {
         VStack(spacing: 0) {
-            // Top-level Library / History segment. Pinned at the top so it's
-            // always reachable regardless of scroll position.
+            // Top-level Library / History segment, pinned at the top of the screen.
             viewModeSegment
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 14)
                 .padding(.top, 6)
-                .padding(.bottom, 4)
+                .padding(.bottom, 6)
 
             #if !os(iOS)
             LibrarySourceSwitcher(selected: vm.source) { vm.selectSource($0) }
@@ -794,24 +984,25 @@ struct LibraryView: View {
             mediaTypeSegment
                 .padding(.horizontal, 16)
                 .padding(.top, 6)
-            // Combined row: Status on left, Genres on right
             filterCapsuleRow
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
             #else
-            // The source switcher + filter row scroll away as the list's first rows; for the
-            // non-list states (loading / empty / error) they're pinned here so the source and
-            // filters stay usable.
+            // The source switcher + filter row scroll away as the list's first rows on iOS.
+            // For the non-list states (loading / empty / error) they're pinned here so the
+            // source and filters stay usable.
             if !showsLibraryList {
-                LibrarySourceSwitcher(selected: vm.source) { vm.selectSource($0) }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 4)
-                mediaTypeSegment
-                    .padding(.horizontal, 16)
-                    .padding(.top, 6)
-                filterCapsuleRow
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
+                VStack(spacing: 8) {
+                    LibrarySourceSwitcher(selected: vm.source) { vm.selectSource($0) }
+                    HStack(spacing: 8) {
+                        mediaTypeSegment
+                        Spacer(minLength: 0)
+                    }
+                    filterCapsuleRow
+                }
+                .padding(.horizontal, 14)
+                .padding(.top, 4)
+                .padding(.bottom, 8)
             }
             #endif
 
@@ -1012,136 +1203,227 @@ struct LibraryView: View {
     }
 }
 
-// MARK: - Library row
+// MARK: - Library row (redesigned card)
 
 private struct LibraryRowView: View {
     let entry: LibraryEntry
     var scoreFormat: ScoreFormat = .point10Decimal
     var onEdit: () -> Void = {}
 
+    private var accentColor: Color { statusAccentColor(entry.status) }
+
     var body: some View {
-        HStack(spacing: 12) {
-            // Cover image — AniListCardView style
-            Color.clear
-                .aspectRatio(2/3, contentMode: .fit)
-                .frame(width: 70)
-                .overlay(
-                    ZStack {
-                        CachedAsyncImage(urlString: entry.media.coverImage.best ?? "")
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .clipped()
+        HStack(alignment: .top, spacing: 0) {
+            // Status accent stripe — color-coded by list status.
+            RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                .fill(accentColor)
+                .frame(width: 3)
+                .padding(.vertical, 4)
 
-                        LinearGradient(
-                            stops: [
-                                .init(color: .clear, location: 0.5),
-                                .init(color: .black.opacity(0.75), location: 1)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    }
-                )
-                .overlay(alignment: .topTrailing) {
-                    if entry.score > 0 {
-                        HStack(spacing: 2) {
-                            if scoreFormat != .point3 {
-                                Image(systemName: "star.fill").font(.system(size: 7))
-                            }
-                            scoreFormat.scoreText(for: entry.displayScore(in: scoreFormat))
-                                .font(.caption2.weight(.bold))
-                                .lineLimit(1)
-                                .fixedSize(horizontal: true, vertical: false)
-                        }
-                        .foregroundStyle(.yellow)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 3)
-                        .background(.black.opacity(0.55), in: Capsule())
-                        .padding(5)
-                    }
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+            cardBody
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.primary.opacity(0.04))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.07), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 2)
+    }
 
-            // Info
-            VStack(alignment: .leading, spacing: 5) {
+    @ViewBuilder
+    private var cardBody: some View {
+        HStack(alignment: .top, spacing: 12) {
+            coverImage
+
+            // Info column — title, progress bar, chips, meta
+            VStack(alignment: .leading, spacing: 6) {
                 Text(entry.media.title.displayTitle)
-                    .font(.subheadline.weight(.semibold))
+                    .font(.system(size: 15, weight: .semibold))
                     .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .foregroundStyle(.primary)
 
-                Text(progressLabel)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                HStack(spacing: 8) {
-                    if let avg = entry.media.averageScore {
-                        HStack(spacing: 3) {
-                            Image(systemName: "chart.bar.fill")
-                                .font(.system(size: 9))
-                            Text("\(avg)%")
-                                .font(.caption2.weight(.semibold))
-                                .lineLimit(1)
-                                .fixedSize(horizontal: true, vertical: false)
-                        }
-                        .foregroundStyle(.blue)
-                    }
-                    if entry.score > 0 {
-                        HStack(spacing: 3) {
-                            if scoreFormat != .point3 {
-                                Image(systemName: "star.fill")
-                                    .font(.system(size: 9))
-                            }
-                            scoreFormat.scoreText(for: entry.displayScore(in: scoreFormat))
-                                .font(.caption2.weight(.semibold))
-                                .lineLimit(1)
-                                .fixedSize(horizontal: true, vertical: false)
-                        }
-                        .foregroundStyle(.yellow)
-                    }
-                    if let ts = entry.updatedAt {
-                        Text(Date(timeIntervalSince1970: TimeInterval(ts)).formatted(.relative(presentation: .named)))
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                            .lineLimit(1)
-                            .fixedSize(horizontal: true, vertical: false)
-                    }
+                if let total = entry.media.episodes, total > 0 {
+                    progressBar(total: total)
+                } else {
+                    Text(progressLabel)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
                 }
+
+                metaRow
 
                 if let genres = entry.media.genres, !genres.isEmpty {
-                    HStack(spacing: 4) {
-                        ForEach(genres.prefix(2), id: \.self) { g in
-                            Text(g)
-                                .font(.caption2.weight(.medium))
-                                .padding(.horizontal, 7)
-                                .padding(.vertical, 2)
-                                .background(Color.secondary.opacity(0.15), in: Capsule())
-                                .lineLimit(1)
-                                .fixedSize(horizontal: true, vertical: false)
-                        }
-                    }
+                    genreChips(genres)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 6)
 
-            Button { onEdit() } label: {
-                Image(systemName: "pencil.circle.fill")
-                    .font(.system(size: 26))
-                    .foregroundStyle(Color.accentColor)
+            // Edit button — column on the right
+            VStack(spacing: 8) {
+                Button { onEdit() } label: {
+                    Image(systemName: "pencil.circle.fill")
+                        .font(.system(size: 26))
+                        .foregroundStyle(Color.accentColor)
+                        .symbolRenderingMode(.hierarchical)
+                }
+                .buttonStyle(.plain)
+                Spacer(minLength: 0)
             }
-            .buttonStyle(.plain)
+            .padding(.top, 6)
+            .padding(.trailing, 4)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+    }
+
+    @ViewBuilder
+    private var coverImage: some View {
+        Color.clear
+            .aspectRatio(2/3, contentMode: .fit)
+            .frame(width: 64, height: 96)
+            .overlay(
+                CachedAsyncImage(urlString: entry.media.coverImage.best ?? "")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+                    .interpolation(.high)
+            )
+            .overlay(alignment: .bottom) {
+                LinearGradient(
+                    stops: [
+                        .init(color: .clear, location: 0.6),
+                        .init(color: .black.opacity(0.55), location: 1)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+            .overlay(alignment: .bottomTrailing) {
+                if entry.score > 0 {
+                    HStack(spacing: 2) {
+                        if scoreFormat != .point3 {
+                            Image(systemName: "star.fill").font(.system(size: 7))
+                        }
+                        scoreFormat.scoreText(for: entry.displayScore(in: scoreFormat))
+                            .font(.system(size: 10, weight: .bold))
+                    }
+                    .foregroundStyle(.yellow)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(.black.opacity(0.6), in: Capsule())
+                    .padding(4)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .shadow(color: .black.opacity(0.25), radius: 3, x: 0, y: 2)
+    }
+
+    @ViewBuilder
+    private func progressBar(total: Int) -> some View {
+        let ratio = min(1.0, Double(entry.progress) / Double(total))
+        VStack(alignment: .leading, spacing: 3) {
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.secondary.opacity(0.18))
+                        .frame(height: 4)
+                    Capsule()
+                        .fill(accentColor)
+                        .frame(width: max(4, proxy.size.width * ratio), height: 4)
+                }
+            }
+            .frame(height: 4)
+
+            HStack(spacing: 4) {
+                Text("\(entry.progress)")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.primary)
+                Text("/")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Text("\(total)")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Text(entry.media.isManga ? "chapters" : "episodes")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if ratio >= 1.0 {
+                    Text("Done")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.green)
+                } else if ratio > 0 {
+                    Text("\(Int(ratio * 100))%")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var metaRow: some View {
+        HStack(spacing: 8) {
+            if let avg = entry.media.averageScore {
+                HStack(spacing: 3) {
+                    Image(systemName: "chart.bar.fill")
+                        .font(.system(size: 9, weight: .bold))
+                    Text("\(avg)%")
+                        .font(.system(size: 10, weight: .bold))
+                }
+                .foregroundStyle(.blue)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.blue.opacity(0.12), in: Capsule())
+            }
+            if entry.isPrivate {
+                HStack(spacing: 3) {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 8, weight: .bold))
+                    Text("Private")
+                        .font(.system(size: 9, weight: .bold))
+                }
+                .foregroundStyle(.orange)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.orange.opacity(0.12), in: Capsule())
+            }
+            if let ts = entry.updatedAt {
+                Text(Date(timeIntervalSince1970: TimeInterval(ts)).formatted(.relative(presentation: .named)))
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    @ViewBuilder
+    private func genreChips(_ genres: [String]) -> some View {
+        HStack(spacing: 4) {
+            ForEach(genres.prefix(3), id: \.self) { g in
+                Text(g)
+                    .font(.system(size: 9, weight: .semibold))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.secondary.opacity(0.15), in: Capsule())
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+            Spacer(minLength: 0)
         }
     }
 
     private var progressLabel: String {
         if entry.media.isManga {
-            if let total = entry.media.episodes {
-                return "\(entry.progress) / \(total) ch"
-            }
             return "\(entry.progress) ch read"
-        }
-        if let total = entry.media.episodes {
-            return "\(entry.progress) / \(total) episodes"
         }
         return "\(entry.progress) episodes watched"
     }
 }
-
