@@ -443,13 +443,10 @@ struct SearchView: View {
     // MARK: - Empty State
 
     /// Items 17+18: Search empty state with recommendations + Surprise Me.
-    /// Surprise Me is now a proper category-based discovery feature: the
-    /// user picks one or more genres, and we fetch anime from AniList
-    /// filtered by those genres. Previously shown IDs are tracked so
-    /// pressing Surprise Me again never returns the same anime twice.
-    ///
-    /// Also includes inline Sources + Filters sections so they're visible
-    /// on the page by default (not hidden behind a toolbar icon).
+    /// Surprise Me is a category-based discovery feature: the user picks
+    /// one or more genres, and we fetch anime from AniList filtered by
+    /// those genres. Previously shown IDs are tracked so pressing
+    /// Surprise Me again never returns the same anime twice.
     private var searchEmptyState: some View {
         ScrollView {
             VStack(spacing: 24) {
@@ -465,15 +462,6 @@ struct SearchView: View {
                         .foregroundStyle(.secondary)
                 }
                 .padding(.top, 20)
-
-                // Sources — visible on the page, not hidden behind an icon.
-                // Shows the current provider + lets the user switch.
-                sourcesSection
-
-                // Quick filters — genre chips visible on the page. Tapping
-                // a chip opens the full filter sheet with that genre
-                // pre-selected.
-                quickFiltersSection
 
                 // Surprise Me — category-based discovery
                 surpriseMeSection
@@ -563,137 +551,6 @@ struct SearchView: View {
         await MainActor.run {
             self.recommendations = Array(mapped)
         }
-    }
-
-    // MARK: - Inline Sources Section (visible on the page)
-
-    @ViewBuilder
-    private var sourcesSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: "rectangle.stack")
-                    .font(.system(size: 13, weight: .semibold))
-                Text("Source")
-                    .font(.subheadline.weight(.bold))
-                Spacer()
-            }
-            .padding(.horizontal, 16)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(providerManager.orderedProviders, id: \.providerType) { provider in
-                        let isSelected = provider.providerType == primaryProvider
-                        Button {
-                            providerManager.selectProvider(provider.providerType)
-                            Haptics.selection()
-                        } label: {
-                            HStack(spacing: 5) {
-                                CachedAsyncImage(urlString: provider.providerType.iconURL)
-                                    .frame(width: 14, height: 14)
-                                    .clipShape(RoundedRectangle(cornerRadius: 3))
-                                Text(provider.displayName)
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .lineLimit(1)
-                            }
-                            .foregroundStyle(isSelected ? Color.appAccent : .primary)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(
-                                Capsule().fill(isSelected
-                                    ? Color.appAccent.opacity(0.15)
-                                    : Color.secondary.opacity(0.10))
-                            )
-                            .overlay(
-                                Capsule().strokeBorder(
-                                    isSelected ? Color.appAccent.opacity(0.4) : Color.clear,
-                                    lineWidth: 1
-                                )
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 16)
-            }
-        }
-    }
-
-    // MARK: - Inline Quick Filters Section (visible on the page)
-
-    @ViewBuilder
-    private var quickFiltersSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: "line.3.horizontal.decrease")
-                    .font(.system(size: 13, weight: .semibold))
-                Text("Quick Filters")
-                    .font(.subheadline.weight(.bold))
-                Spacer()
-                // "More Filters" button — opens the full filter sheet.
-                Button {
-                    showFilters = true
-                } label: {
-                    Text("More Filters")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.appAccent)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, 16)
-
-            // Quick genre chips — tapping adds the genre to the filter and
-            // immediately searches. Multi-select.
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(quickGenres, id: \.self) { genre in
-                        let isSelected = vm.filters.genres.contains(genre)
-                        Button {
-                            Haptics.selection()
-                            if isSelected {
-                                vm.filters.genres.removeAll { $0 == genre }
-                            } else {
-                                vm.filters.genres.append(genre)
-                            }
-                            if vm.filters.isEmpty {
-                                vm.clearResults()
-                            } else {
-                                vm.search(usingModule: usingModule, isMangaMode: isMangaMode)
-                            }
-                        } label: {
-                            HStack(spacing: 5) {
-                                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                                    .font(.system(size: 10, weight: .bold))
-                                Text(genre)
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .lineLimit(1)
-                            }
-                            .foregroundStyle(isSelected ? Color.appAccent : .primary)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(
-                                Capsule().fill(isSelected
-                                    ? Color.appAccent.opacity(0.15)
-                                    : Color.secondary.opacity(0.10))
-                            )
-                            .overlay(
-                                Capsule().strokeBorder(
-                                    isSelected ? Color.appAccent.opacity(0.4) : Color.clear,
-                                    lineWidth: 1
-                                )
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 16)
-            }
-        }
-    }
-
-    /// Quick-access genres for the inline filter chips.
-    private var quickGenres: [String] {
-        ["Action", "Adventure", "Comedy", "Romance", "Fantasy", "Sci-Fi",
-         "Slice of Life", "Mystery", "Horror", "Drama", "Sports", "Supernatural"]
     }
 
     // MARK: - Surprise Me (category-based discovery)
