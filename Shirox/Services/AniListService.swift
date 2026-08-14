@@ -884,7 +884,7 @@ final class AniListService {
         if let errors = response.errors {
             throw AniListError.graphQL(errors.map(\.message).joined(separator: ", "))
         }
-        return response.data?.Page?.media ?? []
+        return response.data?.Page.media ?? []
     }
 
     /// AniList detail for a MANGA id. Mirrors `detail(id:)` but queries the manga
