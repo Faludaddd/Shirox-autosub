@@ -1,9 +1,17 @@
 import SwiftUI
 
-/// Full standalone AniList detail page for manga — mirrors AniListDetailView's
-/// structure (hero, metadata, statistics, synopsis, relations) but for manga.
-/// Has a "Start Reading" button that resolves the manga module and pushes
-/// MangaDetailView (the source page) for chapter reading.
+/// Full standalone AniList detail page for manga — the PRIMARY manga detail
+/// page. Combines what used to be two pages into one:
+///
+///   1. AniList metadata (hero, statistics, synopsis, characters,
+///      recommendations, relations) — pulled from AniList.
+///   2. Module-sourced chapter list — pulled from the active manga module
+///      via `MangaModuleResolver`, then rendered inline as a chapters
+///      section. Tapping a chapter opens the reader directly.
+///
+/// Previously this page had a "Start Reading" button that pushed a separate
+/// `MangaDetailView` (the chapter-list page). That extra hop is gone — the
+/// chapters now live directly on this page, below the AniList metadata.
 struct AniListMangaDetailView: View {
     let mediaId: Int
     var preloadedMedia: Media? = nil
@@ -16,7 +24,14 @@ struct AniListMangaDetailView: View {
     @State private var existingEntry: LibraryEntry? = nil
     @State private var isLoadingEntry = false
     @State private var autoNavigated = false
-    @State private var autoNavItem: SearchItem?
+    /// Chapters fetched from the resolved manga module. nil = not yet
+    /// loaded; empty = loaded but module had no chapters for this title.
+    @State private var chapters: [MangaChapter] = []
+    @State private var isLoadingChapters = false
+    @State private var chaptersError: String?
+    @State private var readerContext: ReaderContext?
+    @State private var match: MangaMatch?
+    @State private var enrichment: Media?
     @AppStorage("showStatistics") private var showStatistics = true
     @EnvironmentObject private var moduleManager: ModuleManager
     @Environment(\.dismiss) private var dismiss
@@ -66,10 +81,11 @@ struct AniListMangaDetailView: View {
         .onChangeOf(resolvedItem) { item in
             guard autoStartReading, let item, !autoNavigated else { return }
             autoNavigated = true
-            autoNavItem = item
-        }
-        .navigationDestinationCompat(item: $autoNavItem) { item in
-            MangaDetailView(item: item)
+            // autoStartReading now opens the first chapter directly instead
+            // of pushing a separate detail page.
+            if let first = chapters.first {
+                openReader(chapter: first, index: 0)
+            }
         }
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
@@ -82,6 +98,9 @@ struct AniListMangaDetailView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 ModuleSelectorMenu(mediaType: .manga)
             }
+        }
+        .fullScreenCover(item: $readerContext) { ctx in
+            MangaReaderView(context: ctx)
         }
         #endif
     }
@@ -109,12 +128,6 @@ struct AniListMangaDetailView: View {
                     .padding(.top, 16)
                 RecommendationsSection(mediaId: media.id, isManga: true)
                     .padding(.top, 8)
-                #if os(iOS)
-                readButton(media: media)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
-                    .padding(.bottom, 8)
-                #endif
                 if let edges = media.relations?.edges {
                     let mangaRelations = edges.filter { $0.node.isManga }
                     if !mangaRelations.isEmpty {
@@ -122,6 +135,12 @@ struct AniListMangaDetailView: View {
                             .padding(.top, 16)
                     }
                 }
+                // Chapters — fetched from the resolved manga module. This is
+                // the old "Start Reading" destination, now inlined so the
+                // user goes straight from the manga detail page to reading
+                // without an intermediate navigation hop.
+                chaptersSection
+                    .padding(.top, 16)
             }
             .padding(.bottom, 30)
         }
@@ -129,7 +148,186 @@ struct AniListMangaDetailView: View {
         .ignoresSafeArea(edges: .top)
     }
 
+    // MARK: - Chapters section (inlined from MangaDetailView)
+
+    @ViewBuilder
+    private var chaptersSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Chapters")
+                    .font(.title3.weight(.bold))
+                Spacer()
+                if !chapters.isEmpty {
+                    Text("\(chapters.count)")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(Color.secondary.opacity(0.15)))
+                }
+            }
+            .padding(.horizontal, 16)
+
+            if isLoadingChapters {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("Loading chapters…")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, 24)
+            } else if let error = chaptersError {
+                VStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.title2)
+                        .foregroundStyle(.secondary)
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    Button("Retry") { Task { await loadChapters() } }
+                        .font(.caption.weight(.semibold))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 24)
+            } else if chapters.isEmpty {
+                // No chapters — either no module matched, or the module had
+                // no results. Show a helpful empty state.
+                VStack(spacing: 8) {
+                    Image(systemName: "book.closed")
+                        .font(.title2)
+                        .foregroundStyle(.secondary)
+                    if phase == .noModule {
+                        Text("Install a manga module to read chapters.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    } else if phase == .notFound {
+                        Text("No chapters found in your manga module.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    } else {
+                        Text("No chapters available.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 24)
+            } else {
+                LazyVStack(spacing: 0) {
+                    ForEach(Array(chapters.enumerated()), id: \.element.id) { idx, chapter in
+                        chapterRow(chapter, index: idx)
+                    }
+                }
+                .background(Color.secondary.opacity(0.05))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal, 16)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func chapterRow(_ chapter: MangaChapter, index: Int) -> some View {
+        Button {
+            openReader(chapter: chapter, index: index)
+        } label: {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(Color.primary.opacity(0.08))
+                        .frame(width: 36, height: 36)
+                    Text(chapter.displayNumber)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(chapter.title.isEmpty ? "Chapter \(chapter.displayNumber)" : chapter.title)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    Text("Chapter")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        if index < chapters.count - 1 {
+            Divider()
+                .padding(.leading, 60)
+        }
+    }
+
+    /// Opens the manga reader for a chapter. Builds a `ReaderContext` from
+    /// the resolved `SearchItem` + the chapter list, then presents it via
+    /// `.fullScreenCover`. This is the same path the old `MangaDetailView`
+    /// used — just hoisted into this page so the extra navigation hop is
+    /// gone.
+    private func openReader(chapter: MangaChapter, index: Int) {
+        #if os(iOS)
+        guard let item = resolvedItem else { return }
+        readerContext = ReaderContext(
+            mangaTitle: item.title,
+            mangaHref: item.href,
+            coverImage: item.image,
+            moduleId: moduleManager.activeModule?.id ?? "",
+            chapters: chapters,
+            chapterIndex: index,
+            resumePage: nil,
+            resumeFraction: nil,
+            match: match
+        )
+        #endif
+    }
+
     // MARK: - Hero
+
+    /// Hero background. When AniList provides a dedicated `bannerImage`
+    /// (different artwork from the cover), we use it directly. When no
+    /// banner is available, we blur the cover image so the hero background
+    /// reads as a distinct visual element from the sharp poster below —
+    /// avoiding the "same image twice" problem where a manga's cover
+    /// appears identically in both the hero and the poster slot.
+    @ViewBuilder
+    private func heroBackground(media: Media, width: CGFloat, height: CGFloat) -> some View {
+        if let banner = media.bannerImage, !banner.isEmpty {
+            // Dedicated banner — different artwork. Use directly.
+            CachedAsyncImage(urlString: banner)
+                .frame(width: width, height: height)
+        } else if let coverURL = media.coverImage.best, !coverURL.isEmpty {
+            // No banner — blur the cover so it's visually distinct from
+            // the sharp poster. The blur + a subtle dark overlay gives the
+            // hero depth without needing a second asset.
+            CachedAsyncImage(urlString: coverURL)
+                .frame(width: width, height: height)
+                .blur(radius: 30)
+                .overlay(Color.black.opacity(0.3))
+                .overlay(
+                    LinearGradient(
+                        colors: [Color.black.opacity(0.2), .clear],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+        } else {
+            // No image at all — solid color fallback.
+            Color.secondary.opacity(0.2)
+                .frame(width: width, height: height)
+        }
+    }
 
     @ViewBuilder
     private func heroSection(media: Media) -> some View {
@@ -141,7 +339,13 @@ struct AniListMangaDetailView: View {
                 let imageH = 420 + stretch + scrollDown * 0.5
                 let imageY = scrollDown * 0.5 - stretch
 
-                CachedAsyncImage(urlString: media.bannerImage ?? media.coverImage.best ?? "")
+                // Hero background: prefer a dedicated banner when AniList
+                // provides one (different artwork from the cover). When no
+                // banner is available, blur the cover image so the hero
+                // background is visually distinct from the sharp poster
+                // below — avoids the "same image twice" problem where a
+                // manga's cover appears identically in both areas.
+                heroBackground(media: media, width: proxy.size.width, height: imageH)
                     .frame(width: proxy.size.width, height: imageH)
                     .clipped()
                     .offset(y: imageY)
@@ -162,6 +366,10 @@ struct AniListMangaDetailView: View {
             .frame(height: 420)
 
             HStack(alignment: .bottom, spacing: 14) {
+                // Poster: use the best available cover image (extraLarge
+                // preferred). This is distinct from the hero background
+                // when a banner exists; when no banner, the hero is
+                // blurred so the two still read as different visuals.
                 CachedAsyncImage(urlString: media.coverImage.best ?? "")
                     .frame(width: 110, height: 165)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -296,45 +504,6 @@ struct AniListMangaDetailView: View {
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.primary.opacity(0.22), lineWidth: 1.2))
     }
 
-    // MARK: - Read button
-
-    @ViewBuilder
-    private func readButton(media: Media) -> some View {
-        if let item = resolvedItem {
-            NavigationLink {
-                MangaDetailView(item: item)
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "book.fill")
-                        .font(.caption.weight(.bold))
-                    Text("Start Reading")
-                        .font(.subheadline.weight(.semibold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                }
-                .foregroundStyle(.primary)
-                .frame(maxWidth: .infinity)
-                .frame(height: 38)
-                .background(.ultraThinMaterial, in: Capsule())
-                .overlay(Capsule().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
-            }
-            .buttonStyle(.plain)
-        } else {
-            // No module match — show a disabled-style button
-            HStack(spacing: 6) {
-                Image(systemName: "book.fill")
-                    .font(.caption.weight(.bold))
-                Text("No Module Match")
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(1)
-            }
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity)
-            .frame(height: 38)
-            .background(Color.secondary.opacity(0.1), in: Capsule())
-        }
-    }
-
     // MARK: - Relations
 
     @ViewBuilder
@@ -388,7 +557,7 @@ struct AniListMangaDetailView: View {
                 .flatMap { AniListProvider.shared.mapEntry($0) }
         }
 
-        // Try to resolve a manga module for the "Start Reading" button
+        // Try to resolve a manga module for chapter reading
         let hasMangaModule = moduleManager.modules.contains { $0.isManga }
         guard hasMangaModule else {
             phase = .noModule
@@ -398,12 +567,44 @@ struct AniListMangaDetailView: View {
         #if os(iOS)
         if let item = await MangaModuleResolver.shared.resolve(title: media!.title.searchTitle) {
             resolvedItem = item
+            // Also try to load an existing match so the reader can track
+            // progress against AniList/MAL.
+            match = await MangaMatchManager.shared.match(
+                mangaHref: item.href, title: item.title)
             phase = .ready
+            // Kick off chapter loading in the background — the page is
+            // already showing; chapters fill in when ready.
+            await loadChapters()
         } else {
             phase = .notFound
         }
         #else
         phase = .noModule
         #endif
+    }
+
+    /// Fetches chapters from the resolved manga module. Called after
+    /// `resolve()` succeeds. Sets `chaptersError` on failure so the UI can
+    /// show a retry button.
+    private func loadChapters() async {
+        guard let item = resolvedItem else { return }
+        isLoadingChapters = true
+        chaptersError = nil
+        do {
+            // Ensure the active manga module is loaded into JSEngine.
+            // MangaModuleResolver.resolve already switched to a module, but
+            // double-check in case the user switched modules via the
+            // selector after resolve() ran.
+            if moduleManager.activeModule?.isManga != true,
+               let mangaModule = moduleManager.modules.first(where: { $0.isManga }) {
+                _ = await moduleManager.selectAndAwaitReady(mangaModule)
+            }
+            let fetched = try await JSEngine.shared.mangaChapters(url: item.href)
+            chapters = fetched
+        } catch {
+            chaptersError = error.localizedDescription
+            chapters = []
+        }
+        isLoadingChapters = false
     }
 }

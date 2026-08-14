@@ -325,8 +325,14 @@ struct MangaDetailView: View {
                 let imageH = 420 + stretch + scrollDown * 0.5
                 let imageY = scrollDown * 0.5 - stretch
 
+                // Hero background: blur the cover so it's visually distinct
+                // from the sharp poster below (module-sourced manga rarely
+                // has a separate banner asset, so the blur is the only way
+                // to avoid "same image twice").
                 CachedAsyncImage(urlString: detail.image)
                     .frame(width: proxy.size.width, height: imageH)
+                    .blur(radius: 30)
+                    .overlay(Color.black.opacity(0.3))
                     .clipped()
                     .offset(y: imageY)
             }
