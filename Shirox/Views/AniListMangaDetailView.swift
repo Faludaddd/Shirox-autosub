@@ -316,13 +316,12 @@ struct AniListMangaDetailView: View {
             CachedAsyncImage(urlString: banner)
                 .frame(width: width, height: height)
         } else if let coverURL = media.coverImage.best, !coverURL.isEmpty {
-            // No banner — blur the cover so it's visually distinct from
-            // the sharp poster. The blur + a subtle dark overlay gives the
-            // hero depth without needing a second asset.
+            // No banner — use the cover image directly (NO blur). The user
+            // wants sharp artwork, not a muddy blurred background. The dark
+            // overlay + gradient still gives the hero depth.
             CachedAsyncImage(urlString: coverURL)
                 .frame(width: width, height: height)
-                .blur(radius: 30)
-                .overlay(Color.black.opacity(0.3))
+                .overlay(Color.black.opacity(0.35))
                 .overlay(
                     LinearGradient(
                         colors: [Color.black.opacity(0.2), .clear],

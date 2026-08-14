@@ -83,6 +83,23 @@ import Combine
         persist()
     }
 
+    /// True when the user has any reading progress (a Continue Reading item
+    /// or any read chapter) for `mangaHref`. Used by MangaDetailView's Reset
+    /// Progress button to decide whether to show.
+    func hasProgress(mangaHref: String) -> Bool {
+        items.contains { $0.mangaHref == mangaHref }
+            || (readChapters[mangaHref]?.isEmpty == false)
+    }
+
+    /// Clears ALL reading progress for `mangaHref` — removes the Continue
+    /// Reading item and all read-chapter markers. Used by MangaDetailView's
+    /// Reset Progress button (mirrors ContinueWatchingManager.resetProgress).
+    func resetProgress(mangaHref: String) {
+        items.removeAll { $0.mangaHref == mangaHref }
+        readChapters[mangaHref] = nil
+        persist()
+    }
+
     func resetAllData() {
         items = []
         readChapters = [:]

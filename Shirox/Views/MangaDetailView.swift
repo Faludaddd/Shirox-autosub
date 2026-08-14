@@ -15,6 +15,12 @@ struct MangaDetailView: View {
     @ObservedObject private var progress = MangaProgressManager.shared
     @State private var isSynopsisExpanded = false
     @State private var newestFirst = false
+    /// Chapters section collapsed by default — manga can have hundreds of
+    /// chapters, so collapsing avoids an enormous scroll. The user taps
+    /// the chevron to expand. Characters/Recommendations sit below the
+    /// chapter section regardless of collapse state.
+    @State private var isChaptersCollapsed = true
+    @State private var showResetConfirmation = false
     @State private var readerContext: ReaderContext?
     @State private var showMatchSheet = false
 
@@ -307,11 +313,31 @@ struct MangaDetailView: View {
                     }
                 }
                 chaptersSection(detail)
+
+                // Characters + Recommendations — placed BELOW the chapters
+                // section per the required layout:
+                // Synopsis → Chapters → Characters → Recommendations.
+                // These fetch from AniList using the matched manga's ID
+                // (from vm.match) or the enrichment media's ID.
+                if let aid = mangaAniListID {
+                    CharactersSection(mediaId: aid, isManga: true)
+                        .padding(.top, 20)
+                    RecommendationsSection(mediaId: aid, isManga: true)
+                        .padding(.top, 8)
+                }
             }
             .padding(.bottom, 30)
         }
         .coordinateSpace(name: "mangaDetailScroll")
         .ignoresSafeArea(edges: .top)
+        .alert("Reset Progress", isPresented: $showResetConfirmation) {
+            Button("Reset", role: .destructive) {
+                progress.resetProgress(mangaHref: item.href)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will clear your reading progress for this manga. You'll start from chapter 1 next time.")
+        }
     }
 
     // MARK: - Hero (mirrors DetailView's parallax banner)
@@ -325,14 +351,13 @@ struct MangaDetailView: View {
                 let imageH = 420 + stretch + scrollDown * 0.5
                 let imageY = scrollDown * 0.5 - stretch
 
-                // Hero background: blur the cover so it's visually distinct
-                // from the sharp poster below (module-sourced manga rarely
-                // has a separate banner asset, so the blur is the only way
-                // to avoid "same image twice").
+                // Hero background: use the cover image directly (NO blur).
+                // The blur was making manga posters look muddy — the user
+                // wants sharp, clear artwork. The dark overlay + gradient
+                // still gives the hero depth without blurring the image.
                 CachedAsyncImage(urlString: detail.image)
                     .frame(width: proxy.size.width, height: imageH)
-                    .blur(radius: 30)
-                    .overlay(Color.black.opacity(0.3))
+                    .overlay(Color.black.opacity(0.35))
                     .clipped()
                     .offset(y: imageY)
             }
@@ -587,6 +612,25 @@ struct MangaDetailView: View {
                         .background(Color.primary, in: Capsule())
                         .lineLimit(1)
                         .fixedSize(horizontal: true, vertical: false)
+
+                    // Collapse/expand chevron — tapping toggles the chapter
+                    // list visibility. Collapsed by default so manga with
+                    // hundreds of chapters don't create an enormous scroll.
+                    Button {
+                        Haptics.light()
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            isChaptersCollapsed.toggle()
+                        }
+                    } label: {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.primary)
+                            .frame(width: 36, height: 36)
+                            .background(.ultraThinMaterial, in: Circle())
+                            .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
+                            .rotationEffect(.degrees(isChaptersCollapsed ? 0 : 90))
+                    }
+                    .buttonStyle(.plain)
                 }
                 Spacer()
 
@@ -608,6 +652,9 @@ struct MangaDetailView: View {
                     .buttonStyle(.plain)
                     #endif
 
+                    // Invert button (same as anime detail's isReversed).
+                    // Toggles newestFirst so chapters display in reverse
+                    // order. Matches the anime detail's Invert button.
                     Button {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                             newestFirst.toggle()
@@ -621,6 +668,22 @@ struct MangaDetailView: View {
                             .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
                     }
                     .buttonStyle(.plain)
+
+                    // Reset progress button (same as anime detail). Shows
+                    // only when the user has reading progress on this manga.
+                    if progress.hasProgress(mangaHref: item.href) {
+                        Button {
+                            showResetConfirmation = true
+                        } label: {
+                            Image(systemName: "arrow.counterclockwise")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(.primary)
+                                .frame(width: 32, height: 32)
+                                .background(.ultraThinMaterial, in: Circle())
+                                .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
             }
             .padding(.horizontal, 16)
@@ -684,7 +747,11 @@ struct MangaDetailView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 16)
-            } else {
+            } else if !isChaptersCollapsed {
+                // Chapter list — only shown when the section is expanded.
+                // Collapsed by default so manga with hundreds of chapters
+                // don't create an enormous scroll. Characters/Recommendations
+                // below are always visible regardless of collapse state.
                 let ordered = newestFirst ? Array(visibleChapters.reversed()) : visibleChapters
                 let lastRead = progress.lastRead(for: item.href)
                 LazyVStack(spacing: 8) {

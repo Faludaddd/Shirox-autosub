@@ -442,7 +442,14 @@ struct SearchView: View {
 
     // MARK: - Empty State
 
-    /// Items 17+18: Search empty state with recommendations + Surprise Me
+    /// Items 17+18: Search empty state with recommendations + Surprise Me.
+    /// Surprise Me is now a proper category-based discovery feature: the
+    /// user picks one or more genres, and we fetch anime from AniList
+    /// filtered by those genres. Previously shown IDs are tracked so
+    /// pressing Surprise Me again never returns the same anime twice.
+    ///
+    /// Also includes inline Sources + Filters sections so they're visible
+    /// on the page by default (not hidden behind a toolbar icon).
     private var searchEmptyState: some View {
         ScrollView {
             VStack(spacing: 24) {
@@ -459,32 +466,17 @@ struct SearchView: View {
                 }
                 .padding(.top, 20)
 
-                // Item 18: Surprise Me — glow enabled (batch 10 item 5).
-                // Uses the large radius + 0.7 base opacity for a strong hero
-                // glow that matches the app-wide glow tuning (radius +30%,
-                // brightness +40%).
-                Button {
-                    surpriseMe()
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "shuffle.circle.fill")
-                            .font(.title2)
-                        Text("Surprise Me")
-                            .font(.headline)
-                    }
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(Color.appAccent, in: RoundedRectangle(cornerRadius: 14))
-                    .shadow(
-                        color: Color.glowEnabled
-                            ? Color.appAccent.opacity(Color.glowOpacity(0.7))
-                            : .clear,
-                        radius: Color.glowEnabled ? Color.glowRadiusLarge : 0
-                    )
-                }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 16)
+                // Sources — visible on the page, not hidden behind an icon.
+                // Shows the current provider + lets the user switch.
+                sourcesSection
+
+                // Quick filters — genre chips visible on the page. Tapping
+                // a chip opens the full filter sheet with that genre
+                // pre-selected.
+                quickFiltersSection
+
+                // Surprise Me — category-based discovery
+                surpriseMeSection
 
                 // Item 17: Recommendations
                 if !recommendations.isEmpty {
@@ -573,28 +565,327 @@ struct SearchView: View {
         }
     }
 
-    /// Item 18: Picks a random title from Planning or Trending
-    @State private var surpriseDestination: Media?
+    // MARK: - Inline Sources Section (visible on the page)
 
-    private func surpriseMe() {
-        Task {
-            let type: MediaListType = isMangaMode ? .manga : .anime
-            // Try Planning list first
-            if let userId = AniListAuthManager.shared.userId {
-                if let library = try? await AniListLibraryService.shared.fetchAllLists(userId: userId, type: type) {
-                    let planning = library.filter { $0.status == .planning }
-                    if let random = planning.randomElement() {
-                        let media = AniListProvider.shared.mapMedia(random.media)
-                        await MainActor.run { self.surpriseDestination = media }
-                        return
+    @ViewBuilder
+    private var sourcesSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: "rectangle.stack")
+                    .font(.system(size: 13, weight: .semibold))
+                Text("Source")
+                    .font(.subheadline.weight(.bold))
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(providerManager.orderedProviders, id: \.providerType) { provider in
+                        let isSelected = provider.providerType == primaryProvider
+                        Button {
+                            providerManager.selectProvider(provider.providerType)
+                            Haptics.selection()
+                        } label: {
+                            HStack(spacing: 5) {
+                                CachedAsyncImage(urlString: provider.providerType.iconURL)
+                                    .frame(width: 14, height: 14)
+                                    .clipShape(RoundedRectangle(cornerRadius: 3))
+                                Text(provider.displayName)
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .lineLimit(1)
+                            }
+                            .foregroundStyle(isSelected ? Color.appAccent : .primary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(
+                                Capsule().fill(isSelected
+                                    ? Color.appAccent.opacity(0.15)
+                                    : Color.secondary.opacity(0.10))
+                            )
+                            .overlay(
+                                Capsule().strokeBorder(
+                                    isSelected ? Color.appAccent.opacity(0.4) : Color.clear,
+                                    lineWidth: 1
+                                )
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
+                .padding(.horizontal, 16)
             }
-            // Fall back to Trending
-            let trending = (try? await AniListService.shared.trending()) ?? []
-            if let random = trending.randomElement() {
-                let media = AniListProvider.shared.mapMedia(random)
-                await MainActor.run { self.surpriseDestination = media }
+        }
+    }
+
+    // MARK: - Inline Quick Filters Section (visible on the page)
+
+    @ViewBuilder
+    private var quickFiltersSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: "line.3.horizontal.decrease")
+                    .font(.system(size: 13, weight: .semibold))
+                Text("Quick Filters")
+                    .font(.subheadline.weight(.bold))
+                Spacer()
+                // "More Filters" button — opens the full filter sheet.
+                Button {
+                    showFilters = true
+                } label: {
+                    Text("More Filters")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.appAccent)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 16)
+
+            // Quick genre chips — tapping adds the genre to the filter and
+            // immediately searches. Multi-select.
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(quickGenres, id: \.self) { genre in
+                        let isSelected = vm.filters.genres.contains(genre)
+                        Button {
+                            Haptics.selection()
+                            if isSelected {
+                                vm.filters.genres.removeAll { $0 == genre }
+                            } else {
+                                vm.filters.genres.append(genre)
+                            }
+                            if vm.filters.isEmpty {
+                                vm.clearResults()
+                            } else {
+                                vm.search(usingModule: usingModule, isMangaMode: isMangaMode)
+                            }
+                        } label: {
+                            HStack(spacing: 5) {
+                                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                                    .font(.system(size: 10, weight: .bold))
+                                Text(genre)
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .lineLimit(1)
+                            }
+                            .foregroundStyle(isSelected ? Color.appAccent : .primary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(
+                                Capsule().fill(isSelected
+                                    ? Color.appAccent.opacity(0.15)
+                                    : Color.secondary.opacity(0.10))
+                            )
+                            .overlay(
+                                Capsule().strokeBorder(
+                                    isSelected ? Color.appAccent.opacity(0.4) : Color.clear,
+                                    lineWidth: 1
+                                )
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
+        }
+    }
+
+    /// Quick-access genres for the inline filter chips.
+    private var quickGenres: [String] {
+        ["Action", "Adventure", "Comedy", "Romance", "Fantasy", "Sci-Fi",
+         "Slice of Life", "Mystery", "Horror", "Drama", "Sports", "Supernatural"]
+    }
+
+    // MARK: - Surprise Me (category-based discovery)
+
+    /// Categories the user can pick from. These map to AniList genres.
+    private let surpriseCategories: [(label: String, genre: String, icon: String)] = [
+        ("Action", "Action", "bolt.fill"),
+        ("Adventure", "Adventure", "mountain.2.fill"),
+        ("Comedy", "Comedy", "face.smiling.fill"),
+        ("Romance", "Romance", "heart.fill"),
+        ("Fantasy", "Fantasy", "wand.and.stars"),
+        ("Horror", "Horror", "ghost.fill"),
+        ("Mystery", "Mystery", "questionmark.circle.fill"),
+        ("Sci-Fi", "Sci-Fi", "rocket.fill"),
+        ("Sports", "Sports", "figure.run"),
+        ("Thriller", "Thriller", "exclamationmark.triangle.fill"),
+        ("Drama", "Drama", "theatermasks.fill"),
+        ("Slice of Life", "Slice of Life", "cup.and.saucer.fill"),
+        ("Supernatural", "Supernatural", "sparkles"),
+        ("Isekai", "Isekai", "arrow.triangle.swap"),
+        ("Shounen", "Shounen", "flame.fill"),
+        ("Seinen", "Seinen", "shield.fill"),
+        ("School", "School", "graduationcap.fill"),
+        ("Historical", "Historical", "clock.fill")
+    ]
+
+    /// Genres the user has selected for Surprise Me. Multi-select.
+    @State private var selectedSurpriseGenres: Set<String> = []
+    /// IDs of anime already shown by Surprise Me in this session. Tracked
+    /// so pressing Surprise Me again never returns the same anime twice.
+    /// Reset when the user clears their selection or exhausts the pool.
+    @State private var surpriseShownIds: Set<Int> = []
+    @State private var surpriseDestination: Media?
+    @State private var isSurpriseLoading = false
+
+    @ViewBuilder
+    private var surpriseMeSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Section header
+            HStack {
+                Image(systemName: "shuffle.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(Color.appAccent)
+                Text("Surprise Me")
+                    .font(.title3.weight(.bold))
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+
+            Text("Pick one or more categories, then tap Surprise Me to discover anime you haven't seen yet.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 16)
+
+            // Category chips — multi-select, same style as the filter chips
+            // in SearchFilterSheet so the UI is consistent.
+            LazyVGrid(columns: [
+                GridItem(.adaptive(minimum: 100), spacing: 8)
+            ], spacing: 8) {
+                ForEach(surpriseCategories, id: \.genre) { cat in
+                    let isSelected = selectedSurpriseGenres.contains(cat.genre)
+                    Button {
+                        Haptics.selection()
+                        if isSelected {
+                            selectedSurpriseGenres.remove(cat.genre)
+                        } else {
+                            selectedSurpriseGenres.insert(cat.genre)
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: cat.icon)
+                                .font(.system(size: 11, weight: .semibold))
+                            Text(cat.label)
+                                .font(.system(size: 12, weight: .semibold))
+                                .lineLimit(1)
+                        }
+                        .foregroundStyle(isSelected ? Color.appAccent : .primary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            Capsule().fill(isSelected
+                                ? Color.appAccent.opacity(0.15)
+                                : Color.secondary.opacity(0.10))
+                        )
+                        .overlay(
+                            Capsule().strokeBorder(
+                                isSelected ? Color.appAccent.opacity(0.4) : Color.clear,
+                                lineWidth: 1
+                            )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 16)
+
+            // Surprise Me button — glow enabled. Disabled while loading or
+            // when no categories are selected.
+            Button {
+                surpriseMe()
+            } label: {
+                HStack(spacing: 8) {
+                    if isSurpriseLoading {
+                        ProgressView()
+                            .tint(.white)
+                            .scaleEffect(0.8)
+                    } else {
+                        Image(systemName: "shuffle")
+                            .font(.title3)
+                    }
+                    Text(isSurpriseLoading ? "Finding…" : "Surprise Me")
+                        .font(.headline)
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(
+                    selectedSurpriseGenres.isEmpty
+                        ? Color.secondary.opacity(0.4)
+                        : Color.appAccent,
+                    in: RoundedRectangle(cornerRadius: 14)
+                )
+                .shadow(
+                    color: !selectedSurpriseGenres.isEmpty && Color.glowEnabled
+                        ? Color.appAccent.opacity(Color.glowOpacity(0.7))
+                        : .clear,
+                    radius: !selectedSurpriseGenres.isEmpty && Color.glowEnabled
+                        ? Color.glowRadiusLarge : 0
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(selectedSurpriseGenres.isEmpty || isSurpriseLoading)
+            .padding(.horizontal, 16)
+
+            // Shown count — lets the user know how many they've explored.
+            if !surpriseShownIds.isEmpty {
+                Text("\(surpriseShownIds.count) explored this session")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            }
+        }
+    }
+
+    /// Picks a random anime from AniList filtered by the selected genres.
+    /// Tracks shown IDs so the same anime is never returned twice in one
+    /// session. When the pool is exhausted, resets the exclusion list.
+    private func surpriseMe() {
+        guard !selectedSurpriseGenres.isEmpty else { return }
+        isSurpriseLoading = true
+        Task {
+            let genres = Array(selectedSurpriseGenres)
+            // Use the genre-filtered browse endpoint. Fetches 50 results per
+            // genre so we have a good pool to pick from after excluding
+            // already-shown IDs.
+            let type = isMangaMode ? "MANGA" : "ANIME"
+            var results: [AniListMedia] = []
+            for genre in genres {
+                if let batch = try? await AniListService.shared.browseByGenre(
+                    type: type, genres: [genre]) {
+                    results.append(contentsOf: batch)
+                }
+            }
+            // Deduplicate by ID
+            var seen = Set<Int>()
+            results = results.filter { seen.insert($0.id).inserted }
+            // Exclude already-shown
+            let pool = results.filter { !surpriseShownIds.contains($0.id) }
+            let pick: AniListMedia?
+            if let random = pool.randomElement() {
+                pick = random
+                surpriseShownIds.insert(random.id)
+            } else if let random = results.randomElement() {
+                // Pool exhausted — reset and pick from the full set
+                surpriseShownIds = [random.id]
+                pick = random
+            } else {
+                pick = nil
+            }
+            await MainActor.run {
+                isSurpriseLoading = false
+                if let pick {
+                    surpriseDestination = AniListProvider.shared.mapMedia(pick)
+                } else {
+                    ToastManager.shared.show(
+                        title: "Surprise Me",
+                        message: "No anime found for those categories. Try different ones.",
+                        icon: "shuffle.circle",
+                        iconColor: .orange
+                    )
+                }
             }
         }
     }

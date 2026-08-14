@@ -680,20 +680,9 @@ struct AniListDetailView: View {
                         .padding(.top, 16)
                 }
 
-                // Characters + Recommendations — directly below the synopsis.
-                // Data is preloaded from the VM's `load()` call (a single
-                // AniList fetch that includes characters + recommendations),
-                // so these sections render immediately without a second
-                // network call.
-                CharactersSection(mediaId: media.id, isManga: false,
-                                  preloaded: vm.characters)
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 16)
-
-                RecommendationsSection(mediaId: media.id, isManga: false,
-                                       preloaded: vm.recommendations)
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 8)
+                // NOTE: Characters + Recommendations are now placed BELOW
+                // the episodes section (see end of this VStack), not here.
+                // Order: Synopsis → Episodes → Characters → Recommendations.
 
                 #if os(iOS)
                 HStack(spacing: 10) {
@@ -783,6 +772,20 @@ struct AniListDetailView: View {
                     }
                     .frame(maxWidth: .infinity)
                 }
+
+                // Characters + Recommendations — placed BELOW the episodes
+                // section per the required layout:
+                // Synopsis → Episodes → Characters → Recommendations.
+                // Data is preloaded from the VM's `load()` call.
+                CharactersSection(mediaId: media.id, isManga: false,
+                                  preloaded: vm.characters)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 20)
+
+                RecommendationsSection(mediaId: media.id, isManga: false,
+                                       preloaded: vm.recommendations)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 8)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             // Invisible scroll-offset probe: reports the VStack's top edge in the

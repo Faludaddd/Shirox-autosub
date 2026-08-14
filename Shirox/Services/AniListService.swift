@@ -841,6 +841,52 @@ final class AniListService {
         return media
     }
 
+    /// Genre-filtered browse for Surprise Me. Fetches a page of anime/manga
+    /// filtered by one or more genres, sorted by popularity. Used by the
+    /// Surprise Me discovery feature to pick random titles the user hasn't
+    /// seen yet.
+    ///
+    /// - Parameters:
+    ///   - page: 1-indexed page number.
+    ///   - type: "ANIME" or "MANGA".
+    ///   - genres: genres to filter by (OR semantics — title matches if it
+    ///     has ANY of the specified genres).
+    ///   - perPage: results per page (default 50 for a good random pool).
+    func browseByGenre(page: Int = 1, type: String = "ANIME",
+                       genres: [String], perPage: Int = 50) async throws -> [AniListMedia] {
+        guard !genres.isEmpty else { return [] }
+        let genresArg = "[\"" + genres.joined(separator: "\", \"") + "\"]"
+        let query = """
+        query ($page: Int) {
+          Page(page: $page, perPage: \(perPage)) {
+            media(type: \(type), genre_in: \(genresArg), sort: POPULARITY_DESC, isAdult: false) {
+              id
+              idMal
+              title { romaji english native }
+              coverImage { large extraLarge }
+              bannerImage
+              description(asHtml: false)
+              episodes
+              chapters
+              status
+              averageScore
+              genres
+              format
+              season
+              seasonYear
+              type
+            }
+          }
+        }
+        """
+        let data = try await post(query: query, variables: ["page": page])
+        let response = try JSONDecoder().decode(GraphQLResponse<PageData>.self, from: data)
+        if let errors = response.errors {
+            throw AniListError.graphQL(errors.map(\.message).joined(separator: ", "))
+        }
+        return response.data?.Page?.media ?? []
+    }
+
     /// AniList detail for a MANGA id. Mirrors `detail(id:)` but queries the manga
     /// media type (chapters/volumes instead of episodes, no airing) and includes
     /// relations.
