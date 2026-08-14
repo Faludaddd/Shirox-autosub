@@ -14,6 +14,7 @@ import SwiftUI
 
 struct CharactersSection: View {
     let mediaId: Int
+    let isManga: Bool
     /// Optional preloaded characters — when the parent already has them
     /// (e.g. anime detail fetches them as part of the main query), pass
     /// them in to avoid a second network call.
@@ -68,8 +69,10 @@ struct CharactersSection: View {
     @ViewBuilder
     private func characterCard(_ edge: AniListCharacterEdge) -> some View {
         VStack(alignment: .leading, spacing: 6) {
+            // Character images from AniList are 2:3 portrait. Use a 100×150
+            // frame (2:3) so the image fills without distortion or cropping.
             CachedAsyncImage(urlString: edge.node.image?.large ?? edge.node.image?.medium ?? "")
-                .frame(width: 100, height: 140)
+                .frame(width: 100, height: 150)
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -97,10 +100,22 @@ struct CharactersSection: View {
 
     private func loadCharacters() async {
         didLoad = true
-        // Reuse the main detail query — it already includes characters with
-        // voice actors. This is a single extra call, cached by URLCache.
-        if let media = try? await AniListService.shared.detail(id: mediaId) {
+        // Use the right endpoint for the media type. The anime detail query
+        // (AniListService.detail) uses `type: ANIME`; the manga detail query
+        // (AniListService.mangaDetail) uses `type: MANGA`. Calling the wrong
+        // one returns nothing, which is why characters never appeared on
+        // manga pages.
+        do {
+            let media: AniListMedia
+            if isManga {
+                media = try await AniListService.shared.mangaDetail(id: mediaId)
+            } else {
+                media = try await AniListService.shared.detail(id: mediaId)
+            }
             characters = media.characters?.edges ?? []
+        } catch {
+            // Best-effort — leave characters empty if the fetch fails.
+            characters = []
         }
     }
 }
@@ -177,9 +192,10 @@ struct CharacterDetailView: View {
                 )
 
             // Foreground: sharp character portrait on the left.
+            // 2:3 aspect ratio matches AniList character images (no distortion).
             HStack(alignment: .bottom, spacing: 14) {
                 CachedAsyncImage(urlString: displayCharacter.image?.large ?? displayCharacter.image?.medium ?? "")
-                    .frame(width: 110, height: 160)
+                    .frame(width: 110, height: 165)
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -269,8 +285,9 @@ struct CharacterDetailView: View {
     @ViewBuilder
     private func voiceActorCard(_ va: AniListVoiceActor) -> some View {
         VStack(alignment: .leading, spacing: 6) {
+            // VA images are also 2:3 portrait on AniList.
             CachedAsyncImage(urlString: va.image?.large ?? va.image?.medium ?? "")
-                .frame(width: 90, height: 120)
+                .frame(width: 90, height: 135)
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -448,16 +465,22 @@ struct RecommendationsSection: View {
 
     private func loadRecommendations() async {
         didLoad = true
-        // The anime detail query already includes recommendations; the manga
-        // detail query does not. We call the anime detail endpoint for both
-        // — AniList returns cross-type recommendations either way, and we
-        // filter to the right type client-side.
-        if let media = try? await AniListService.shared.detail(id: mediaId) {
+        // Use the right endpoint for the media type. The anime detail query
+        // includes recommendations; the manga detail query now does too
+        // (added in this batch). Both return a `recommendations` connection
+        // we filter by type.
+        do {
+            let media: AniListMedia
+            if isManga {
+                media = try await AniListService.shared.mangaDetail(id: mediaId)
+            } else {
+                media = try await AniListService.shared.detail(id: mediaId)
+            }
             let all = media.recommendations?.nodes ?? []
             // Filter by type so anime pages only show anime recs and manga
-            // pages only show manga recs. The recommendation payload doesn't
-            // always include `type`, so we fall back to showing everything
-            // when the type field is missing (better than an empty section).
+            // pages only show manga recs. The recommendation payload's
+            // `type` field is now included in both queries; if it's missing
+            // we fall back to showing the rec (better than an empty section).
             if isManga {
                 recommendations = all.filter { rec in
                     guard let t = rec.mediaRecommendation?.type else { return true }
@@ -469,6 +492,9 @@ struct RecommendationsSection: View {
                     return t == "ANIME"
                 }
             }
+        } catch {
+            // Best-effort — leave recommendations empty if the fetch fails.
+            recommendations = []
         }
     }
 }

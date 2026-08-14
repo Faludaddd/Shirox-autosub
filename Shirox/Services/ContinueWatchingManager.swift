@@ -283,8 +283,11 @@ import Combine
             persist()
             
         } catch {
-            // No internet → expected silent failure; anything else is worth logging.
-            if !ProviderManager.isOfflineError(error) {
+            // Cancellation is expected (view disappeared mid-sync, or a
+            // newer sync superseded this one). Offline is also expected.
+            // Only log genuine failures.
+            if !ProviderManager.isCancellationError(error)
+                && !ProviderManager.isOfflineError(error) {
                 Logger.shared.log("[CW] Sync failed: \(error.localizedDescription)", type: "Error")
             }
         }
@@ -356,7 +359,8 @@ import Combine
             items = Array(newItems.sorted { cwSortOrder($0, $1) }.prefix(maxItems))
             persist()
         } catch {
-            if !ProviderManager.isOfflineError(error) {
+            if !ProviderManager.isCancellationError(error)
+                && !ProviderManager.isOfflineError(error) {
                 Logger.shared.log("[CW] MAL sync failed: \(error.localizedDescription)", type: "Error")
             }
         }

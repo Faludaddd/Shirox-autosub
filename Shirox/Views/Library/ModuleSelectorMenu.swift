@@ -77,7 +77,14 @@ struct ModuleSelectorMenu: View {
                             HStack {
                                 moduleLabel(module)
                                 if activeModuleForType?.id == module.id {
-                                    Image(systemName: "checkmark")
+                                    // Clear Apple-style selected indicator:
+                                    // a filled checkmark circle in the
+                                    // accent color. Updates immediately
+                                    // when the user switches modules
+                                    // because the label reads from
+                                    // @ObservedObject moduleManager.
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(Color.appAccent)
                                 }
                             }
                         }
@@ -116,38 +123,43 @@ struct ModuleSelectorMenu: View {
     /// The menu button shows the active module's icon + truncated name so
     /// the user always sees which module is in use at a glance. Falls back
     /// to a generic puzzle-piece icon when no relevant module is installed.
+    ///
+    /// **Sizing:** icon 25×25, text 15pt — ~40% larger than the original
+    /// (18×18 / 13pt) so it's readable and tappable, matching the Add to
+    /// Library button's visual weight. Padding kept tight so the touch
+    /// area doesn't bloat.
     @ViewBuilder
     private var menuLabel: some View {
         if let active = activeModuleForType {
-            HStack(spacing: 5) {
+            HStack(spacing: 6) {
                 moduleIconView(active)
-                    .frame(width: 18, height: 18)
+                    .frame(width: 25, height: 25)
                 Text(truncate(active.sourceName))
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                     .lineLimit(1)
                     .foregroundStyle(.primary)
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 8, weight: .bold))
+                    .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(.secondary)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
             .background(Capsule().fill(Color.secondary.opacity(0.12)))
             .overlay(Capsule().strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
         } else {
-            HStack(spacing: 5) {
+            HStack(spacing: 6) {
                 Image(systemName: "puzzlepiece.extension")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                 Text("No Module")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                     .lineLimit(1)
                     .foregroundStyle(.secondary)
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 8, weight: .bold))
+                    .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(.secondary)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
             .background(Capsule().fill(Color.secondary.opacity(0.08)))
             .overlay(Capsule().strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
         }

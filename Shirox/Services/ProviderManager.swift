@@ -116,6 +116,15 @@ final class ProviderManager: ObservableObject {
         _ operation: @MainActor (any MediaProvider) async throws -> T,
         primaryError: Error
     ) async throws -> T {
+        // Cancellation is intentional (SwiftUI view disappeared, a newer
+        // request replaced this one, etc.) — NOT a provider failure. Skip
+        // the fallback entirely and re-throw without logging so the logs
+        // aren't spammed with "fallback check — error: cancelled" every
+        // time the user navigates.
+        if Self.isCancellationError(primaryError) {
+            throw primaryError
+        }
+
         let eligible = isFallbackEligible(primaryError)
         Logger.shared.log(
             "ProviderManager fallback check — error: \(primaryError), eligible: \(eligible), fallback: \(fallback?.providerType.rawValue ?? "nil")",
@@ -171,6 +180,18 @@ final class ProviderManager: ObservableObject {
         default:
             return false
         }
+    }
+
+    /// True when the error represents an intentional request cancellation
+    /// (URLError.cancelled = -999, or Swift's CancellationError). These are
+    /// NOT provider failures — they happen every time a SwiftUI view
+    /// disappears mid-request, or when a newer search/detail request
+    /// supersedes an in-flight one. Treating them as fallback-eligible
+    /// caused log spam and occasional unnecessary MAL fallback.
+    nonisolated static func isCancellationError(_ error: Error) -> Bool {
+        if error is CancellationError { return true }
+        if let urlError = error as? URLError, urlError.code == .cancelled { return true }
+        return false
     }
 
     private func isFallbackEligible(_ error: Error) -> Bool {

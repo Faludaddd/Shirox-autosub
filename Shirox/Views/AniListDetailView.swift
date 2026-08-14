@@ -683,7 +683,7 @@ struct AniListDetailView: View {
                 // Characters + Recommendations — directly below the synopsis.
                 // Both sections fetch from AniList via CharactersSection /
                 // RecommendationsSection (best-effort; hidden if no data).
-                CharactersSection(mediaId: media.id)
+                CharactersSection(mediaId: media.id, isManga: false)
                     .frame(maxWidth: .infinity)
                     .padding(.top, 16)
 

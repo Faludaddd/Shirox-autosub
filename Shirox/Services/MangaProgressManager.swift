@@ -129,7 +129,11 @@ import Combine
             }
             persist()
         } catch {
-            Logger.shared.log("[MangaProgress] syncFromAniList failed: \(error.localizedDescription)", type: "Error")
+            // Skip logging for expected cancellation / offline.
+            if !ProviderManager.isCancellationError(error)
+                && !ProviderManager.isOfflineError(error) {
+                Logger.shared.log("[MangaProgress] syncFromAniList failed: \(error.localizedDescription)", type: "Error")
+            }
         }
     }
 

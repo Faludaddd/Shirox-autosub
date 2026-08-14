@@ -12,7 +12,20 @@ extension JSEngine {
 
     static let mangaBridgeJS = """
     function __shiroxCallJSON(fnName, args) {
-        return Promise.resolve(globalThis[fnName].apply(null, args)).then(function(r) {
+        // Guard: verify the function exists on globalThis before calling
+        // .apply. Luna-style modules expose searchResults / extractDetails /
+        // extractChapters / extractImages, but some modules omit one or more
+        // of these (e.g. a module with no extractDetails). Without this
+        // guard, `globalThis[fnName].apply` throws "TypeError: undefined is
+        // not an object" — which flooded the logs as a JS Exception. Now
+        // we throw a descriptive error that the caller can handle cleanly.
+        var fn = globalThis[fnName];
+        if (typeof fn !== 'function') {
+            return Promise.reject(
+                new Error('Module function \"' + fnName + '\" is not defined')
+            );
+        }
+        return Promise.resolve(fn.apply(null, args)).then(function(r) {
             return JSON.stringify(r);
         });
     }

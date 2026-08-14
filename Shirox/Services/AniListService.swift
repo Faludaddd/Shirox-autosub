@@ -872,6 +872,44 @@ final class AniListService {
             startDate { year month day }
             endDate { year month day }
             studios { edges { isMain node { id name } } }
+            characters(sort: ROLE, perPage: 12) {
+              edges {
+                role
+                node {
+                  id
+                  name { full native }
+                  image { large medium }
+                  description(asHtml: false)
+                }
+                voiceActors(language: JAPANESE, sort: ROLE) {
+                  id
+                  name { full native }
+                  language
+                  image { large medium }
+                }
+              }
+            }
+            recommendations(sort: RATING_DESC, perPage: 12) {
+              nodes {
+                rating
+                mediaRecommendation {
+                  id
+                  idMal
+                  title { romaji english native }
+                  coverImage { large extraLarge }
+                  bannerImage
+                  averageScore
+                  chapters
+                  volumes
+                  status
+                  format
+                  season
+                  seasonYear
+                  genres
+                  type
+                }
+              }
+            }
             relations {
               edges {
                 relationType
