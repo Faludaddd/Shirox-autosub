@@ -169,19 +169,47 @@ extension Color {
         return UserDefaults.standard.object(forKey: "glowEnabled") as? Bool ?? true
     }
 
-    // MARK: - Shared glow radius constants (item 3 — batch 7)
+    // MARK: - Global glow tuning (batch 10 — item 5)
+    //
+    // Two global knobs control every glow effect in the app:
+    //
+    //   • `glowBrightnessMultiplier` — multiplies the *opacity* of every
+    //     glow shadow. 1.4 = +40% brightness vs. the previous baseline.
+    //     Capped at 1.0 per channel via `glowOpacity(_:)` so a maxed-out
+    //     slider doesn't clip to fully-opaque black shadows.
+    //
+    //   • The radius constants below — multiplied by 1.3 (= +30%) vs. the
+    //     previous baseline. Use `glowOpacity(_:)` for the opacity component
+    //     so the brightness bump lands on every call site automatically.
+    //
+    // Call sites that previously read `Color.glowIntensity * 0.8` should now
+    // read `Color.glowOpacity(0.8)` — same semantic, but the brightness
+    // multiplier is baked in.
+
+    /// Global brightness multiplier for glow shadows (+40% vs. baseline).
+    static var glowBrightnessMultiplier: Double { 1.4 }
+
+    /// Convenience for call sites: returns `base * glowIntensity *
+    /// glowBrightnessMultiplier`, clamped to [0, 1]. Use this anywhere a
+    /// glow shadow's opacity is computed so the global brightness knob
+    /// applies uniformly.
+    static func glowOpacity(_ base: Double) -> Double {
+        min(1.0, max(0.0, base * glowIntensity * glowBrightnessMultiplier))
+    }
+
+    // MARK: - Shared glow radius constants (item 3 — batch 7, +30% batch 10)
     // All glow radii are defined here as multipliers of glowIntensity,
-    // increased 50% from original values for better visibility.
+    // increased 30% over the previous batch for stronger visual presence.
     // Use these instead of hardcoding multipliers at each call site.
 
-    /// Toggle glow radius (was 16, now 24).
-    static var glowRadiusToggle: CGFloat { CGFloat(24 * glowIntensity) }
-    /// Selection/indicator glow radius (was 14, now 21).
-    static var glowRadiusSelection: CGFloat { CGFloat(21 * glowIntensity) }
-    /// Small indicator glow radius (was 8, now 12).
-    static var glowRadiusSmall: CGFloat { CGFloat(12 * glowIntensity) }
-    /// Large/hero glow radius (was 28, now 42).
-    static var glowRadiusLarge: CGFloat { CGFloat(42 * glowIntensity) }
+    /// Toggle glow radius (was 24, now 31.2 — +30%).
+    static var glowRadiusToggle: CGFloat { CGFloat(31.2 * glowIntensity) }
+    /// Selection/indicator glow radius (was 21, now 27.3 — +30%).
+    static var glowRadiusSelection: CGFloat { CGFloat(27.3 * glowIntensity) }
+    /// Small indicator glow radius (was 12, now 15.6 — +30%).
+    static var glowRadiusSmall: CGFloat { CGFloat(15.6 * glowIntensity) }
+    /// Large/hero glow radius (was 42, now 54.6 — +30%).
+    static var glowRadiusLarge: CGFloat { CGFloat(54.6 * glowIntensity) }
 
     static var dataSavingMode: Bool {
         UserDefaults.standard.bool(forKey: "dataSavingEnabled")

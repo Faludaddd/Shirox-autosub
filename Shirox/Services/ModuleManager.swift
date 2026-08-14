@@ -12,6 +12,22 @@ enum AnimeModulePreference {
     }
 }
 
+/// User-facing install errors. Surfaced via `errorDescription` so callers
+/// can show them in a toast or alert without extra mapping.
+enum ModuleInstallError: Error, LocalizedError {
+    case scriptDownloadFailed(String)
+    case invalidManifest(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .scriptDownloadFailed(let name):
+            return "Could not download the script for \"\(name)\". The module URL may be offline or blocked."
+        case .invalidManifest(let reason):
+            return "Invalid module manifest: \(reason)"
+        }
+    }
+}
+
 @MainActor
 final class ModuleManager: ObservableObject {
     static let shared = ModuleManager()
@@ -31,7 +47,17 @@ final class ModuleManager: ObservableObject {
 
     // MARK: - Add Module
 
-    func addModule(from jsonURL: URL) async {
+    /// Installs a module from its JSON manifest URL.
+    ///
+    /// **Throws** on failure so callers can surface errors to the user (the
+    /// previous non-throwing signature silently swallowed errors — `try await`
+    /// on a non-throwing function is a no-op in Swift, so install failures
+    /// from `ModulesSettingsPage` and `ModuleStorePage` were never reported,
+    /// and the user saw no feedback when a module failed to install).
+    ///
+    /// The thrown error is also captured in `errorMessage` for callers that
+    /// prefer to observe via the published property rather than `try`.
+    func addModule(from jsonURL: URL) async throws {
         isLoading = true
         errorMessage = nil
         do {
@@ -39,22 +65,43 @@ final class ModuleManager: ObservableObject {
             var module = try JSONDecoder().decode(ModuleDefinition.self, from: data)
             module.jsonUrl = jsonURL.absoluteString
 
-            // Cache script and icon
+            // Cache script and icon — but require the script to actually
+            // download. A module without a runnable script is unusable, and
+            // silently installing it would leave the user with a broken row
+            // in the Modules tab.
             await cacheAssets(for: &module)
+            if module.scriptContent == nil || module.scriptContent?.isEmpty == true {
+                throw ModuleInstallError.scriptDownloadFailed(
+                    module.sourceName.isEmpty ? "Unknown module" : module.sourceName
+                )
+            }
 
-            // Avoid duplicates
+            // Avoid duplicates — replace any existing module with the same id.
             if modules.contains(where: { $0.id == module.id }) {
                 modules.removeAll { $0.id == module.id }
             }
             modules.append(module)
             saveToStorage()
 
-            // Auto-select if it's the first module
-            if activeModule == nil {
+            // Auto-select if it's the first module of this kind (anime vs manga).
+            // For manga modules, also kick the MangaModuleManager sync via the
+            // $modules publisher so the manga UI picks it up immediately.
+            if activeModule == nil && !module.isManga {
                 selectModule(module)
             }
+
+            Logger.shared.log(
+                "[ModuleManager] Installed module: \(module.sourceName) (id=\(module.id), isManga=\(module.isManga))",
+                type: "Module"
+            )
         } catch {
             errorMessage = error.localizedDescription
+            Logger.shared.log(
+                "[ModuleManager] Failed to install module from \(jsonURL.absoluteString): \(error.localizedDescription)",
+                type: "Error"
+            )
+            isLoading = false
+            throw error
         }
         isLoading = false
     }

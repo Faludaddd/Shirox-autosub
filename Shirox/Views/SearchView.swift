@@ -459,7 +459,10 @@ struct SearchView: View {
                 }
                 .padding(.top, 20)
 
-                // Item 18: Surprise Me
+                // Item 18: Surprise Me — glow enabled (batch 10 item 5).
+                // Uses the large radius + 0.7 base opacity for a strong hero
+                // glow that matches the app-wide glow tuning (radius +30%,
+                // brightness +40%).
                 Button {
                     surpriseMe()
                 } label: {
@@ -473,6 +476,12 @@ struct SearchView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
                     .background(Color.appAccent, in: RoundedRectangle(cornerRadius: 14))
+                    .shadow(
+                        color: Color.glowEnabled
+                            ? Color.appAccent.opacity(Color.glowOpacity(0.7))
+                            : .clear,
+                        radius: Color.glowEnabled ? Color.glowRadiusLarge : 0
+                    )
                 }
                 .buttonStyle(.plain)
                 .padding(.horizontal, 16)
@@ -1636,7 +1645,7 @@ struct SourcesPickerSheet: View {
     @ViewBuilder
     private func sourceIcon(type: ProviderType, isConnected: Bool) -> some View {
         let glowColor: Color = isConnected ? .green : .red
-        let glowOpacity: Double = Color.glowEnabled ? Color.glowIntensity * 1.0 : 0
+        let glowOpacity: Double = Color.glowEnabled ? Color.glowOpacity(1.0) : 0
         let glowRadius: CGFloat = Color.glowEnabled ? Color.glowRadiusLarge : 0
 
         CachedAsyncImage(urlString: type.iconURL)

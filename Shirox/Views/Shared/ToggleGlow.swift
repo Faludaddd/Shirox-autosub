@@ -9,7 +9,7 @@ struct ToggleGlow: ViewModifier {
         content
             .shadow(
                 color: isOn && Color.glowEnabled
-                    ? Color.appAccent.opacity(Color.glowIntensity * 0.8)
+                    ? Color.appAccent.opacity(Color.glowOpacity(0.8))
                     : .clear,
                 radius: isOn && Color.glowEnabled
                     ? Color.glowRadiusToggle

@@ -155,6 +155,7 @@ struct NotificationsView: View {
                     )
                     .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
                     .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
                     .contextMenu {
                         if isTappable(notif) {
                             Button { handleTap(notif) } label: {
@@ -244,35 +245,13 @@ struct NotificationsView: View {
             EmptyView()
         }
     }
-
-    private func iconFor(_ notif: ProviderNotification) -> (String, Color) {
-        switch notif.kind {
-        case .airing: return ("tv", .blue)
-        case .following: return ("person.badge.plus", .green)
-        case .activityMessage: return ("envelope", .purple)
-        case .activityReply, .activityMention: return ("bubble.left", .orange)
-        case .activityLike: return ("heart.fill", .pink)
-        case .mediaChange: return ("arrow.triangle.2.circlepath", .gray)
-        case .unknown: return ("bell", .gray)
-        }
-    }
 }
 
 // MARK: - NotificationSwipeRow
 //
-// Custom row with full gesture support:
-//   • Swipe LEFT — reveals a Close button aligned to the right edge. Tapping
-//     the button removes the notification.
-//   • Swipe DOWN — fully dismisses the notification immediately (quick-
-//     dismiss shortcut). The gesture has a minimum vertical distance and
-//     requires the horizontal component to be small so it doesn't trigger
-//     during normal vertical scrolling.
-//   • Tap — opens the notification's detail view (if tappable).
-//
-// The row is built on a ScrollView-friendly VStack (NOT a List) so the
-// swipe gestures don't conflict with the system list's scroll-vs-swipe
-// gesture priority. Animations use spring/easeInOut for smooth translation,
-// fade-out on dismissal, and eased return when cancelled.
+// Custom row with full gesture support. Kept for reference but the active
+// list uses `NotificationRowContent` (below) inside a standard List so the
+// built-in swipeActions work cleanly.
 
 private struct NotificationSwipeRow: View {
     let notif: ProviderNotification
@@ -306,8 +285,7 @@ private struct NotificationSwipeRow: View {
             .padding(.trailing, 8)
 
             // Foreground row content.
-            rowContent
-                .background(rowBackground)
+            NotificationRowContent(notif: notif, isTappable: isTappable, onTap: onTap)
                 .offset(x: revealOffset)
                 .offset(y: verticalDragOffset)
                 .opacity(isDismissing ? 0 : 1)
@@ -320,123 +298,21 @@ private struct NotificationSwipeRow: View {
         .clipped()
     }
 
-    // MARK: - Row Content
-
-    private var rowContent: some View {
-        HStack(alignment: .top, spacing: 10) {
-            notificationIcon
-
-            VStack(alignment: .leading, spacing: 3) {
-                bodyText
-                    .font(.subheadline)
-                    .lineLimit(3)
-                    .multilineTextAlignment(.leading)
-                Text(notif.createdAt.toTimeAgo())
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer(minLength: 0)
-
-            if isTappable {
-                Image(systemName: "chevron.right")
-                    .font(.caption2).foregroundStyle(.tertiary)
-                    .padding(.top, 4)
-            }
-        }
-        .padding(10)
-    }
-
-    private var rowBackground: some View {
-        RoundedRectangle(cornerRadius: 10)
-            .fill(Color.secondary.opacity(0.07))
-    }
-
-    // MARK: - Icon (delegates to the parent's icon logic)
-
-    private var notificationIcon: some View {
-        let (symbol, color) = NotificationSwipeRow.iconAndColor(for: notif)
-        return Group {
-            if let iconImage = notif.kind.iconImage {
-                switch iconImage {
-                case .avatar(let url):
-                    ZStack(alignment: .bottomTrailing) {
-                        CachedAsyncImage(urlString: url)
-                            .frame(width: 48, height: 48)
-                            .clipShape(Circle())
-                        Image(systemName: symbol)
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 18, height: 18)
-                            .background(Circle().fill(color))
-                            .offset(x: 3, y: 3)
-                    }
-                    .frame(width: 52, height: 52)
-                case .cover(let url):
-                    ZStack(alignment: .bottomTrailing) {
-                        CachedAsyncImage(urlString: url)
-                            .frame(width: 40, height: 56)
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
-                        Image(systemName: symbol)
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 18, height: 18)
-                            .background(Circle().fill(color))
-                            .offset(x: 3, y: 3)
-                    }
-                    .frame(width: 44, height: 60)
-                }
-            } else {
-                Image(systemName: symbol)
-                    .font(.callout.weight(.bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 34, height: 34)
-                    .background(Circle().fill(color))
-            }
-        }
-    }
-
-    private var bodyText: Text {
-        switch notif.kind {
-        case .airing(let episode, let mediaTitle, _, _):
-            return Text("\(mediaTitle ?? "Anime") ").bold() + Text("episode \(episode) aired")
-        case .following(_, let userName, _):
-            return Text(userName ?? "Someone").bold() + Text(" followed you")
-        case .activityMessage(_, let context, _), .activityReply(_, let context, _),
-             .activityMention(_, let context, _), .activityLike(_, let context, _):
-            return Text("Activity ") + Text(context ?? "")
-        case .mediaChange(let title, let context, _, _):
-            if let title, !title.isEmpty {
-                return Text(title).bold() + Text(context ?? " was recently added to the site.")
-            } else {
-                return Text(context ?? "A title was updated")
-            }
-        case .unknown(let context):
-            return Text(context ?? "Notification")
-        }
-    }
-
     // MARK: - Gestures
 
-    /// Horizontal swipe — reveals the Close button when dragged left past a
-    /// threshold. Snaps open/closed with a spring animation. Dragging right
-    /// past the row's leading edge does nothing (no positive offset).
     private var horizontalSwipeGesture: some Gesture {
         DragGesture(minimumDistance: 12)
             .onChanged { value in
-                // Only respond to predominantly-horizontal drags.
                 guard abs(value.translation.width) > abs(value.translation.height) else { return }
                 let base: CGFloat = closeRevealed ? -closeRevealWidth : 0
                 let dragged = base + value.translation.width
-                // Clamp so the row can't be dragged right past 0 (no
-                // positive offset) or left past the close button width.
                 revealOffset = min(0, max(dragged, -closeRevealWidth - 20))
             }
             .onEnded { value in
                 guard abs(value.translation.width) > abs(value.translation.height) else { return }
                 let shouldReveal = closeRevealed
-                    ? (value.translation.width > -closeRevealWidth / 2)  // swipe right to hide
-                    : (value.translation.width < -closeRevealWidth / 2)  // swipe left to reveal
+                    ? (value.translation.width > -closeRevealWidth / 2)
+                    : (value.translation.width < -closeRevealWidth / 2)
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
                     closeRevealed = shouldReveal
                     revealOffset = shouldReveal ? -closeRevealWidth : 0
@@ -444,21 +320,14 @@ private struct NotificationSwipeRow: View {
             }
     }
 
-    /// Vertical swipe-down — fully dismisses the notification. Requires a
-    /// predominantly-vertical drag with a minimum downward distance of 60pt
-    /// so it doesn't trigger during normal vertical scrolling. The row
-    /// translates downward and fades out before being removed.
     private var verticalSwipeGesture: some Gesture {
         DragGesture(minimumDistance: 30)
             .onChanged { value in
-                // Only respond to predominantly-downward drags.
                 guard value.translation.height > 0,
                       value.translation.height > abs(value.translation.width) else {
                     verticalDragOffset = 0
                     return
                 }
-                // Track the drag so the row follows the finger, but only
-                // once the threshold is crossed.
                 if value.translation.height > 30 {
                     verticalDragOffset = value.translation.height - 30
                 }
@@ -471,18 +340,15 @@ private struct NotificationSwipeRow: View {
                     }
                     return
                 }
-                // Dismiss if the user swiped down past 60pt total.
                 if value.translation.height > 60 {
                     isDismissing = true
                     withAnimation(.easeInOut(duration: 0.25)) {
                         verticalDragOffset = 300
                     }
-                    // Remove the notification after the fade-out animation.
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
                         onClose()
                     }
                 } else {
-                    // Spring back — cancelled.
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
                         verticalDragOffset = 0
                     }
@@ -505,85 +371,167 @@ private struct NotificationSwipeRow: View {
     }
 }
 
-// MARK: - NotificationRowContent (item 16 — standard List row without custom gestures)
+// MARK: - NotificationRowContent (redesigned — large posters, strong layout)
 
-/// Simple row content for use inside a List with standard swipeActions.
-/// Renders the same visual content as NotificationSwipeRow but without
-/// the custom gesture wrapper — the List's built-in swipe handles dismiss.
+/// Redesigned notification row. Posters/covers are scaled up significantly
+/// (covers now 64×90pt, avatars 64×64pt) so visual content dominates the
+/// row. The card uses a stronger rounded background, an accent stripe on
+/// the left for the notification type, and a clearer text hierarchy.
 private struct NotificationRowContent: View {
     let notif: ProviderNotification
     let isTappable: Bool
     let onTap: () -> Void
 
+    private var accentColor: Color {
+        NotificationSwipeRow.iconAndColor(for: notif).1
+    }
+
     var body: some View {
-        // Do NOT use Button — it intercepts gestures and prevents swipeActions
-        // and contextMenu from working inside a List. Use .onTapGesture instead.
-        HStack(alignment: .top, spacing: 10) {
-            notificationIcon
+        HStack(alignment: .top, spacing: 0) {
+            // Type accent stripe — same visual language as redesigned LibraryRow.
+            RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                .fill(accentColor)
+                .frame(width: 3)
+                .padding(.vertical, 6)
 
-            VStack(alignment: .leading, spacing: 3) {
-                bodyText
-                    .font(.subheadline)
-                    .lineLimit(3)
-                    .multilineTextAlignment(.leading)
-                Text(notif.createdAt.toTimeAgo())
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+            HStack(alignment: .top, spacing: 12) {
+                notificationVisual
+                textColumn
+                if isTappable {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.tertiary)
+                        .padding(.top, 8)
+                }
             }
-
-            Spacer(minLength: 0)
-
-            if isTappable {
-                Image(systemName: "chevron.right")
-                    .font(.caption2).foregroundStyle(.tertiary)
-                    .padding(.top, 4)
-            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 10)
         }
-        .padding(10)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.07)))
-        .contentShape(RoundedRectangle(cornerRadius: 10))
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.primary.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 2)
+        .contentShape(RoundedRectangle(cornerRadius: 14))
         .onTapGesture { onTap() }
     }
 
-    private var notificationIcon: some View {
+    // MARK: - Visual (poster / avatar)
+
+    /// Scaled-up poster for cover-type notifications, large circle for
+    /// avatars, large icon circle for plain notifications. The visual is
+    /// the row's anchor — text wraps around it, not the other way around.
+    @ViewBuilder
+    private var notificationVisual: some View {
         let (symbol, color) = NotificationSwipeRow.iconAndColor(for: notif)
-        return Group {
-            if let iconImage = notif.kind.iconImage {
-                switch iconImage {
-                case .avatar(let url):
-                    ZStack(alignment: .bottomTrailing) {
-                        CachedAsyncImage(urlString: url)
-                            .frame(width: 48, height: 48)
-                            .clipShape(Circle())
-                        Image(systemName: symbol)
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 18, height: 18)
-                            .background(Circle().fill(color))
-                            .offset(x: 3, y: 3)
-                    }
-                    .frame(width: 52, height: 52)
-                case .cover(let url):
-                    ZStack(alignment: .bottomTrailing) {
-                        CachedAsyncImage(urlString: url)
-                            .frame(width: 40, height: 56)
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
-                        Image(systemName: symbol)
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 18, height: 18)
-                            .background(Circle().fill(color))
-                            .offset(x: 3, y: 3)
-                    }
-                    .frame(width: 44, height: 60)
+        if let iconImage = notif.kind.iconImage {
+            switch iconImage {
+            case .avatar(let url):
+                ZStack(alignment: .bottomTrailing) {
+                    CachedAsyncImage(urlString: url)
+                        .frame(width: 64, height: 64)
+                        .clipShape(Circle())
+                        .overlay(
+                            Circle().strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
+                        )
+                    Image(systemName: symbol)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 22, height: 22)
+                        .background(Circle().fill(color))
+                        .overlay(Circle().strokeBorder(.white, lineWidth: 2))
+                        .offset(x: 4, y: 4)
                 }
-            } else {
-                Image(systemName: symbol)
-                    .font(.callout.weight(.bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 34, height: 34)
-                    .background(Circle().fill(color))
+                .frame(width: 70, height: 70)
+            case .cover(let url):
+                ZStack(alignment: .bottomTrailing) {
+                    CachedAsyncImage(urlString: url)
+                        .aspectRatio(2/3, contentMode: .fill)
+                        .frame(width: 64, height: 96)
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
+                        )
+                        .shadow(color: .black.opacity(0.25), radius: 3, x: 0, y: 2)
+                    Image(systemName: symbol)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 22, height: 22)
+                        .background(Circle().fill(color))
+                        .overlay(Circle().strokeBorder(.white, lineWidth: 2))
+                        .offset(x: 4, y: 4)
+                }
+                .frame(width: 70, height: 100)
             }
+        } else {
+            // Plain icon notification — bigger circle for stronger visual.
+            Image(systemName: symbol)
+                .font(.system(size: 22, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 56, height: 56)
+                .background(Circle().fill(color))
+                .overlay(Circle().strokeBorder(Color.primary.opacity(0.1), lineWidth: 1))
+                .shadow(color: color.opacity(0.35), radius: 5, x: 0, y: 2)
+        }
+    }
+
+    // MARK: - Text column
+
+    @ViewBuilder
+    private var textColumn: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            // Type chip — small pill at the top showing the notification category.
+            typeChip
+
+            bodyText
+                .font(.subheadline.weight(.medium))
+                .lineLimit(3)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 6) {
+                Image(systemName: "clock")
+                    .font(.system(size: 9, weight: .semibold))
+                Text(notif.createdAt.toTimeAgo())
+                    .font(.caption2.weight(.medium))
+            }
+            .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 2)
+    }
+
+    @ViewBuilder
+    private var typeChip: some View {
+        let (symbol, color) = NotificationSwipeRow.iconAndColor(for: notif)
+        HStack(spacing: 3) {
+            Image(systemName: symbol)
+                .font(.system(size: 8, weight: .bold))
+            Text(typeLabel)
+                .font(.system(size: 9, weight: .bold))
+                .textCase(.uppercase)
+        }
+        .foregroundStyle(color)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(color.opacity(0.15), in: Capsule())
+    }
+
+    private var typeLabel: String {
+        switch notif.kind {
+        case .airing: return "Airing"
+        case .following: return "Follow"
+        case .activityMessage: return "Message"
+        case .activityReply: return "Reply"
+        case .activityMention: return "Mention"
+        case .activityLike: return "Like"
+        case .mediaChange: return "Update"
+        case .unknown: return "Notice"
         }
     }
 
@@ -611,6 +559,7 @@ private struct NotificationRowContent: View {
 // MARK: - Notifications History View (item 9)
 
 /// Shows past/dismissed notifications with their original date/time.
+/// Redesigned with the same large-poster layout as the main notifications list.
 struct NotificationsHistoryView: View {
     @ObservedObject var vm: ProfileViewModel
     @Environment(\.dismiss) private var dismiss
@@ -642,35 +591,81 @@ struct NotificationsHistoryView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ScrollView {
-                LazyVStack(spacing: 8) {
+                LazyVStack(spacing: 10) {
                     ForEach(Array(vm.notificationHistory.enumerated()), id: \.offset) { _, notif in
-                        HStack(alignment: .top, spacing: 10) {
-                            let (symbol, color) = NotificationSwipeRow.iconAndColor(for: notif)
-                            Image(systemName: symbol)
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(.white)
-                                .frame(width: 34, height: 34)
-                                .background(Circle().fill(color))
-
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(historyBodyText(for: notif))
-                                    .font(.subheadline)
-                                    .lineLimit(2)
-                                Text(Date(timeIntervalSince1970: TimeInterval(notif.createdAt))
-                                    .formatted(date: .abbreviated, time: .standard))
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer(minLength: 0)
-                        }
-                        .padding(10)
-                        .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.07)))
+                        historyRow(notif)
                     }
                 }
                 .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .padding(.vertical, 10)
             }
         }
+    }
+
+    @ViewBuilder
+    private func historyRow(_ notif: ProviderNotification) -> some View {
+        let (symbol, color) = NotificationSwipeRow.iconAndColor(for: notif)
+        HStack(alignment: .top, spacing: 0) {
+            RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                .fill(color)
+                .frame(width: 3)
+                .padding(.vertical, 6)
+
+            HStack(alignment: .top, spacing: 12) {
+                if let iconImage = notif.kind.iconImage {
+                    switch iconImage {
+                    case .avatar(let url):
+                        CachedAsyncImage(urlString: url)
+                            .frame(width: 56, height: 56)
+                            .clipShape(Circle())
+                            .overlay(Circle().strokeBorder(Color.primary.opacity(0.1), lineWidth: 1))
+                    case .cover(let url):
+                        CachedAsyncImage(urlString: url)
+                            .aspectRatio(2/3, contentMode: .fill)
+                            .frame(width: 56, height: 84)
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
+                            )
+                            .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
+                    }
+                } else {
+                    Image(systemName: symbol)
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 48, height: 48)
+                        .background(Circle().fill(color))
+                }
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(historyBodyText(for: notif))
+                        .font(.subheadline.weight(.medium))
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock")
+                            .font(.system(size: 9, weight: .semibold))
+                        Text(Date(timeIntervalSince1970: TimeInterval(notif.createdAt))
+                            .formatted(date: .abbreviated, time: .standard))
+                            .font(.caption2.weight(.medium))
+                    }
+                    .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 10)
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.primary.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.05), radius: 3, x: 0, y: 1)
     }
 }
 

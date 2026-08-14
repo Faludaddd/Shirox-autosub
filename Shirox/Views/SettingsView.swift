@@ -1842,7 +1842,7 @@ struct NotificationsSettingsPage: View {
             }
             .shadow(
                 color: (anyEnabled && Color.glowEnabled)
-                    ? Color.green.opacity(Color.glowIntensity * 0.6) : .clear,
+                    ? Color.green.opacity(Color.glowOpacity(0.6)) : .clear,
                 radius: (anyEnabled && Color.glowEnabled)
                     ? Color.glowRadiusSelection : 0
             )
@@ -1944,7 +1944,7 @@ struct NotificationsSettingsPage: View {
                     .frame(maxWidth: .infinity)
                     .shadow(
                         color: Color.glowEnabled
-                            ? Color.red.opacity(Color.glowIntensity * 0.4) : .clear,
+                            ? Color.red.opacity(Color.glowOpacity(0.4)) : .clear,
                         radius: Color.glowEnabled
                             ? Color.glowRadiusSmall : 0
                     )
@@ -2196,7 +2196,7 @@ struct SourcesSettingsPage: View {
         // 0 + radius 0). When on, the intensity (0.0–1.0) drives BOTH the
         // shadow radius (`20 * intensity`) and its opacity (`intensity * 1.0`)
         // so the slider visibly grows and brightens the halo around the icon.
-        let glowOpacity: Double = Color.glowEnabled ? Color.glowIntensity * 1.0 : 0
+        let glowOpacity: Double = Color.glowEnabled ? Color.glowOpacity(1.0) : 0
         let glowRadius: CGFloat = Color.glowEnabled ? Color.glowRadiusLarge : 0
 
         CachedAsyncImage(urlString: provider.iconURL)
@@ -2267,7 +2267,7 @@ struct ModulesSettingsPage: View {
                         .onTapGesture { moduleManager.selectModule(module) }
                         .shadow(
                             color: (moduleManager.activeModule?.id == module.id && Color.glowEnabled)
-                                ? Color.appAccent.opacity(Color.glowIntensity * 0.8)
+                                ? Color.appAccent.opacity(Color.glowOpacity(0.8))
                                 : .clear,
                             radius: (moduleManager.activeModule?.id == module.id && Color.glowEnabled)
                                 ? Color.glowRadiusSelection
@@ -2371,7 +2371,15 @@ struct ModulesSettingsPage: View {
     }
 
     private func addModuleInline() {
-        guard let url = URL(string: moduleURL.trimmingCharacters(in: .whitespacesAndNewlines)) else { return }
+        guard let url = URL(string: moduleURL.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+            ToastManager.shared.show(
+                title: "Invalid URL",
+                message: "That doesn't look like a valid module URL.",
+                icon: "exclamationmark.triangle.fill",
+                iconColor: .orange
+            )
+            return
+        }
         isAddingModule = true
         Task {
             do {
@@ -2380,9 +2388,23 @@ struct ModulesSettingsPage: View {
                     moduleURL = ""
                     isAddingModule = false
                     isTextFieldFocused = false
+                    ToastManager.shared.show(
+                        title: "Installed",
+                        message: "Module added to your library.",
+                        icon: "checkmark.circle.fill",
+                        iconColor: .green
+                    )
                 }
             } catch {
-                await MainActor.run { isAddingModule = false }
+                await MainActor.run {
+                    isAddingModule = false
+                    ToastManager.shared.show(
+                        title: "Install Failed",
+                        message: error.localizedDescription,
+                        icon: "exclamationmark.triangle.fill",
+                        iconColor: .red
+                    )
+                }
             }
         }
     }
@@ -2616,14 +2638,38 @@ struct ModuleStorePage: View {
     }
 
     private func installModule(_ mod: StoreModuleItem) {
-        guard let url = URL(string: mod.manifestUrl) else { return }
+        guard let url = URL(string: mod.manifestUrl) else {
+            ToastManager.shared.show(
+                title: "Install Failed",
+                message: "Invalid module URL.",
+                icon: "exclamationmark.triangle.fill",
+                iconColor: .red
+            )
+            return
+        }
         isInstalling = true
         Task {
             do {
                 try await moduleManager.addModule(from: url)
-                await MainActor.run { isInstalling = false }
+                await MainActor.run {
+                    isInstalling = false
+                    ToastManager.shared.show(
+                        title: "Installed",
+                        message: "\(mod.name) is ready to use.",
+                        icon: "checkmark.circle.fill",
+                        iconColor: .green
+                    )
+                }
             } catch {
-                await MainActor.run { isInstalling = false }
+                await MainActor.run {
+                    isInstalling = false
+                    ToastManager.shared.show(
+                        title: "Install Failed",
+                        message: "\(mod.name): \(error.localizedDescription)",
+                        icon: "exclamationmark.triangle.fill",
+                        iconColor: .red
+                    )
+                }
             }
         }
     }
@@ -2938,7 +2984,7 @@ private struct StoreModuleTile: View {
         // preference and scaled by its intensity slider.
         .shadow(
             color: isInstalled && Color.glowEnabled
-                ? Color.appAccent.opacity(Color.glowIntensity * 0.5)
+                ? Color.appAccent.opacity(Color.glowOpacity(0.5))
                 : .clear,
             radius: isInstalled && Color.glowEnabled
                 ? Color.glowRadiusSmall
@@ -3003,7 +3049,7 @@ private struct StoreModuleTile: View {
         )
         .shadow(
             color: isInstalled && Color.glowEnabled
-                ? Color.appAccent.opacity(Color.glowIntensity * 0.5)
+                ? Color.appAccent.opacity(Color.glowOpacity(0.5))
                 : .clear,
             radius: isInstalled && Color.glowEnabled
                 ? Color.glowRadiusSmall
@@ -3078,7 +3124,7 @@ private struct GlowingInstallButtonStyle: ButtonStyle {
             .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
             .shadow(
                 color: configuration.isPressed && Color.glowEnabled
-                    ? Color.appAccent.opacity(Color.glowIntensity * 0.5)
+                    ? Color.appAccent.opacity(Color.glowOpacity(0.5))
                     : .clear,
                 radius: configuration.isPressed && Color.glowEnabled
                     ? Color.glowRadiusSmall
@@ -4411,7 +4457,7 @@ struct BackupRestoreSettingsPage: View {
                     .tint(.appAccent)
                     .shadow(
                         color: Color.glowEnabled
-                            ? Color.appAccent.opacity(Color.glowIntensity * 0.5) : .clear,
+                            ? Color.appAccent.opacity(Color.glowOpacity(0.5)) : .clear,
                         radius: Color.glowEnabled ? Color.glowRadiusSelection : 0
                     )
                 }

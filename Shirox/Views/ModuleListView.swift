@@ -526,7 +526,7 @@ struct ModuleListView: View {
         }
 
         Task {
-            await moduleManager.addModule(from: url)
+            do { try await moduleManager.addModule(from: url) } catch { /* errorMessage already set */ }
 
             await MainActor.run {
                 withAnimation {
@@ -586,7 +586,7 @@ struct ModuleListView: View {
             isAddingLocalModule = true
         }
         Task {
-            await moduleManager.addModule(from: url)
+            do { try await moduleManager.addModule(from: url) } catch { /* errorMessage already set */ }
 
             await MainActor.run {
                 withAnimation {
@@ -627,7 +627,7 @@ struct ModuleListView: View {
             isAddingJellyfinModule = true
         }
         Task {
-            await moduleManager.addModule(from: url)
+            do { try await moduleManager.addModule(from: url) } catch { /* errorMessage already set */ }
 
             await MainActor.run {
                 withAnimation {

@@ -822,7 +822,7 @@ private struct MangaReaderSettingsPage: View {
             )
             .shadow(
                 color: selected && Color.glowEnabled
-                    ? Color.appAccent.opacity(Color.glowIntensity * 0.4)
+                    ? Color.appAccent.opacity(Color.glowOpacity(0.4))
                     : .clear,
                 radius: selected && Color.glowEnabled ? Color.glowRadiusSmall : 0
             )
@@ -1087,7 +1087,7 @@ private struct MangaTrackingSettingsPage: View {
 
     private func trackingServiceCard(name: String, iconURL: String?, isLoggedIn: Bool, username: String?, onConnect: @escaping () -> Void) -> some View {
         let glowColor: Color = isLoggedIn ? .green : .red
-        let glowOpacity: Double = Color.glowEnabled ? Color.glowIntensity * 1.0 : 0
+        let glowOpacity: Double = Color.glowEnabled ? Color.glowOpacity(1.0) : 0
         let glowRadius: CGFloat = Color.glowEnabled ? Color.glowRadiusLarge : 0
 
         return VStack(alignment: .leading, spacing: 12) {

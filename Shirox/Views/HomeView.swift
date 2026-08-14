@@ -1006,7 +1006,7 @@ private struct HomePressStyle: ButtonStyle {
             .scaleEffect(configuration.isPressed ? 0.94 : 1.0)
             .opacity(configuration.isPressed ? 0.88 : 1.0)
             .shadow(
-                color: glowOn ? Color.appAccent.opacity(Color.glowIntensity * 0.6) : .clear,
+                color: glowOn ? Color.appAccent.opacity(Color.glowOpacity(0.6)) : .clear,
                 radius: glowOn ? Color.glowRadiusSelection : 0
             )
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: configuration.isPressed)
