@@ -117,8 +117,8 @@ extension UIColor {
 
 extension Color {
     /// Resolves the user's custom accent color from UserDefaults, falling back to
-    /// UIColor.systemGray (adapts: dark grey in light mode, light grey in dark mode)
-    /// so toggles are always distinguishable from their surroundings — not white.
+    /// UIColor.systemRed — visible and saturated so toggle glow is perceptible.
+    /// Matches the app's accent color asset (red, ef4444).
     static var appAccent: Color {
         let hex = UserDefaults.standard.string(forKey: "accentColorHex") ?? ""
         let trimmed = hex.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -128,9 +128,9 @@ extension Color {
             #endif
         }
         #if canImport(UIKit)
-        return Color(UIColor.systemGray)
+        return Color(UIColor.systemRed)
         #else
-        return Color(NSColor.systemGray)
+        return Color(NSColor.systemRed)
         #endif
     }
 
@@ -207,9 +207,9 @@ struct ShiroxApp: App {
             #endif
         }
         #if canImport(UIKit)
-        return Color(UIColor.systemGray)
+        return Color(UIColor.systemRed)
         #else
-        return Color(NSColor.systemGray)
+        return Color(NSColor.systemRed)
         #endif
     }
 

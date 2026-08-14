@@ -942,10 +942,22 @@ private struct AnimeSection: View {
                         .buttonStyle(HomePressStyle())
                         .frame(width: cardWidth)
                         .contextMenu {
-                            Button { } label: {
+                            Button {
+                                Task {
+                                    try? await AniListLibraryService.shared.updateEntry(
+                                        mediaId: media.id, status: .planning, progress: 0, score: nil)
+                                }
+                            } label: {
                                 Label("Add to Planning", systemImage: "plus.circle")
                             }
-                            Button { } label: {
+                            Button {
+                                #if os(iOS)
+                                let av = UIActivityViewController(activityItems: [media.title.displayTitle], applicationActivities: nil)
+                                guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                                      let root = scene.windows.first?.rootViewController else { return }
+                                root.present(av, animated: true)
+                                #endif
+                            } label: {
                                 Label("Share", systemImage: "square.and.arrow.up")
                             }
                         }

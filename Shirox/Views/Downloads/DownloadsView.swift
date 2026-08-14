@@ -153,46 +153,29 @@ struct DownloadsView: View {
                             }
                         }
 
-                        // Completed — grouped module → media → episodes
+                        // Completed — grouped by module, each episode as its own row
                         ForEach(moduleGroups) { moduleGroup in
                             Section {
                                 ForEach(moduleGroup.mediaGroups) { mediaGroup in
-                                    let snap = DownloadedMediaSnapshotStore.shared
-                                        .snapshot(mediaTitle: mediaGroup.mediaTitle, moduleId: moduleGroup.id)
-                                        ?? DownloadedMediaSnapshotStore.shared.backfill(
-                                            mediaTitle: mediaGroup.mediaTitle,
-                                            moduleId: moduleGroup.id,
-                                            items: mediaGroup.items
-                                        )
-                                    let posterURLString: String = snap.posterFile
-                                        .map { DownloadedMediaSnapshotStore.shared.localFileURL(in: snap, relative: $0).absoluteString }
-                                        ?? mediaGroup.imageUrl
-                                    let detailHref = mediaGroup.items.first?.detailHref ?? ""
-                                    NavigationLink {
-                                        DetailView(
-                                            item: SearchItem(title: snap.mediaTitle, image: posterURLString, href: detailHref),
-                                            offlineSnapshot: snap,
-                                            moduleId: moduleGroup.id,
-                                            aniListID: snap.aniListID
-                                        )
-                                        .task {
-                                            // One-shot auto-upgrade for snapshots written by the
-                                            // pre-v2 enrichment pipeline. Fire-and-forget — the
-                                            // view renders whatever's on disk now and re-renders
-                                            // when the upgrade persists.
-                                            if snap.schemaVersion < DownloadedMediaSnapshot.currentSchemaVersion {
-                                                await DownloadedMediaSnapshotStore.shared
-                                                    .reenrichIfStale(mediaKey: snap.mediaKey)
+                                    ForEach(mediaGroup.items) { item in
+                                        NavigationLink {
+                                            downloadDetailDestination(for: item)
+                                        } label: {
+                                            DownloadProgressRow(item: item)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .contextMenu {
+                                            Button(role: .destructive) { dm.remove(item) } label: {
+                                                Label("Delete", systemImage: "trash")
                                             }
                                         }
-                                    } label: {
-                                        MediaGroupRow(
-                                            mediaTitle: mediaGroup.mediaTitle,
-                                            imageUrl: mediaGroup.imageUrl,
-                                            count: mediaGroup.items.count
-                                        )
+                                        .swipeActions(edge: .trailing) {
+                                            Button(role: .destructive) { dm.remove(item) } label: {
+                                                Label("Delete", systemImage: "trash")
+                                            }
+                                            .tint(.red)
+                                        }
                                     }
-                                    .buttonStyle(.plain)
                                 }
                             } header: {
                                 ModuleSectionHeader(

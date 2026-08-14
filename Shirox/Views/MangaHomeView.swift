@@ -648,13 +648,11 @@ private struct MangaReaderSettingsPage: View {
 
                 Divider().padding(.vertical, 4)
 
-                // Layout — horizontal scroll of tiles
+                // Layout — grid of visual preview cards (item 10 rework)
                 sectionLabel("Page Layout")
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        ForEach(layouts, id: \.value) { layout in
-                            layoutTile(layout)
-                        }
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                    ForEach(layouts, id: \.value) { layout in
+                        layoutCard(layout)
                     }
                 }
                 toggleRow("Crop Page Margins", isOn: $cropMargins)
@@ -745,31 +743,51 @@ private struct MangaReaderSettingsPage: View {
         .buttonStyle(.plain)
     }
 
-    private func layoutTile(_ layout: (label: String, icon: String, value: String)) -> some View {
+    /// Item 10 — Visual preview card for each page layout option.
+    /// Shows a small visual representation of the layout mode alongside
+    /// the label, in a grid of selectable cards with highlighted border
+    /// when selected (matching the module selection UI style).
+    private func layoutCard(_ layout: (label: String, icon: String, value: String)) -> some View {
         let selected = zoomMode == layout.value
         return Button {
             Haptics.light()
             zoomMode = layout.value
         } label: {
-            VStack(spacing: 6) {
-                Image(systemName: layout.icon)
-                    .font(.system(size: 24))
-                    .foregroundStyle(selected ? Color.appAccent : .secondary)
+            VStack(spacing: 10) {
+                // Visual preview icon
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(selected ? Color.appAccent.opacity(0.12) : Color.secondary.opacity(0.08))
+                        .frame(height: 56)
+                    Image(systemName: layout.icon)
+                        .font(.system(size: 28))
+                        .foregroundStyle(selected ? Color.appAccent : .secondary)
+                }
                 Text(layout.label)
-                    .font(.caption2.weight(selected ? .bold : .medium))
+                    .font(.caption.weight(selected ? .bold : .medium))
                     .foregroundStyle(selected ? Color.appAccent : .primary)
             }
-            .frame(width: 80, height: 80)
+            .padding(12)
+            .frame(maxWidth: .infinity)
             .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(selected ? Color.appAccent.opacity(0.12) : Color(.secondarySystemGroupedBackground))
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(selected ? Color.appAccent.opacity(0.08) : Color(.secondarySystemGroupedBackground))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(selected ? Color.appAccent.opacity(0.5) : Color.clear, lineWidth: 1.5)
+                RoundedRectangle(cornerRadius: 14)
+                    .strokeBorder(selected ? Color.appAccent.opacity(0.6) : Color.clear, lineWidth: 2)
+            )
+            .shadow(
+                color: selected && Color.glowEnabled
+                    ? Color.appAccent.opacity(Color.glowIntensity * 0.4)
+                    : .clear,
+                radius: selected && Color.glowEnabled ? CGFloat(8 * Color.glowIntensity) : 0
             )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Page layout \(layout.label)")
+        .accessibilityValue(selected ? "Selected" : "Not selected")
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private func toggleRow(_ title: String, isOn: Binding<Bool>) -> some View {

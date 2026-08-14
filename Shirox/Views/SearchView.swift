@@ -141,6 +141,14 @@ struct SearchView: View {
                 // #100 — Liquid-glass backdrop for the modal sheet.
                 .background(.ultraThinMaterial)
         }
+        .task { await loadRecommendations() }
+        .navigationDestinationCompat(item: $surpriseDestination) { media in
+            if isMangaMode {
+                AniListMangaDetailView(mediaId: media.id, preloadedMedia: media)
+            } else {
+                AniListDetailView(mediaId: media.id, preloadedMedia: media)
+            }
+        }
         .adaptiveSheet(isPresented: $showFilters) {
             // #91 — pass the last-applied result count + hasSearched so the sheet
             // can show a live "N results" preview / "Apply to update" hint at the bottom.
@@ -182,13 +190,8 @@ struct SearchView: View {
             if vm.query.isEmpty && !history.queries.isEmpty {
                 historyView
             } else {
-                // Mode-aware empty state. In Reading Mode the search only
-                // returns manga; in Anime Mode it only returns anime.
-                emptyStateView(
-                    icon: isMangaMode ? "book" : "magnifyingglass",
-                    title: isMangaMode ? "Search Manga" : "Search Anime",
-                    subtitle: isMangaMode ? "Find any manga via AniList" : "Find any anime via AniList"
-                )
+                // Items 17+18: Recommendations + Surprise Me in empty state
+                searchEmptyState
             }
         } else if vm.isLoading {
             loadingView
@@ -437,6 +440,155 @@ struct SearchView: View {
     }
 
     // MARK: - Empty State
+
+    /// Items 17+18: Search empty state with recommendations + Surprise Me
+    private var searchEmptyState: some View {
+        ScrollView {
+            VStack(spacing: 24) {
+                // Header
+                VStack(spacing: 8) {
+                    Image(systemName: isMangaMode ? "book" : "magnifyingglass")
+                        .font(.system(size: 40))
+                        .foregroundStyle(.secondary)
+                    Text(isMangaMode ? "Search Manga" : "Search Anime")
+                        .font(.headline)
+                    Text(isMangaMode ? "Find any manga via AniList" : "Find any anime via AniList")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.top, 20)
+
+                // Item 18: Surprise Me
+                Button {
+                    surpriseMe()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "shuffle.circle.fill")
+                            .font(.title2)
+                        Text("Surprise Me")
+                            .font(.headline)
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Color.appAccent, in: RoundedRectangle(cornerRadius: 14))
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 16)
+
+                // Item 17: Recommendations
+                if !recommendations.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("Recommended for You")
+                                .font(.title3.weight(.bold))
+                            Spacer()
+                        }
+                        .padding(.horizontal, 16)
+
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            LazyHStack(spacing: 12) {
+                                ForEach(recommendations) { media in
+                                    NavigationLink {
+                                        if isMangaMode {
+                                            AniListMangaDetailView(mediaId: media.id, preloadedMedia: media)
+                                        } else {
+                                            AniListDetailView(mediaId: media.id, preloadedMedia: media)
+                                        }
+                                    } label: {
+                                        VStack(alignment: .leading, spacing: 6) {
+                                            CachedAsyncImage(urlString: media.coverImage.extraLarge ?? media.coverImage.large ?? "")
+                                                .aspectRatio(2/3, contentMode: .fill)
+                                                .frame(width: 110, height: 165)
+                                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                            Text(media.title.displayTitle)
+                                                .font(.caption.weight(.semibold))
+                                                .lineLimit(2)
+                                                .frame(width: 110, alignment: .leading)
+                                        }
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @State private var recommendations: [Media] = []
+
+    private func loadRecommendations() async {
+        let type = isMangaMode ? "MANGA" : "ANIME"
+        // Get user's library genres for content-based matching
+        guard let userId = AniListAuthManager.shared.userId else {
+            // No login — fall back to trending
+            await loadTrendingFallback(type: type)
+            return
+        }
+        do {
+            let library = try await AniListLibraryService.shared.fetchAllLists(
+                userId: userId, type: isMangaMode ? .manga : .anime)
+            // Collect genres from watching/reading + completed entries
+            var genreSet: Set<String> = []
+            for entry in library.prefix(20) {
+                if let genres = entry.media.genres {
+                    genreSet.formUnion(genres.prefix(3))
+                }
+            }
+            guard !genreSet.isEmpty else {
+                await loadTrendingFallback(type: type)
+                return
+            }
+            // Search for titles matching top genres
+            let topGenres = Array(genreSet.prefix(3))
+            let query = topGenres.joined(separator: " ")
+            let results = try await AniListService.shared.search(keyword: query)
+            let mapped = results.prefix(12).map { AniListProvider.shared.mapMedia($0) }
+            await MainActor.run {
+                self.recommendations = Array(mapped)
+            }
+        } catch {
+            await loadTrendingFallback(type: type)
+        }
+    }
+
+    private func loadTrendingFallback(type: String) async {
+        let results = (try? await AniListService.shared.trending()) ?? []
+        let mapped = results.prefix(12).map { AniListProvider.shared.mapMedia($0) }
+        await MainActor.run {
+            self.recommendations = Array(mapped)
+        }
+    }
+
+    /// Item 18: Picks a random title from Planning or Trending
+    @State private var surpriseDestination: Media?
+
+    private func surpriseMe() {
+        Task {
+            let type = isMangaMode ? .manga : .anime
+            // Try Planning list first
+            if let userId = AniListAuthManager.shared.userId {
+                if let library = try? await AniListLibraryService.shared.fetchAllLists(userId: userId, type: type) {
+                    let planning = library.filter { $0.status == .planning }
+                    if let random = planning.randomElement() {
+                        let media = AniListProvider.shared.mapMedia(random.media)
+                        await MainActor.run { self.surpriseDestination = media }
+                        return
+                    }
+                }
+            }
+            // Fall back to Trending
+            let trending = (try? await AniListService.shared.trending()) ?? []
+            if let random = trending.randomElement() {
+                let media = AniListProvider.shared.mapMedia(random)
+                await MainActor.run { self.surpriseDestination = media }
+            }
+        }
+    }
+
     private func emptyStateView(icon: String, title: String, subtitle: String) -> some View {
         VStack(spacing: 16) {
             Image(systemName: icon)

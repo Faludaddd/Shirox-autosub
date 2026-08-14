@@ -156,7 +156,7 @@ struct DownloadDetailView: View {
     private var actionSection: some View {
         VStack(spacing: 12) {
             if liveItem.state == .completed, let fileURL = downloadedFileURL {
-                Button { shareFile(fileURL) } label: {
+                Button { findFile(fileURL) } label: {
                     Label("Find File", systemImage: "folder.badge.magnifyingglass")
                         .frame(maxWidth: .infinity).padding(.vertical, 4)
                 }
@@ -211,6 +211,16 @@ struct DownloadDetailView: View {
         guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
               let root = scene.windows.first?.rootViewController else { return }
         root.present(UIActivityViewController(activityItems: [url], applicationActivities: nil), animated: true)
+    }
+
+    /// Reveals the file in the iOS Files app via UIDocumentPickerViewController.
+    private func findFile(_ url: URL) {
+        Haptics.light()
+        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let root = scene.windows.first?.rootViewController else { return }
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.audiovisualContent, .item])
+        picker.shouldShowFileExtensions = true
+        root.present(picker, animated: true)
     }
 }
 

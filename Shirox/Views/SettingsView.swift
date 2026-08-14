@@ -2605,7 +2605,7 @@ struct ModuleStorePage: View {
         if mediaType == .manga {
             result = result.filter { item in
                 let type = (item.type ?? "").lowercased()
-                return type.contains("manga")
+                return type.contains("manga") || type.contains("novel")
             }
         }
         if searchText.isEmpty { return result }
