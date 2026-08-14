@@ -52,21 +52,9 @@ struct LibraryHistoryView: View {
             // Back button — leading slot. Explicit "← Library" so the user
             // always has a clear way back to the tracked-list view, even
             // when this view is shown inline (no system back button).
-            if let onBack {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        Haptics.light()
-                        onBack()
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "chevron.left")
-                                .font(.system(size: 14, weight: .semibold))
-                            Text("Library")
-                                .font(.subheadline.weight(.medium))
-                        }
-                    }
-                }
-            }
+            // Wrapped in `if let onBack` at the view-body level (not inside
+            // @ToolbarContentBuilder) to stay compatible with iOS 15.
+            backToolbarItem
             ToolbarItem(placement: .topBarTrailing) {
                 if !history.entries.isEmpty {
                     Menu {
@@ -100,6 +88,34 @@ struct LibraryHistoryView: View {
                     systemImage: "book.closed",
                     description: Text("This manga was read from a local module and doesn't have an AniList detail page.")
                 )
+            }
+        }
+    }
+
+    // MARK: - Back Button Toolbar Item
+
+    /// Always-present toolbar item whose visibility is driven by `onBack`.
+    /// We avoid `if let` inside `@ToolbarContentBuilder` (which requires
+    /// iOS 16 via `buildIf`) by always emitting the `ToolbarItem` and using
+    /// a `Group` + `if let` inside its content closure — that path is plain
+    /// `@ViewBuilder`, which is iOS 15-compatible.
+    @ToolbarContentBuilder
+    private var backToolbarItem: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            Group {
+                if let onBack {
+                    Button {
+                        Haptics.light()
+                        onBack()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 14, weight: .semibold))
+                            Text("Library")
+                                .font(.subheadline.weight(.medium))
+                        }
+                    }
+                }
             }
         }
     }
