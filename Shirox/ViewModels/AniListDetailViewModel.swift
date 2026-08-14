@@ -71,11 +71,18 @@ final class AniListDetailViewModel: ObservableObject {
         isLoading = false
     }
 
+    /// True while autoResolveWithActiveModule is running. Prevents the user
+    /// from spamming the Watch button and firing multiple resolve cycles
+    /// (each of which hammers the module's server with search + episodes +
+    /// streams requests). The Watch button should check this and disable.
+    @Published var isResolving = false
+
     func watchEpisode(_ number: Int) {
+        // Guard: don't start a new resolve if one is already in flight.
+        // This prevents the duplicate episode/stream fetches that happen
+        // when the user spams the Watch button.
+        guard !isResolving else { return }
         selectedEpisodeNumber = number
-        // Auto-resolve using the active anime module — no module-selection
-        // sheet. Only fall back to the picker if there's no active module
-        // or the active module fails to resolve streams.
         Task { await autoResolveWithActiveModule(episode: number) }
     }
 
@@ -86,6 +93,9 @@ final class AniListDetailViewModel: ObservableObject {
     /// should just use it. If resolution fails, show an error toast and
     /// NEVER fall back to the old module-selection picker.
     private func autoResolveWithActiveModule(episode: Int) async {
+        isResolving = true
+        defer { isResolving = false }
+
         // Need a media title to search.
         guard let media else {
             ToastManager.shared.show(

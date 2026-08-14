@@ -866,9 +866,15 @@ struct AniListDetailView: View {
             }
         } label: {
             HStack(spacing: 10) {
-                Image(systemName: "play.fill")
-                    .font(.system(size: 13, weight: .bold))
-                Text(label)
+                if vm.isResolving {
+                    ProgressView()
+                        .tint(.primary)
+                        .scaleEffect(0.8)
+                } else {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 13, weight: .bold))
+                }
+                Text(vm.isResolving ? "Loading…" : label)
                     .font(.system(size: 15, weight: .bold))
                     .lineLimit(1)
             }
@@ -882,7 +888,7 @@ struct AniListDetailView: View {
             .foregroundStyle(.primary)
         }
         .buttonStyle(.plain)
-        .disabled(total == 0)
+        .disabled(total == 0 || vm.isResolving)
     }
 
     private func resumeWatching(item: ContinueWatchingItem) {
