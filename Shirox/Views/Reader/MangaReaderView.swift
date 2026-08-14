@@ -257,11 +257,11 @@ struct MangaReaderView: View {
     private var verticalReader: some View {
         // `invertPages` reverses the page sequence (Page 400 → Page 1)
         // when the user toggles the Invert button in MangaDetailView.
-        let displayOrder = invertPages ? Array(strip.reversed()) : strip
+        // Inlined into ForEach (can't use `let` in a @ViewBuilder).
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    ForEach(displayOrder) { item in
+                    ForEach(invertPages ? Array(strip.reversed()) : strip) { item in
                         ReaderPageView(urlString: item.url, referer: referer, pageNumber: item.pageIdx + 1)
                             .id(item.globalIdx)
                             .background(
