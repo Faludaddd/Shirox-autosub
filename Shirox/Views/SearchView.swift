@@ -568,7 +568,7 @@ struct SearchView: View {
 
     private func surpriseMe() {
         Task {
-            let type = isMangaMode ? .manga : .anime
+            let type: MediaListType = isMangaMode ? .manga : .anime
             // Try Planning list first
             if let userId = AniListAuthManager.shared.userId {
                 if let library = try? await AniListLibraryService.shared.fetchAllLists(userId: userId, type: type) {
