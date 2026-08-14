@@ -268,6 +268,23 @@ final class ModuleJSRunner {
             request.httpMethod = method
             request.setValue(self.userAgent, forHTTPHeaderField: "User-Agent")
 
+            // Set a default Referer derived from the request's own host if
+            // the module's JS didn't explicitly provide one. Many anime-
+            // streaming source sites 403 requests without a matching Referer.
+            let existingHeaders = (!headersVal.isUndefined && !headersVal.isNull)
+                ? (headersVal.toDictionary() as? [String: String] ?? [:])
+                : [String: String]()
+            if existingHeaders["Referer"] == nil && existingHeaders["referer"] == nil,
+               let host = url.host {
+                let scheme = url.scheme ?? "https"
+                request.setValue("\(scheme)://\(host)/", forHTTPHeaderField: "Referer")
+            }
+            if existingHeaders["Origin"] == nil && existingHeaders["origin"] == nil,
+               let host = url.host {
+                let scheme = url.scheme ?? "https"
+                request.setValue("\(scheme)://\(host)", forHTTPHeaderField: "Origin")
+            }
+
             if !headersVal.isUndefined, !headersVal.isNull {
                 if let dict = headersVal.toDictionary() as? [String: String] {
                     for (key, value) in dict { request.setValue(value, forHTTPHeaderField: key) }
@@ -326,6 +343,17 @@ final class ModuleJSRunner {
                     }
 
                     let status = httpResponse.statusCode
+
+                    // Log 403/401 errors with the actual URL so we can
+                    // diagnose which source site is blocking the request.
+                    if status == 403 || status == 401 {
+                        let bodySnippet = String(responseText.prefix(200))
+                        Logger.shared.log(
+                            "[fetchNative] \(status) on \(method) \(urlString) — body: \(bodySnippet)",
+                            type: "Error"
+                        )
+                    }
+
                     var headersDict: [String: String] = [:]
                     for (key, value) in httpResponse.allHeaderFields {
                         headersDict[String(describing: key)] = String(describing: value)

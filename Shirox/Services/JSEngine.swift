@@ -137,6 +137,25 @@ final class JSEngine: ObservableObject {
             var request = URLRequest(url: url)
             request.httpMethod = method
             request.setValue(self.userAgent, forHTTPHeaderField: "User-Agent")
+
+            // Set a default Referer derived from the request's own host if
+            // the module's JS didn't explicitly provide one. Many anime-
+            // streaming source sites 403 requests to their internal API /
+            // server-list endpoints unless the Referer matches their own
+            // domain (anti-hotlinking). Deriving it from the request URL
+            // means it always matches the site the module is talking to.
+            if jsHeaders["Referer"] == nil && jsHeaders["referer"] == nil,
+               let host = url.host {
+                let scheme = url.scheme ?? "https"
+                request.setValue("\(scheme)://\(host)/", forHTTPHeaderField: "Referer")
+            }
+            // Same for Origin — some sites require it for API-style requests.
+            if jsHeaders["Origin"] == nil && jsHeaders["origin"] == nil,
+               let host = url.host {
+                let scheme = url.scheme ?? "https"
+                request.setValue("\(scheme)://\(host)", forHTTPHeaderField: "Origin")
+            }
+
             for (key, value) in jsHeaders {
                 request.setValue(value, forHTTPHeaderField: key)
             }
@@ -199,6 +218,19 @@ final class JSEngine: ObservableObject {
                     }
 
                     let status = httpResponse.statusCode
+
+                    // Log 403/401 errors with the actual URL so we can
+                    // diagnose which source site is blocking the request.
+                    // The module's JS only logs a generic "Failed to fetch
+                    // servers, status: 403" — this Swift-side log captures
+                    // the exact URL, method, and response body snippet.
+                    if status == 403 || status == 401 {
+                        let bodySnippet = String(responseText.prefix(200))
+                        Logger.shared.log(
+                            "[fetchNative] \(status) on \(method) \(urlString) — body: \(bodySnippet)",
+                            type: "Error"
+                        )
+                    }
 
                     var headersDict: [String: String] = [:]
                     for (key, value) in httpResponse.allHeaderFields {
@@ -414,7 +446,15 @@ final class JSEngine: ObservableObject {
 
     static func isTurnstileResponse(status: Int, body: String) -> Bool {
         let lower = body.lowercased()
-        guard lower.contains("cloudflare") else { return false }
+        // A 403/503 from Cloudflare always has "cloudflare" somewhere in
+        // the body (server header, challenge form, error page). If we see
+        // "cloudflare" + 403/503, treat it as a CF challenge even if the
+        // specific challenge markers aren't present — some CF edge cases
+        // return a bare 403 with just the CF server header in the body.
+        if (status == 403 || status == 503) && lower.contains("cloudflare") {
+            return true
+        }
+        // Classic challenge patterns + 200 "just a moment" interstitial.
         let hasChallenge = lower.contains("cf-turnstile") ||
                lower.contains("challenges.cloudflare.com") ||
                lower.contains("__cf_chl_") ||
