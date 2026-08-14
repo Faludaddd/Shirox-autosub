@@ -90,6 +90,49 @@ import Combine
         UserDefaults.standard.removeObject(forKey: Keys.readChapters)
     }
 
+    // MARK: - Server sync (item 23)
+
+    /// Rebuilds reading progress from AniList manga list entries on login.
+    /// Creates placeholder Continue Reading items for manga the user has
+    /// started reading (status = CURRENT or REPEATING) so the Continue
+    /// Reading section isn't empty after a fresh install + re-login.
+    func syncFromAniList() async {
+        guard let userId = AniListAuthManager.shared.userId else { return }
+        do {
+            let library = try await AniListLibraryService.shared.fetchAllLists(userId: userId, type: .manga)
+            let reading = library.filter { $0.status == .current || $0.status == .repeating }
+            for entry in reading {
+                let media = AniListProvider.shared.mapMangaMedia(entry.media)
+                let title = media.title.displayTitle
+                // Use a synthetic href from the AniList ID so the item is
+                // unique. The Continue Reading card will route to
+                // AniListMangaDetailView when tapped (View Details).
+                let href = "anilist://manga/\(media.id)"
+
+                // Only add if not already in local items
+                guard !items.contains(where: { $0.mangaHref == href }) else { continue }
+
+                let item = MangaReadingItem(
+                    mangaTitle: title,
+                    mangaHref: href,
+                    coverImage: media.coverImage.best ?? "",
+                    moduleId: "",
+                    chapterHref: "",
+                    chapterName: "Chapter \(entry.progress)",
+                    chapterNumber: Double(entry.progress),
+                    pageIndex: 0,
+                    totalPages: 0,
+                    pageFraction: 0,
+                    lastReadAt: Date()
+                )
+                items = Self.upsert(item, into: items)
+            }
+            persist()
+        } catch {
+            Logger.shared.log("[MangaProgress] syncFromAniList failed: \(error.localizedDescription)", type: "Error")
+        }
+    }
+
     // MARK: - Persistence
 
     private func persist() {

@@ -132,6 +132,7 @@ final class AniListAuthManager: NSObject, ObservableObject {
             #if os(iOS)
             await ContinueWatchingManager.shared.syncWithAniList()
             await ContinueWatchingManager.shared.syncWithMAL()
+            await MangaProgressManager.shared.syncFromAniList()
             #endif
         }
     }

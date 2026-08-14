@@ -112,23 +112,35 @@ struct NotificationsView: View {
         } else if vm.notifications.isEmpty {
             ContentUnavailableView("No Notifications", systemImage: "bell.slash")
         } else {
-            // ScrollView-based list (NOT a List) so we can attach custom
-            // swipe gestures to each row without conflicting with the
-            // system list's scroll-vs-swipe gesture priority.
-            ScrollView {
-                LazyVStack(spacing: 10) {
-                    ForEach(vm.notifications) { notif in
-                        NotificationSwipeRow(
-                            notif: notif,
-                            isTappable: isTappable(notif),
-                            onTap: { handleTap(notif) },
-                            onClose: { dismissNotification(notif) }
-                        )
+            // Standard List with swipeActions for swipe-to-close (item 16).
+            // Swipe left reveals a Close button; swipe right also dismisses.
+            List {
+                ForEach(vm.notifications) { notif in
+                    NotificationRowContent(
+                        notif: notif,
+                        isTappable: isTappable(notif),
+                        onTap: { handleTap(notif) }
+                    )
+                    .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+                    .listRowSeparator(.hidden)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            dismissNotification(notif)
+                        } label: {
+                            Label("Close", systemImage: "xmark.circle.fill")
+                        }
+                    }
+                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                        Button {
+                            dismissNotification(notif)
+                        } label: {
+                            Label("Dismiss", systemImage: "hand.raised.fill")
+                        }
+                        .tint(.orange)
                     }
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
             }
+            .listStyle(.plain)
             .refreshable { await vm.loadNotifications() }
         }
     }
@@ -435,7 +447,7 @@ private struct NotificationSwipeRow: View {
 
     // MARK: - Icon Helper
 
-    private static func iconAndColor(for notif: ProviderNotification) -> (String, Color) {
+    static func iconAndColor(for notif: ProviderNotification) -> (String, Color) {
         switch notif.kind {
         case .airing: return ("tv", .blue)
         case .following: return ("person.badge.plus", .green)
@@ -444,6 +456,108 @@ private struct NotificationSwipeRow: View {
         case .activityLike: return ("heart.fill", .pink)
         case .mediaChange: return ("arrow.triangle.2.circlepath", .gray)
         case .unknown: return ("bell", .gray)
+        }
+    }
+}
+
+// MARK: - NotificationRowContent (item 16 — standard List row without custom gestures)
+
+/// Simple row content for use inside a List with standard swipeActions.
+/// Renders the same visual content as NotificationSwipeRow but without
+/// the custom gesture wrapper — the List's built-in swipe handles dismiss.
+private struct NotificationRowContent: View {
+    let notif: ProviderNotification
+    let isTappable: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(alignment: .top, spacing: 10) {
+                notificationIcon
+
+                VStack(alignment: .leading, spacing: 3) {
+                    bodyText
+                        .font(.subheadline)
+                        .lineLimit(3)
+                        .multilineTextAlignment(.leading)
+                    Text(notif.createdAt.toTimeAgo())
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 0)
+
+                if isTappable {
+                    Image(systemName: "chevron.right")
+                        .font(.caption2).foregroundStyle(.tertiary)
+                        .padding(.top, 4)
+                }
+            }
+            .padding(10)
+            .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.07)))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var notificationIcon: some View {
+        let (symbol, color) = NotificationSwipeRow.iconAndColor(for: notif)
+        return Group {
+            if let iconImage = notif.kind.iconImage {
+                switch iconImage {
+                case .avatar(let url):
+                    ZStack(alignment: .bottomTrailing) {
+                        CachedAsyncImage(urlString: url)
+                            .frame(width: 36, height: 36)
+                            .clipShape(Circle())
+                        Image(systemName: symbol)
+                            .font(.system(size: 7, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 15, height: 15)
+                            .background(Circle().fill(color))
+                            .offset(x: 3, y: 3)
+                    }
+                    .frame(width: 40, height: 40)
+                case .cover(let url):
+                    ZStack(alignment: .bottomTrailing) {
+                        CachedAsyncImage(urlString: url)
+                            .frame(width: 30, height: 42)
+                            .clipShape(RoundedRectangle(cornerRadius: 5))
+                        Image(systemName: symbol)
+                            .font(.system(size: 7, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 15, height: 15)
+                            .background(Circle().fill(color))
+                            .offset(x: 3, y: 3)
+                    }
+                    .frame(width: 34, height: 46)
+                }
+            } else {
+                Image(systemName: symbol)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 26, height: 26)
+                    .background(Circle().fill(color))
+            }
+        }
+    }
+
+    private var bodyText: Text {
+        switch notif.kind {
+        case .airing(let episode, let mediaTitle, _, _):
+            return Text("\(mediaTitle ?? "Anime") ").bold() + Text("episode \(episode) aired")
+        case .following(_, let userName, _):
+            return Text(userName ?? "Someone").bold() + Text(" followed you")
+        case .activityMessage(_, let context, _), .activityReply(_, let context, _),
+             .activityMention(_, let context, _), .activityLike(_, let context, _):
+            return Text("Activity ") + Text(context ?? "")
+        case .mediaChange(let title, let context, _, _):
+            if let title, !title.isEmpty {
+                return Text(title).bold() + Text(context ?? " was recently added to the site.")
+            } else {
+                return Text(context ?? "A title was updated")
+            }
+        case .unknown(let context):
+            return Text(context ?? "Notification")
         }
     }
 }

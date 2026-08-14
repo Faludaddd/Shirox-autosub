@@ -3,7 +3,7 @@ import SwiftUI
 import UIKit
 
 /// Custom download detail view with circular progress ring, ETA, speed,
-/// and Find File button. Shown when tapping a download row.
+/// Find File (share sheet), and rich metadata. Shown when tapping a download row.
 struct DownloadDetailView: View {
     let item: DownloadItem
 
@@ -17,6 +17,7 @@ struct DownloadDetailView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
+                headerCard
                 ringSection
                 infoSection
                 actionSection
@@ -32,12 +33,67 @@ struct DownloadDetailView: View {
         }
     }
 
+    // MARK: - Header with poster
+
+    private var headerCard: some View {
+        HStack(spacing: 16) {
+            CachedAsyncImage(urlString: liveItem.imageUrl)
+                .aspectRatio(2/3, contentMode: .fit)
+                .frame(width: 70, height: 105)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .shadow(radius: 3)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(liveItem.mediaTitle)
+                    .font(.headline)
+                    .lineLimit(2)
+                Text(liveItem.episodeTitle ?? "Episode \(liveItem.episodeNumber)")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                if let stream = liveItem.streamTitle {
+                    Text(stream)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                statusBadge
+            }
+            Spacer()
+        }
+        .padding(16)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    private var statusBadge: some View {
+        let (text, color, icon): (String, Color, String) = {
+            switch liveItem.state {
+            case .downloading: return ("Downloading", .blue, "arrow.down.circle.fill")
+            case .pending: return ("Waiting", .orange, "hourglass.fill")
+            case .completed: return ("Completed", .green, "checkmark.circle.fill")
+            case .failed: return ("Failed", .red, "exclamationmark.triangle.fill")
+            }
+        }()
+        return HStack(spacing: 4) {
+            Image(systemName: icon).font(.caption2)
+            Text(text).font(.caption.weight(.semibold))
+        }
+        .foregroundStyle(color)
+        .padding(.horizontal, 8).padding(.vertical, 4)
+        .background(color.opacity(0.12), in: Capsule())
+    }
+
+    // MARK: - Progress ring
+
     private var ringSection: some View {
         VStack(spacing: 12) {
             CircularProgressView(progress: liveItem.progress, state: liveItem.state)
-                .frame(width: 160, height: 160)
+                .frame(width: 140, height: 140)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Download progress")
+                .accessibilityValue("\(Int(liveItem.progress * 100)) percent, \(liveItem.state.rawValue)")
 
-            if liveItem.state == .downloading {
+            if liveItem.state == .downloading || liveItem.state == .pending {
                 HStack(spacing: 20) {
                     statLabel(liveItem.speedFormatted, "Speed")
                     statLabel(liveItem.etaFormatted, "Remaining")
@@ -58,14 +114,24 @@ struct DownloadDetailView: View {
         }
     }
 
+    // MARK: - Info
+
     private var infoSection: some View {
         VStack(spacing: 8) {
             if let fileName = liveItem.fileName {
                 infoRow("doc.fill", "File", fileName)
             }
+            if liveItem.isHLS {
+                infoRow("film.fill", "Type", "HLS Stream")
+            } else if liveItem.fileName != nil {
+                infoRow("film.fill", "Type", "MP4 Video")
+            }
             infoRow("calendar.fill", "Queued", liveItem.createdAt.formatted(date: .abbreviated, time: .shortened))
             if let completed = liveItem.completedAt {
                 infoRow("checkmark.seal.fill", "Completed", completed.formatted(date: .abbreviated, time: .shortened))
+            }
+            if let sub = liveItem.relativeSubtitlePath {
+                infoRow("captions.bubble.fill", "Subtitles", sub)
             }
             if let err = liveItem.error, liveItem.state == .failed {
                 infoRow("exclamationmark.triangle.fill", "Error", err).foregroundStyle(.red)
@@ -80,10 +146,11 @@ struct DownloadDetailView: View {
             Spacer()
             Text(value).font(.subheadline.weight(.medium)).lineLimit(2).multilineTextAlignment(.trailing)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 16).padding(.vertical, 10)
         .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10))
     }
+
+    // MARK: - Actions
 
     @ViewBuilder
     private var actionSection: some View {
@@ -95,6 +162,13 @@ struct DownloadDetailView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.appAccent)
+                .controlSize(.large)
+
+                Button { shareFile(fileURL) } label: {
+                    Label("Share File", systemImage: "square.and.arrow.up")
+                        .frame(maxWidth: .infinity).padding(.vertical, 4)
+                }
+                .buttonStyle(.bordered)
                 .controlSize(.large)
             }
             if liveItem.state == .failed {
@@ -163,11 +237,11 @@ private struct CircularProgressView: View {
                 .animation(.linear(duration: 0.3), value: displayProgress)
             if state == .downloading {
                 Text("\(Int(displayProgress * 100))%")
-                    .font(.system(size: 28, weight: .heavy, design: .rounded).monospacedDigit())
+                    .font(.system(size: 26, weight: .heavy, design: .rounded).monospacedDigit())
                     .foregroundStyle(ringColor)
             } else {
                 Image(systemName: state == .completed ? "checkmark.circle.fill" : state == .failed ? "exclamationmark.triangle.fill" : "hourglass")
-                    .font(.system(size: 32))
+                    .font(.system(size: 30))
                     .foregroundStyle(ringColor)
             }
         }

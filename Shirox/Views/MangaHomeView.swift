@@ -18,6 +18,7 @@ struct MangaHomeContent: View {
     @StateObject private var vm = MangaHomeViewModel()
     @State private var readerContext: ReaderContext?
     @State private var crNavTarget: ContinueReadingNavTarget?
+    @AppStorage("mangaBrowseCategoriesGridLayout") private var browseCategoriesGridLayout = false
 
     var body: some View {
         Group {
@@ -55,10 +56,13 @@ struct MangaHomeContent: View {
                         }
                         #endif
 
-                        // 3. BROWSE — manga shelves, same horizontal-strip
-                        //    pattern as the anime home's AnimeSection.
-                        MangaSection(title: "Trending Manga", items: vm.trending)
-                        MangaSection(title: "All-Time Popular", items: vm.popular)
+                        // 3. BROWSE — manga shelves or grid
+                        if browseCategoriesGridLayout {
+                            mangaBrowseGrid
+                        } else {
+                            MangaSection(title: "Trending Manga", items: vm.trending)
+                            MangaSection(title: "All-Time Popular", items: vm.popular)
+                        }
 
                         Spacer().frame(height: 28)
                     }
@@ -75,6 +79,25 @@ struct MangaHomeContent: View {
         }
         .continueReadingNavigation($crNavTarget)
         #endif
+    }
+
+    // MARK: - Grid layout (item 9)
+    private var mangaBrowseGrid: some View {
+        // Deduplicate by media id (trending + popular may overlap)
+        var seen = Set<Int>()
+        let allItems = (vm.trending + vm.popular).filter { seen.insert($0.id).inserted }
+        let columns = [GridItem(.adaptive(minimum: 110), spacing: 12)]
+        return LazyVGrid(columns: columns, spacing: 16) {
+            ForEach(allItems) { media in
+                NavigationLink {
+                    AniListMangaDetailView(mediaId: media.id, preloadedMedia: media)
+                } label: {
+                    MangaPosterCard(media: media)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 16)
     }
 }
 
@@ -766,6 +789,7 @@ private struct MangaDisplaySettingsPage: View {
     @AppStorage("manga.downsampleImages") private var downsampleImages: Bool = false
     @AppStorage("manga.dataSavingCellular") private var dataSavingCellular: Bool = false
     @AppStorage("manga.keepScreenOn") private var keepScreenOn: Bool = true
+    @AppStorage("mangaBrowseCategoriesGridLayout") private var browseCategoriesGridLayout: Bool = false
 
     private let bgColors: [(label: String, color: Color, value: String)] = [
         ("Black", .black, "black"),
@@ -856,6 +880,9 @@ private struct MangaDisplaySettingsPage: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                         .textCase(.uppercase)
+                    Toggle("Browse as Grid", isOn: $browseCategoriesGridLayout)
+                        .tint(Color.appAccent)
+                        .glowEffect(isOn: browseCategoriesGridLayout)
                     Toggle("Show Page Numbers", isOn: $showPageNumbers)
                         .tint(Color.appAccent)
                         .glowEffect(isOn: showPageNumbers)

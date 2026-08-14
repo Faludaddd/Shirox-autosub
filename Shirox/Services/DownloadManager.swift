@@ -57,6 +57,10 @@ final class DownloadManager: NSObject, ObservableObject {
     private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
     /// Per-task speed smoothing state for exponential moving average.
     private var speedState: [Int: (lastBytes: Int64, lastTime: Date, smoothedSpeed: Double)] = [:]
+    /// Per-item resume data for MP4 downloads (item 25). Captured when a
+    /// background download task is cancelled/fails, used on retry to resume
+    /// from where it left off instead of restarting from byte 0.
+    private var resumeData: [UUID: Data] = [:]
     private var backgroundCompletionHandler: (() -> Void)?
     private var isBackgrounded = false
     private static let keepAliveReason = "hls-downloads"
@@ -522,6 +526,7 @@ final class DownloadManager: NSObject, ObservableObject {
     func remove(_ item: DownloadItem) {
         hlsTasks[item.id]?.cancel()
         hlsTasks.removeValue(forKey: item.id)
+        resumeData.removeValue(forKey: item.id)
         refreshDownloadKeepAlive()
         if let taskID = item.taskIdentifier {
             urlSession.getAllTasks { tasks in tasks.first { $0.taskIdentifier == taskID }?.cancel() }
@@ -782,10 +787,19 @@ final class DownloadManager: NSObject, ObservableObject {
 
     private func startMP4(_ item: DownloadItem) {
         guard let streamURL = item.streamURL else { return }
-        var req = URLRequest(url: streamURL)
-        item.headers.forEach { req.setValue($1, forHTTPHeaderField: $0) }
-        
-        let task = urlSession.downloadTask(with: req)
+
+        // Item 25: if resume data exists from a previous failed/cancelled
+        // attempt, resume from where it left off instead of restarting.
+        let task: URLSessionDownloadTask
+        if let resumeData = resumeData[item.id] {
+            task = urlSession.downloadTask(withResumeData: resumeData)
+            resumeData.removeValue(forKey: item.id)
+            Logger.shared.log("[Downloads] Resuming MP4 from resume data for \(item.mediaTitle) Ep \(item.episodeNumber)", type: "Download")
+        } else {
+            var req = URLRequest(url: streamURL)
+            item.headers.forEach { req.setValue($1, forHTTPHeaderField: $0) }
+            task = urlSession.downloadTask(with: req)
+        }
         task.taskDescription = item.id.uuidString
         if let idx = items.firstIndex(where: { $0.id == item.id }) {
             items[idx].taskIdentifier = task.taskIdentifier
@@ -818,6 +832,7 @@ final class DownloadManager: NSObject, ObservableObject {
             items[idx].completedAt = Date()
             items[idx].bytesPerSecond = nil
             if let taskKey = items[idx].taskIdentifier { speedState.removeValue(forKey: taskKey) }
+            resumeData.removeValue(forKey: id)
             persist()
 
             let appState = UIApplication.shared.applicationState
@@ -1030,9 +1045,16 @@ extension DownloadManager: URLSessionDownloadDelegate {
         guard let error else { return }
         let nsError = error as NSError
         guard nsError.domain != NSURLErrorDomain || nsError.code != NSURLErrorCancelled else { return }
+
+        // Capture resume data if available (item 25) so retry can resume
+        // from where it left off instead of restarting from byte 0.
+        let resumeData = nsError.userInfo[NSURLSessionDownloadTaskResumeData] as? Data
         let taskID = task.taskIdentifier
         Task { @MainActor in
             if let idx = self.items.firstIndex(where: { $0.taskIdentifier == taskID }) {
+                if let resumeData = resumeData {
+                    self.resumeData[self.items[idx].id] = resumeData
+                }
                 self.updateError(self.items[idx].id, error)
             }
         }
