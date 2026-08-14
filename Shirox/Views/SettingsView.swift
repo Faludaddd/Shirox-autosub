@@ -1781,7 +1781,7 @@ struct NotificationsSettingsPage: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Divider().opacity(0.4)
-            Toggle(isOn: $episodeReminders).tint(Color.appAccent).glowEffect(isOn: episodeReminders) {
+            Toggle(isOn: $episodeReminders) {
                 HStack(spacing: 6) {
                     Image(systemName: "calendar.badge.clock")
                         .font(.caption)
@@ -1789,8 +1789,10 @@ struct NotificationsSettingsPage: View {
                     Text("Episode Reminders")
                 }
             }
+            .tint(Color.appAccent)
+            .glowEffect(isOn: episodeReminders)
             .disabled(!phoneNotificationsEnabled)
-            Toggle(isOn: $airingNotifications).tint(Color.appAccent).glowEffect(isOn: airingNotifications) {
+            Toggle(isOn: $airingNotifications) {
                 HStack(spacing: 6) {
                     Image(systemName: "tv.fill")
                         .font(.caption)
@@ -1798,6 +1800,8 @@ struct NotificationsSettingsPage: View {
                     Text("Airing Notifications")
                 }
             }
+            .tint(Color.appAccent)
+            .glowEffect(isOn: airingNotifications)
             .disabled(!phoneNotificationsEnabled)
             Text("Reminders fire before an episode airs. Requires an AniList account and a connected schedule.")
                 .font(.caption)

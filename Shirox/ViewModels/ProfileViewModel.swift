@@ -185,19 +185,52 @@ final class ProfileViewModel: ObservableObject {
     }
 
     // MARK: - History persistence (item 6)
-    private static let historyKey = "notificationHistory"
+    private static let historyKey = "notificationHistoryData"
+
+    /// Simple Codable representation for persistence.
+    private struct HistoryEntry: Codable {
+        let id: Int
+        let bodyText: String
+        let createdAt: Int
+    }
 
     private func saveHistory() {
-        if let data = try? JSONEncoder().encode(notificationHistory) {
+        let entries = notificationHistory.map {
+            HistoryEntry(id: $0.id, bodyText: historyBodyText(for: $0), createdAt: $0.createdAt)
+        }
+        if let data = try? JSONEncoder().encode(entries) {
             UserDefaults.standard.set(data, forKey: Self.historyKey)
         }
     }
 
     private func loadHistory() {
         guard let data = UserDefaults.standard.data(forKey: Self.historyKey),
-              let decoded = try? JSONDecoder().decode([ProviderNotification].self, from: data)
+              let decoded = try? JSONDecoder().decode([HistoryEntry].self, from: data)
         else { return }
-        notificationHistory = decoded
+        // Reconstruct ProviderNotification from persisted data — use .unknown
+        // kind with the body text as context, since the full enum can't be
+        // easily Codable. The history view only needs bodyText + date.
+        notificationHistory = decoded.map { entry in
+            ProviderNotification(id: entry.id, kind: .unknown(context: entry.bodyText), createdAt: entry.createdAt)
+        }
+    }
+
+    /// Generates human-readable body text for a notification (item 6).
+    private func historyBodyText(for notif: ProviderNotification) -> String {
+        switch notif.kind {
+        case .airing(let episode, let mediaTitle, _, _):
+            return "\(mediaTitle ?? "Anime") — Episode \(episode) aired"
+        case .following(_, let userName, _):
+            return "\(userName ?? "Someone") followed you"
+        case .activityMessage(_, let context, _), .activityReply(_, let context, _),
+             .activityMention(_, let context, _), .activityLike(_, let context, _):
+            return "Activity: \(context ?? "")"
+        case .mediaChange(let title, let context, _, _):
+            if let title, !title.isEmpty { return "\(title): \(context ?? "Updated")" }
+            return context ?? "Media updated"
+        case .unknown(let context):
+            return context ?? "Notification"
+        }
     }
 
     func loadSocial(userId: Int, type: SocialType, loadMore: Bool = false) async {
