@@ -525,9 +525,7 @@ struct UpdateSettingsPage: View {
 
 #if os(iOS)
 /// `UIActivityViewController` bridge used by the Download Options card's
-/// "Share via…" and "Send to KSign" fallback paths. Deliberately a separate
-/// type from `UpdateShareSheet` (defined in `UpdatePopupView.swift`) so this
-/// page stays self-contained even if the legacy popup is removed.
+/// "Share via…" and "Send to KSign" fallback paths.
 struct UpdateSettingsShareSheet: UIViewControllerRepresentable {
     let items: [Any]
 

@@ -160,6 +160,9 @@ struct NotificationsView: View {
                         Button { dismissNotification(notif) } label: {
                             Label("Dismiss", systemImage: "xmark.circle")
                         }
+                        Button(role: .destructive) { dismissNotification(notif) } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
                     }
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                         Button(role: .destructive) {
@@ -509,32 +512,33 @@ private struct NotificationRowContent: View {
     let onTap: () -> Void
 
     var body: some View {
-        Button(action: onTap) {
-            HStack(alignment: .top, spacing: 10) {
-                notificationIcon
+        // Do NOT use Button — it intercepts gestures and prevents swipeActions
+        // and contextMenu from working inside a List. Use .onTapGesture instead.
+        HStack(alignment: .top, spacing: 10) {
+            notificationIcon
 
-                VStack(alignment: .leading, spacing: 3) {
-                    bodyText
-                        .font(.subheadline)
-                        .lineLimit(3)
-                        .multilineTextAlignment(.leading)
-                    Text(notif.createdAt.toTimeAgo())
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer(minLength: 0)
-
-                if isTappable {
-                    Image(systemName: "chevron.right")
-                        .font(.caption2).foregroundStyle(.tertiary)
-                        .padding(.top, 4)
-                }
+            VStack(alignment: .leading, spacing: 3) {
+                bodyText
+                    .font(.subheadline)
+                    .lineLimit(3)
+                    .multilineTextAlignment(.leading)
+                Text(notif.createdAt.toTimeAgo())
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
-            .padding(10)
-            .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.07)))
+
+            Spacer(minLength: 0)
+
+            if isTappable {
+                Image(systemName: "chevron.right")
+                    .font(.caption2).foregroundStyle(.tertiary)
+                    .padding(.top, 4)
+            }
         }
-        .buttonStyle(.plain)
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.07)))
+        .contentShape(RoundedRectangle(cornerRadius: 10))
+        .onTapGesture { onTap() }
     }
 
     private var notificationIcon: some View {
