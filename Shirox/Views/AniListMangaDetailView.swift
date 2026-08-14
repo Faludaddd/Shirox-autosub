@@ -247,7 +247,7 @@ struct AniListMangaDetailView: View {
                         .minimumScaleFactor(0.6)
                 }
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(chapter.title.isEmpty ? "Chapter \(chapter.displayNumber)" : chapter.title)
+                    Text((chapter.title?.isEmpty ?? true) ? "Chapter \(chapter.displayNumber)" : chapter.title!)
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
