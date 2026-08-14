@@ -70,6 +70,7 @@ struct Media: Identifiable, Codable, Equatable, Hashable, Sendable {
             .replacingOccurrences(of: "<br><br>", with: "\n\n")
             .replacingOccurrences(of: "<br>", with: "\n")
             .replacingOccurrences(of: #"<[^>]+>"#, with: "", options: .regularExpression)
+            .decodingHTMLEntities()
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
@@ -213,5 +214,44 @@ struct MediaRelationEdge: Codable, Identifiable, Equatable, Hashable {
 
     var formattedRelation: String {
         relationType.replacingOccurrences(of: "_", with: " ").capitalized
+    }
+}
+
+// MARK: - HTML Entity Decoding (item 19)
+
+extension String {
+    /// Decodes common HTML entities (&quot;, &amp;, &#039;, etc.) to their
+    /// actual characters so they don't appear literally in displayed text.
+    func decodingHTMLEntities() -> String {
+        var result = self
+        let entities: [(String, String)] = [
+            ("&quot;", "\""), ("&amp;", "&"), ("&apos;", "'"),
+            ("&#039;", "'"), ("&#39;", "'"), ("&lt;", "<"),
+            ("&gt;", ">"), ("&hellip;", "…"), ("&mdash;", "—"),
+            ("&ndash;", "–"), ("&nbsp;", " "), ("&laquo;", "«"),
+            ("&raquo;", "»"), ("&trade;", "™"), ("&copy;", "©"),
+            ("&reg;", "®"), ("&deg;", "°"), ("&para;", "¶"),
+            ("&middot;", "·"), ("&rsquo;", "'"), ("&lsquo;", "'"),
+            ("&rdquo;", "\""), ("&ldquo;", "\""), ("&sbquo;", ","),
+        ]
+        for (entity, replacement) in entities {
+            result = result.replacingOccurrences(of: entity, with: replacement)
+        }
+        // Decode numeric entities like &#1234; and &#x4D2;
+        while let range = result.range(of: #"&#x?[0-9a-fA-F]+;"#, options: .regularExpression) {
+            let entity = String(result[range])
+            let hex = entity.hasPrefix("&#x")
+            let numStr = entity
+                .replacingOccurrences(of: "&#", with: "")
+                .replacingOccurrences(of: "x", with: "")
+                .replacingOccurrences(of: ";", with: "")
+            if let scalar = UInt32(hex ? numStr : String(Int(numStr) ?? 0), base: hex ? 16 : 10),
+               let char = Unicode.Scalar(scalar) {
+                result = result.replacingCharacters(in: range, with: String(char))
+            } else {
+                break
+            }
+        }
+        return result
     }
 }

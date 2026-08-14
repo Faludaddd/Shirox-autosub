@@ -28,6 +28,9 @@ final class PlayerPresenter: ObservableObject {
 
     #if os(iOS)
     @Published var orientationLock = UIInterfaceOrientationMask.portrait
+    /// Shared flag set by PlayerView when 2× speed hold is active, so the
+    /// drag-to-dismiss gesture coordinator can check it and block dismissal.
+    @Published var isSpeedBoosted = false
     #endif
 
     /// Set by `presentRatingPromptIfNeeded` after the user finishes the last episode.

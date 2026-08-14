@@ -10,6 +10,8 @@ final class ProfileViewModel: ObservableObject {
 
     @Published var notifications: [ProviderNotification] = []
     private var allNotifications: [ProviderNotification] = []
+    /// Archived notifications (item 9) — persisted in-memory for the session.
+    @Published var notificationHistory: [ProviderNotification] = []
     @Published var followers: [UserProfile] = []
     @Published var hasNextFollowersPage = false
     private var currentFollowersPage = 1
@@ -161,8 +163,19 @@ final class ProfileViewModel: ObservableObject {
     }
 
     func removeNotification(_ notif: ProviderNotification) {
+        // Archive to history before removing (item 9)
+        notificationHistory.insert(notif, at: 0)
+        if notificationHistory.count > 100 { notificationHistory = Array(notificationHistory.prefix(100)) }
         allNotifications.removeAll { $0.id == notif.id }
         notifications.removeAll { $0.id == notif.id }
+    }
+
+    /// Clears all active notifications, archiving them to history (items 9+10).
+    func clearAllNotifications() {
+        notificationHistory.insert(contentsOf: notifications, at: 0)
+        if notificationHistory.count > 100 { notificationHistory = Array(notificationHistory.prefix(100)) }
+        allNotifications.removeAll()
+        notifications.removeAll()
     }
 
     func loadSocial(userId: Int, type: SocialType, loadMore: Bool = false) async {

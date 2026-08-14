@@ -738,15 +738,15 @@ struct PlayerView: View {
                 onBegan: {
                     if !castManager.isConnected {
                         isSpeedBoosted = true
+                        PlayerPresenter.shared.isSpeedBoosted = true
                         player.rate = 2.0
-                        // Hide the controls (title, gradients, play/pause) so the
-                        // 2× badge sits cleanly at the top by itself while boosting.
                         setControlsVisible(false)
                     }
                 },
                 onEnded: {
                     if isSpeedBoosted {
                         isSpeedBoosted = false
+                        PlayerPresenter.shared.isSpeedBoosted = false
                         player.rate = isPlaying ? Float(playbackSpeed) : 0
                     }
                 }
@@ -2863,6 +2863,10 @@ private final class DragToDismissCoordinator: NSObject, UIGestureRecognizerDeleg
     }
     func gestureRecognizerShouldBegin(_ gr: UIGestureRecognizer) -> Bool {
         guard let pan = gr as? UIPanGestureRecognizer, let vc = viewController else { return true }
+        // Item 15: don't allow drag-dismiss while speed boost is active —
+        // the swipe-down should end the speed hold, not exit the player.
+        // Check via the shared PlayerPresenter flag.
+        if PlayerPresenter.shared.isSpeedBoosted { return false }
         let v = pan.velocity(in: vc.view)
         return v.y > 0 && v.y > abs(v.x)
     }

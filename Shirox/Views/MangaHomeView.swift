@@ -162,6 +162,14 @@ struct MangaSection: View {
                                     .frame(width: 130)
                             }
                             .buttonStyle(CardPressStyle())
+                            .contextMenu {
+                                Button { } label: {
+                                    Label("Add to Planning", systemImage: "plus.circle")
+                                }
+                                Button { } label: {
+                                    Label("Share", systemImage: "square.and.arrow.up")
+                                }
+                            }
                         }
                     }
                     .padding(.horizontal, 16)
@@ -183,8 +191,9 @@ struct MangaPosterCard: View, Equatable {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             CachedAsyncImage(urlString: media.coverImage.extraLarge ?? media.coverImage.large ?? "")
-                .frame(height: 190)
+                .aspectRatio(2/3, contentMode: .fill)
                 .frame(maxWidth: .infinity)
+                .frame(height: 190)
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.1)))
                 .overlay(alignment: .topTrailing) {

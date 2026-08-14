@@ -38,6 +38,7 @@ struct AniListMedia: Identifiable, Codable {
             .replacingOccurrences(of: "<br><br>", with: "\n\n")
             .replacingOccurrences(of: "<br>", with: "\n")
             .replacingOccurrences(of: #"<[^>]+>"#, with: "", options: .regularExpression)
+            .decodingHTMLEntities()
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 

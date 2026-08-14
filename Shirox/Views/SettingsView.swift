@@ -3592,8 +3592,8 @@ struct SubtitleSettingsPage: View {
                     .tint(.appAccent)
             }
 
-            Toggle("Background", isOn: $subtitleBackgroundEnabled)
-                .tint(.appAccent)
+            // Background toggle removed here — it's duplicated in positionCard.
+            // The one in positionCard (labeled "Position & Background") is kept.
             Toggle("Bold Text", isOn: $subtitleBoldText)
                 .tint(.appAccent)
         }

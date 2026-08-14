@@ -113,6 +113,7 @@ struct DetailView: View {
             .padding(.bottom, 30)
         }
         .coordinateSpace(name: "detailScroll")
+        .ignoresSafeArea(edges: .top)
     }
 
     var body: some View {

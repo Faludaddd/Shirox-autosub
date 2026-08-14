@@ -35,6 +35,8 @@ struct ActivityFetchView: View {
 struct NotificationsView: View {
     @ObservedObject var vm: ProfileViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var showHistory = false
+    @State private var showClearConfirmation = false
 
     var body: some View {
         NavigationStack {
@@ -52,6 +54,21 @@ struct NotificationsView: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showHistory = true
+                    } label: {
+                        Image(systemName: "clock.arrow.circlepath")
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showClearConfirmation = true
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .disabled(vm.notifications.isEmpty)
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                 }
@@ -61,6 +78,17 @@ struct NotificationsView: View {
             // (which would interfere with the swipe gestures).
             .navigationDestinationCompat(item: $pendingNavNotif) { notif in
                 destinationView(for: notif)
+            }
+            .alert("Clear All Notifications?", isPresented: $showClearConfirmation) {
+                Button("Clear All", role: .destructive) {
+                    vm.clearAllNotifications()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This will dismiss all notifications. They'll be saved to history.")
+            }
+            .sheet(isPresented: $showHistory) {
+                NotificationsHistoryView(vm: vm)
             }
         }
         .task { if vm.notifications.isEmpty { await vm.loadNotifications() } }
@@ -123,6 +151,16 @@ struct NotificationsView: View {
                     )
                     .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
                     .listRowSeparator(.hidden)
+                    .contextMenu {
+                        if isTappable(notif) {
+                            Button { handleTap(notif) } label: {
+                                Label("View Details", systemImage: "info.circle")
+                            }
+                        }
+                        Button { dismissNotification(notif) } label: {
+                            Label("Dismiss", systemImage: "xmark.circle")
+                        }
+                    }
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                         Button(role: .destructive) {
                             dismissNotification(notif)
@@ -558,6 +596,45 @@ private struct NotificationRowContent: View {
             }
         case .unknown(let context):
             return Text(context ?? "Notification")
+        }
+    }
+}
+
+// MARK: - Notifications History View (item 9)
+
+/// Shows past/dismissed notifications with their original date/time.
+struct NotificationsHistoryView: View {
+    @ObservedObject var vm: ProfileViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if vm.notificationHistory.isEmpty {
+                    ContentUnavailableView("No History", systemImage: "clock.slash")
+                } else {
+                    List {
+                        ForEach(vm.notificationHistory) { notif in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(notif.kind.context ?? "Notification")
+                                    .font(.subheadline)
+                                Text(notif.createdAt.formatted(date: .abbreviated, time: .standard))
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .listRowSeparator(.hidden)
+                        }
+                    }
+                    .listStyle(.plain)
+                }
+            }
+            .navigationTitle("History")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
         }
     }
 }

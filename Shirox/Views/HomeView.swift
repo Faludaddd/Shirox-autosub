@@ -774,29 +774,28 @@ private struct FeaturedCard: View, Equatable {
             } else {
                 GeometryReader { geo in
                     let pageOffset = geo.frame(in: .global).minX
-                    // Use fanart (landscape banner) instead of the portrait
-                    // cover image — the cover is only ~230px wide and gets
-                    // upscaled ~6× on iPhone, causing severe blur. The fanart
-                    // is a full-width landscape image that matches the card's
-                    // aspect ratio. Falls back to bannerImage, then cover.
                     let imageURL = media.bannerImage
                         ?? media.coverImage.extraLarge
                         ?? media.coverImage.large
                         ?? ""
                     ZStack {
-                        // Blurred background layer — fills edges during swipe-up
-                        // parallax so black never shows through.
+                        // Blurred background layer — only fills the TOP edge
+                        // (the only edge affected by swipe-up parallax).
                         CachedAsyncImage(urlString: imageURL)
-                            .frame(width: geo.size.width * 1.2, height: geo.size.height * 1.2)
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: geo.size.width, height: geo.size.height + 100)
                             .blur(radius: 35)
                             .overlay(
                                 LinearGradient(
-                                    colors: [.clear, .black.opacity(0.5)],
-                                    startPoint: .center, endPoint: .bottom
+                                    colors: [.black.opacity(0.5), .clear],
+                                    startPoint: .top, endPoint: .center
                                 )
                             )
-                        // Sharp foreground image
+                            .clipped()
+                        // Sharp foreground image — must use .fill so it
+                        // crops instead of stretching (item 6 fix).
                         CachedAsyncImage(urlString: imageURL)
+                            .aspectRatio(contentMode: .fill)
                             .frame(width: geo.size.width, height: geo.size.height)
                             .clipped()
                             .offset(x: -pageOffset * 0.25)
@@ -959,6 +958,14 @@ private struct AnimeSection: View {
                         }
                         .buttonStyle(HomePressStyle())
                         .frame(width: cardWidth)
+                        .contextMenu {
+                            Button { } label: {
+                                Label("Add to Planning", systemImage: "plus.circle")
+                            }
+                            Button { } label: {
+                                Label("Share", systemImage: "square.and.arrow.up")
+                            }
+                        }
                     }
                 }
                 .padding(.horizontal, 16)

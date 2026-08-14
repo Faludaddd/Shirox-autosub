@@ -519,12 +519,12 @@ struct MangaDetailView: View {
         HStack(spacing: 10) {
             if anilistAuth.isLoggedIn, mangaAniListID != nil {
                 listButton(
-                    title: existingAniListEntry.map { "\($0.status.displayName) \($0.progress)/\(vm.match?.totalChapters.map(String.init) ?? "?")" } ?? "Add to AniList",
+                    title: existingAniListEntry.map { "\($0.status.displayName(for: .manga)) \($0.progress)/\(vm.match?.totalChapters.map(String.init) ?? "?")" } ?? "Add to AniList",
                     systemImage: "list.bullet.rectangle") { showAniListEdit = true }
             }
             if malAuth.isLoggedIn, mangaMALID != nil {
                 listButton(
-                    title: existingMALEntry.map { "MAL · \($0.status.displayName) \($0.progress)" } ?? "Add to MAL",
+                    title: existingMALEntry.map { "MAL · \($0.status.displayName(for: .manga)) \($0.progress)" } ?? "Add to MAL",
                     systemImage: "list.bullet.rectangle") { showMALEdit = true }
             }
         }
