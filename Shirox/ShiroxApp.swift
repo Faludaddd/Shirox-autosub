@@ -169,6 +169,20 @@ extension Color {
         return UserDefaults.standard.object(forKey: "glowEnabled") as? Bool ?? true
     }
 
+    // MARK: - Shared glow radius constants (item 3 — batch 7)
+    // All glow radii are defined here as multipliers of glowIntensity,
+    // increased 50% from original values for better visibility.
+    // Use these instead of hardcoding multipliers at each call site.
+
+    /// Toggle glow radius (was 16, now 24).
+    static var glowRadiusToggle: CGFloat { CGFloat(24 * glowIntensity) }
+    /// Selection/indicator glow radius (was 14, now 21).
+    static var glowRadiusSelection: CGFloat { CGFloat(21 * glowIntensity) }
+    /// Small indicator glow radius (was 8, now 12).
+    static var glowRadiusSmall: CGFloat { CGFloat(12 * glowIntensity) }
+    /// Large/hero glow radius (was 28, now 42).
+    static var glowRadiusLarge: CGFloat { CGFloat(42 * glowIntensity) }
+
     static var dataSavingMode: Bool {
         UserDefaults.standard.bool(forKey: "dataSavingEnabled")
             || UserDefaults.standard.bool(forKey: "dataSavingMode")

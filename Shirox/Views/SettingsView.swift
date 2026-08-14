@@ -1845,7 +1845,7 @@ struct NotificationsSettingsPage: View {
                 color: (anyEnabled && Color.glowEnabled)
                     ? Color.green.opacity(Color.glowIntensity * 0.6) : .clear,
                 radius: (anyEnabled && Color.glowEnabled)
-                    ? CGFloat(14 * Color.glowIntensity) : 0
+                    ? Color.glowRadiusSelection : 0
             )
 
             VStack(spacing: 4) {
@@ -1947,7 +1947,7 @@ struct NotificationsSettingsPage: View {
                         color: Color.glowEnabled
                             ? Color.red.opacity(Color.glowIntensity * 0.4) : .clear,
                         radius: Color.glowEnabled
-                            ? CGFloat(8 * Color.glowIntensity) : 0
+                            ? Color.glowRadiusSmall : 0
                     )
             }
             .buttonStyle(.bordered)
@@ -2198,7 +2198,7 @@ struct SourcesSettingsPage: View {
         // shadow radius (`20 * intensity`) and its opacity (`intensity * 1.0`)
         // so the slider visibly grows and brightens the halo around the icon.
         let glowOpacity: Double = Color.glowEnabled ? Color.glowIntensity * 1.0 : 0
-        let glowRadius: CGFloat = Color.glowEnabled ? CGFloat(28 * Color.glowIntensity) : 0
+        let glowRadius: CGFloat = Color.glowEnabled ? Color.glowRadiusLarge : 0
 
         CachedAsyncImage(urlString: provider.iconURL)
             .frame(width: 34, height: 34)
@@ -2271,7 +2271,7 @@ struct ModulesSettingsPage: View {
                                 ? Color.appAccent.opacity(Color.glowIntensity * 0.8)
                                 : .clear,
                             radius: (moduleManager.activeModule?.id == module.id && Color.glowEnabled)
-                                ? CGFloat(14 * Color.glowIntensity)
+                                ? Color.glowRadiusSelection
                                 : 0
                         )
                     }
@@ -2942,7 +2942,7 @@ private struct StoreModuleTile: View {
                 ? Color.appAccent.opacity(Color.glowIntensity * 0.5)
                 : .clear,
             radius: isInstalled && Color.glowEnabled
-                ? CGFloat(8 * Color.glowIntensity)
+                ? Color.glowRadiusSmall
                 : 0
         )
     }
@@ -3007,7 +3007,7 @@ private struct StoreModuleTile: View {
                 ? Color.appAccent.opacity(Color.glowIntensity * 0.5)
                 : .clear,
             radius: isInstalled && Color.glowEnabled
-                ? CGFloat(8 * Color.glowIntensity)
+                ? Color.glowRadiusSmall
                 : 0
         )
     }
@@ -3082,7 +3082,7 @@ private struct GlowingInstallButtonStyle: ButtonStyle {
                     ? Color.appAccent.opacity(Color.glowIntensity * 0.5)
                     : .clear,
                 radius: configuration.isPressed && Color.glowEnabled
-                    ? CGFloat(8 * Color.glowIntensity)
+                    ? Color.glowRadiusSmall
                     : 0
             )
     }
@@ -4330,7 +4330,7 @@ struct TrackersSettingsPage: View {
                     color: isConnected && Color.glowEnabled
                         ? Color.green.opacity(Color.glowIntensity) : .clear,
                     radius: isConnected && Color.glowEnabled
-                        ? CGFloat(21 * Color.glowIntensity) : 0
+                        ? Color.glowRadiusSelection : 0
                 )
 
             VStack(alignment: .leading, spacing: 4) {
@@ -4413,7 +4413,7 @@ struct BackupRestoreSettingsPage: View {
                     .shadow(
                         color: Color.glowEnabled
                             ? Color.appAccent.opacity(Color.glowIntensity * 0.5) : .clear,
-                        radius: Color.glowEnabled ? CGFloat(17 * Color.glowIntensity) : 0
+                        radius: Color.glowEnabled ? Color.glowRadiusSelection : 0
                     )
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

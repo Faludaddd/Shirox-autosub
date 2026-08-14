@@ -12,7 +12,7 @@ struct ToggleGlow: ViewModifier {
                     ? Color.appAccent.opacity(Color.glowIntensity * 0.8)
                     : .clear,
                 radius: isOn && Color.glowEnabled
-                    ? CGFloat(16 * Color.glowIntensity)
+                    ? Color.glowRadiusToggle
                     : 0
             )
     }

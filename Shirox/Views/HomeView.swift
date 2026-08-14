@@ -5,15 +5,10 @@ struct HomeView: View {
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
     @ObservedObject private var mangaProgress = MangaProgressManager.shared
     @ObservedObject private var appMode = AppModeManager.shared
-    // #111 — Observing AniListAuthManager here lets HomeView re-render the
-    // Continue Watching section's signed-out prompt card the moment the user
-    // completes (or signs out of) AniList auth, without needing a manual reload.
     @ObservedObject private var anilistAuth = AniListAuthManager.shared
-    // Continue Watching context-menu navigation. Driven from here so the hidden
-    // NavigationLink that performs the push sits OUTSIDE the ScrollView below.
+    @StateObject private var profileVM = ProfileViewModel()
     @State private var cwNavTarget: ContinueWatchingNavTarget?
     @State private var readerContext: ReaderContext?
-    /// Controls navigation to the notifications page via NavigationLink.
     @State private var navigateToNotifications = false
     /// Drives the custom pull-to-refresh overlay (#98). Toggled at the start/end
     /// of the `.refreshable` task so `CustomRefreshControl` can spin while the
@@ -71,7 +66,7 @@ struct HomeView: View {
                     .accessibilityLabel(appMode.mode.toggleAccessibilityLabel)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink(destination: NotificationsPage()) {
+                    NavigationLink(destination: NotificationsView(vm: profileVM)) {
                         Image(systemName: "bell")
                             .font(.system(size: 18, weight: .medium))
                             .foregroundStyle(.primary)
@@ -1006,7 +1001,7 @@ private struct HomePressStyle: ButtonStyle {
             .opacity(configuration.isPressed ? 0.88 : 1.0)
             .shadow(
                 color: glowOn ? Color.appAccent.opacity(Color.glowIntensity * 0.6) : .clear,
-                radius: glowOn ? CGFloat(21 * Color.glowIntensity) : 0
+                radius: glowOn ? Color.glowRadiusSelection : 0
             )
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: configuration.isPressed)
     }
@@ -2875,79 +2870,6 @@ struct MangaScheduleSettingsPage: View {
 }
 
 // MARK: - Notifications Page
-
-/// Notifications page — opened via the bell icon in HomeView's toolbar.
-struct NotificationsPage: View {
-    @State private var notifications: [AniListNotification] = []
-    @State private var isLoading = false
-    @State private var error: String?
-
-    var body: some View {
-        Group {
-            if isLoading && notifications.isEmpty {
-                notifLoadingView
-            } else if let error = error, notifications.isEmpty {
-                ContentUnavailableView("Couldn't Load", systemImage: "wifi.slash", description: Text(error))
-            } else if notifications.isEmpty {
-                ContentUnavailableView("No Notifications", systemImage: "bell.slash", description: Text("You're all caught up!"))
-            } else {
-                // Issue #6 — Redesigned Notifications layout. Uses a
-                // ScrollView + LazyVStack of card-style rows instead of a
-                // plain List, so the larger artwork and redesigned card
-                // layout can breathe with proper spacing and hierarchy.
-                ScrollView {
-                    LazyVStack(spacing: 12) {
-                        ForEach(notifications, id: \.id) { notification in
-                            NotificationRow(notification: notification)
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
-                    .padding(.bottom, 24)
-                }
-            }
-        }
-        .navigationTitle("Notifications")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
-        .task { await load() }
-        .refreshable { await load() }
-    }
-
-    private var notifLoadingView: some View {
-        // Issue #6 — Skeleton matches the redesigned NotificationRow layout:
-        // a 75×105 rounded-rectangle poster placeholder on the left and
-        // three stacked text bars on the right.
-        VStack(spacing: 12) {
-            ForEach(0..<6, id: \.self) { _ in
-                HStack(alignment: .top, spacing: 16) {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color.secondary.opacity(0.15))
-                        .frame(width: 75, height: 105)
-                    VStack(alignment: .leading, spacing: 8) {
-                        RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.15)).frame(width: 100, height: 12)
-                        RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.15)).frame(height: 16)
-                        RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.15)).frame(width: 200, height: 12)
-                        RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.15)).frame(width: 60, height: 10)
-                    }
-                    Spacer(minLength: 0)
-                }
-                .padding(16)
-                .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            }
-            Spacer()
-        }
-        .padding(.horizontal, 16).padding(.top, 16)
-    }
-
-    private func load() async {
-        isLoading = true; error = nil
-        do { notifications = try await AniListSocialService.shared.fetchNotifications() }
-        catch { self.error = error.localizedDescription }
-        isLoading = false
-    }
-}
 
 // Issue #6 — Redesigned NotificationRow with 50% larger artwork (75×105,
 // up from 50×70) and a new card-style layout. The row is now a self-
