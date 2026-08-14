@@ -63,12 +63,24 @@ struct PlayerBottomBar: View {
                                 .font(.system(size: isPad ? 16 : 14, weight: .semibold))
                                 .foregroundStyle(.white.opacity(0.6))
                                 .lineLimit(1)
+                                .minimumScaleFactor(0.6)
                         }
                         if let title = mediaTitle, !title.isEmpty {
+                            // Episode title — must NEVER truncate. Use
+                            // lineLimit(1) + minimumScaleFactor(0.4) so long
+                            // titles dynamically scale down to fit on one
+                            // line instead of being cut off with "…".
+                            // Works in both portrait and landscape because
+                            // the HStack gives the title the full width
+                            // minus the right button group (Spacer pushes
+                            // buttons to the trailing edge, and the title
+                            // VStack is given priority via layoutPriority).
                             Text(title)
                                 .font(.system(size: isPad ? 24 : 20, weight: .heavy))
                                 .foregroundStyle(.white)
                                 .lineLimit(1)
+                                .minimumScaleFactor(0.4)
+                                .layoutPriority(1)
                         }
                     }
                     skip85Button

@@ -83,12 +83,17 @@ final class AniListDetailViewModel: ObservableObject {
     /// module, WITHOUT showing the ModuleStreamPickerView. This is the fix
     /// for "tapping Watch Anime opens another selection UI" — the user
     /// already picked a module via the toolbar module selector, so we
-    /// should just use it. Falls back to the picker sheet only when there
-    /// is no active anime module or the resolution genuinely fails.
+    /// should just use it. If resolution fails, show an error toast and
+    /// NEVER fall back to the old module-selection picker.
     private func autoResolveWithActiveModule(episode: Int) async {
         // Need a media title to search.
         guard let media else {
-            showStreamPicker = true
+            ToastManager.shared.show(
+                title: "Watch",
+                message: "Media not loaded yet — try again in a moment.",
+                icon: "exclamationmark.triangle.fill",
+                iconColor: .orange
+            )
             return
         }
 
@@ -101,9 +106,13 @@ final class AniListDetailViewModel: ObservableObject {
         }()
 
         guard let module = activeAnimeModule else {
-            // No anime module installed — show the picker so the user sees
-            // the empty state and can install one.
-            showStreamPicker = true
+            // No anime module installed — show a toast, NOT the picker.
+            ToastManager.shared.show(
+                title: "No Anime Module",
+                message: "Install an anime module from Settings to watch episodes.",
+                icon: "puzzlepiece.extension",
+                iconColor: .orange
+            )
             return
         }
 
@@ -131,7 +140,12 @@ final class AniListDetailViewModel: ObservableObject {
                 results = try await runner.search(keyword: searchTitle)
             }
             guard !results.isEmpty else {
-                showStreamPicker = true
+                ToastManager.shared.show(
+                    title: "Not Found",
+                    message: "\"\(media.title.searchTitle)\" wasn't found in \(module.sourceName). Try another module.",
+                    icon: "magnifyingglass",
+                    iconColor: .orange
+                )
                 return
             }
             // Pick the best-ranked result (same logic as ModuleStreamRow).
@@ -147,7 +161,12 @@ final class AniListDetailViewModel: ObservableObject {
                 episodes = try await runner.fetchEpisodes(url: match.href)
             }
             guard !episodes.isEmpty else {
-                showStreamPicker = true
+                ToastManager.shared.show(
+                    title: "No Episodes",
+                    message: "\(module.sourceName) returned no episodes for this title.",
+                    icon: "tv.slash",
+                    iconColor: .orange
+                )
                 return
             }
 
@@ -165,14 +184,24 @@ final class AniListDetailViewModel: ObservableObject {
                 return nil
             }()
             guard let matched else {
-                showStreamPicker = true
+                ToastManager.shared.show(
+                    title: "Episode Not Found",
+                    message: "Episode \(episode) isn't available in \(module.sourceName).",
+                    icon: "exclamationmark.triangle.fill",
+                    iconColor: .orange
+                )
                 return
             }
 
             // 4. Fetch streams for the matched episode.
             let streams = try await runner.fetchStreams(episodeUrl: matched.href)
             guard !streams.isEmpty else {
-                showStreamPicker = true
+                ToastManager.shared.show(
+                    title: "No Streams",
+                    message: "No playable streams found for episode \(episode).",
+                    icon: "exclamationmark.triangle.fill",
+                    iconColor: .orange
+                )
                 return
             }
 
@@ -187,10 +216,16 @@ final class AniListDetailViewModel: ObservableObject {
             onStreamsLoaded(sorted, selectedStream: nil, episodeHref: match.href,
                             availableCount: episodes.count, actualEpisodeHref: matched.href)
         } catch {
-            // Resolution failed (network, module error, etc.) — fall back
-            // to the picker so the user can try another module manually.
+            // Resolution failed (network, module error, etc.) — show a
+            // toast, NOT the picker. Cancellation is silent (expected when
+            // the user navigates away mid-resolve).
             if !ProviderManager.isCancellationError(error) {
-                showStreamPicker = true
+                ToastManager.shared.show(
+                    title: "Playback Error",
+                    message: error.localizedDescription,
+                    icon: "exclamationmark.triangle.fill",
+                    iconColor: .red
+                )
             }
         }
     }

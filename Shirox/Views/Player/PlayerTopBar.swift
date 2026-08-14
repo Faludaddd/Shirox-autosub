@@ -20,11 +20,14 @@ struct PlayerTopBar: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            // Title pinned to top to stay level with buttons
+            // Title pinned to top to stay level with buttons. Uses
+            // minimumScaleFactor(0.4) so long titles scale down to fit on
+            // one line instead of truncating with "…".
             Text(title)
                 .font(isPad ? .title3.weight(.semibold) : .subheadline.weight(.semibold))
                 .foregroundStyle(.white)
                 .lineLimit(1)
+                .minimumScaleFactor(0.4)
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, isPad ? 140 : 100)
                 .frame(height: isPad ? 56 : 44) // match dismiss button height

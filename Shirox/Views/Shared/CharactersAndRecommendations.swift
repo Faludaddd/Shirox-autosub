@@ -20,13 +20,24 @@ struct CharactersSection: View {
     /// them in to avoid a second network call.
     var preloaded: [AniListCharacterEdge]? = nil
 
-    @State private var characters: [AniListCharacterEdge] = []
-    @State private var didLoad = false
+    @State private var fetchedCharacters: [AniListCharacterEdge] = []
+    @State private var didFetch = false
     @State private var selectedCharacter: AniListCharacterEdge?
+
+    /// The characters to display — prefers preloaded data (passed from the
+    /// parent VM), falls back to any we fetched ourselves. Using a computed
+    /// property instead of copying into @State means the view ALWAYS
+    /// reflects the latest preloaded value, even when the parent passes it
+    /// AFTER the first render (which is what happens when the VM's async
+    /// fetch completes).
+    private var displayCharacters: [AniListCharacterEdge] {
+        if let preloaded, !preloaded.isEmpty { return preloaded }
+        return fetchedCharacters
+    }
 
     var body: some View {
         Group {
-            if !characters.isEmpty {
+            if !displayCharacters.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Text("Characters")
@@ -37,7 +48,7 @@ struct CharactersSection: View {
 
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 12) {
-                            ForEach(characters) { edge in
+                            ForEach(displayCharacters) { edge in
                                 Button {
                                     Haptics.light()
                                     selectedCharacter = edge
@@ -57,10 +68,9 @@ struct CharactersSection: View {
             CharacterDetailView(edge: edge)
         }
         .task {
-            if let preloaded {
-                characters = preloaded
-                didLoad = true
-            } else if !didLoad {
+            // Only fetch if the parent didn't pass preloaded data.
+            // If preloaded is nil or empty, we fetch ourselves.
+            if preloaded == nil && !didFetch {
                 await loadCharacters()
             }
         }
@@ -99,7 +109,7 @@ struct CharactersSection: View {
     }
 
     private func loadCharacters() async {
-        didLoad = true
+        didFetch = true
         // Use the right endpoint for the media type. The anime detail query
         // (AniListService.detail) uses `type: ANIME`; the manga detail query
         // (AniListService.mangaDetail) uses `type: MANGA`. Calling the wrong
@@ -112,10 +122,10 @@ struct CharactersSection: View {
             } else {
                 media = try await AniListService.shared.detail(id: mediaId)
             }
-            characters = media.characters?.edges ?? []
+            fetchedCharacters = media.characters?.edges ?? []
         } catch {
-            // Best-effort — leave characters empty if the fetch fails.
-            characters = []
+            // Best-effort — leave fetchedCharacters empty if the fetch fails.
+            fetchedCharacters = []
         }
     }
 }
@@ -345,12 +355,21 @@ struct RecommendationsSection: View {
     let isManga: Bool
     var preloaded: [AniListRecommendation]? = nil
 
-    @State private var recommendations: [AniListRecommendation] = []
-    @State private var didLoad = false
+    @State private var fetchedRecommendations: [AniListRecommendation] = []
+    @State private var didFetch = false
+
+    /// Computed: prefers preloaded data, falls back to self-fetched. Same
+    /// pattern as CharactersSection — using a computed property means the
+    /// view ALWAYS reflects the latest preloaded value, even when the
+    /// parent passes it after the first render.
+    private var displayRecommendations: [AniListRecommendation] {
+        if let preloaded, !preloaded.isEmpty { return preloaded }
+        return fetchedRecommendations
+    }
 
     var body: some View {
         Group {
-            if !recommendations.isEmpty {
+            if !displayRecommendations.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Text("Recommendations")
@@ -361,7 +380,7 @@ struct RecommendationsSection: View {
 
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 12) {
-                            ForEach(recommendations) { rec in
+                            ForEach(displayRecommendations) { rec in
                                 if let media = rec.mediaRecommendation {
                                     NavigationLink {
                                         destination(for: media)
@@ -379,10 +398,8 @@ struct RecommendationsSection: View {
             }
         }
         .task {
-            if let preloaded {
-                recommendations = preloaded
-                didLoad = true
-            } else if !didLoad {
+            // Only fetch if the parent didn't pass preloaded data.
+            if preloaded == nil && !didFetch {
                 await loadRecommendations()
             }
         }
@@ -464,7 +481,7 @@ struct RecommendationsSection: View {
     }
 
     private func loadRecommendations() async {
-        didLoad = true
+        didFetch = true
         // Use the right endpoint for the media type. The anime detail query
         // includes recommendations; the manga detail query now does too
         // (added in this batch). Both return a `recommendations` connection
@@ -482,19 +499,19 @@ struct RecommendationsSection: View {
             // `type` field is now included in both queries; if it's missing
             // we fall back to showing the rec (better than an empty section).
             if isManga {
-                recommendations = all.filter { rec in
+                fetchedRecommendations = all.filter { rec in
                     guard let t = rec.mediaRecommendation?.type else { return true }
                     return t == "MANGA"
                 }
             } else {
-                recommendations = all.filter { rec in
+                fetchedRecommendations = all.filter { rec in
                     guard let t = rec.mediaRecommendation?.type else { return true }
                     return t == "ANIME"
                 }
             }
         } catch {
-            // Best-effort — leave recommendations empty if the fetch fails.
-            recommendations = []
+            // Best-effort — leave fetchedRecommendations empty if the fetch fails.
+            fetchedRecommendations = []
         }
     }
 }
