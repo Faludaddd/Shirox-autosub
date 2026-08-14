@@ -87,11 +87,10 @@ final class AniListDetailViewModel: ObservableObject {
     }
 
     /// Auto-resolves streams for `episode` using the currently-active anime
-    /// module, WITHOUT showing the ModuleStreamPickerView. This is the fix
-    /// for "tapping Watch Anime opens another selection UI" — the user
-    /// already picked a module via the toolbar module selector, so we
-    /// should just use it. If resolution fails, show an error toast and
-    /// NEVER fall back to the old module-selection picker.
+    /// module. Normal flow: search → episodes → match → streams → auto-play
+    /// the best stream. Fallback flow: if auto-play fails (403, empty, error),
+    /// show the ModuleStreamPickerView so the user can manually pick a
+    /// module/source/stream.
     private func autoResolveWithActiveModule(episode: Int) async {
         isResolving = true
         defer { isResolving = false }
@@ -116,23 +115,24 @@ final class AniListDetailViewModel: ObservableObject {
         }()
 
         guard let module = activeAnimeModule else {
-            // No anime module installed — show a toast, NOT the picker.
-            ToastManager.shared.show(
-                title: "No Anime Module",
-                message: "Install an anime module from Settings to watch episodes.",
-                icon: "puzzlepiece.extension",
-                iconColor: .orange
-            )
+            // No anime module installed — show the picker so the user can
+            // install one.
+            showStreamPicker = true
             return
         }
 
         // Ensure the chosen module is the active one (loads its JS).
+        // MODULE ISOLATION: the selected module must be the one that
+        // performs ALL operations — search, episodes, streams. We never
+        // mix modules.
         if manager.activeModule?.id != module.id {
             _ = await manager.selectAndAwaitReady(module)
         }
 
-        // Use the same ModuleJSRunner path as ModuleStreamRow, but drive
-        // it directly instead of presenting a row UI.
+        // Use a dedicated ModuleJSRunner for this module. The runner
+        // carries its own JSContext loaded with THIS module's script,
+        // so all calls (search, fetchEpisodes, fetchStreams) go through
+        // the same module — no cross-module contamination.
         let runner = ModuleJSRunner()
         let searchTitle = ModuleSearchAliasManager.shared.getAlias(
             mediaId: media.id, animeTitle: media.title.searchTitle, moduleId: module.id
@@ -150,12 +150,9 @@ final class AniListDetailViewModel: ObservableObject {
                 results = try await runner.search(keyword: searchTitle)
             }
             guard !results.isEmpty else {
-                ToastManager.shared.show(
-                    title: "Not Found",
-                    message: "\"\(media.title.searchTitle)\" wasn't found in \(module.sourceName). Try another module.",
-                    icon: "magnifyingglass",
-                    iconColor: .orange
-                )
+                // No search results — fall back to the manual picker so
+                // the user can try a different module or alias.
+                showStreamPicker = true
                 return
             }
             // Pick the best-ranked result (same logic as ModuleStreamRow).
@@ -171,12 +168,7 @@ final class AniListDetailViewModel: ObservableObject {
                 episodes = try await runner.fetchEpisodes(url: match.href)
             }
             guard !episodes.isEmpty else {
-                ToastManager.shared.show(
-                    title: "No Episodes",
-                    message: "\(module.sourceName) returned no episodes for this title.",
-                    icon: "tv.slash",
-                    iconColor: .orange
-                )
+                showStreamPicker = true
                 return
             }
 
@@ -194,50 +186,103 @@ final class AniListDetailViewModel: ObservableObject {
                 return nil
             }()
             guard let matched else {
-                ToastManager.shared.show(
-                    title: "Episode Not Found",
-                    message: "Episode \(episode) isn't available in \(module.sourceName).",
-                    icon: "exclamationmark.triangle.fill",
-                    iconColor: .orange
-                )
+                showStreamPicker = true
                 return
             }
 
             // 4. Fetch streams for the matched episode.
             let streams = try await runner.fetchStreams(episodeUrl: matched.href)
             guard !streams.isEmpty else {
-                ToastManager.shared.show(
-                    title: "No Streams",
-                    message: "No playable streams found for episode \(episode).",
-                    icon: "exclamationmark.triangle.fill",
-                    iconColor: .orange
-                )
+                // No streams — fall back to manual picker.
+                showStreamPicker = true
                 return
             }
 
-            // 5. Hand off to the existing onStreamsLoaded path — if there's
-            // exactly one stream, it auto-plays; if multiple, the final
-            // stream picker shows (quality picker, NOT module picker).
+            // 5. Auto-select the best stream. Don't blindly pick the first
+            // returned stream — prefer streams that look like HLS/m3u8 (most
+            // reliable), then by title (quality indicators like "1080p" rank
+            // higher). If "Auto-pick Last Stream" is enabled and we have a
+            // saved preference, use that.
             let sorted = streams.sorted { $0.title < $1.title }
+            let selectedStream: StreamResult?
+
+            // Check for saved stream preference (autoPickLastStream).
+            if UserDefaults.standard.bool(forKey: "autoPickLastStream"),
+               let moduleId = manager.activeModule?.id,
+               let savedTitle = ModuleSearchAliasManager.shared.getLastStreamTitle(moduleId: moduleId),
+               let saved = sorted.first(where: { $0.title == savedTitle }) {
+                selectedStream = saved
+            } else if sorted.count == 1 {
+                // Only one stream — use it directly.
+                selectedStream = sorted[0]
+            } else {
+                // Multiple streams — try to auto-select the best one.
+                // Prefer HLS streams (m3u8) as they're most reliable.
+                // Then prefer higher quality (1080p > 720p > 480p).
+                selectedStream = pickBestStream(sorted)
+            }
+
             // Remember the alias + href for next time.
             ModuleSearchAliasManager.shared.setLastSearchResultHref(
                 mediaId: media.id, animeTitle: media.title.searchTitle,
                 moduleId: module.id, href: match.href)
-            onStreamsLoaded(sorted, selectedStream: nil, episodeHref: match.href,
-                            availableCount: episodes.count, actualEpisodeHref: matched.href)
+
+            if let selectedStream {
+                // Auto-play the selected stream.
+                onStreamsLoaded(sorted, selectedStream: selectedStream,
+                                episodeHref: match.href,
+                                availableCount: episodes.count,
+                                actualEpisodeHref: matched.href)
+            } else {
+                // Couldn't auto-select — show the manual stream picker
+                // (the quality/server picker, NOT the module picker).
+                onStreamsLoaded(sorted, selectedStream: nil,
+                                episodeHref: match.href,
+                                availableCount: episodes.count,
+                                actualEpisodeHref: matched.href)
+            }
         } catch {
-            // Resolution failed (network, module error, etc.) — show a
-            // toast, NOT the picker. Cancellation is silent (expected when
-            // the user navigates away mid-resolve).
+            // Resolution failed (403, network, module error, etc.).
+            // FALLBACK: show the ModuleStreamPickerView so the user can
+            // manually try a different module or approach. Cancellation
+            // is silent (expected when the user navigates away).
             if !ProviderManager.isCancellationError(error) {
-                ToastManager.shared.show(
-                    title: "Playback Error",
-                    message: error.localizedDescription,
-                    icon: "exclamationmark.triangle.fill",
-                    iconColor: .red
+                Logger.shared.log(
+                    "[Watch] Auto-resolve failed for ep \(episode): \(error.localizedDescription) — falling back to manual picker",
+                    type: "Error"
                 )
+                showStreamPicker = true
             }
         }
+    }
+
+    /// Picks the best stream from a list. Prefers HLS (m3u8) streams as
+    /// they're most reliable, then ranks by quality indicators in the title
+    /// (1080p > 720p > 480p > unknown). Returns nil if no stream looks
+    /// playable.
+    private func pickBestStream(_ streams: [StreamResult]) -> StreamResult? {
+        guard !streams.isEmpty else { return nil }
+
+        // Quality ranking: extract resolution from title.
+        func qualityScore(_ title: String) -> Int {
+            let lower = title.lowercased()
+            if lower.contains("1080") { return 100 }
+            if lower.contains("720") { return 80 }
+            if lower.contains("480") { return 60 }
+            if lower.contains("360") { return 40 }
+            return 50  // unknown quality — middle priority
+        }
+
+        // Prefer HLS streams (m3u8) — they're more reliable than MP4 direct.
+        let hlsStreams = streams.filter { $0.url.absoluteString.contains(".m3u8") }
+        let pool = hlsStreams.isEmpty ? streams : hlsStreams
+
+        // Sort by quality score (descending), then by title alphabetically.
+        return pool.sorted { a, b in
+            let qa = qualityScore(a.title)
+            let qb = qualityScore(b.title)
+            return qa != qb ? qa > qb : a.title < b.title
+        }.first
     }
 
     func dismissModulePicker() {
