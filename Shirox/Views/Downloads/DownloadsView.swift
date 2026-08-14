@@ -138,6 +138,11 @@ struct DownloadsView: View {
                                         DownloadProgressRow(item: item)
                                     }
                                     .buttonStyle(.plain)
+                                    .contextMenu {
+                                        Button { dm.remove(item) } label: {
+                                            Label("Cancel Download", systemImage: "xmark.circle")
+                                        }
+                                    }
                                     .swipeActions(edge: .trailing) {
                                         Button(role: .destructive) { dm.remove(item) } label: {
                                             Label("Cancel", systemImage: "xmark")
@@ -209,6 +214,14 @@ struct DownloadsView: View {
                                         DownloadProgressRow(item: item)
                                     }
                                     .buttonStyle(.plain)
+                                    .contextMenu {
+                                        Button { dm.retry(item) } label: {
+                                            Label("Retry", systemImage: "arrow.clockwise")
+                                        }
+                                        Button(role: .destructive) { dm.remove(item) } label: {
+                                            Label("Delete", systemImage: "trash")
+                                        }
+                                    }
                                     .swipeActions(edge: .trailing) {
                                         Button(role: .destructive) { dm.remove(item) } label: {
                                             Label("Delete", systemImage: "trash")
@@ -368,11 +381,11 @@ private struct DownloadProgressRow: View {
                         .lineLimit(1)
                         .fixedSize(horizontal: true, vertical: false)
                 case .failed:
-                    HStack {
-                        Text(item.error ?? "Download failed")
-                            .font(.caption2)
+                    HStack(spacing: 8) {
+                        Text("Failed")
+                            .font(.caption2.weight(.semibold))
                             .foregroundStyle(.red)
-                            .lineLimit(2)
+                            .lineLimit(1)
                         Spacer()
                         Button {
                             DownloadManager.shared.retry(item)
@@ -438,8 +451,8 @@ private struct MangaDownloadProgressRow: View {
                         .lineLimit(1)
                         .fixedSize(horizontal: true, vertical: false)
                 case .failed:
-                    HStack {
-                        Text(item.error ?? "Download failed").font(.caption2).foregroundStyle(.red).lineLimit(2)
+                    HStack(spacing: 8) {
+                        Text("Failed").font(.caption2.weight(.semibold)).foregroundStyle(.red).lineLimit(1)
                         Spacer()
                         Button { MangaDownloadManager.shared.retry(item) } label: {
                             Label("Retry", systemImage: "arrow.clockwise")

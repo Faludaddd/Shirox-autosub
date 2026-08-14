@@ -7,6 +7,7 @@ import SwiftUI
 struct AniListMangaDetailView: View {
     let mediaId: Int
     var preloadedMedia: Media? = nil
+    var autoStartReading: Bool = false
 
     @State private var media: Media?
     @State private var resolvedItem: SearchItem?
@@ -14,14 +15,18 @@ struct AniListMangaDetailView: View {
     @State private var showLibraryEdit = false
     @State private var existingEntry: LibraryEntry? = nil
     @State private var isLoadingEntry = false
+    @State private var autoNavigated = false
+    @State private var autoNavItem: SearchItem?
     @AppStorage("showStatistics") private var showStatistics = true
     @EnvironmentObject private var moduleManager: ModuleManager
+    @Environment(\.dismiss) private var dismiss
 
     private enum Phase: Equatable { case loading, ready, noModule, notFound, error(String) }
 
-    init(mediaId: Int, preloadedMedia: Media? = nil) {
+    init(mediaId: Int, preloadedMedia: Media? = nil, autoStartReading: Bool = false) {
         self.mediaId = mediaId
         self.preloadedMedia = preloadedMedia
+        self.autoStartReading = autoStartReading
         _media = State(initialValue: preloadedMedia)
     }
 
@@ -57,6 +62,15 @@ struct AniListMangaDetailView: View {
             }
         }
         .task { await resolve() }
+        // Item 6: auto-navigate to source page when opened from carousel
+        .onChangeOf(resolvedItem) { item in
+            guard autoStartReading, let item, !autoNavigated else { return }
+            autoNavigated = true
+            autoNavItem = item
+        }
+        .navigationDestinationCompat(item: $autoNavItem) { item in
+            MangaDetailView(item: item)
+        }
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundHidden()

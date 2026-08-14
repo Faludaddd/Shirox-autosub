@@ -159,6 +159,7 @@ struct HomeView: View {
                         Spacer().frame(height: 28)
                     }
                 }
+                .scrollBounceBehavior(.basedOnSize, axes: .vertical)  // item 4: disable upward bounce
                 .refreshable {
                     Haptics.light()
                     isRefreshing = true
@@ -466,7 +467,7 @@ struct FeaturedCarousel: View {
 
                         NavigationLink {
                             if isManga {
-                                AniListMangaDetailView(mediaId: currentMedia.id, preloadedMedia: currentMedia)
+                                AniListMangaDetailView(mediaId: currentMedia.id, preloadedMedia: currentMedia, autoStartReading: true)
                             } else {
                                 AniListDetailView(mediaId: currentMedia.id, preloadedMedia: currentMedia)
                             }
@@ -778,28 +779,11 @@ private struct FeaturedCard: View, Equatable {
                         ?? media.coverImage.extraLarge
                         ?? media.coverImage.large
                         ?? ""
-                    ZStack {
-                        // Blurred background layer — only fills the TOP edge
-                        // (the only edge affected by swipe-up parallax).
-                        CachedAsyncImage(urlString: imageURL)
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: geo.size.width, height: geo.size.height + 100)
-                            .blur(radius: 35)
-                            .overlay(
-                                LinearGradient(
-                                    colors: [.black.opacity(0.5), .clear],
-                                    startPoint: .top, endPoint: .center
-                                )
-                            )
-                            .clipped()
-                        // Sharp foreground image — must use .fill so it
-                        // crops instead of stretching (item 6 fix).
-                        CachedAsyncImage(urlString: imageURL)
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: geo.size.width, height: geo.size.height)
-                            .clipped()
-                            .offset(x: -pageOffset * 0.25)
-                    }
+                    CachedAsyncImage(urlString: imageURL)
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .clipped()
+                        .offset(x: -pageOffset * 0.25)
                 }
                 .clipped()
             }
