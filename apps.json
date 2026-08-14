@@ -32,7 +32,7 @@
           "date": "2026-08-14",
           "localizedDescription": "Fixed privacy state syncing from AniList server. Fixed toggle/long-press Mark as Private sync. Fixed anime detail page content clipping. Fixed anime search results to navigate to AniList page. Removed Statistics from manga source page. Built full AniList manga detail page with Statistics. Fixed all toggles rendering white (now light grey). Fixed toggle glow effect. Changed Continue Reading manga cards to vertical poster format. Fixed carousel Start Reading button truncation. Fixed manga View Details to open source page. Fixed manga View on AniList to open distinct AniList page.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 10752567,
+          "size": 10768220,
           "minOSVersion": "15.0"
         },
         {
