@@ -614,14 +614,10 @@ struct NotificationsHistoryView: View {
                     ContentUnavailableView("No History", systemImage: "clock.slash")
                 } else {
                     List {
-                        ForEach(vm.notificationHistory, id: \.id) { notif in
+                        ForEach(Array(vm.notificationHistory.enumerated()), id: \.offset) { _, notif in
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(NotificationSwipeRow.iconAndColor(for: notif).0)
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.secondary)
-                                Text(notif.createdAt.toTimeAgo())
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
+                                Text("Notification")
+                                    .font(.subheadline)
                                 Text(notif.createdAt.formatted(date: .abbreviated, time: .standard))
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
