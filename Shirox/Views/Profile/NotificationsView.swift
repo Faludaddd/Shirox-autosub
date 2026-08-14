@@ -609,32 +609,38 @@ struct NotificationsHistoryView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if vm.notificationHistory.isEmpty {
-                    ContentUnavailableView("No History", systemImage: "clock.slash")
-                } else {
-                    List {
-                        ForEach(Array(vm.notificationHistory.enumerated()), id: \.offset) { _, notif in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Notification")
-                                    .font(.subheadline)
-                                Text(notif.createdAt.formatted(date: .abbreviated, time: .standard))
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .listRowSeparator(.hidden)
-                        }
+            historyContent
+                .navigationTitle("History")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { dismiss() }
                     }
-                    .listStyle(.plain)
+                }
+        }
+    }
+
+    @ViewBuilder
+    private var historyContent: some View {
+        if vm.notificationHistory.isEmpty {
+            Text("No notification history")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        } else {
+            List {
+                ForEach(Array(vm.notificationHistory.enumerated()), id: \.offset) { _, notif in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Notification").font(.subheadline)
+                            Text(notif.createdAt.formatted(date: .abbreviated, time: .standard))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                    }
                 }
             }
-            .navigationTitle("History")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
+            .listStyle(.plain)
         }
     }
 }
