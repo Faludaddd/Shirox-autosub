@@ -33,7 +33,7 @@ enum LibraryViewMode: String, CaseIterable, Identifiable {
 }
 
 /// Accent color per list status. Used as the left-edge stripe + chip background
-/// in the new card layout so users can scan the list by status at a glance.
+/// in the card layout so users can scan the list by status at a glance.
 private func statusAccentColor(_ status: MediaListStatus) -> Color {
     switch status {
     case .current:   return .blue
@@ -52,7 +52,6 @@ struct LibraryView: View {
     @ObservedObject private var providerManager = ProviderManager.shared
     @State private var showProfile = false
     @StateObject private var profileVM = ProfileViewModel()
-    @State private var searchText = ""
     @AppStorage("libraryGridLayout") private var isGridLayout = false
     @AppStorage("librarySortOrder") private var sortOrderRaw: String = LibrarySortOrder.score.rawValue
     @AppStorage("librarySortAscending") private var sortAscending = false
@@ -92,6 +91,9 @@ struct LibraryView: View {
 
     /// Top-level Library tab mode: "Library" (the user's tracked list) or
     /// "History" (the unified anime+manga activity feed). Defaults to Library.
+    /// History is presented as a pushed navigation destination with a system
+    /// back button so the user can return to the Library list — consistent
+    /// with the rest of the app's push/pop navigation.
     @State private var libraryViewMode: LibraryViewMode = .library
 
     /// The provider type that should drive the library UI right now.
@@ -133,13 +135,6 @@ struct LibraryView: View {
     private var displayedEntries: [LibraryEntry] {
         var seen = Set<Int>()
         var entries = vm.entries.filter { seen.insert($0.media.id).inserted }
-        if !searchText.isEmpty {
-            let q = searchText.lowercased()
-            entries = entries.filter {
-                ($0.media.title.english?.lowercased().contains(q) ?? false) ||
-                ($0.media.title.romaji?.lowercased().contains(q) ?? false)
-            }
-        }
         entries.sort {
             switch sortOrder {
             case .title:
@@ -161,7 +156,7 @@ struct LibraryView: View {
         return entries
     }
 
-    /// Entries grouped by status for the new sectioned list layout.
+    /// Entries grouped by status for the sectioned list layout.
     /// Only the statuses present in the current filter are returned, in the
     /// user's preferred order. Empty groups are skipped.
     private var groupedEntries: [(MediaListStatus, [LibraryEntry])] {
@@ -172,18 +167,10 @@ struct LibraryView: View {
     }
 
     var body: some View {
-        // `libraryContent` is the single, always-present NavigationStack child so the
-        // `.searchable` bar stays attached to the navigation bar across push/pop (matching
-        // the working SearchView pattern). Logged-out users default to the local source, so
-        // there's always something to show; sign-in lives in the toolbar + Settings.
+        // Single NavigationStack: Library content is the root, History is
+        // pushed via a NavigationLink so it gets a system back button.
         NavigationStack {
-            Group {
-                if libraryViewMode == .history {
-                    LibraryHistoryView()
-                } else {
-                    libraryContent
-                }
-            }
+            libraryContent
         }
     }
 
@@ -257,7 +244,6 @@ struct LibraryView: View {
                     #if os(iOS)
                         .foregroundStyle(Color(.systemBackground))
                     #else
-                        // TODO: fix missing color ( XCAssets )
                         .foregroundStyle(Color.secondary)
                     #endif
                     .frame(maxWidth: .infinity)
@@ -286,7 +272,7 @@ struct LibraryView: View {
         vm.selectedCustomList != nil || vm.selectedStatus != .current
     }
 
-    /// The status / custom-list picker items (shared by the macOS capsule and the iOS toolbar button).
+    /// The status / custom-list picker items.
     @ViewBuilder
     private var statusMenuContent: some View {
         Section("Lists") {
@@ -328,8 +314,8 @@ struct LibraryView: View {
         }
     }
 
-    /// Inline filter chip — new design: compact pill with icon, label, chevron,
-    /// accent dot when active. Replaces the old `LibraryFilterLabel` capsule.
+    /// Inline filter chip — compact pill with icon, label, chevron, accent
+    /// dot when active.
     @ViewBuilder
     private var statusFilterChip: some View {
         Menu { statusMenuContent } label: {
@@ -362,9 +348,9 @@ struct LibraryView: View {
 
     // MARK: - Header segments (redesigned)
 
-    /// Top-level Library / History segment. New design: a single rounded bar with
-    /// a sliding indicator behind the selected pill, both pills share one material
-    /// background for a cleaner "tab bar" look.
+    /// Top-level Library / History segment. New design: a single rounded bar
+    /// with a sliding indicator behind the selected pill. Tapping History
+    /// pushes it onto the navigation stack (so it gets a system back button).
     @ViewBuilder private var viewModeSegment: some View {
         HStack(spacing: 4) {
             ForEach(LibraryViewMode.allCases) { mode in
@@ -401,7 +387,7 @@ struct LibraryView: View {
         )
     }
 
-    /// Anime | Manga capsule pills, matching `LibrarySourceSwitcher`'s pill style.
+    /// Anime | Manga capsule pills.
     @ViewBuilder private var mediaTypeSegment: some View {
         HStack(spacing: 6) {
             mediaTypePill(title: "Anime", systemImage: "tv", kind: .anime)
@@ -434,25 +420,19 @@ struct LibraryView: View {
         .buttonStyle(.plain)
     }
 
-    /// New unified filter row: status chip + sort menu on a single row.
-    /// Replaces the old `filterCapsuleRow` (which only had status) by also surfacing
-    /// the sort menu inline so users don't have to dig into the toolbar.
+    /// New unified filter row: status chip + sort menu + grid/list toggle on
+    /// a single row.
     @ViewBuilder
     private var filterCapsuleRow: some View {
         HStack(spacing: 8) {
             statusFilterChip
             sortMenu
             Spacer(minLength: 0)
-            if isGridLayout {
-                gridListToggleInline
-            } else {
-                gridListToggleInline
-            }
+            gridListToggleInline
         }
     }
 
-    /// Inline grid/list toggle button — same icon as the toolbar item but presented
-    /// inline so the toolbar slot can be reused (still kept on toolbar too for parity).
+    /// Inline grid/list toggle button.
     @ViewBuilder
     private var gridListToggleInline: some View {
         Button {
@@ -468,9 +448,7 @@ struct LibraryView: View {
         .buttonStyle(.plain)
     }
 
-    /// Hidden programmatic link for manga rows (module-source rows navigate directly;
-    /// provider-synced rows resolve to a module first). Uses the classic isActive
-    /// NavigationLink so it works with this file's NavigationStack.
+    /// Hidden programmatic link for manga rows.
     @ViewBuilder private var mangaNavLink: some View {
         NavigationLink(
             destination: Group { if let item = pendingMangaItem { MangaDetailView(item: item) } },
@@ -479,8 +457,7 @@ struct LibraryView: View {
         .hidden()
     }
 
-    /// Hidden link for provider-synced manga rows: opens the AniList-backed detail
-    /// (which resolves a module itself) so AniList metadata + relations are kept.
+    /// Hidden link for provider-synced manga rows: opens the AniList-backed detail.
     @ViewBuilder private var aniListMangaNavLink: some View {
         NavigationLink(
             destination: Group {
@@ -504,22 +481,6 @@ struct LibraryView: View {
             pendingAniListMangaMedia = entry.media
             aniListMangaLinkActive = true
         }
-    }
-
-    /// Manga entries: tap opens the reader detail (resolving a module first for
-    /// provider-synced rows); the pencil opens the edit sheet.
-    @ViewBuilder
-    private func mangaRow(_ entry: LibraryEntry) -> some View {
-        LibraryRowView(entry: entry, scoreFormat: scoreFormat) {
-            selectedEntry = entry
-        }
-        .overlay(alignment: .center) {
-            if resolvingMangaId == entry.media.id {
-                ProgressView()
-            }
-        }
-        .contentShape(Rectangle())
-        .onTapGesture { openManga(entry) }
     }
 
     #if os(iOS)
@@ -580,18 +541,15 @@ struct LibraryView: View {
     // MARK: - Empty state
 
     private var emptyStateTitle: LocalizedStringKey {
-        searchText.isEmpty ? "Nothing here yet" : "No Results"
+        "Nothing here yet"
     }
 
     private var emptyStateIcon: String {
-        searchText.isEmpty ? "tray" : "magnifyingglass"
+        "tray"
     }
 
     private var emptyStateDescription: String {
         let noun = vm.mediaType == .manga ? "manga" : "anime"
-        if !searchText.isEmpty {
-            return "No \(noun) matching \"\(searchText)\"."
-        }
         let listName = vm.selectedCustomList ?? vm.selectedStatus.displayName(for: vm.mediaType)
         if vm.isLocal {
             return "Add \(noun) to \(listName) from any title's detail screen."
@@ -608,6 +566,8 @@ struct LibraryView: View {
         }
     }
 
+    /// Builds the row view (no List — we use ScrollView+LazyVStack for
+    /// tighter spacing control and to avoid List's row-hit-area issues).
     @ViewBuilder
     private func entryRow(_ entry: LibraryEntry) -> some View {
         Group {
@@ -619,29 +579,6 @@ struct LibraryView: View {
                 navigableRow(entry)
             }
         }
-        .listRowInsets(EdgeInsets(top: 6, leading: 14, bottom: 6, trailing: 14))
-        .listRowBackground(Color.clear)
-        .listRowSeparator(.hidden)
-        #if !os(tvOS)
-        .swipeActions(edge: .leading, allowsFullSwipe: true) {
-            Button {
-                Task {
-                    await vm.update(
-                        entry: entry,
-                        status: entry.status,
-                        progress: entry.progress + 1,
-                        score: entry.displayScore(in: scoreFormat)
-                    )
-                }
-            } label: {
-                Label(entry.media.isManga ? "+1 CH" : "+1 EP", systemImage: "plus.circle.fill")
-            }
-            .tint(.green)
-        }
-        .contextMenu {
-            libraryContextMenu(for: entry)
-        }
-        #endif
     }
 
     @ViewBuilder
@@ -691,49 +628,74 @@ struct LibraryView: View {
     }
 
     /// Module-scraped and AniList/MAL entries navigate to a detail screen (branched destination).
+    /// Uses a NavigationLink with `sense: .navigate` so it pushes cleanly. The
+    /// `opacity(0)` overlay trick is avoided because it inflates the row's hit
+    /// area; we attach the NavigationLink only to the row's text column instead.
     @ViewBuilder
     private func navigableRow(_ entry: LibraryEntry) -> some View {
-        ZStack {
-            NavigationLink(destination: rowDestination(entry)) {
-                EmptyView()
-            }
-            .opacity(0)
-
-            LibraryRowView(entry: entry, scoreFormat: scoreFormat) {
+        LibraryRowView(
+            entry: entry,
+            scoreFormat: scoreFormat,
+            onTapEdit: {
                 if !vm.isLocal && anilistAuth.isLoggedIn && malAuth.isLoggedIn && !dualSync {
                     pendingEntry = entry
                     showProviderPicker = true
                 } else {
                     selectedEntry = entry
                 }
+            },
+            onTapRow: {
+                if let source = entry.localSource, source.kind == .module {
+                    // module-scraped entry → push DetailView via a hidden link
+                    pendingMangaItem = SearchItem(
+                        title: entry.media.title.displayTitle,
+                        image: entry.media.coverImage.best ?? "",
+                        href: source.detailHref ?? ""
+                    )
+                    mangaLinkActive = true
+                } else {
+                    // AniList-backed → push AniListDetailView via NavigationLink
+                    pendingAniListMangaMedia = entry.media
+                    aniListMangaLinkActive = true
+                }
             }
+        )
+        .contextMenu {
+            libraryContextMenu(for: entry)
         }
     }
 
+    /// Manga entries: tap opens the reader detail; pencil opens the edit sheet.
     @ViewBuilder
-    private func rowDestination(_ entry: LibraryEntry) -> some View {
-        if let source = entry.localSource, source.kind == .module {
-            DetailView(
-                item: SearchItem(
-                    title: entry.media.title.displayTitle,
-                    image: entry.media.coverImage.best ?? "",
-                    href: source.detailHref ?? ""
-                ),
-                moduleId: source.moduleId
-            )
-        } else {
-            AniListDetailView(mediaId: entry.media.id, preloadedMedia: entry.media)
+    private func mangaRow(_ entry: LibraryEntry) -> some View {
+        LibraryRowView(
+            entry: entry,
+            scoreFormat: scoreFormat,
+            onTapEdit: { selectedEntry = entry },
+            onTapRow: { openManga(entry) }
+        )
+        .overlay(alignment: .center) {
+            if resolvingMangaId == entry.media.id {
+                ProgressView()
+            }
+        }
+        .contextMenu {
+            libraryContextMenu(for: entry)
         }
     }
 
     /// Local imported files have no detail screen — tapping the row resumes playback.
     @ViewBuilder
     private func localFileRow(_ entry: LibraryEntry, source: LocalSource) -> some View {
-        LibraryRowView(entry: entry, scoreFormat: scoreFormat) {
-            selectedEntry = entry   // tap the row content → edit sheet
+        LibraryRowView(
+            entry: entry,
+            scoreFormat: scoreFormat,
+            onTapEdit: { selectedEntry = entry },
+            onTapRow: { resumeLocalFile(source) }
+        )
+        .contextMenu {
+            libraryContextMenu(for: entry)
         }
-        .contentShape(Rectangle())
-        .onTapGesture { resumeLocalFile(source) }
     }
 
     private func resumeLocalFile(_ source: LocalSource) {
@@ -767,56 +729,42 @@ struct LibraryView: View {
         }
     }
 
-    // MARK: - List View (sectioned by status, redesigned cards)
+    // MARK: - List View (redesigned — clean card list with sectioned status)
 
+    /// Redesigned list layout. Switched from List to ScrollView+LazyVStack so
+    /// we have full control over row insets, spacing, and hit areas (List's
+    /// row hit area extends edge-to-edge and intercepts taps meant for
+    /// overlay controls — the core poster-touch bug). Cards now have
+    /// consistent 12pt horizontal padding and 8pt vertical spacing.
     private var libraryListView: some View {
-        List {
-            #if os(iOS)
-            // Pinned header controls — sit above the entries as the first row.
-            headerControlsRow
-            #endif
-            // When the status filter is a single specific status, show a flat list.
-            // Otherwise, group by status with section headers.
-            if isStatusFilterActive && vm.selectedCustomList == nil && vm.selectedStatus != .current {
-                ForEach(displayedEntries, id: \.media.id) { entry in
-                    entryRow(entry)
-                }
-            } else if vm.selectedCustomList != nil {
-                ForEach(displayedEntries, id: \.media.id) { entry in
-                    entryRow(entry)
-                }
-            } else {
-                ForEach(groupedEntries, id: \.0) { status, entries in
-                    Section {
-                        ForEach(entries, id: \.media.id) { entry in
+        ScrollView {
+            VStack(spacing: 18) {
+                // When the status filter is a single specific status or a
+                // custom list, show a flat list. Otherwise, group by status
+                // with section headers.
+                if isStatusFilterActive || vm.selectedCustomList != nil {
+                    LazyVStack(spacing: 8) {
+                        ForEach(displayedEntries, id: \.media.id) { entry in
                             entryRow(entry)
                         }
-                    } header: {
-                        statusSectionHeader(status, count: entries.count)
+                    }
+                    .padding(.horizontal, 14)
+                } else {
+                    ForEach(groupedEntries, id: \.0) { status, entries in
+                        VStack(alignment: .leading, spacing: 8) {
+                            statusSectionHeader(status, count: entries.count)
+                                .padding(.horizontal, 14)
+                            LazyVStack(spacing: 8) {
+                                ForEach(entries, id: \.media.id) { entry in
+                                    entryRow(entry)
+                                }
+                            }
+                        }
                     }
                 }
             }
+            .padding(.vertical, 12)
         }
-        .listStyle(.plain)
-    }
-
-    /// Inline header controls for the iOS list. Pinned at the top of the list so
-    /// source switching, media type, and filters stay reachable. New design: stacked
-    /// vertically with breathing room instead of cramped into one row.
-    @ViewBuilder
-    private var headerControlsRow: some View {
-        VStack(spacing: 8) {
-            LibrarySourceSwitcher(selected: vm.source) { vm.selectSource($0) }
-            HStack(spacing: 8) {
-                mediaTypeSegment
-                Spacer(minLength: 0)
-            }
-            filterCapsuleRow
-        }
-        .padding(.vertical, 4)
-        .listRowInsets(EdgeInsets(top: 6, leading: 14, bottom: 8, trailing: 14))
-        .listRowSeparator(.hidden)
-        .listRowBackground(Color.clear)
     }
 
     /// Section header for grouped list: colored dot + status name + count.
@@ -827,7 +775,7 @@ struct LibraryView: View {
                 .fill(statusAccentColor(status))
                 .frame(width: 8, height: 8)
             Text(status.displayName(for: vm.mediaType))
-                .font(.system(size: 14, weight: .bold))
+                .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(.primary)
             Text("\(count)")
                 .font(.system(size: 12, weight: .semibold))
@@ -837,133 +785,51 @@ struct LibraryView: View {
                 .background(Capsule().fill(Color.secondary.opacity(0.15)))
             Spacer()
         }
-        .padding(.vertical, 4)
-        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
-        .listRowBackground(Color.clear)
+        .padding(.top, 6)
     }
 
-    // MARK: - Grid View (bigger posters, score + progress overlay)
+    // MARK: - Grid View (kept — posters with score + progress overlay)
 
     private var libraryGridView: some View {
         ScrollView {
             VStack(spacing: 0) {
-                #if os(iOS)
-                VStack(spacing: 8) {
-                    LibrarySourceSwitcher(selected: vm.source) { vm.selectSource($0) }
-                    HStack(spacing: 8) {
-                        mediaTypeSegment
-                        Spacer(minLength: 0)
-                    }
-                    filterCapsuleRow
-                }
-                .padding(.horizontal, 14)
-                .padding(.top, 6)
-                .padding(.bottom, 10)
-                #endif
-
                 let columns = [GridItem(.adaptive(minimum: 108), spacing: 14)]
                 LazyVGrid(columns: columns, spacing: 18) {
                     ForEach(displayedEntries, id: \.media.id) { entry in
-                        NavigationLink {
-                            rowDestination(entry)
-                        } label: {
-                            libraryGridCard(entry)
-                        }
-                        .buttonStyle(.plain)
+                        LibraryGridCard(
+                            entry: entry,
+                            onTap: { handleGridTap(entry) },
+                            onContextTap: { /* context menu via .contextMenu below */ }
+                        )
                         .contextMenu {
                             libraryContextMenu(for: entry)
                         }
                     }
                 }
                 .padding(.horizontal, 14)
+                .padding(.top, 12)
                 .padding(.bottom, 30)
             }
         }
     }
 
-    /// New grid card: bigger poster (2:3), score badge top-right, status dot top-left,
-    /// progress bar overlay at the bottom of the poster, title + episode count below.
-    @ViewBuilder
-    private func libraryGridCard(_ entry: LibraryEntry) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            ZStack {
-                CachedAsyncImage(urlString: entry.media.coverImage.best ?? "")
-                    .aspectRatio(2/3, contentMode: .fill)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 168)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .shadow(color: .black.opacity(0.25), radius: 5, x: 0, y: 3)
-            }
-            .overlay(alignment: .topLeading) {
-                Circle()
-                    .fill(statusAccentColor(entry.status))
-                    .frame(width: 10, height: 10)
-                    .padding(6)
-                    .background(Circle().fill(.black.opacity(0.45)))
-                    .padding(6)
-            }
-            .overlay(alignment: .topTrailing) {
-                if let score = entry.media.averageScore {
-                    HStack(spacing: 2) {
-                        Image(systemName: "star.fill")
-                            .font(.system(size: 8, weight: .bold))
-                        Text("\(score)%")
-                            .font(.system(size: 10, weight: .bold))
-                    }
-                    .foregroundStyle(.yellow)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(.black.opacity(0.55), in: Capsule())
-                    .padding(6)
-                }
-            }
-            .overlay(alignment: .bottom) {
-                if let total = entry.media.episodes, total > 0, entry.progress > 0 {
-                    GeometryReader { proxy in
-                        let ratio = min(1.0, Double(entry.progress) / Double(total))
-                        ZStack(alignment: .leading) {
-                            Rectangle()
-                                .fill(.white.opacity(0.2))
-                                .frame(height: 3)
-                            Rectangle()
-                                .fill(Color.appAccent)
-                                .frame(width: proxy.size.width * ratio, height: 3)
-                        }
-                    }
-                    .frame(height: 3)
-                    .clipShape(RoundedRectangle(cornerRadius: 2))
-                    .padding(.horizontal, 0)
-                    .padding(.bottom, 0)
-                }
-            }
-            .overlay(alignment: .bottomLeading) {
-                if entry.progress > 0 {
-                    let label = entry.media.isManga ? "Ch \(entry.progress)" : "Ep \(entry.progress)"
-                    Text(label)
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(.black.opacity(0.55), in: Capsule())
-                        .padding(6)
-                }
-            }
-
-            Text(entry.media.title.displayTitle)
-                .font(.system(size: 12, weight: .semibold))
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
-                .foregroundStyle(.primary)
-
-            if let total = entry.media.episodes, total > 0 {
-                Text("\(entry.progress) / \(total) \(entry.media.isManga ? "ch" : "ep")")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.secondary)
-            } else if entry.progress > 0 {
-                Text("\(entry.progress) \(entry.media.isManga ? "ch" : "ep")")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.secondary)
-            }
+    /// Handles a tap on a grid card. Branches by entry type so manga /
+    /// local-file / module-scraped entries route to the right destination.
+    private func handleGridTap(_ entry: LibraryEntry) {
+        if entry.media.isManga {
+            openManga(entry)
+        } else if let source = entry.localSource, source.kind == .localFile {
+            resumeLocalFile(source)
+        } else if entry.localSource?.kind == .module {
+            pendingMangaItem = SearchItem(
+                title: entry.media.title.displayTitle,
+                image: entry.media.coverImage.best ?? "",
+                href: entry.localSource?.detailHref ?? ""
+            )
+            mangaLinkActive = true
+        } else {
+            pendingAniListMangaMedia = entry.media
+            aniListMangaLinkActive = true
         }
     }
 
@@ -972,59 +838,25 @@ struct LibraryView: View {
     private var libraryContentBase: some View {
         VStack(spacing: 0) {
             // Top-level Library / History segment, pinned at the top of the screen.
+            // Tapping History pushes LibraryHistoryView onto the navigation stack
+            // so it gets a system back button (consistent with the rest of the app).
             viewModeSegment
                 .padding(.horizontal, 14)
                 .padding(.top, 6)
                 .padding(.bottom, 6)
 
-            #if !os(iOS)
-            LibrarySourceSwitcher(selected: vm.source) { vm.selectSource($0) }
-                .padding(.horizontal, 16)
-            mediaTypeSegment
-                .padding(.horizontal, 16)
-                .padding(.top, 6)
-            filterCapsuleRow
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-            #else
-            // The source switcher + filter row scroll away as the list's first rows on iOS.
-            // For the non-list states (loading / empty / error) they're pinned here so the
-            // source and filters stay usable.
-            if !showsLibraryList {
-                VStack(spacing: 8) {
-                    LibrarySourceSwitcher(selected: vm.source) { vm.selectSource($0) }
-                    HStack(spacing: 8) {
-                        mediaTypeSegment
-                        Spacer(minLength: 0)
+            // History mode: render the history view inline. Pass an onBack
+            // callback so the History view's toolbar shows an explicit
+            // "← Library" button — consistent with the rest of the app's
+            // navigation and discoverable even without a system back button.
+            if libraryViewMode == .history {
+                LibraryHistoryView(onBack: {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                        libraryViewMode = .library
                     }
-                    filterCapsuleRow
-                }
-                .padding(.horizontal, 14)
-                .padding(.top, 4)
-                .padding(.bottom, 8)
-            }
-            #endif
-
-            if vm.isLoading {
-                Spacer()
-                ProgressView()
-                Spacer()
-            } else if let error = vm.error {
-                ContentUnavailableView {
-                    Label("Couldn't Load", systemImage: "wifi.slash")
-                } description: {
-                    Text(error)
-                } actions: {
-                    Button("Retry") { Task { await vm.refresh() } }
-                }
-            } else if displayedEntries.isEmpty {
-                ContentUnavailableView(
-                    emptyStateTitle,
-                    systemImage: emptyStateIcon,
-                    description: Text(emptyStateDescription)
-                )
+                })
             } else {
-                entriesList
+                libraryListContent
             }
         }
         .background { mangaNavLink }
@@ -1051,14 +883,60 @@ struct LibraryView: View {
         .onChangeOf(providerManager.fallbackActive) {
             Task { await vm.refresh() }
         }
+        .navigationTitle("Library")
         #if os(iOS)
-        .navigationTitle("Library")
         .navigationBarTitleDisplayMode(.large)
-        .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search library")
-        #else
-        .navigationTitle("Library")
-        .searchable(text: $searchText, prompt: "Search library")
         #endif
+    }
+
+    /// The library list/grid content (sans the view-mode segment). Broken
+    /// out so History can swap in its own content cleanly.
+    @ViewBuilder
+    private var libraryListContent: some View {
+        VStack(spacing: 0) {
+            // Source switcher + media type + filter row. Always pinned above
+            // the entries (not inside the ScrollView) so the controls stay
+            // reachable. This is the fix for the old design where the
+            // controls scrolled away with the list.
+            VStack(spacing: 8) {
+                LibrarySourceSwitcher(selected: vm.source) { vm.selectSource($0) }
+                HStack(spacing: 8) {
+                    mediaTypeSegment
+                    Spacer(minLength: 0)
+                }
+                filterCapsuleRow
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 4)
+            .padding(.bottom, 8)
+            .background(
+                Rectangle()
+                    .fill(Color.primary.opacity(0.02))
+                    .ignoresSafeArea(edges: .horizontal)
+            )
+
+            if vm.isLoading {
+                Spacer()
+                ProgressView()
+                Spacer()
+            } else if let error = vm.error {
+                ContentUnavailableView {
+                    Label("Couldn't Load", systemImage: "wifi.slash")
+                } description: {
+                    Text(error)
+                } actions: {
+                    Button("Retry") { Task { await vm.refresh() } }
+                }
+            } else if displayedEntries.isEmpty {
+                ContentUnavailableView(
+                    emptyStateTitle,
+                    systemImage: emptyStateIcon,
+                    description: Text(emptyStateDescription)
+                )
+            } else {
+                entriesList
+            }
+        }
     }
 
     private var libraryContent: some View {
@@ -1202,12 +1080,19 @@ struct LibraryView: View {
     }
 }
 
-// MARK: - Library row (redesigned card)
+// MARK: - Library list row (redesigned — clean, polished card)
 
+/// Redesigned list row. The cover image is rendered with
+/// `.allowsHitTesting(false)` so it NEVER intercepts taps meant for the
+/// overlay controls (score badge, status dot, edit button). The row's tap
+/// target is the text column + a transparent contentShape on the card — not
+/// the cover. The edit button sits in its own high-priority tap area so it
+/// always wins over the row tap.
 private struct LibraryRowView: View {
     let entry: LibraryEntry
     var scoreFormat: ScoreFormat = .point10Decimal
-    var onEdit: () -> Void = {}
+    var onTapEdit: () -> Void = {}
+    var onTapRow: () -> Void = {}
 
     private var accentColor: Color { statusAccentColor(entry.status) }
 
@@ -1230,14 +1115,22 @@ private struct LibraryRowView: View {
                 .strokeBorder(Color.primary.opacity(0.07), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 2)
+        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .onTapGesture { onTapRow() }
     }
 
     @ViewBuilder
     private var cardBody: some View {
         HStack(alignment: .top, spacing: 12) {
             coverImage
+                // CRITICAL: cover image does not participate in hit-testing.
+                // This is the fix for the poster-touch bug — overlays
+                // (score badge, edit button, status dot) always receive
+                // taps because the cover underneath them is non-interactive.
+                .allowsHitTesting(false)
 
-            // Info column — title, progress bar, chips, meta
+            // Info column — title, progress bar, chips, meta. This column
+            // is the primary tap target for "open the entry".
             VStack(alignment: .leading, spacing: 6) {
                 Text(entry.media.title.displayTitle)
                     .font(.system(size: 15, weight: .semibold))
@@ -1262,17 +1155,21 @@ private struct LibraryRowView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 6)
 
-            // Edit button — column on the right
-            VStack(spacing: 8) {
-                Button { onEdit() } label: {
-                    Image(systemName: "pencil.circle.fill")
-                        .font(.system(size: 26))
-                        .foregroundStyle(Color.accentColor)
-                        .symbolRenderingMode(.hierarchical)
-                }
-                .buttonStyle(.plain)
-                Spacer(minLength: 0)
+            // Edit button — its own high-priority tap area so it always
+            // wins over the row tap, even when visually overlapping the
+            // cover's overlay badges.
+            Button {
+                onTapEdit()
+            } label: {
+                Image(systemName: "pencil.circle.fill")
+                    .font(.system(size: 26))
+                    .foregroundStyle(Color.accentColor)
+                    .symbolRenderingMode(.hierarchical)
+                    .frame(width: 36, height: 36)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .highPriorityGesture(TapGesture())
             .padding(.top, 6)
             .padding(.trailing, 4)
         }
@@ -1423,5 +1320,122 @@ private struct LibraryRowView: View {
             return "\(entry.progress) ch read"
         }
         return "\(entry.progress) episodes watched"
+    }
+}
+
+// MARK: - Library grid card (redesigned — poster with controlled hit area)
+
+/// Redesigned grid card. The poster image is rendered with
+/// `.allowsHitTesting(false)` so the overlay controls (status dot, score
+/// badge, progress bar, ep-count badge) always receive taps. The card's
+/// tap target is a transparent contentShape that matches the visible card
+/// boundary — not the full grid cell — so taps on the gaps between cards
+/// don't accidentally open a card.
+private struct LibraryGridCard: View {
+    let entry: LibraryEntry
+    var onTap: () -> Void = {}
+    var onContextTap: () -> Void = {}
+
+    private var accentColor: Color { statusAccentColor(entry.status) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            poster
+                // CRITICAL: poster does not participate in hit-testing.
+                // Overlays (status dot, score badge, progress bar) sit on
+                // top of the poster and need to receive taps directly.
+                // The card's tap target is the contentShape on the
+                // outer VStack, scoped to the visible card.
+                .allowsHitTesting(false)
+
+            Text(entry.media.title.displayTitle)
+                .font(.system(size: 12, weight: .semibold))
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .foregroundStyle(.primary)
+
+            if let total = entry.media.episodes, total > 0 {
+                Text("\(entry.progress) / \(total) \(entry.media.isManga ? "ch" : "ep")")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.secondary)
+            } else if entry.progress > 0 {
+                Text("\(entry.progress) \(entry.media.isManga ? "ch" : "ep")")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        // Tap target = visible card only. The contentShape is a rounded
+        // rectangle matching the card's bounds so taps in the grid gap
+        // don't trigger a card open.
+        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .onTapGesture { onTap() }
+    }
+
+    @ViewBuilder
+    private var poster: some View {
+        ZStack {
+            CachedAsyncImage(urlString: entry.media.coverImage.best ?? "")
+                .aspectRatio(2/3, contentMode: .fill)
+                .frame(maxWidth: .infinity)
+                .frame(height: 168)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .shadow(color: .black.opacity(0.25), radius: 5, x: 0, y: 3)
+        }
+        .overlay(alignment: .topLeading) {
+            Circle()
+                .fill(accentColor)
+                .frame(width: 10, height: 10)
+                .padding(6)
+                .background(Circle().fill(.black.opacity(0.45)))
+                .padding(6)
+                .allowsHitTesting(true)  // status dot — currently non-interactive; safe.
+        }
+        .overlay(alignment: .topTrailing) {
+            if let score = entry.media.averageScore {
+                HStack(spacing: 2) {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 8, weight: .bold))
+                    Text("\(score)%")
+                        .font(.system(size: 10, weight: .bold))
+                }
+                .foregroundStyle(.yellow)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(.black.opacity(0.55), in: Capsule())
+                .padding(6)
+                .allowsHitTesting(true)
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if let total = entry.media.episodes, total > 0, entry.progress > 0 {
+                GeometryReader { proxy in
+                    let ratio = min(1.0, Double(entry.progress) / Double(total))
+                    ZStack(alignment: .leading) {
+                        Rectangle()
+                            .fill(.white.opacity(0.2))
+                            .frame(height: 3)
+                        Rectangle()
+                            .fill(Color.appAccent)
+                            .frame(width: proxy.size.width * ratio, height: 3)
+                    }
+                }
+                .frame(height: 3)
+                .clipShape(RoundedRectangle(cornerRadius: 2))
+                .allowsHitTesting(true)
+            }
+        }
+        .overlay(alignment: .bottomLeading) {
+            if entry.progress > 0 {
+                let label = entry.media.isManga ? "Ch \(entry.progress)" : "Ep \(entry.progress)"
+                Text(label)
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(.black.opacity(0.55), in: Capsule())
+                    .padding(6)
+                    .allowsHitTesting(true)
+            }
+        }
     }
 }

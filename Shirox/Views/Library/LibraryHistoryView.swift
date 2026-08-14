@@ -9,26 +9,39 @@ import SwiftUI
 /// The view observes `HistoryManager.shared` directly, so any progress
 /// update from ContinueWatchingManager (anime) or MangaProgressManager
 /// (manga) is reflected here in real time — no manual refresh needed.
+///
+/// **Navigation**: When presented inside the Library tab, this view shows a
+/// "← Library" back button in its toolbar so the user can return to the
+/// tracked-list view. The button calls `onBack` so the parent can flip
+/// `libraryViewMode` back to `.library`.
 struct LibraryHistoryView: View {
+    /// Optional back-button callback. When non-nil, a "← Library" button is
+    /// shown in the toolbar's leading slot. When nil (e.g. presented as a
+    /// pushed NavigationLink), the system back button is used instead.
+    var onBack: (() -> Void)? = nil
+
     @ObservedObject private var history = HistoryManager.shared
     @State private var selectedAnimeEntry: HistoryEntry?
     @State private var selectedMangaEntry: HistoryEntry?
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                if history.entries.isEmpty {
-                    emptyState
-                } else {
-                    if !history.animeEntries.isEmpty {
-                        animeSection
+        Group {
+            if history.entries.isEmpty {
+                emptyState
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        if !history.animeEntries.isEmpty {
+                            animeSection
+                        }
+                        if !history.mangaEntries.isEmpty {
+                            mangaSection
+                        }
                     }
-                    if !history.mangaEntries.isEmpty {
-                        mangaSection
-                    }
+                    .padding(.vertical, 16)
                 }
+                .background(background.ignoresSafeArea())
             }
-            .padding(.vertical, 16)
         }
         .background(background.ignoresSafeArea())
         .navigationTitle("History")
@@ -36,6 +49,24 @@ struct LibraryHistoryView: View {
         .navigationBarTitleDisplayMode(.large)
         #endif
         .toolbar {
+            // Back button — leading slot. Explicit "← Library" so the user
+            // always has a clear way back to the tracked-list view, even
+            // when this view is shown inline (no system back button).
+            if let onBack {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        Haptics.light()
+                        onBack()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 14, weight: .semibold))
+                            Text("Library")
+                                .font(.subheadline.weight(.medium))
+                        }
+                    }
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 if !history.entries.isEmpty {
                     Menu {
@@ -181,11 +212,13 @@ private struct HistoryRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Cover image
+            // Cover image — non-interactive so it never intercepts taps
+            // meant for the row's button or context menu.
             CachedAsyncImage(urlString: entry.coverImageURL ?? "")
                 .frame(width: 52, height: 74)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.1)))
+                .allowsHitTesting(false)
 
             // Title + progress + date
             VStack(alignment: .leading, spacing: 4) {
