@@ -45,8 +45,11 @@ final class MangaDetailViewModel: ObservableObject {
             // installed manga modules. This is the fix for "can't read
             // manga with multiple modules installed" — a single module
             // might not have this particular title.
-            let info: (description: String, tags: [String])
-            let chapters: [MangaChapter]
+            //
+            // Declared as `var` because the `catch` branch reassigns them
+            // when the active module fails and a fallback module succeeds.
+            var info: (description: String, tags: [String])
+            var chapters: [MangaChapter]
             do {
                 info = try await JSEngine.shared.mangaDetails(url: item.href)
                 chapters = try await JSEngine.shared.mangaChapters(url: item.href)
