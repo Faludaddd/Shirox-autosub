@@ -791,8 +791,8 @@ final class DownloadManager: NSObject, ObservableObject {
         // Item 25: if resume data exists from a previous failed/cancelled
         // attempt, resume from where it left off instead of restarting.
         let task: URLSessionDownloadTask
-        if let resumeData = resumeData[item.id] {
-            task = urlSession.downloadTask(withResumeData: resumeData)
+        if let savedResumeData = resumeData[item.id] {
+            task = urlSession.downloadTask(withResumeData: savedResumeData)
             resumeData.removeValue(forKey: item.id)
             Logger.shared.log("[Downloads] Resuming MP4 from resume data for \(item.mediaTitle) Ep \(item.episodeNumber)", type: "Download")
         } else {
