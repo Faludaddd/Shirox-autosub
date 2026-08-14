@@ -2,21 +2,37 @@ import Foundation
 import Combine
 
 extension JSEngine {
+    /// In-flight stream fetch dedup for the shared JSEngine. Prevents
+    /// duplicate extractStreamUrl calls for the same episode URL when
+    /// multiple UI parts trigger the same fetch simultaneously.
+    private static var inFlightStreams: [String: Task<[StreamResult], Error>] = [:]
+
     func fetchStreams(episodeUrl: String) async throws -> [StreamResult] {
-        let json = try await callAsyncJS("extractStreamUrl", args: [episodeUrl])
-        let trimmed = json.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        // Some modules return a raw URL string instead of JSON (e.g. animeheaven, animekai)
-        if let url = URL(string: trimmed), url.scheme != nil, !trimmed.hasPrefix("{") {
-            return [StreamResult(title: "Play", url: url, headers: [:])]
+        // Dedup: if a fetch for this URL is already in flight, await it
+        // instead of starting a new one. Prevents duplicate extractStreamUrl
+        // calls that lead to repeated 403 errors.
+        if let existing = Self.inFlightStreams[episodeUrl] {
+            return try await existing.value
         }
+        let task = Task<[StreamResult], Error> {
+            defer { Self.inFlightStreams.removeValue(forKey: episodeUrl) }
+            let json = try await callAsyncJS("extractStreamUrl", args: [episodeUrl])
+            let trimmed = json.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        guard let data = trimmed.data(using: .utf8),
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw JSEngineError.parseError("Could not parse stream result")
+            // Some modules return a raw URL string instead of JSON (e.g. animeheaven, animekai)
+            if let url = URL(string: trimmed), url.scheme != nil, !trimmed.hasPrefix("{") {
+                return [StreamResult(title: "Play", url: url, headers: [:])]
+            }
+
+            guard let data = trimmed.data(using: .utf8),
+                  let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                throw JSEngineError.parseError("Could not parse stream result")
+            }
+
+            return parseStreamResults(from: obj)
         }
-
-        return parseStreamResults(from: obj)
+        Self.inFlightStreams[episodeUrl] = task
+        return try await task.value
     }
 }
 

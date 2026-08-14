@@ -48,6 +48,10 @@ struct MangaReaderView: View {
 
     @Environment(\.dismiss) private var dismiss
     @AppStorage("mangaReadingMode") private var modeRaw = MangaReadingMode.vertical.rawValue
+    /// When true, the page order within each chapter is reversed (last page
+    /// first). Set by the MangaDetailView's Invert button via
+    /// @AppStorage("mangaInvertPages") so the toggle persists across reads.
+    @AppStorage("mangaInvertPages") private var invertPages = false
 
     // Strip + chapter state
     @State private var strip: [StripPage] = []
@@ -251,10 +255,13 @@ struct MangaReaderView: View {
     }
 
     private var verticalReader: some View {
+        // `invertPages` reverses the page sequence (Page 400 → Page 1)
+        // when the user toggles the Invert button in MangaDetailView.
+        let displayOrder = invertPages ? Array(strip.reversed()) : strip
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    ForEach(strip) { item in
+                    ForEach(displayOrder) { item in
                         ReaderPageView(urlString: item.url, referer: referer, pageNumber: item.pageIdx + 1)
                             .id(item.globalIdx)
                             .background(
@@ -317,10 +324,13 @@ struct MangaReaderView: View {
 
 
     private var pagedReader: some View {
-        // Stable tags (globalIdx) + reversed data order for RTL: appending a
-        // stitched chapter never shifts existing pages' identity, so the
-        // current page holds still while the strip grows in either direction.
-        let displayOrder = isRTL ? Array(strip.reversed()) : strip
+        // Stable tags (globalIdx) + reversed data order for RTL or Invert:
+        // appending a stitched chapter never shifts existing pages'
+        // identity, so the current page holds still while the strip grows.
+        // `invertPages` reverses the page sequence (Page 400 → Page 1)
+        // when the user toggles the Invert button in MangaDetailView.
+        let baseOrder = isRTL ? Array(strip.reversed()) : strip
+        let displayOrder = invertPages ? Array(baseOrder.reversed()) : baseOrder
         return TabView(selection: $currentPage) {
             ForEach(displayOrder) { item in
                 ZoomableContainer(onSingleTap: {

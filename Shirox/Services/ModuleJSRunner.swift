@@ -82,7 +82,33 @@ final class ModuleJSRunner {
 
     // MARK: - Episodes
 
+    /// In-flight episode fetch dedup. Keyed by URL — when multiple callers
+    /// request episodes for the same URL concurrently (e.g. SwiftUI view
+    /// re-renders, multiple download tasks), they all share ONE fetch and
+    /// get the same result. This prevents the "repeatedly requesting the
+    /// same 18 episodes" log spam.
+    private static var inFlightEpisodes: [String: Task<[EpisodeLink], Error>] = [:]
+    /// In-flight stream fetch dedup. Same pattern — prevents duplicate
+    /// extractStreamUrl calls for the same episode URL.
+    private static var inFlightStreams: [String: Task<[StreamResult], Error>] = [:]
+
     func fetchEpisodes(url: String) async throws -> [EpisodeLink] {
+        // Dedup: if a fetch for this URL is already in flight, await it
+        // instead of starting a new one. This prevents the duplicate
+        // episode-list requests that happen when SwiftUI re-renders the
+        // detail view or multiple download tasks fire simultaneously.
+        if let existing = Self.inFlightEpisodes[url] {
+            return try await existing.value
+        }
+        let task = Task<[EpisodeLink], Error> {
+            defer { Self.inFlightEpisodes.removeValue(forKey: url) }
+            return try await fetchEpisodesUncached(url: url)
+        }
+        Self.inFlightEpisodes[url] = task
+        return try await task.value
+    }
+
+    private func fetchEpisodesUncached(url: String) async throws -> [EpisodeLink] {
         let json = try await callAsyncJS("extractEpisodes", args: [url])
         guard let data = json.data(using: .utf8),
               let array = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
@@ -108,6 +134,21 @@ final class ModuleJSRunner {
     // MARK: - Streams
 
     func fetchStreams(episodeUrl: String) async throws -> [StreamResult] {
+        // Dedup: if a stream fetch for this URL is already in flight, await
+        // it instead of starting a new one. This prevents the duplicate
+        // extractStreamUrl calls that lead to repeated 403 errors.
+        if let existing = Self.inFlightStreams[episodeUrl] {
+            return try await existing.value
+        }
+        let task = Task<[StreamResult], Error> {
+            defer { Self.inFlightStreams.removeValue(forKey: episodeUrl) }
+            return try await fetchStreamsUncached(episodeUrl: episodeUrl)
+        }
+        Self.inFlightStreams[episodeUrl] = task
+        return try await task.value
+    }
+
+    private func fetchStreamsUncached(episodeUrl: String) async throws -> [StreamResult] {
         let json = try await callAsyncJS("extractStreamUrl", args: [episodeUrl])
         let trimmed = json.trimmingCharacters(in: .whitespacesAndNewlines)
 
