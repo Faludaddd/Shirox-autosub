@@ -571,6 +571,18 @@ struct LibraryView: View {
 
     @ViewBuilder
     private func libraryContextMenu(for entry: LibraryEntry) -> some View {
+        // Top action: open the detail page. Label auto-switches between
+        // "View Anime" and "View Manga" based on the entry's media type so
+        // the menu reads correctly for both content kinds.
+        Button {
+            openEntryDetail(entry)
+        } label: {
+            Label(
+                entry.media.isManga ? "View Manga" : "View Anime",
+                systemImage: entry.media.isManga ? "book.circle" : "tv.circle"
+            )
+        }
+        Divider()
         ForEach(MediaListStatus.allCases) { status in
             if status != entry.status {
                 Button {
@@ -601,6 +613,27 @@ struct LibraryView: View {
             Task { await vm.delete(entry: entry) }
         } label: {
             Label("Remove from Library", systemImage: "trash")
+        }
+    }
+
+    /// Opens the detail page for an entry — shared by the context menu's
+    /// "View Anime"/"View Manga" action. Branches by entry type so manga,
+    /// local-file, and module-scraped entries all route correctly.
+    private func openEntryDetail(_ entry: LibraryEntry) {
+        if entry.media.isManga {
+            openManga(entry)
+        } else if let source = entry.localSource, source.kind == .localFile {
+            resumeLocalFile(source)
+        } else if entry.localSource?.kind == .module {
+            pendingMangaItem = SearchItem(
+                title: entry.media.title.displayTitle,
+                image: entry.media.coverImage.best ?? "",
+                href: entry.localSource?.detailHref ?? ""
+            )
+            mangaLinkActive = true
+        } else {
+            pendingAniListMangaMedia = entry.media
+            aniListMangaLinkActive = true
         }
     }
 

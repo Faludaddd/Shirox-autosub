@@ -685,6 +685,10 @@
 		F424A5B457A54915804DA4B0 /* ModuleSelectorMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71A75A1C89CB4572A122815F /* ModuleSelectorMenu.swift */; };
 		F27E4771D4E145CDAFEAAF42 /* ModuleSelectorMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71A75A1C89CB4572A122815F /* ModuleSelectorMenu.swift */; };
 		D31F3AE1550D4325907AE96E /* ModuleSelectorMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71A75A1C89CB4572A122815F /* ModuleSelectorMenu.swift */; };
+		103F64B93BFD4E1F84563AE1 /* CharactersAndRecommendations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DA313B576B24603A98BB0C4 /* CharactersAndRecommendations.swift */; };
+		9C5EA46E33FB48A191991C24 /* CharactersAndRecommendations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DA313B576B24603A98BB0C4 /* CharactersAndRecommendations.swift */; };
+		198ADC9EE85E423CAA4826DB /* CharactersAndRecommendations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DA313B576B24603A98BB0C4 /* CharactersAndRecommendations.swift */; };
+		F5C81FEA82C540A693EF5418 /* CharactersAndRecommendations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DA313B576B24603A98BB0C4 /* CharactersAndRecommendations.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -946,6 +950,7 @@
 
 		2578024E3A4D4BDD8A604C2C /* LibraryDesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryDesignSystem.swift; sourceTree = "<group>"; };
 		71A75A1C89CB4572A122815F /* ModuleSelectorMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleSelectorMenu.swift; sourceTree = "<group>"; };
+		7DA313B576B24603A98BB0C4 /* CharactersAndRecommendations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CharactersAndRecommendations.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1233,6 +1238,7 @@
                                 0C1B57D4AEDB48F28A04789C /* AnimationModifiers.swift */,
                                 7BC6D003A0C9444AA11E160A /* UpdateSettingsPage.swift */,
                                 A15090D8B47044D285B51DCF /* ToggleGlow.swift */,
+			7DA313B576B24603A98BB0C4 /* CharactersAndRecommendations.swift */,
                         );
                         path = Shared;
                         sourceTree = "<group>";
@@ -1610,6 +1616,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 499662116A2E43978193A47E /* ToggleGlow.swift in Sources */,
 			7C0C6605ED1F492BB9DFF5C2 /* LibraryDesignSystem.swift in Sources */,
 			F68950F5BF8543B59C2CA4A6 /* ModuleSelectorMenu.swift in Sources */,
+			103F64B93BFD4E1F84563AE1 /* CharactersAndRecommendations.swift in Sources */,
                         );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -1818,6 +1825,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 F9145A12960F440BAC6A4556 /* ToggleGlow.swift in Sources */,
 			995B9032301847B689999977 /* LibraryDesignSystem.swift in Sources */,
 			F424A5B457A54915804DA4B0 /* ModuleSelectorMenu.swift in Sources */,
+			9C5EA46E33FB48A191991C24 /* CharactersAndRecommendations.swift in Sources */,
                         );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -2027,6 +2035,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 A16180FB70044D67A99A2BFA /* ToggleGlow.swift in Sources */,
 			07DD4D5C2BBD44819992CE6E /* LibraryDesignSystem.swift in Sources */,
 			F27E4771D4E145CDAFEAAF42 /* ModuleSelectorMenu.swift in Sources */,
+			198ADC9EE85E423CAA4826DB /* CharactersAndRecommendations.swift in Sources */,
                         );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -2236,6 +2245,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 87EE82E06AD94040BB9C5986 /* ToggleGlow.swift in Sources */,
 			7F4F2D7382E74A0CBB8868A1 /* LibraryDesignSystem.swift in Sources */,
 			D31F3AE1550D4325907AE96E /* ModuleSelectorMenu.swift in Sources */,
+			F5C81FEA82C540A693EF5418 /* CharactersAndRecommendations.swift in Sources */,
                         );
                         runOnlyForDeploymentPostprocessing = 0;
                 };

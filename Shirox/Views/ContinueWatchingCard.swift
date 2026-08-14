@@ -300,7 +300,7 @@ struct ContinueWatchingSection: View {
                 }
                 navTarget = .detail(item)
             } label: {
-                Label("View Details", systemImage: "list.bullet.below.rectangle")
+                Label("View Anime", systemImage: "list.bullet.below.rectangle")
             }
         }
         if item.aniListID != nil {

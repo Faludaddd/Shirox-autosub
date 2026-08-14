@@ -102,6 +102,13 @@ struct AniListMangaDetailView: View {
                     SynopsisSection(text: desc)
                         .padding(.top, 16)
                 }
+                // Characters + Recommendations — directly below the synopsis.
+                // Both sections fetch from AniList (manga detail query doesn't
+                // include them, so the sections fetch fresh). Hidden if empty.
+                CharactersSection(mediaId: media.id)
+                    .padding(.top, 16)
+                RecommendationsSection(mediaId: media.id, isManga: true)
+                    .padding(.top, 8)
                 #if os(iOS)
                 readButton(media: media)
                     .padding(.horizontal, 16)

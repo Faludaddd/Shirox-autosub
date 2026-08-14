@@ -74,7 +74,7 @@ struct ContinueReadingSection: View {
                                     moduleId: item.moduleId
                                 )
                             } label: {
-                                Label("View Details", systemImage: "info.circle")
+                                Label("View Manga", systemImage: "info.circle")
                             }
                             if let aniListId = MangaMatchManager.shared.cachedMatch(mangaHref: item.mangaHref)?.aniListID {
                                 Button {

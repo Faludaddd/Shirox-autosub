@@ -201,7 +201,7 @@ struct MangaSection: View {
                                 NavigationLink {
                                     AniListMangaDetailView(mediaId: media.id, preloadedMedia: media)
                                 } label: {
-                                    Label("View Details", systemImage: "info.circle")
+                                    Label("View Manga", systemImage: "info.circle")
                                 }
                                 Button {
                                     #if os(iOS)

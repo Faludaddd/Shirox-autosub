@@ -680,6 +680,17 @@ struct AniListDetailView: View {
                         .padding(.top, 16)
                 }
 
+                // Characters + Recommendations — directly below the synopsis.
+                // Both sections fetch from AniList via CharactersSection /
+                // RecommendationsSection (best-effort; hidden if no data).
+                CharactersSection(mediaId: media.id)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 16)
+
+                RecommendationsSection(mediaId: media.id, isManga: false)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 8)
+
                 #if os(iOS)
                 HStack(spacing: 10) {
                     watchButton(media: media)
