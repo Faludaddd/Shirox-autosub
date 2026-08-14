@@ -631,27 +631,45 @@ struct NotificationsHistoryView: View {
     @ViewBuilder
     private var historyContent: some View {
         if vm.notificationHistory.isEmpty {
-            Text("No notification history")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            VStack(spacing: 12) {
+                Image(systemName: "clock.slash")
+                    .font(.system(size: 44))
+                    .foregroundStyle(.secondary)
+                Text("No notification history")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            List {
-                ForEach(Array(vm.notificationHistory.enumerated()), id: \.offset) { _, notif in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(historyBodyText(for: notif))
-                                .font(.subheadline)
-                                .lineLimit(2)
-                            Text(Date(timeIntervalSince1970: TimeInterval(notif.createdAt))
-                                .formatted(date: .abbreviated, time: .standard))
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
+            ScrollView {
+                LazyVStack(spacing: 8) {
+                    ForEach(Array(vm.notificationHistory.enumerated()), id: \.offset) { _, notif in
+                        HStack(alignment: .top, spacing: 10) {
+                            let (symbol, color) = NotificationSwipeRow.iconAndColor(for: notif)
+                            Image(systemName: symbol)
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 34, height: 34)
+                                .background(Circle().fill(color))
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(historyBodyText(for: notif))
+                                    .font(.subheadline)
+                                    .lineLimit(2)
+                                Text(Date(timeIntervalSince1970: TimeInterval(notif.createdAt))
+                                    .formatted(date: .abbreviated, time: .standard))
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength: 0)
                         }
-                        Spacer()
+                        .padding(10)
+                        .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.07)))
                     }
                 }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
             }
-            .listStyle(.plain)
         }
     }
 }

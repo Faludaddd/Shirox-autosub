@@ -925,12 +925,7 @@ struct AppearanceSettingsPage: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Section("Motion") {
-                // Reduce Motion removed — the setting was inert (only consumer
-                // was AnimatedBackgroundView which is never instantiated).
-                // The system's own accessibilityReduceMotion is respected
-                // automatically by SwiftUI.
-            }
+            // Motion section removed — was empty after Reduce Motion toggle deletion.
             // Issue #5 — Browse Categories layout toggle + statistics toggle.
             Section {
                 Toggle("Browse Categories as Grid", isOn: $browseCategoriesGridLayout).tint(Color.appAccent).glowEffect(isOn: browseCategoriesGridLayout)
@@ -2238,7 +2233,7 @@ struct ModulesSettingsPage: View {
     private var filteredModules: [ModuleDefinition] {
         switch mediaType {
         case .manga: return moduleManager.modules.filter { $0.isManga }
-        case nil: return moduleManager.modules
+        case nil: return moduleManager.modules.filter { !$0.isManga }
         }
     }
 

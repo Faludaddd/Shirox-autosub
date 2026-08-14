@@ -3130,9 +3130,6 @@ private struct ContinueWatchingSignInPrompt: View {
                     Text("Continue Watching")
                         .font(.title2.weight(.heavy))
                         .tracking(0.3)
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.primary)
-                        .frame(width: 36, height: 3)
                 }
                 Spacer()
             }

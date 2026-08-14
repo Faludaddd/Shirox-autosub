@@ -62,6 +62,8 @@ struct MangaHomeContent: View {
                         } else {
                             MangaSection(title: "Trending Manga", items: vm.trending)
                             MangaSection(title: "All-Time Popular", items: vm.popular)
+                            MangaSection(title: "Top Rated", items: vm.topRated)
+                            MangaSection(title: "Latest Manga", items: vm.latest)
                         }
 
                         Spacer().frame(height: 28)

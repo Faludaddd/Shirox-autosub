@@ -135,20 +135,21 @@ struct SearchView: View {
                         vm.search(usingModule: usingModule, isMangaMode: isMangaMode)
                     }
                 }
-        }
-        .adaptiveSheet(isPresented: $showSources) {
-            SourcesPickerSheet()
-                // #100 — Liquid-glass backdrop for the modal sheet.
-                .background(.ultraThinMaterial)
+                .navigationDestinationCompat(item: $surpriseDestination) { media in
+                    if isMangaMode {
+                        AniListMangaDetailView(mediaId: media.id, preloadedMedia: media)
+                    } else {
+                        AniListDetailView(mediaId: media.id, preloadedMedia: media)
+                    }
+                }
         }
         .task { await loadRecommendations() }
-        .navigationDestinationCompat(item: $surpriseDestination) { media in
-            if isMangaMode {
-                AniListMangaDetailView(mediaId: media.id, preloadedMedia: media)
-            } else {
-                AniListDetailView(mediaId: media.id, preloadedMedia: media)
-            }
+        #if os(iOS)
+        .adaptiveSheet(isPresented: $showSources) {
+            SourcesPickerSheet()
+                .background(.ultraThinMaterial)
         }
+        #endif
         .adaptiveSheet(isPresented: $showFilters) {
             // #91 — pass the last-applied result count + hasSearched so the sheet
             // can show a live "N results" preview / "Apply to update" hint at the bottom.
@@ -967,11 +968,15 @@ struct SearchFilterSheet: View {
                     step: 1,
                     display: { v in v == 0 ? "Any" : "\(Int(v))+" }
                 )
-                FilterTextRow(
+                FilterSliderRow(
                     title: "Max Episodes",
-                    text: $maxEpisodesText,
-                    placeholder: "Any",
-                    onChange: { v in localFilters.maxEpisodes = Int(v.filter(\.isNumber)) }
+                    value: Binding(
+                        get: { Double(localFilters.maxEpisodes ?? 0) },
+                        set: { localFilters.maxEpisodes = $0 == 0 ? nil : Int($0) }
+                    ),
+                    range: 0...200,
+                    step: 1,
+                    display: { v in v == 0 ? "Any" : "\(Int(v))" }
                 )
             }
             FilterFootnote(isMangaMode
@@ -1099,12 +1104,15 @@ struct SearchFilterSheet: View {
                     step: 5,
                     display: { v in v == 0 ? "Any" : "\(Int(v)) min+" }
                 )
-                FilterTextRow(
+                FilterSliderRow(
                     title: "Max Duration",
-                    text: $maxDurationText,
-                    placeholder: "Any",
-                    suffix: "min",
-                    onChange: { v in localFilters.maxDuration = Int(v.filter(\.isNumber)) }
+                    value: Binding(
+                        get: { Double(localFilters.maxDuration ?? 0) },
+                        set: { localFilters.maxDuration = $0 == 0 ? nil : Int($0) }
+                    ),
+                    range: 0...180,
+                    step: 5,
+                    display: { v in v == 0 ? "Any" : "\(Int(v)) min" }
                 )
                 FilterFootnote("Filter by episode length in minutes.")
             }
