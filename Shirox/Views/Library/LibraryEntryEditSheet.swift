@@ -59,17 +59,16 @@ struct LibraryEntryEditSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Status") {
+                // Item 9: Merged Status + Progress + Score into one "Tracking" section
+                Section("Tracking") {
                     Picker("Status", selection: $status) {
                         ForEach(MediaListStatus.allCases) { s in
                             Text(s.displayName).tag(s)
                         }
                     }
                     .pickerStyle(.menu)
-                }
 
-                if status != .completed {
-                    Section("Progress") {
+                    if status != .completed {
                         #if !os(tvOS)
                         Stepper(
                             "\(progress) \(progressUnit)\(progress == 1 ? "" : "s") \(progressUnit == "chapter" ? "read" : "watched")",
@@ -83,35 +82,25 @@ struct LibraryEntryEditSheet: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
-                }
 
-                Section("Score") {
                     ScoreInputView(score: $score, format: scoreFormat)
                 }
 
                 if onTogglePrivate != nil {
-                    Section {
+                    Section("Privacy") {
                         Toggle(isOn: $isPrivate) {
                             HStack {
                                 Image(systemName: isPrivate ? "lock.fill" : "lock.open")
                                     .foregroundStyle(isPrivate ? .red : .secondary)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Mark as Private")
-                                        .font(.subheadline.weight(.medium))
-                                    Text(isPrivate
-                                         ? "Hidden from your public profile and social feeds."
-                                         : "Hide this entry from your public profile and social feeds.")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
+                                Text("Mark as Private")
+                                    .font(.subheadline.weight(.medium))
                             }
                         }
+                        .tint(Color.appAccent)
+                        .glowEffect(isOn: isPrivate)
                         .onChange(of: isPrivate) { newValue in
                             onTogglePrivate?(newValue)
                         }
-                    } header: {
-                        Text("Privacy")
                     }
                 }
 
@@ -171,7 +160,7 @@ struct LibraryEntryEditSheet: View {
                 }
 
                 if entry != nil, onDelete != nil {
-                    Section {
+                    Section("Danger Zone") {
                         Button(role: .destructive) {
                             showDeleteConfirmation = true
                         } label: {

@@ -38,7 +38,6 @@ struct LibraryView: View {
     @ObservedObject private var malAuth = MALAuthManager.shared
     @ObservedObject private var providerManager = ProviderManager.shared
     @State private var showProfile = false
-    @State private var showNotifications = false
     @StateObject private var profileVM = ProfileViewModel()
     @State private var searchText = ""
     @AppStorage("libraryGridLayout") private var isGridLayout = false
@@ -466,18 +465,6 @@ struct LibraryView: View {
         ToolbarItem(placement: toolbarItemPlacement[1]) {
             if isActiveProviderAuthenticated {
                 HStack(spacing: 10) {
-                    if activeProviderType == .anilist {
-                        Button {
-                            anilistAuth.unreadNotificationCount = 0
-                            showNotifications = true
-                        } label: {
-                            Image(systemName: "bell")
-                                .font(.system(size: 17, weight: .medium))
-                                .notificationBadge(count: anilistAuth.unreadNotificationCount)
-                        }
-                        Divider().frame(height: 16)
-                    }
-
                     Button {
                         showProfile = true
                     } label: {
@@ -1018,9 +1005,6 @@ struct LibraryView: View {
             } else if let uid = anilistAuth.userId, let username = anilistAuth.username {
                 ProfileView(userId: uid, username: username, avatarURL: anilistAuth.avatarURL)
             }
-        }
-        .adaptiveSheet(isPresented: $showNotifications) {
-            NotificationsView(vm: profileVM)
         }
         .adaptiveSheet(isPresented: $showManageCollections) {
             ManageCollectionsView()

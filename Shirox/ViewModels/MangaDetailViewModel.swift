@@ -24,6 +24,14 @@ final class MangaDetailViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         do {
+            // Item 11: ensure a manga module is loaded before calling JSEngine.
+            // Fixes the race condition where "View Details" from Continue
+            // Reading pushes MangaDetailView before the module JS is ready,
+            // causing "Function not found" errors that require manual Retry.
+            if ModuleManager.shared.activeModule?.isManga != true,
+               let mangaModule = ModuleManager.shared.modules.first(where: { $0.isManga }) {
+                _ = await ModuleManager.shared.selectAndAwaitReady(mangaModule)
+            }
             let info = try await JSEngine.shared.mangaDetails(url: item.href)
             let chapters = try await JSEngine.shared.mangaChapters(url: item.href)
             detail = MangaDetail(

@@ -13,7 +13,7 @@ import Combine
 extension Date {
     func timeAgo() -> String {
         let f = RelativeDateTimeFormatter()
-        f.unitsStyle = .short
+        f.unitsStyle = .full
         return f.localizedString(for: self, relativeTo: Date())
     }
 }

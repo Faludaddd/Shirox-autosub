@@ -10,6 +10,7 @@ struct HomeView: View {
     @State private var cwNavTarget: ContinueWatchingNavTarget?
     @State private var readerContext: ReaderContext?
     @State private var navigateToNotifications = false
+    @State private var showNotifications = false
     /// Drives the custom pull-to-refresh overlay (#98). Toggled at the start/end
     /// of the `.refreshable` task so `CustomRefreshControl` can spin while the
     /// reload is in flight. The system `.refreshable` spinner still drives the
@@ -66,7 +67,9 @@ struct HomeView: View {
                     .accessibilityLabel(appMode.mode.toggleAccessibilityLabel)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink(destination: NotificationsView(vm: profileVM)) {
+                    Button {
+                        showNotifications = true
+                    } label: {
                         Image(systemName: "bell")
                             .font(.system(size: 18, weight: .medium))
                             .foregroundStyle(.primary)
@@ -93,6 +96,9 @@ struct HomeView: View {
             #if os(iOS)
             .fullScreenCover(item: $readerContext) { ctx in
                 MangaReaderView(context: ctx)
+            }
+            .adaptiveSheet(isPresented: $showNotifications) {
+                NotificationsView(vm: profileVM)
             }
             #endif
         }

@@ -933,8 +933,8 @@ struct AppearanceSettingsPage: View {
             }
             // Issue #5 — Browse Categories layout toggle + statistics toggle.
             Section {
-                Toggle("Browse Categories as Grid", isOn: $browseCategoriesGridLayout)
-                Toggle("Show Statistics on Detail Pages", isOn: $showStatistics)
+                Toggle("Browse Categories as Grid", isOn: $browseCategoriesGridLayout).tint(Color.appAccent).glowEffect(isOn: browseCategoriesGridLayout)
+                Toggle("Show Statistics on Detail Pages", isOn: $showStatistics).tint(Color.appAccent).glowEffect(isOn: showStatistics)
             } header: {
                 Text("Layout")
             } footer: {
@@ -943,7 +943,7 @@ struct AppearanceSettingsPage: View {
                     .foregroundStyle(.secondary)
             }
             Section {
-                Toggle("Enable Glow", isOn: $glowEnabled)
+                Toggle("Enable Glow", isOn: $glowEnabled).tint(Color.appAccent).glowEffect(isOn: glowEnabled)
                 if glowEnabled {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
@@ -1760,7 +1760,7 @@ struct NotificationsSettingsPage: View {
     private var inAppToastsCard: some View {
         VStack(alignment: .leading, spacing: 14) {
             cardHeader("In-App Toast Notifications", systemImage: "rectangle.stack.fill")
-            Toggle("Show In-App Toasts", isOn: $inAppToastsEnabled)
+            Toggle("Show In-App Toasts", isOn: $inAppToastsEnabled).tint(Color.appAccent).glowEffect(isOn: inAppToastsEnabled)
             Text("Controls temporary messages that appear inside the app itself — toast banners, in-app alerts, and visual notifications. Does not affect device/lock-screen notifications.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -1775,13 +1775,13 @@ struct NotificationsSettingsPage: View {
     private var phoneNotificationsCard: some View {
         VStack(alignment: .leading, spacing: 14) {
             cardHeader("Phone Notifications", systemImage: "iphone.radiowaves.left.and.right")
-            Toggle("Enable Phone Notifications", isOn: $phoneNotificationsEnabled)
+            Toggle("Enable Phone Notifications", isOn: $phoneNotificationsEnabled).tint(Color.appAccent).glowEffect(isOn: phoneNotificationsEnabled)
             Text("Controls real system notifications that appear outside the app — Lock Screen, Notification Center, and banner alerts. Requires iOS notification permission.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Divider().opacity(0.4)
-            Toggle(isOn: $episodeReminders) {
+            Toggle(isOn: $episodeReminders).tint(Color.appAccent).glowEffect(isOn: episodeReminders) {
                 HStack(spacing: 6) {
                     Image(systemName: "calendar.badge.clock")
                         .font(.caption)
@@ -1790,7 +1790,7 @@ struct NotificationsSettingsPage: View {
                 }
             }
             .disabled(!phoneNotificationsEnabled)
-            Toggle(isOn: $airingNotifications) {
+            Toggle(isOn: $airingNotifications).tint(Color.appAccent).glowEffect(isOn: airingNotifications) {
                 HStack(spacing: 6) {
                     Image(systemName: "tv.fill")
                         .font(.caption)

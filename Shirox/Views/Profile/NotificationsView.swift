@@ -54,6 +54,8 @@ struct NotificationsView: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
+                // History + Clear-all both on leading, well-separated.
+                // Done on trailing by itself — no overlap.
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
                         showHistory = true
@@ -61,7 +63,7 @@ struct NotificationsView: View {
                         Image(systemName: "clock.arrow.circlepath")
                     }
                 }
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .topBarLeading) {
                     Button {
                         showClearConfirmation = true
                     } label: {
@@ -69,7 +71,7 @@ struct NotificationsView: View {
                     }
                     .disabled(vm.notifications.isEmpty)
                 }
-                ToolbarItem(placement: .confirmationAction) {
+                ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
                 }
             }
@@ -360,35 +362,35 @@ private struct NotificationSwipeRow: View {
                 case .avatar(let url):
                     ZStack(alignment: .bottomTrailing) {
                         CachedAsyncImage(urlString: url)
-                            .frame(width: 36, height: 36)
+                            .frame(width: 48, height: 48)
                             .clipShape(Circle())
                         Image(systemName: symbol)
-                            .font(.system(size: 7, weight: .bold))
+                            .font(.system(size: 9, weight: .bold))
                             .foregroundStyle(.white)
-                            .frame(width: 15, height: 15)
+                            .frame(width: 18, height: 18)
                             .background(Circle().fill(color))
                             .offset(x: 3, y: 3)
                     }
-                    .frame(width: 40, height: 40)
+                    .frame(width: 52, height: 52)
                 case .cover(let url):
                     ZStack(alignment: .bottomTrailing) {
                         CachedAsyncImage(urlString: url)
-                            .frame(width: 30, height: 42)
-                            .clipShape(RoundedRectangle(cornerRadius: 5))
+                            .frame(width: 40, height: 56)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
                         Image(systemName: symbol)
-                            .font(.system(size: 7, weight: .bold))
+                            .font(.system(size: 9, weight: .bold))
                             .foregroundStyle(.white)
-                            .frame(width: 15, height: 15)
+                            .frame(width: 18, height: 18)
                             .background(Circle().fill(color))
                             .offset(x: 3, y: 3)
                     }
-                    .frame(width: 34, height: 46)
+                    .frame(width: 44, height: 60)
                 }
             } else {
                 Image(systemName: symbol)
-                    .font(.caption.weight(.bold))
+                    .font(.callout.weight(.bold))
                     .foregroundStyle(.white)
-                    .frame(width: 26, height: 26)
+                    .frame(width: 34, height: 34)
                     .background(Circle().fill(color))
             }
         }
@@ -551,35 +553,35 @@ private struct NotificationRowContent: View {
                 case .avatar(let url):
                     ZStack(alignment: .bottomTrailing) {
                         CachedAsyncImage(urlString: url)
-                            .frame(width: 36, height: 36)
+                            .frame(width: 48, height: 48)
                             .clipShape(Circle())
                         Image(systemName: symbol)
-                            .font(.system(size: 7, weight: .bold))
+                            .font(.system(size: 9, weight: .bold))
                             .foregroundStyle(.white)
-                            .frame(width: 15, height: 15)
+                            .frame(width: 18, height: 18)
                             .background(Circle().fill(color))
                             .offset(x: 3, y: 3)
                     }
-                    .frame(width: 40, height: 40)
+                    .frame(width: 52, height: 52)
                 case .cover(let url):
                     ZStack(alignment: .bottomTrailing) {
                         CachedAsyncImage(urlString: url)
-                            .frame(width: 30, height: 42)
-                            .clipShape(RoundedRectangle(cornerRadius: 5))
+                            .frame(width: 40, height: 56)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
                         Image(systemName: symbol)
-                            .font(.system(size: 7, weight: .bold))
+                            .font(.system(size: 9, weight: .bold))
                             .foregroundStyle(.white)
-                            .frame(width: 15, height: 15)
+                            .frame(width: 18, height: 18)
                             .background(Circle().fill(color))
                             .offset(x: 3, y: 3)
                     }
-                    .frame(width: 34, height: 46)
+                    .frame(width: 44, height: 60)
                 }
             } else {
                 Image(systemName: symbol)
-                    .font(.caption.weight(.bold))
+                    .font(.callout.weight(.bold))
                     .foregroundStyle(.white)
-                    .frame(width: 26, height: 26)
+                    .frame(width: 34, height: 34)
                     .background(Circle().fill(color))
             }
         }
@@ -637,8 +639,11 @@ struct NotificationsHistoryView: View {
                 ForEach(Array(vm.notificationHistory.enumerated()), id: \.offset) { _, notif in
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Notification").font(.subheadline)
-                            Text(Date(timeIntervalSince1970: TimeInterval(notif.createdAt)).formatted(date: .abbreviated, time: .standard))
+                            Text(historyBodyText(for: notif))
+                                .font(.subheadline)
+                                .lineLimit(2)
+                            Text(Date(timeIntervalSince1970: TimeInterval(notif.createdAt))
+                                .formatted(date: .abbreviated, time: .standard))
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
@@ -648,5 +653,23 @@ struct NotificationsHistoryView: View {
             }
             .listStyle(.plain)
         }
+    }
+}
+
+// MARK: - History body text helper (item 6)
+private func historyBodyText(for notif: ProviderNotification) -> String {
+    switch notif.kind {
+    case .airing(let episode, let mediaTitle, _, _):
+        return "\(mediaTitle ?? "Anime") — Episode \(episode) aired"
+    case .following(_, let userName, _):
+        return "\(userName ?? "Someone") followed you"
+    case .activityMessage(_, let context, _), .activityReply(_, let context, _),
+         .activityMention(_, let context, _), .activityLike(_, let context, _):
+        return "Activity: \(context ?? "")"
+    case .mediaChange(let title, let context, _, _):
+        if let title, !title.isEmpty { return "\(title): \(context ?? "Updated")" }
+        return context ?? "Media updated"
+    case .unknown(let context):
+        return context ?? "Notification"
     }
 }

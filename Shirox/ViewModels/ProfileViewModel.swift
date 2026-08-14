@@ -29,6 +29,10 @@ final class ProfileViewModel: ObservableObject {
     @Published var isLoadingActivity = false
     @Published var isLoadingNotifications = false
     @Published var isLoadingSocial = false
+
+    init() {
+        loadHistory()
+    }
     @Published var error: String?
 
     /// Showing a saved (stale) copy because a refresh was rate-limited.
@@ -163,9 +167,10 @@ final class ProfileViewModel: ObservableObject {
     }
 
     func removeNotification(_ notif: ProviderNotification) {
-        // Archive to history before removing (item 9)
+        // Archive to history before removing (item 6 — persisted)
         notificationHistory.insert(notif, at: 0)
         if notificationHistory.count > 100 { notificationHistory = Array(notificationHistory.prefix(100)) }
+        saveHistory()
         allNotifications.removeAll { $0.id == notif.id }
         notifications.removeAll { $0.id == notif.id }
     }
@@ -174,8 +179,25 @@ final class ProfileViewModel: ObservableObject {
     func clearAllNotifications() {
         notificationHistory.insert(contentsOf: notifications, at: 0)
         if notificationHistory.count > 100 { notificationHistory = Array(notificationHistory.prefix(100)) }
+        saveHistory()
         allNotifications.removeAll()
         notifications.removeAll()
+    }
+
+    // MARK: - History persistence (item 6)
+    private static let historyKey = "notificationHistory"
+
+    private func saveHistory() {
+        if let data = try? JSONEncoder().encode(notificationHistory) {
+            UserDefaults.standard.set(data, forKey: Self.historyKey)
+        }
+    }
+
+    private func loadHistory() {
+        guard let data = UserDefaults.standard.data(forKey: Self.historyKey),
+              let decoded = try? JSONDecoder().decode([ProviderNotification].self, from: data)
+        else { return }
+        notificationHistory = decoded
     }
 
     func loadSocial(userId: Int, type: SocialType, loadMore: Bool = false) async {

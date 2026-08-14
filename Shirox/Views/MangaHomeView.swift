@@ -113,7 +113,10 @@ final class MangaHomeViewModel: ObservableObject {
     @Published var error: String?
 
     func load() async {
-        guard trending.isEmpty else { return }
+        // Only skip if ALL sections already have data (not just trending).
+        // Previously the guard was `trending.isEmpty` which blocked recovery
+        // when trending loaded but other sections failed.
+        guard trending.isEmpty || popular.isEmpty else { return }
         isLoading = true
         error = nil
         async let trendingRes = try? AniListService.shared.mangaTrending()
@@ -126,6 +129,11 @@ final class MangaHomeViewModel: ObservableObject {
         topRated = (r ?? []).map { AniListProvider.shared.mapMangaMedia($0) }
         latest = (l ?? []).map { AniListProvider.shared.mapMangaMedia($0) }
         isLoading = false
+        // Show error UI when all fetches fail so the user sees a Retry button
+        // instead of silently empty sections.
+        if trending.isEmpty && popular.isEmpty && topRated.isEmpty && latest.isEmpty {
+            error = "Couldn't load manga. Check your connection and try again."
+        }
     }
 }
 
