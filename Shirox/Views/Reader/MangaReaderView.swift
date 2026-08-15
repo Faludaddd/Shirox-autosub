@@ -48,10 +48,6 @@ struct MangaReaderView: View {
 
     @Environment(\.dismiss) private var dismiss
     @AppStorage("mangaReadingMode") private var modeRaw = MangaReadingMode.vertical.rawValue
-    /// When true, the page order within each chapter is reversed (last page
-    /// first). Set by the MangaDetailView's Invert button via
-    /// @AppStorage("mangaInvertPages") so the toggle persists across reads.
-    @AppStorage("mangaInvertPages") private var invertPages = false
 
     // Strip + chapter state
     @State private var strip: [StripPage] = []
@@ -255,13 +251,10 @@ struct MangaReaderView: View {
     }
 
     private var verticalReader: some View {
-        // `invertPages` reverses the page sequence (Page 400 → Page 1)
-        // when the user toggles the Invert button in MangaDetailView.
-        // Inlined into ForEach (can't use `let` in a @ViewBuilder).
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    ForEach(invertPages ? Array(strip.reversed()) : strip) { item in
+                    ForEach(strip) { item in
                         ReaderPageView(urlString: item.url, referer: referer, pageNumber: item.pageIdx + 1)
                             .id(item.globalIdx)
                             .background(
@@ -324,13 +317,13 @@ struct MangaReaderView: View {
 
 
     private var pagedReader: some View {
-        // Stable tags (globalIdx) + reversed data order for RTL or Invert:
-        // appending a stitched chapter never shifts existing pages'
-        // identity, so the current page holds still while the strip grows.
-        // `invertPages` reverses the page sequence (Page 400 → Page 1)
-        // when the user toggles the Invert button in MangaDetailView.
-        let baseOrder = isRTL ? Array(strip.reversed()) : strip
-        let displayOrder = invertPages ? Array(baseOrder.reversed()) : baseOrder
+        // Paged reader: one page at a time via TabView swipe.
+        // LTR (Left → Right): Page 1 → Page 2 → Page 3 → ...
+        // RTL (Right → Left): Page N → Page N-1 → ... → Page 1
+        // The TabView's .page style handles the swipe direction naturally;
+        // we just need to reverse the data order for RTL so swiping right
+        // goes to the next page in the correct reading direction.
+        let displayOrder = isRTL ? Array(strip.reversed()) : strip
         return TabView(selection: $currentPage) {
             ForEach(displayOrder) { item in
                 ZoomableContainer(onSingleTap: {

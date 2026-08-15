@@ -24,38 +24,26 @@ struct ModuleDefinition: Codable, Identifiable, Equatable {
     var isLocalPlayback: Bool { supportsLocalPlayback == true }
     var isJellyfin: Bool { supportsJellyfin == true }
 
-    /// True for any module that serves manga or novel content (not anime).
+    /// True for modules that serve manga content (not anime, not novels).
     ///
-    /// **Why a contains-check, not an exact match:** module manifests use a
-    /// mix of type strings across registries — cufiy.net uses `"mangas"` and
-    /// `"novels"`, Luna-style manifests sometimes use `"manga"`, and some
-    /// community modules use compound types like `"manga/novels"`. The
-    /// previous exact-match (`type == "mangas" || type == "manga"`) missed
-    /// `"novels"` entirely, so novel modules installed via the Manga Module
-    /// Store were silently classified as anime modules — appearing under
-    /// Anime Settings and never being picked up by the manga reading flow.
+    /// Novel modules (type "novels") are excluded because they lack the
+    /// `extractImages` function required for manga page reading — they can
+    /// search and list chapters but return text, not image URLs. Including
+    /// them in the manga store caused user confusion ("modules don't work")
+    /// because they'd install a novel module, try to read manga, and get
+    /// errors when `extractImages` was called.
     ///
-    /// We also explicitly exclude the known anime-ish types (`"anime"`,
-    /// `"movies/shows"`, `"shows"`, `"live/tv"`, `"vod/livestream"`) so a
-    /// compound type like `"anime/movies"` is never mis-classified as manga
-    /// just because it might contain the substring "manga" via some future
-    /// naming oddity.
+    /// Only true manga modules (type "mangas" or "manga") are classified
+    /// as manga. These have all four required functions: searchResults,
+    /// extractDetails, extractChapters, extractImages.
     var isManga: Bool {
         let t = type.lowercased()
-        // Short-circuit: exact anime types are never manga.
-        let animeTypes: Set<String> = [
-            "anime", "movies/shows", "shows", "live/tv", "vod/livestream",
-            "movies/shows/anime", "anime/movies", "anime/movies/shows",
-            "anime/shows/movies", "shows/movies", "shows/movies/anime",
-            "movies", "tv", "live"
-        ]
-        if animeTypes.contains(t) { return false }
-        // Positive match: anything containing "manga" or "novel".
-        return t.contains("manga") || t.contains("novel")
+        return t == "mangas" || t == "manga"
     }
 
-    /// True for novel-type modules specifically (a subset of `isManga`).
-    /// Used to fine-tune UI labels ("Read" vs "Read Chapter") if needed.
+    /// True for novel-type modules specifically. These can search and list
+    /// chapters but lack `extractImages` — they're text readers, not manga
+    /// readers. Kept for potential future novel-reading support.
     var isNovel: Bool {
         type.lowercased().contains("novel")
     }

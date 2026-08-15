@@ -35,7 +35,6 @@ struct ActivityFetchView: View {
 struct NotificationsView: View {
     @ObservedObject var vm: ProfileViewModel
     @Environment(\.dismiss) private var dismiss
-    @State private var showHistory = false
     @State private var showClearConfirmation = false
     /// Layout toggle: list (default, full row per notification) or grid
     /// (2×2 compact cards). Persists across launches.
@@ -57,15 +56,8 @@ struct NotificationsView: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
-                // History + Clear-all + Layout toggle on leading.
+                // Clear-all + Layout toggle on leading.
                 // Done on trailing by itself — no overlap.
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        showHistory = true
-                    } label: {
-                        Image(systemName: "clock.arrow.circlepath")
-                    }
-                }
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
                         showClearConfirmation = true
@@ -100,10 +92,7 @@ struct NotificationsView: View {
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("This will dismiss all notifications. They'll be saved to history.")
-            }
-            .sheet(isPresented: $showHistory) {
-                NotificationsHistoryView(vm: vm)
+                Text("This will dismiss all notifications.")
             }
         }
         .task { if vm.notifications.isEmpty { await vm.loadNotifications() } }
@@ -447,14 +436,7 @@ private struct NotificationRowContent: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 0) {
-            // Type accent stripe — same visual language as redesigned LibraryRow.
-            RoundedRectangle(cornerRadius: 1.5, style: .continuous)
-                .fill(accentColor)
-                .frame(width: 3)
-                .padding(.vertical, 6)
-
-            HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: 12) {
                 notificationVisual
                 textColumn
                 if isTappable {
@@ -463,7 +445,6 @@ private struct NotificationRowContent: View {
                         .foregroundStyle(.tertiary)
                         .padding(.top, 8)
                 }
-            }
             .padding(.horizontal, 10)
             .padding(.vertical, 10)
         }
@@ -665,13 +646,7 @@ struct NotificationsHistoryView: View {
     @ViewBuilder
     private func historyRow(_ notif: ProviderNotification) -> some View {
         let (symbol, color) = NotificationSwipeRow.iconAndColor(for: notif)
-        HStack(alignment: .top, spacing: 0) {
-            RoundedRectangle(cornerRadius: 1.5, style: .continuous)
-                .fill(color)
-                .frame(width: 3)
-                .padding(.vertical, 6)
-
-            HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: 12) {
                 if let iconImage = notif.kind.iconImage {
                     switch iconImage {
                     case .avatar(let url):
@@ -713,7 +688,6 @@ struct NotificationsHistoryView: View {
                     .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
-            }
             .padding(.horizontal, 10)
             .padding(.vertical, 10)
         }

@@ -15,12 +15,6 @@ struct MangaDetailView: View {
     @ObservedObject private var progress = MangaProgressManager.shared
     @State private var isSynopsisExpanded = false
     @State private var newestFirst = false
-    /// When true, the page order within each chapter is reversed when
-    /// reading (Page 400 → Page 1). Bound to @AppStorage("mangaInvertPages")
-    /// so the MangaReaderView reads the same value. Toggled by the Invert
-    /// button in the chapter header — same placement as the anime detail's
-    /// Invert button, but reverses PAGE order (not chapter order).
-    @AppStorage("mangaInvertPages") private var invertPages = false
     /// Chapters section collapsed by default — manga can have hundreds of
     /// chapters, so collapsing avoids an enormous scroll. The user taps
     /// the chevron to expand. Characters/Recommendations sit below the
@@ -658,18 +652,15 @@ struct MangaDetailView: View {
                     .buttonStyle(.plain)
                     #endif
 
-                    // Invert button — reverses the PAGE reading order in
-                    // the reader (Page 400 → Page 1). Uses @AppStorage so
-                    // the MangaReaderView reads the same value. This is
-                    // NOT the chapter-order toggle (newestFirst) — it
-                    // controls the page sequence within each chapter.
+                    // Invert button — toggles chapter order (newest first
+                    // vs oldest first). Same as the anime detail's Invert.
                     Button {
                         Haptics.selection()
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                            invertPages.toggle()
+                            newestFirst.toggle()
                         }
                     } label: {
-                        Image(systemName: invertPages ? "arrow.down" : "arrow.up")
+                        Image(systemName: newestFirst ? "arrow.down" : "arrow.up")
                             .font(.system(size: 14, weight: .bold))
                             .foregroundStyle(.primary)
                             .frame(width: 36, height: 36)
