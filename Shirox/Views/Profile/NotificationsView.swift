@@ -689,7 +689,6 @@ struct NotificationsHistoryView: View {
                 }
                 Spacer(minLength: 0)
             }
-        }
         .padding(.horizontal, 10)
         .padding(.vertical, 10)
         .background(
