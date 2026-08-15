@@ -66,16 +66,6 @@ struct ContinueReadingSection: View {
                         .buttonStyle(.plain)
                         .frame(width: 110)
                         .contextMenu {
-                            Button {
-                                navTarget = .detail(
-                                    mangaHref: item.mangaHref,
-                                    mangaTitle: item.mangaTitle,
-                                    coverImage: item.coverImage,
-                                    moduleId: item.moduleId
-                                )
-                            } label: {
-                                Label("View Manga", systemImage: "info.circle")
-                            }
                             if let aniListId = MangaMatchManager.shared.cachedMatch(mangaHref: item.mangaHref)?.aniListID {
                                 Button {
                                     navTarget = .anilist(aniListId)

@@ -63,7 +63,7 @@ struct LibraryEntryEditSheet: View {
                 Section("Tracking") {
                     Picker("Status", selection: $status) {
                         ForEach(MediaListStatus.allCases) { s in
-                            Text(s.displayName).tag(s)
+                            Text(s.displayName(for: progressUnit == "chapter" ? .manga : .anime)).tag(s)
                         }
                     }
                     .pickerStyle(.menu)

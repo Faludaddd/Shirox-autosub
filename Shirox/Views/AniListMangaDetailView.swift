@@ -82,6 +82,14 @@ struct AniListMangaDetailView: View {
             }
         }
         .task { await resolve() }
+        // Reload chapters when the user switches manga modules via the
+        // ModuleSelectorMenu. Without this, selecting a different source
+        // from the dropdown does nothing — the chapter list stays stuck
+        // on the originally matched module.
+        .onChangeOf(moduleManager.activeModule) { newModule in
+            guard let newModule, newModule.isManga, resolvedItem != nil else { return }
+            Task { await loadChapters() }
+        }
         // Item 6: auto-navigate to source page when opened from carousel
         .onChangeOf(resolvedItem) { item in
             guard autoStartReading, let item, !autoNavigated else { return }
@@ -97,15 +105,62 @@ struct AniListMangaDetailView: View {
         .toolbarBackgroundHidden()
         .tint(.primary)
         .toolbar {
-            // Module selector — manga modules only. Sits in the trailing
-            // toolbar so it's reachable while reading. The menu's Settings
-            // entry deep-links into ModulesSettingsPage(mediaType: .manga).
+            // Module selector — manga modules only.
             ToolbarItem(placement: .topBarTrailing) {
                 ModuleSelectorMenu(mediaType: .manga)
+            }
+            // Edit (pencil) button — opens the Library Edit Entry sheet,
+            // matching the anime AniList page's toolbar.
+            ToolbarItem(placement: .topBarTrailing) {
+                if AniListAuthManager.shared.isLoggedIn || MALAuthManager.shared.isLoggedIn {
+                    Button {
+                        showLibraryEdit = true
+                    } label: {
+                        Image(systemName: "pencil.circle")
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(.primary)
+                    }
+                }
             }
         }
         .fullScreenCover(item: $readerContext) { ctx in
             MangaReaderView(context: ctx)
+        }
+        .adaptiveSheet(isPresented: $showLibraryEdit) {
+            if let media = self.media {
+                LibraryEntryEditSheet(
+                    entry: existingEntry,
+                    media: media,
+                    progressUnit: "chapter",
+                    onSave: { status, progress, score in
+                        Task {
+                            if AniListAuthManager.shared.isLoggedIn {
+                                try? await AniListLibraryService.shared.updateEntry(
+                                    mediaId: mediaId, status: status, progress: progress, score: score, type: .manga)
+                                if let raw = try? await AniListLibraryService.shared.fetchEntry(mediaId: mediaId, type: .manga) {
+                                    existingEntry = AniListProvider.shared.mapEntry(raw)
+                                }
+                            }
+                        }
+                    },
+                    onDelete: existingEntry != nil ? {
+                        if let entryId = existingEntry?.id {
+                            existingEntry = nil
+                            Task { try? await AniListLibraryService.shared.deleteEntry(entryId: entryId) }
+                        }
+                    } : nil,
+                    onTogglePrivate: { newValue in
+                        Task {
+                            try? await AniListLibraryService.shared.updateEntry(
+                                mediaId: mediaId,
+                                status: existingEntry?.status ?? .current,
+                                progress: existingEntry?.progress ?? 0,
+                                score: existingEntry?.score ?? 0,
+                                type: .manga, isPrivate: newValue)
+                        }
+                    }
+                )
+            }
         }
         #endif
     }
@@ -126,6 +181,27 @@ struct AniListMangaDetailView: View {
                     SynopsisSection(text: desc)
                         .padding(.top, 16)
                 }
+                // Continue/Read button + action icon buttons — matches the
+                // anime AniList page's button row layout.
+                #if os(iOS)
+                HStack(spacing: 10) {
+                    readButton(media: media)
+                    Button {
+                        showLibraryEdit = true
+                    } label: {
+                        Image(systemName: "person.3.fill")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .frame(width: 46, height: 46)
+                            .background(.ultraThinMaterial, in: Circle())
+                            .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 8)
+                #endif
                 // Characters + Recommendations — directly below the synopsis.
                 // Data is preloaded from the resolve() call's raw AniList
                 // fetch, so these sections render without a second network
@@ -449,6 +525,41 @@ struct AniListMangaDetailView: View {
         }
     }
 
+    // MARK: - Read button
+
+    @ViewBuilder
+    private func readButton(media: Media) -> some View {
+        Button {
+            // Continue reading: open the last-read chapter, or the first
+            // chapter if no progress exists.
+            if let first = chapters.first {
+                let lastRead = MangaProgressManager.shared.lastRead(for: resolvedItem?.href ?? "")
+                let idx = lastRead.flatMap { last in
+                    chapters.firstIndex(where: { $0.href == last.chapterHref })
+                } ?? 0
+                openReader(chapter: chapters[idx], index: idx)
+            } else if let first = chapters.first {
+                openReader(chapter: first, index: 0)
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "book.fill")
+                    .font(.system(size: 13, weight: .bold))
+                Text(chapters.isEmpty ? "No Chapters" : "Continue Chapter")
+                    .font(.system(size: 15, weight: .bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+            .foregroundStyle(.primary)
+            .frame(maxWidth: .infinity)
+            .frame(height: 46)
+            .background(.ultraThinMaterial, in: Capsule())
+            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .disabled(chapters.isEmpty || isLoadingChapters)
+    }
+
     // MARK: - Statistics
 
     @ViewBuilder
@@ -600,17 +711,52 @@ struct AniListMangaDetailView: View {
     }
 
     /// Fetches chapters from the resolved manga module. Called after
-    /// `resolve()` succeeds. Sets `chaptersError` on failure so the UI can
-    /// show a retry button.
+    /// `resolve()` succeeds, or when the user switches modules via the
+    /// ModuleSelectorMenu. When switching modules, re-resolves the title
+    /// through the new module (the old href won't work cross-module).
     private func loadChapters() async {
-        guard let item = resolvedItem else { return }
         isLoadingChapters = true
         chaptersError = nil
+
+        // When the user switches modules, the old resolvedItem.href won't
+        // work with the new module — each module uses its own URL scheme.
+        // Re-resolve the title through the active module to get a fresh
+        // href that works with it.
+        guard let media else {
+            isLoadingChapters = false
+            return
+        }
+
+        // Check if the current resolvedItem's href works with the active
+        // module. If the active module changed, re-resolve.
+        let needsReResolve: Bool = {
+            guard let resolvedItem else { return true }
+            // If the active module is the one that originally resolved,
+            // we can reuse the href. Otherwise, re-resolve.
+            return moduleManager.activeModule?.id != nil
+                && resolvedItem.href != ""
+                && moduleManager.moduleReadyId != moduleManager.activeModule?.id
+        }()
+
+        if needsReResolve {
+            // Re-resolve through the new active module
+            if let newItem = await MangaModuleResolver.shared.resolve(title: media.title.searchTitle) {
+                resolvedItem = newItem
+            } else {
+                chapters = []
+                chaptersError = "No results in \(moduleManager.activeModule?.sourceName ?? "this module")."
+                isLoadingChapters = false
+                return
+            }
+        }
+
+        guard let item = resolvedItem else {
+            isLoadingChapters = false
+            return
+        }
+
         do {
             // Ensure the active manga module is loaded into JSEngine.
-            // MangaModuleResolver.resolve already switched to a module, but
-            // double-check in case the user switched modules via the
-            // selector after resolve() ran.
             if moduleManager.activeModule?.isManga != true,
                let mangaModule = moduleManager.modules.first(where: { $0.isManga }) {
                 _ = await moduleManager.selectAndAwaitReady(mangaModule)
