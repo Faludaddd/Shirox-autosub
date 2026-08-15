@@ -437,17 +437,17 @@ private struct NotificationRowContent: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-                notificationVisual
-                textColumn
-                if isTappable {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.tertiary)
-                        .padding(.top, 8)
-                }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 10)
+            notificationVisual
+            textColumn
+            if isTappable {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.tertiary)
+                    .padding(.top, 8)
+            }
         }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 10)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(Color.primary.opacity(0.05))
@@ -688,9 +688,10 @@ struct NotificationsHistoryView: View {
                     .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 10)
+            }
         }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 10)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(Color.primary.opacity(0.05))
