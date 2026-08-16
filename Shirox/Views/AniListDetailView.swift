@@ -1533,11 +1533,11 @@ struct AniListDetailView: View {
                 // Ongoing anime with no episode count yet — show a default
                 // range of 1-12 so the user can at least try to watch.
                 let fallbackTotal = 12
-                let range = Array(1...fallbackTotal)
-                let sortedRange = isReversed ? range.reversed() : range
+                let range: [Int] = Array(1...fallbackTotal)
+                let sortedRange: [Int] = isReversed ? Array(range.reversed()) : range
 
                 LazyVStack(spacing: 8) {
-                    ForEach(Array(sortedRange), id: \.self) { ep in
+                    ForEach(sortedRange, id: \.self) { ep in
                         #if os(iOS)
                         let sel = isSelectionMode
                         let selected = selectedEpisodeNumbers.contains(ep)
