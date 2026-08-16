@@ -152,7 +152,6 @@ struct ToastView: View {
     let toast: ToastData
     let stackIndex: Int
     let total: Int
-    @State private var revealDismiss = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -168,16 +167,15 @@ struct ToastView: View {
                 Text(toast.title).font(.subheadline.weight(.semibold)).foregroundStyle(.primary).lineLimit(1)
                 Text(toast.message).font(.caption).foregroundStyle(.secondary).lineLimit(2)
             }
-            Spacer(minLength: 8)
+            Spacer(minLength: 4)
 
-            // X button — only visible when revealed
-            if revealDismiss {
-                Button { ToastManager.shared.dismiss(toast.id) } label: {
-                    Image(systemName: "xmark.circle.fill").font(.system(size: 22)).foregroundStyle(.red)
-                }
-                .buttonStyle(.plain)
-                .transition(.scale.combined(with: .opacity))
+            // Always-visible X close button — no swipe gesture needed.
+            Button { ToastManager.shared.dismiss(toast.id) } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 22))
+                    .foregroundStyle(.secondary)
             }
+            .buttonStyle(.plain)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
@@ -187,29 +185,7 @@ struct ToastView: View {
         .scaleEffect(stackIndex == total - 1 ? 1.0 : 0.95)
         .opacity(stackIndex == total - 1 ? 1.0 : 0.8)
         .contentShape(Rectangle())
-        // #89 — The parent ToastContainerView has `.allowsHitTesting(false)`
-        // so the empty space above the toast stack passes touches through to
-        // the underlying app content. That flag ALSO blocks touches from
-        // reaching the toasts themselves — re-enable hit testing here so the
-        // drag + tap gestures below can actually receive touches.
         .allowsHitTesting(true)
-        .highPriorityGesture(
-            DragGesture(minimumDistance: 15)
-                .onChanged { value in
-                    if value.translation.width < -15 {
-                        withAnimation(.spring(response: 0.3)) { revealDismiss = true }
-                    } else if value.translation.width > -5 {
-                        withAnimation(.spring(response: 0.3)) { revealDismiss = false }
-                    }
-                }
-                .onEnded { value in
-                    if value.translation.width < -100 || value.translation.height > 50 {
-                        ToastManager.shared.dismiss(toast.id)
-                    } else {
-                        withAnimation(.spring(response: 0.3)) { revealDismiss = false }
-                    }
-                }
-        )
         .onTapGesture {
             if let action = toast.action { action() }
             ToastManager.shared.dismiss(toast.id)

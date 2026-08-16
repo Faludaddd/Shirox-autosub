@@ -50,23 +50,43 @@ final class AniListDetailViewModel: ObservableObject {
         isLoading = true
         error = nil
         do {
-            media = try await ProviderManager.shared.call { try await $0.detail(id: id) }
+            // Always try AniList directly first — the detail query doesn't
+            // require authentication and returns the full field set
+            // (statistics, studio, source, duration, etc.). The
+            // ProviderManager.call path may route to MAL when AniList is
+            // rate-limited, but MAL's detail endpoint returns fewer fields,
+            // causing the incomplete Statistics section when unauthenticated.
+            let raw = try await AniListService.shared.detail(id: id)
+            media = AniListProvider.shared.mapMedia(raw)
+            // Pre-populate characters + recommendations from the same fetch.
+            characters = raw.characters?.edges ?? []
+            recommendations = raw.recommendations?.nodes ?? []
             // MAL/Jikan has no banner art; reuse the already-cached TVDB fanart.
-            if media?.provider == .mal, media?.bannerImage == nil {
-                let artwork = await TVDBMappingService.shared.getArtwork(for: id, provider: .mal)
+            if media?.bannerImage == nil {
+                let artwork = await TVDBMappingService.shared.getArtwork(for: id, provider: .anilist)
                 if let fanart = artwork.fanart {
                     media?.bannerImage = fanart
                 }
             }
-            // Fetch raw AniList media for characters + recommendations.
-            // Best-effort: don't fail the whole load if this secondary
-            // fetch errors. Uses the anime endpoint (the VM is anime-only).
-            if let raw = try? await AniListService.shared.detail(id: id) {
-                characters = raw.characters?.edges ?? []
-                recommendations = raw.recommendations?.nodes ?? []
-            }
         } catch {
-            self.error = error.localizedDescription
+            // If AniList fails (rate-limited, offline), try the provider
+            // manager's fallback path as a last resort.
+            do {
+                media = try await ProviderManager.shared.call { try await $0.detail(id: id) }
+                if media?.provider == .mal, media?.bannerImage == nil {
+                    let artwork = await TVDBMappingService.shared.getArtwork(for: id, provider: .mal)
+                    if let fanart = artwork.fanart {
+                        media?.bannerImage = fanart
+                    }
+                }
+                // Still try to get characters from AniList (best-effort).
+                if let raw = try? await AniListService.shared.detail(id: id) {
+                    characters = raw.characters?.edges ?? []
+                    recommendations = raw.recommendations?.nodes ?? []
+                }
+            } catch {
+                self.error = error.localizedDescription
+            }
         }
         isLoading = false
     }

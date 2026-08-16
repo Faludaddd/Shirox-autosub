@@ -3132,11 +3132,13 @@ private struct ContinueWatchingSignInPrompt: View {
                         Text("Sign in to continue watching")
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.primary)
-                            .lineLimit(1)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
                         Text("Connect AniList to sync your progress and pick up where you left off.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                            .lineLimit(2)
+                            .lineLimit(3)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
 
                     Spacer(minLength: 8)
@@ -3154,15 +3156,15 @@ private struct ContinueWatchingSignInPrompt: View {
                             Capsule().fill(Color.appAccent)
                         )
                 }
-                .padding(14)
+                .padding(16)
                 .frame(maxWidth: .infinity)
                 .background(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(Color.secondary.opacity(0.10))
+                        .fill(Color.appAccent.opacity(0.08))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+                        .strokeBorder(Color.appAccent.opacity(0.2), lineWidth: 1)
                 )
             }
             .buttonStyle(HomePressStyle())

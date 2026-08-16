@@ -877,9 +877,11 @@ struct AniListDetailView: View {
                 Text(vm.isResolving ? "Loading…" : label)
                     .font(.system(size: 15, weight: .bold))
                     .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
             .frame(maxWidth: .infinity)
             .frame(height: 46)
+            .layoutPriority(1)
             .background(.ultraThinMaterial, in: Capsule())
             .overlay(
                 Capsule()

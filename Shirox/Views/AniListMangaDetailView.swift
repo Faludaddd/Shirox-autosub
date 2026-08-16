@@ -42,6 +42,8 @@ struct AniListMangaDetailView: View {
     @State private var selectedTab = 0
     @State private var showResetConfirmation = false
     @State private var newestFirst = false
+    @State private var isSelectionMode = false
+    @State private var selectedChapterHrefs: Set<String> = []
     /// When set, navigates to MangaDetailView for batch download selection.
     @State private var pendingDownloadItem: SearchItem?
     @State private var downloadNavActive = false
@@ -257,20 +259,25 @@ struct AniListMangaDetailView: View {
                     }
                     .buttonStyle(.plain)
 
-                    // Download button — same as anime's download icon.
-                    // Tapping it opens the chapter selection mode for batch
-                    // download. Uses a distinct icon from the jump button.
+                    // Download button — opens chapter selection mode for
+                    // batch download. Toggles isSelectionMode on the
+                    // chapters section (same as MangaDetailView's flow).
                     if !chapters.isEmpty {
                         Button {
-                            if let item = resolvedItem {
-                                pendingDownloadItem = item
-                                downloadNavActive = true
+                            Haptics.selection()
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                isSelectionMode.toggle()
+                                if !isSelectionMode { selectedChapterHrefs.removeAll() }
                             }
                         } label: {
-                            Image(systemName: "square.and.arrow.down")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(.primary)
+                            Image(systemName: isSelectionMode ? "checkmark.circle.fill" : "arrow.down.circle")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(isSelectionMode ? platformBackground : .primary)
                                 .frame(width: 46, height: 46)
+                                .background(
+                                    isSelectionMode ? Color.primary : Color.clear,
+                                    in: Circle()
+                                )
                                 .background(.ultraThinMaterial, in: Circle())
                                 .overlay(
                                     Circle()
@@ -492,7 +499,7 @@ struct AniListMangaDetailView: View {
                 let displayChapters = newestFirst ? Array(chapters.reversed()) : chapters
                 LazyVStack(spacing: 0) {
                     ForEach(Array(displayChapters.enumerated()), id: \.element.id) { idx, chapter in
-                        chapterRow(chapter, index: idx)
+                        chapterRow(chapter, index: idx, isSelected: selectedChapterHrefs.contains(chapter.href))
                     }
                 }
                 .background(Color.secondary.opacity(0.05))
@@ -503,20 +510,34 @@ struct AniListMangaDetailView: View {
     }
 
     @ViewBuilder
-    private func chapterRow(_ chapter: MangaChapter, index: Int) -> some View {
+    private func chapterRow(_ chapter: MangaChapter, index: Int, isSelected: Bool = false) -> some View {
         Button {
-            openReader(chapter: chapter, index: index)
+            if isSelectionMode {
+                if selectedChapterHrefs.contains(chapter.href) {
+                    selectedChapterHrefs.remove(chapter.href)
+                } else {
+                    selectedChapterHrefs.insert(chapter.href)
+                }
+            } else {
+                openReader(chapter: chapter, index: index)
+            }
         } label: {
             HStack(spacing: 12) {
                 ZStack {
                     Circle()
-                        .fill(Color.primary.opacity(0.08))
+                        .fill(isSelected ? Color.appAccent : Color.primary.opacity(0.08))
                         .frame(width: 36, height: 36)
-                    Text(chapter.displayNumber)
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
+                    if isSelectionMode {
+                        Image(systemName: isSelected ? "checkmark" : "")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(.white)
+                    } else {
+                        Text(chapter.displayNumber)
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                    }
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text((chapter.title?.isEmpty ?? true) ? "Chapter \(chapter.displayNumber)" : chapter.title!)
