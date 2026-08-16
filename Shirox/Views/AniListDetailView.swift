@@ -1529,6 +1529,56 @@ struct AniListDetailView: View {
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 16)
                 }
+            } else if media.status == "RELEASING" {
+                // Ongoing anime with no episode count yet — show a default
+                // range of 1-12 so the user can at least try to watch.
+                let fallbackTotal = 12
+                let range = Array(1...fallbackTotal)
+                let sortedRange = isReversed ? range.reversed() : range
+
+                LazyVStack(spacing: 8) {
+                    ForEach(sortedRange, id: \.self) { ep in
+                        #if os(iOS)
+                        let sel = isSelectionMode
+                        let selected = selectedEpisodeNumbers.contains(ep)
+                        AniListEpisodeRowContainer(
+                            ep: ep,
+                            mediaId: media.id,
+                            provider: media.provider,
+                            mediaTitle: media.title.searchTitle,
+                            coverImage: media.coverImage.best,
+                            totalEpisodes: fallbackTotal,
+                            aniListProgress: existingEntry?.progress,
+                            aniListStatus: existingEntry?.status,
+                            isAiring: true,
+                            onTap: sel ? {
+                                if selected { selectedEpisodeNumbers.remove(ep) }
+                                else { selectedEpisodeNumbers.insert(ep) }
+                            } : {
+                                vm.watchEpisode(ep)
+                            },
+                            onDownload: {
+                                pendingDownloadEpisodeNumber = DownloadEpisodeItem(episodeNumber: ep, mediaId: media.id, mediaTitle: media.title.searchTitle, coverImage: media.coverImage.best ?? "")
+                            },
+                            isSelected: selected,
+                            isSelectionMode: sel
+                        )
+                        #else
+                        EpisodeRowView(
+                            ep: ep,
+                            mediaId: media.id,
+                            mediaTitle: media.title.searchTitle,
+                            coverImage: media.coverImage.best ?? "",
+                            totalEpisodes: fallbackTotal,
+                            aniListProgress: existingEntry?.progress,
+                            aniListStatus: existingEntry?.status,
+                            isAiring: true,
+                            onTap: { vm.watchEpisode(ep) }
+                        )
+                        #endif
+                    }
+                }
+                .padding(.horizontal, 16)
             } else {
                 Text("Episode count not available")
                     .font(.subheadline)

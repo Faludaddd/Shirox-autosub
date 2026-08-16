@@ -1444,7 +1444,7 @@ struct ScheduleView: View {
 
             let entry = UnifiedScheduleEntry(
                 id: media.id,
-                source: ScheduleSource.anime,
+                source: ScheduleSource.manga,
                 sourceMediaId: media.id,
                 aniListMediaId: media.id,
                 title: media.title.displayTitle,
@@ -2268,7 +2268,11 @@ private struct ScheduleCard: View {
     }
 
     private var sourceBadgeColor: Color {
-        entry.source == .anime ? .purple : .cyan
+        switch entry.source {
+        case .anime:   return .purple
+        case .manga:   return .teal
+        case .western: return .cyan
+        }
     }
 
     var body: some View {
@@ -2308,7 +2312,7 @@ private struct ScheduleCard: View {
                             .fixedSize()
                     }
 
-                    Text(entry.source == .anime ? "Anime" : "Western")
+                    Text(entry.source == .anime ? "Anime" : entry.source == .manga ? "Manga" : "Western")
                         .font(.caption2.weight(.semibold))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
@@ -2484,7 +2488,19 @@ struct ScheduleDetailView: View {
     }
 
     private var sourceBadgeColor: Color {
-        entry.source == .anime ? .purple : .cyan
+        switch entry.source {
+        case .anime:   return .purple
+        case .manga:   return .teal
+        case .western: return .cyan
+        }
+    }
+
+    private var sourceBadgeLabel: String {
+        switch entry.source {
+        case .anime:   return "Anime"
+        case .manga:   return "Manga"
+        case .western: return "Western"
+        }
     }
 
     /// Absolute air date + time formatted in the selected timezone (Local / UTC).
@@ -2506,7 +2522,7 @@ struct ScheduleDetailView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(frostedBackground)
-        .navigationTitle(entry.title)
+        .navigationTitle("")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
@@ -2543,7 +2559,7 @@ struct ScheduleDetailView: View {
                             .background(formatBadgeColor.opacity(0.9), in: Capsule())
                             .foregroundStyle(.white)
                     }
-                    Text(entry.source == .anime ? "Anime" : "Western")
+                    Text(sourceBadgeLabel)
                         .font(.caption.weight(.bold))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
@@ -2587,10 +2603,14 @@ struct ScheduleDetailView: View {
                 genresSection(genres: genres)
             }
 
-            // Action buttons.
-            VStack(spacing: 10) {
-                reminderButton
+            // Action buttons — side-by-side layout: primary action takes
+            // more width, reminder toggle is a smaller button beside it.
+            HStack(spacing: 10) {
                 viewFullDetailsButton
+                    .frame(maxWidth: .infinity)
+                    .layoutPriority(1)
+                reminderButton
+                    .frame(width: 50)
             }
             .padding(.top, 4)
         }
@@ -2639,20 +2659,16 @@ struct ScheduleDetailView: View {
 
     private var reminderButton: some View {
         Button(action: onToggleNotification) {
-            Label(
-                isNotificationOn ? "Reminder Set" : "Set Reminder",
-                systemImage: isNotificationOn ? "bell.badge.fill" : "bell.fill"
-            )
-            .font(.headline)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(
-                isNotificationOn
-                    ? Color.yellow.opacity(0.22)
-                    : Color.accentColor.opacity(0.18),
-                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-            )
-            .foregroundStyle(isNotificationOn ? Color.yellow : Color.accentColor)
+            Image(systemName: isNotificationOn ? "bell.badge.fill" : "bell.fill")
+                .font(.system(size: 20, weight: .semibold))
+                .frame(width: 50, height: 48)
+                .background(
+                    isNotificationOn
+                        ? Color.yellow.opacity(0.22)
+                        : Color.accentColor.opacity(0.18),
+                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                )
+                .foregroundStyle(isNotificationOn ? Color.yellow : Color.accentColor)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(isNotificationOn ? "Cancel reminder" : "Set reminder")
@@ -2660,16 +2676,20 @@ struct ScheduleDetailView: View {
 
     // MARK: - View Full Details Button
 
-    /// Pushes the standard `AniListDetailView` for anime entries that have an AniList
-    /// media id. Western entries (no AniList cross-reference) get an informational hint
-    /// instead — they have no full detail page in the app.
+    /// Pushes the appropriate detail page based on source type.
+    /// Anime → AniListDetailView, Manga → AniListMangaDetailView.
     @ViewBuilder
     private var viewFullDetailsButton: some View {
         if let mediaId = entry.aniListMediaId {
             NavigationLink {
-                AniListDetailView(mediaId: mediaId, preloadedMedia: nil)
+                if entry.source == .manga {
+                    AniListMangaDetailView(mediaId: mediaId, preloadedMedia: nil)
+                } else {
+                    AniListDetailView(mediaId: mediaId, preloadedMedia: nil)
+                }
             } label: {
-                Label("View Full Details", systemImage: "info.circle.fill")
+                Label(entry.source == .manga ? "Read Manga" : "View Full Details",
+                      systemImage: entry.source == .manga ? "book.fill" : "info.circle.fill")
                     .font(.headline)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
@@ -2708,21 +2728,10 @@ struct ScheduleDetailView: View {
                 .foregroundStyle(.secondary)
                 .textCase(.uppercase)
 
-            LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: 88), spacing: 8)],
-                alignment: .leading,
-                spacing: 8
-            ) {
-                ForEach(genres, id: \.self) { genre in
-                    Text(genre)
-                        .font(.caption.weight(.medium))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(Color.secondary.opacity(0.14), in: Capsule())
-                        .foregroundStyle(.primary)
-                        .fixedSize()
-                }
-            }
+            // Use a wrapping HStack via flow layout instead of LazyVGrid
+            // with adaptive columns — adaptive stretches pills to fill the
+            // row, causing wide spacing. Flow layout packs tightly.
+            GenreFlowLayout(genres: genres)
         }
     }
 
@@ -2736,6 +2745,31 @@ struct ScheduleDetailView: View {
         Rectangle()
             .fill(.regularMaterial)
             .ignoresSafeArea()
+    }
+}
+
+// MARK: - Genre Flow Layout
+
+/// Simple wrapping flow layout for genre pills. Packs pills tightly from
+/// the leading edge, wrapping to the next line when the row is full,
+/// instead of stretching them across the full width like LazyVGrid.
+private struct GenreFlowLayout: View {
+    let genres: [String]
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(genres, id: \.self) { genre in
+                    Text(genre)
+                        .font(.caption.weight(.medium))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Color.secondary.opacity(0.14), in: Capsule())
+                        .foregroundStyle(.primary)
+                        .fixedSize()
+                }
+            }
+        }
     }
 }
 

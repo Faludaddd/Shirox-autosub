@@ -5,6 +5,7 @@ import Foundation
 /// Where a schedule entry originated.
 enum ScheduleSource: String, Codable, Hashable, Sendable {
     case anime
+    case manga
     case western
 }
 
@@ -194,7 +195,11 @@ struct UnifiedScheduleEntry: Identifiable, Hashable, Sendable {
     }
 
     /// Compact episode badge text (e.g. "EP 12" or "S2 EP 4").
+    /// For manga entries, shows "CH <episode>" (chapter) instead.
     var episodeBadge: String {
+        if source == .manga {
+            return "CH \(episode)"
+        }
         if let season = season, season > 0 {
             return "S\(season) EP \(episode)"
         }
