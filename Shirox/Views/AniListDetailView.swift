@@ -1537,7 +1537,7 @@ struct AniListDetailView: View {
                 let fSorted = isReversed ? Array(fRange.reversed()) : fRange
 
                 LazyVStack(spacing: 8) {
-                    ForEach(fSorted, id: \.self) { ep in
+                    ForEach(fSorted, id: \.self) { (ep: Int) in
                         #if os(iOS)
                         let sel = isSelectionMode
                         let selected = selectedEpisodeNumbers.contains(ep)
