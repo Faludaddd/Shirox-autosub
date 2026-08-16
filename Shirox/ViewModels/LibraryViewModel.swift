@@ -413,7 +413,8 @@ final class LibraryViewModel: ObservableObject {
                         id: r.id, media: media,
                         status: r.status, progress: r.progress, score: r.score,
                         updatedAt: r.updatedAt, customListName: r.customListName,
-                        timesRewatched: r.repeat)
+                        timesRewatched: r.repeat,
+                        isPrivate: r.isPrivate)
                 }
             case .mal:
                 let entries = try await MALMangaLibraryService.shared.fetchLibrary()

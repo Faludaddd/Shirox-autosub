@@ -853,48 +853,56 @@ struct AniListMangaDetailView: View {
         guard phase == .loading else { return }
         if media == nil {
             do { media = try await AniListProvider.shared.mangaDetail(id: mediaId) }
-            catch { phase = .error(error.localizedDescription); return }
+            catch {
+                // Don't get stuck loading forever — show the error.
+                phase = .error(error.localizedDescription)
+                return
+            }
         }
-        guard media != nil else { phase = .error("No data"); return }
+        guard media != nil else {
+            phase = .error("No data")
+            return
+        }
+
+        // Show the page immediately — the media is ready. Everything below
+        // is secondary and shouldn't block the page from rendering.
+        phase = .ready
 
         // Fetch raw AniList manga for characters + recommendations.
         // Best-effort: don't fail the whole page if this secondary fetch
-        // errors. Uses the manga endpoint (includes characters + recs as
-        // of the latest query update).
+        // errors. Runs in parallel with module resolution.
+        async let charRecs: Void = fetchCharactersAndRecommendations()
+        async let entry: Void = fetchLibraryEntry()
+        async let moduleResolve: Void = resolveMangaModule()
+
+        _ = await (charRecs, entry, moduleResolve)
+    }
+
+    private func fetchCharactersAndRecommendations() async {
         if let raw = try? await AniListService.shared.mangaDetail(id: mediaId) {
             preloadedCharacters = raw.characters?.edges ?? []
             preloadedRecommendations = raw.recommendations?.nodes ?? []
         }
+    }
 
-        // Load library entry if logged in
+    private func fetchLibraryEntry() async {
         if AniListAuthManager.shared.isLoggedIn {
             existingEntry = (try? await AniListLibraryService.shared.fetchEntry(mediaId: mediaId, type: .manga))
                 .flatMap { AniListProvider.shared.mapEntry($0) }
         }
+    }
 
-        // Try to resolve a manga module for chapter reading
+    private func resolveMangaModule() async {
         let hasMangaModule = moduleManager.modules.contains { $0.isManga }
-        guard hasMangaModule else {
-            phase = .noModule
-            return
-        }
+        guard hasMangaModule else { return }
 
         #if os(iOS)
         if let item = await MangaModuleResolver.shared.resolve(title: media!.title.searchTitle) {
             resolvedItem = item
-            // Also try to load an existing match so the reader can track
-            // progress against AniList/MAL.
             match = await MangaMatchManager.shared.match(
                 mangaHref: item.href, title: item.title)
-            phase = .ready
-            // Kick off chapter loading in the background — the page is
-            // already showing; chapters fill in when ready.
             await loadChapters()
-        } else {
-            phase = .notFound
         }
-        #else
-        phase = .noModule
         #endif
     }
 

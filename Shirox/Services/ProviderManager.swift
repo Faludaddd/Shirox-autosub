@@ -202,7 +202,14 @@ final class ProviderManager: ObservableObject {
         }
         if let aniError = error as? AniListError {
             switch aniError {
-            case .httpError(let code): return code == 403 || code == 404 || code >= 500
+            case .httpError(let code):
+                // 403 = blocked/rate-limited → try MAL
+                // 404 = not found on AniList → might exist on MAL
+                // 429 = rate limited → try MAL
+                // 5xx = server error → try MAL
+                // Do NOT fall back on 400/401 (bad request/unauthorized — these
+                // will fail on MAL too, and the fallback just adds latency).
+                return code == 403 || code == 404 || code == 429 || code >= 500
             case .rateLimited: return true
             default: return false
             }
