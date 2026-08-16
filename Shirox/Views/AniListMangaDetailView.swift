@@ -41,6 +41,7 @@ struct AniListMangaDetailView: View {
     /// Toggled by the social/people icon button, matching the anime page.
     @State private var selectedTab = 0
     @State private var showResetConfirmation = false
+    @State private var newestFirst = false
     /// When set, navigates to MangaDetailView for batch download selection.
     @State private var pendingDownloadItem: SearchItem?
     @State private var downloadNavActive = false
@@ -301,6 +302,28 @@ struct AniListMangaDetailView: View {
                         .buttonStyle(.plain)
                     }
 
+                    // Invert chapter order button — toggles newestFirst
+                    // (same as anime's episode invert button).
+                    if chapters.count > 1 {
+                        Button {
+                            Haptics.selection()
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                newestFirst.toggle()
+                            }
+                        } label: {
+                            Image(systemName: newestFirst ? "arrow.down" : "arrow.up")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.primary)
+                                .frame(width: 46, height: 46)
+                                .background(.ultraThinMaterial, in: Circle())
+                                .overlay(
+                                    Circle()
+                                        .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+
                     // Reset/recent progress button — same as anime's
                     // reset progress button.
                     if let item = resolvedItem,
@@ -466,8 +489,9 @@ struct AniListMangaDetailView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 24)
             } else {
+                let displayChapters = newestFirst ? Array(chapters.reversed()) : chapters
                 LazyVStack(spacing: 0) {
-                    ForEach(Array(chapters.enumerated()), id: \.element.id) { idx, chapter in
+                    ForEach(Array(displayChapters.enumerated()), id: \.element.id) { idx, chapter in
                         chapterRow(chapter, index: idx)
                     }
                 }

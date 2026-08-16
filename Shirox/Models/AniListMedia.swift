@@ -236,11 +236,19 @@ struct AniListCharacter: Codable, Identifiable {
     let name: AniListCharacterName?
     let image: AniListCharacterImage?
     let description: String?
+    let gender: String?
+    let dateOfBirth: AniListFuzzyDate?
+    let age: String?
+    let bloodType: String?
+    let favourites: Int?
+    let siteUrl: String?
 }
 
 struct AniListCharacterName: Codable {
     let full: String?
     let native: String?
+    let alternative: [String]?
+    let alternativeSpoiler: [String]?
 }
 
 struct AniListCharacterImage: Codable {

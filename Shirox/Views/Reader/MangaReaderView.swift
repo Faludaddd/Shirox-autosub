@@ -279,6 +279,12 @@ struct MangaReaderView: View {
             .coordinateSpace(name: "readerScroll")
             .onPreferenceChange(ReaderPageFrameKey.self) { frames in
                 geomStore.geoms = frames
+                // Skip page tracking during fast scroll-up to prevent jitter.
+                // The tracker updates currentPage, which can trigger
+                // onChangeOf(currentPage) → updateDisplayedChapter, causing
+                // small geometry shifts that re-trigger this callback.
+                // Only track when not actively pinching or settling.
+                guard !pinching, !isSettling else { return }
                 // Pixel-exact save anchor: the page under the viewport's TOP
                 // edge and how far into it the top sits. (The display page
                 // below uses a mid-screen rule, which can be one panel ahead

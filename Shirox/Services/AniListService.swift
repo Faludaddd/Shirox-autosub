@@ -780,13 +780,13 @@ final class AniListService {
                 role
                 node {
                   id
-                  name { full native }
+                  name { full native alternative alternativeSpoiler }
                   image { large medium }
                   description(asHtml: false)
                 }
-                voiceActors(language: JAPANESE, sort: ROLE) {
+                voiceActors(language: JAPANESE, sort: ROLE) { VO_EXPANDED
                   id
-                  name { full native }
+                  name { full native alternative alternativeSpoiler }
                   language
                   image { large medium }
                 }
@@ -923,13 +923,13 @@ final class AniListService {
                 role
                 node {
                   id
-                  name { full native }
+                  name { full native alternative alternativeSpoiler }
                   image { large medium }
                   description(asHtml: false)
                 }
-                voiceActors(language: JAPANESE, sort: ROLE) {
+                voiceActors(language: JAPANESE, sort: ROLE) { VO_EXPANDED
                   id
-                  name { full native }
+                  name { full native alternative alternativeSpoiler }
                   language
                   image { large medium }
                 }

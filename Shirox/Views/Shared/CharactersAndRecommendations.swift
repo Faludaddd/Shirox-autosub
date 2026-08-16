@@ -79,10 +79,13 @@ struct CharactersSection: View {
     @ViewBuilder
     private func characterCard(_ edge: AniListCharacterEdge) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            // Character images from AniList are 2:3 portrait. Use a 100×150
-            // frame (2:3) so the image fills without distortion or cropping.
+            // Fixed 100×150 frame with aspectRatio + fill + clipped so all
+            // character images render at the same size regardless of the
+            // source image's actual dimensions.
             CachedAsyncImage(urlString: edge.node.image?.large ?? edge.node.image?.medium ?? "")
+                .aspectRatio(contentMode: .fill)
                 .frame(width: 100, height: 150)
+                .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -161,6 +164,9 @@ struct CharacterDetailView: View {
                     roleSection(role: role)
                         .padding(.top, 16)
                 }
+                // Additional info section — gender, age, birthday, favourites.
+                infoSection
+                    .padding(.top, 16)
                 if let vas = edge.voiceActors, !vas.isEmpty {
                     voiceActorsSection(vas: vas)
                         .padding(.top, 16)
@@ -242,8 +248,66 @@ struct CharacterDetailView: View {
                     .font(.title3.weight(.medium))
                     .foregroundStyle(.secondary)
             }
+            // Alternative names (aliases)
+            if let alt = displayCharacter.name?.alternative, !alt.isEmpty {
+                Text("Also known as: " + alt.joined(separator: ", "))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 2)
+            }
         }
         .padding(.horizontal, 16)
+    }
+
+    // MARK: - Info section (gender, age, birthday, favourites)
+
+    @ViewBuilder
+    private var infoSection: some View {
+        let items = infoItems
+        if !items.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Information")
+                    .font(.headline)
+                    .padding(.horizontal, 16)
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                    ForEach(items, id: \.0) { item in
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(item.0)
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(.secondary)
+                                .textCase(.uppercase)
+                            Text(item.1)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.primary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(10)
+                        .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.08)))
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
+        }
+    }
+
+    private var infoItems: [(String, String)] {
+        var items: [(String, String)] = []
+        if let gender = displayCharacter.gender, !gender.isEmpty {
+            items.append(("Gender", gender.capitalized))
+        }
+        if let age = displayCharacter.age, !age.isEmpty {
+            items.append(("Age", age))
+        }
+        if let dob = displayCharacter.dateOfBirth, let formatted = dob.formatted as String?, !formatted.isEmpty {
+            items.append(("Birthday", formatted))
+        }
+        if let blood = displayCharacter.bloodType, !blood.isEmpty {
+            items.append(("Blood Type", blood))
+        }
+        if let fav = displayCharacter.favourites, fav > 0 {
+            items.append(("Favourites", "\(fav)"))
+        }
+        return items
     }
 
     @ViewBuilder
@@ -295,9 +359,10 @@ struct CharacterDetailView: View {
     @ViewBuilder
     private func voiceActorCard(_ va: AniListVoiceActor) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            // VA images are also 2:3 portrait on AniList.
             CachedAsyncImage(urlString: va.image?.large ?? va.image?.medium ?? "")
+                .aspectRatio(contentMode: .fill)
                 .frame(width: 90, height: 135)
+                .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
