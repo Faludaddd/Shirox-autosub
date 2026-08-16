@@ -762,6 +762,7 @@ struct AniListMangaDetailView: View {
             .foregroundStyle(.primary)
             .frame(maxWidth: .infinity)
             .frame(height: 46)
+            .layoutPriority(1)
             .background(.ultraThinMaterial, in: Capsule())
             .overlay(Capsule().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
         }

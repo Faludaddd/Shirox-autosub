@@ -474,7 +474,7 @@ struct FeaturedCarousel: View {
                         } label: {
                             HStack(spacing: 6) {
                                 Image(systemName: isManga ? "book.fill" : "play.fill").font(.caption.weight(.bold))
-                                Text(isManga ? "Start Reading" : "Watch")
+                                Text(isManga ? "Start Reading" : "Start Watching")
                                     .font(.subheadline.weight(.semibold))
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.7)
@@ -652,7 +652,7 @@ private struct MacFeaturedCarousel: View {
                                 } label: {
                                     HStack(spacing: 6) {
                                         Image(systemName: isManga ? "book.fill" : "play.fill").font(.footnote.weight(.semibold))
-                                        Text(isManga ? "Start Reading" : "Watch").fontWeight(.semibold)
+                                        Text(isManga ? "Start Reading" : "Start Watching").fontWeight(.semibold)
                                             .lineLimit(1)
                                     }
                                     .foregroundStyle(platformBackground)

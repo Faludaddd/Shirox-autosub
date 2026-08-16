@@ -445,9 +445,6 @@ struct LibraryView: View {
             }
         }
         #endif
-        ToolbarItem(placement: toolbarItemPlacement[0]) {
-            sortMenu
-        }
         ToolbarItem(placement: toolbarItemPlacement[1]) {
             if isActiveProviderAuthenticated {
                 HStack(spacing: 10) {
