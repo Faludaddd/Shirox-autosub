@@ -1546,7 +1546,7 @@ struct AniListDetailView: View {
                             mediaId: media.id,
                             provider: media.provider,
                             mediaTitle: media.title.searchTitle,
-                            coverImage: media.coverImage.best,
+                            coverImage: media.coverImage.best ?? "",
                             totalEpisodes: fallbackTotal,
                             aniListProgress: existingEntry?.progress,
                             aniListStatus: existingEntry?.status,
