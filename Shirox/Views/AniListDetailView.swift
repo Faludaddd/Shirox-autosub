@@ -1560,8 +1560,8 @@ struct AniListDetailView: View {
                             onDownload: {
                                 pendingDownloadEpisodeNumber = DownloadEpisodeItem(episodeNumber: ep, mediaId: media.id, mediaTitle: media.title.searchTitle, coverImage: media.coverImage.best ?? "")
                             },
-                            isSelected: selected,
-                            isSelectionMode: sel
+                            isSelectionMode: sel,
+                            isSelected: selected
                         )
                         #else
                         EpisodeRowView(
