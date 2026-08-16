@@ -146,12 +146,8 @@ struct NotificationsView: View {
         } else if vm.notifications.isEmpty {
             ContentUnavailableView("No Notifications", systemImage: "bell.slash")
         } else if isGridLayout {
-            // 2×2 grid layout — compact visual cards. Posters/avatars are
-            // the dominant element; text is condensed to 2 lines + type.
             gridContent
         } else {
-            // Standard List with swipeActions for swipe-to-close (item 16).
-            // Swipe left reveals a Close button; swipe right also dismisses.
             listContent
         }
     }
@@ -163,7 +159,8 @@ struct NotificationsView: View {
                 NotificationRowContent(
                     notif: notif,
                     isTappable: isTappable(notif),
-                    onTap: { handleTap(notif) }
+                    onTap: { handleTap(notif) },
+                    onDismiss: { dismissNotification(notif) }
                 )
                 .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
                 .listRowSeparator(.hidden)
@@ -174,27 +171,9 @@ struct NotificationsView: View {
                             Label("View Details", systemImage: "info.circle")
                         }
                     }
-                    Button { dismissNotification(notif) } label: {
-                        Label("Dismiss", systemImage: "xmark.circle")
-                    }
                     Button(role: .destructive) { dismissNotification(notif) } label: {
                         Label("Delete", systemImage: "trash")
                     }
-                }
-                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                    Button(role: .destructive) {
-                        dismissNotification(notif)
-                    } label: {
-                        Label("Close", systemImage: "xmark.circle.fill")
-                    }
-                }
-                .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                    Button {
-                        dismissNotification(notif)
-                    } label: {
-                        Label("Dismiss", systemImage: "hand.raised.fill")
-                    }
-                    .tint(.orange)
                 }
             }
         }
@@ -430,6 +409,7 @@ private struct NotificationRowContent: View {
     let notif: ProviderNotification
     let isTappable: Bool
     let onTap: () -> Void
+    var onDismiss: (() -> Void)? = nil
 
     private var accentColor: Color {
         NotificationSwipeRow.iconAndColor(for: notif).1
@@ -444,6 +424,19 @@ private struct NotificationRowContent: View {
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(.tertiary)
                     .padding(.top, 8)
+            }
+            // Always-visible X dismiss button — replaces the old
+            // swipe-to-dismiss gesture. Tapping it calls onDismiss.
+            if let onDismiss {
+                Button {
+                    onDismiss()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 2)
             }
         }
         .padding(.horizontal, 10)

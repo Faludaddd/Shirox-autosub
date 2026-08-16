@@ -46,9 +46,6 @@ struct ContinueReadingSection: View {
                     Text("Continue Reading")
                         .font(.title2.weight(.heavy))
                         .tracking(0.3)
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.primary)
-                        .frame(width: 36, height: 3)
                 }
                 Spacer()
             }
@@ -64,7 +61,7 @@ struct ContinueReadingSection: View {
                             )
                         }
                         .buttonStyle(.plain)
-                        .frame(width: 110)
+                        .frame(width: 130)
                         .contextMenu {
                             if let aniListId = MangaMatchManager.shared.cachedMatch(mangaHref: item.mangaHref)?.aniListID {
                                 Button {
@@ -123,14 +120,27 @@ struct ContinueReadingSection: View {
                     return
                 }
                 let idx = chapters.firstIndex(where: { $0.href == item.chapterHref }) ?? 0
-                let isResume = chapters[idx].href == item.chapterHref
+                // Off-by-one fix: if the exact href match fails, try
+                // matching by chapter number as a fallback. The href might
+                // differ if the module changed its URL scheme.
+                let resolvedIdx: Int = {
+                    if chapters.indices.contains(idx), chapters[idx].href == item.chapterHref {
+                        return idx
+                    }
+                    // Fallback: match by chapter number
+                    if let numIdx = chapters.firstIndex(where: { $0.number == item.chapterNumber }) {
+                        return numIdx
+                    }
+                    return 0
+                }()
+                let isResume = chapters[resolvedIdx].href == item.chapterHref
                 readerContext = ReaderContext(
                     mangaTitle: item.mangaTitle,
                     mangaHref: item.mangaHref,
                     coverImage: item.coverImage,
                     moduleId: item.moduleId,
                     chapters: chapters,
-                    chapterIndex: idx,
+                    chapterIndex: resolvedIdx,
                     resumePage: isResume ? item.pageIndex : nil,
                     resumeFraction: isResume ? item.pageFraction : nil,
                     match: MangaMatchManager.shared.cachedMatch(mangaHref: item.mangaHref)

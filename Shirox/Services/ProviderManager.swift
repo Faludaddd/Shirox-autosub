@@ -202,7 +202,7 @@ final class ProviderManager: ObservableObject {
         }
         if let aniError = error as? AniListError {
             switch aniError {
-            case .httpError(let code): return code == 403 || code >= 500
+            case .httpError(let code): return code == 403 || code == 404 || code >= 500
             case .rateLimited: return true
             default: return false
             }

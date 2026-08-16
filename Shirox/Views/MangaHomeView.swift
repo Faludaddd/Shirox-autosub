@@ -201,16 +201,7 @@ struct MangaSection: View {
                                 NavigationLink {
                                     AniListMangaDetailView(mediaId: media.id, preloadedMedia: media)
                                 } label: {
-                                    Label("View Manga", systemImage: "info.circle")
-                                }
-                                Button {
-                                    #if os(iOS)
-                                    if let url = URL(string: "https://anilist.co/manga/\(media.id)") {
-                                        UIApplication.shared.open(url)
-                                    }
-                                    #endif
-                                } label: {
-                                    Label("View on AniList", systemImage: "safari")
+                                    Label("View on AniList", systemImage: "info.circle")
                                 }
                             }
                         }
