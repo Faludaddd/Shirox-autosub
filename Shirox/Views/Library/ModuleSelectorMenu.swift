@@ -145,10 +145,6 @@ struct ModuleSelectorMenu: View {
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(.secondary)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(Capsule().fill(Color.secondary.opacity(0.12)))
-            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
         } else {
             HStack(spacing: 6) {
                 Image(systemName: "puzzlepiece.extension")
@@ -161,10 +157,6 @@ struct ModuleSelectorMenu: View {
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(.secondary)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(Capsule().fill(Color.secondary.opacity(0.08)))
-            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
         }
     }
 

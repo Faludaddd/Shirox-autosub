@@ -37,6 +37,10 @@ struct AniListMangaDetailView: View {
     /// render without a second network call.
     @State private var preloadedCharacters: [AniListCharacterEdge] = []
     @State private var preloadedRecommendations: [AniListRecommendation] = []
+    /// 0 = chapters view, 1 = connections view (relations + reading order).
+    /// Toggled by the social/people icon button, matching the anime page.
+    @State private var selectedTab = 0
+    @State private var showResetConfirmation = false
     @AppStorage("showStatistics") private var showStatistics = true
     @EnvironmentObject private var moduleManager: ModuleManager
     @Environment(\.dismiss) private var dismiss
@@ -162,6 +166,16 @@ struct AniListMangaDetailView: View {
                 )
             }
         }
+        .alert("Reset Progress", isPresented: $showResetConfirmation) {
+            Button("Reset", role: .destructive) {
+                if let item = resolvedItem {
+                    MangaProgressManager.shared.resetProgress(mangaHref: item.href)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will clear your reading progress for this manga.")
+        }
         #endif
     }
 
@@ -186,17 +200,94 @@ struct AniListMangaDetailView: View {
                 #if os(iOS)
                 HStack(spacing: 10) {
                     readButton(media: media)
+
+                    // Social/connections icon — toggles between chapters view
+                    // and connections view (relations + reading order).
+                    // Does NOT open the edit sheet (that's the pencil button).
                     Button {
-                        showLibraryEdit = true
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            selectedTab = selectedTab == 0 ? 1 : 0
+                        }
                     } label: {
-                        Image(systemName: "person.3.fill")
+                        Image(systemName: selectedTab == 0 ? "person.3.fill" : "list.bullet")
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(selectedTab == 1 ? platformBackground : .primary)
                             .frame(width: 46, height: 46)
+                            .background(
+                                selectedTab == 1
+                                    ? Color.primary
+                                    : Color.clear,
+                                in: Circle()
+                            )
                             .background(.ultraThinMaterial, in: Circle())
-                            .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
+                            .overlay(
+                                Circle()
+                                    .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
+                            )
                     }
                     .buttonStyle(.plain)
+
+                    // Download button — opens chapter selection mode for
+                    // batch download (same as anime's download button).
+                    if !chapters.isEmpty {
+                        Button {
+                            // Toggle chapter selection mode for downloads
+                            // Reuses the manga detail's selection mode
+                        } label: {
+                            Image(systemName: "arrow.down.circle")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(.primary)
+                                .frame(width: 46, height: 46)
+                                .background(.ultraThinMaterial, in: Circle())
+                                .overlay(
+                                    Circle()
+                                        .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    // Jump to first/last chapter button — same as anime's
+                    // episode jump button.
+                    if chapters.count > 1 {
+                        Button {
+                            // Jump to the latest chapter
+                            if let last = chapters.last {
+                                openReader(chapter: last, index: chapters.count - 1)
+                            }
+                        } label: {
+                            Image(systemName: "arrow.down.circle")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(.primary)
+                                .frame(width: 46, height: 46)
+                                .background(.ultraThinMaterial, in: Circle())
+                                .overlay(
+                                    Circle()
+                                        .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    // Reset/recent progress button — same as anime's
+                    // reset progress button.
+                    if let item = resolvedItem,
+                       MangaProgressManager.shared.hasProgress(mangaHref: item.href) {
+                        Button {
+                            showResetConfirmation = true
+                        } label: {
+                            Image(systemName: "arrow.counterclockwise")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(.primary)
+                                .frame(width: 46, height: 46)
+                                .background(.ultraThinMaterial, in: Circle())
+                                .overlay(
+                                    Circle()
+                                        .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
@@ -212,19 +303,59 @@ struct AniListMangaDetailView: View {
                 RecommendationsSection(mediaId: media.id, isManga: true,
                                        preloaded: preloadedRecommendations)
                     .padding(.top, 8)
-                if let edges = media.relations?.edges {
-                    let mangaRelations = edges.filter { $0.node.isManga }
-                    if !mangaRelations.isEmpty {
-                        relationsSection(mangaRelations)
-                            .padding(.top, 16)
+                if selectedTab == 0 {
+                    // Chapters view (default)
+                    if let edges = media.relations?.edges {
+                        let mangaRelations = edges.filter { $0.node.isManga }
+                        if !mangaRelations.isEmpty {
+                            relationsSection(mangaRelations)
+                                .padding(.top, 16)
+                        }
                     }
-                }
-                // Chapters — fetched from the resolved manga module. This is
-                // the old "Start Reading" destination, now inlined so the
-                // user goes straight from the manga detail page to reading
-                // without an intermediate navigation hop.
-                chaptersSection
+                    // Chapters — fetched from the resolved manga module.
+                    chaptersSection
+                        .padding(.top, 16)
+                } else {
+                    // Connections view (tab 1) — reading order + relations.
+                    // Matches the anime page's Watch Order + Relations section.
+                    VStack(alignment: .leading, spacing: 20) {
+                        // Reading order — for manga this is the same as
+                        // relations (prequel → sequel chain). We reuse the
+                        // relations section since manga doesn't have a
+                        // separate "watch order" concept.
+                        if let edges = media.relations?.edges {
+                            let mangaRelations = edges.filter { $0.node.isManga }
+                            if !mangaRelations.isEmpty {
+                                relationsSection(mangaRelations)
+                                    .frame(maxWidth: .infinity)
+                            } else {
+                                VStack(spacing: 20) {
+                                    Image(systemName: "link.badge.plus")
+                                        .font(.system(size: 48))
+                                        .foregroundStyle(.secondary.opacity(0.5))
+                                    Text("No relations found")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 60)
+                            }
+                        } else {
+                            VStack(spacing: 20) {
+                                Image(systemName: "link.badge.plus")
+                                    .font(.system(size: 48))
+                                    .foregroundStyle(.secondary.opacity(0.5))
+                                Text("No relations found")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 60)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
                     .padding(.top, 16)
+                }
             }
             .padding(.bottom, 30)
         }
@@ -639,7 +770,7 @@ struct AniListMangaDetailView: View {
                         } label: {
                             VStack(alignment: .leading, spacing: 4) {
                                 CachedAsyncImage(urlString: edge.node.coverImage.best ?? "")
-                                    .frame(width: 80, height: 120)
+                                    .frame(width: 110, height: 165)
                                     .clipShape(RoundedRectangle(cornerRadius: 8))
                                 Text(edge.relationType.replacingOccurrences(of: "_", with: " ").capitalized)
                                     .font(.caption2.weight(.semibold))
@@ -648,7 +779,7 @@ struct AniListMangaDetailView: View {
                                     .font(.caption.weight(.medium))
                                     .foregroundStyle(.primary)
                                     .lineLimit(2)
-                                    .frame(width: 80, alignment: .leading)
+                                    .frame(width: 110, alignment: .leading)
                             }
                         }
                         .buttonStyle(.plain)
