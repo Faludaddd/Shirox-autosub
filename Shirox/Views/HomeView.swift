@@ -967,16 +967,7 @@ private struct AnimeSection: View {
                             NavigationLink {
                                 AniListDetailView(mediaId: media.id, preloadedMedia: media)
                             } label: {
-                                Label("View Anime", systemImage: "info.circle")
-                            }
-                            Button {
-                                #if os(iOS)
-                                if let url = URL(string: "https://anilist.co/anime/\(media.id)") {
-                                    UIApplication.shared.open(url)
-                                }
-                                #endif
-                            } label: {
-                                Label("View on AniList", systemImage: "safari")
+                                Label("View on AniList", systemImage: "info.circle")
                             }
                         }
                     }
@@ -1401,17 +1392,7 @@ struct ScheduleView: View {
                                 Button {
                                     detailEntry = entry
                                 } label: {
-                                    Label("View Manga", systemImage: "info.circle")
-                                }
-                                Button {
-                                    #if os(iOS)
-                                    let mediaId = entry.aniListMediaId ?? entry.sourceMediaId
-                                    if let url = URL(string: "https://anilist.co/manga/\(mediaId)") {
-                                        UIApplication.shared.open(url)
-                                    }
-                                    #endif
-                                } label: {
-                                    Label("View on AniList", systemImage: "safari")
+                                    Label("View on AniList", systemImage: "info.circle")
                                 }
                             }
                         }
@@ -2427,7 +2408,7 @@ private struct ScheduleCardContextMenu: ViewModifier {
         Button {
             onViewDetails()
         } label: {
-            Label("View Anime", systemImage: "info.circle")
+            Label("View on AniList", systemImage: "info.circle")
         }
     }
 

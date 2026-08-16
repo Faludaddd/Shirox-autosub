@@ -41,6 +41,9 @@ struct AniListMangaDetailView: View {
     /// Toggled by the social/people icon button, matching the anime page.
     @State private var selectedTab = 0
     @State private var showResetConfirmation = false
+    /// When set, navigates to MangaDetailView for batch download selection.
+    @State private var pendingDownloadItem: SearchItem?
+    @State private var downloadNavActive = false
     @AppStorage("showStatistics") private var showStatistics = true
     @EnvironmentObject private var moduleManager: ModuleManager
     @Environment(\.dismiss) private var dismiss
@@ -86,6 +89,17 @@ struct AniListMangaDetailView: View {
             }
         }
         .task { await resolve() }
+        .background {
+            NavigationLink(
+                destination: Group {
+                    if let item = pendingDownloadItem {
+                        MangaDetailView(item: item)
+                    }
+                },
+                isActive: $downloadNavActive
+            ) { EmptyView() }
+            .hidden()
+        }
         // Reload chapters when the user switches manga modules via the
         // ModuleSelectorMenu. Without this, selecting a different source
         // from the dropdown does nothing — the chapter list stays stuck
@@ -113,17 +127,32 @@ struct AniListMangaDetailView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 ModuleSelectorMenu(mediaType: .manga)
             }
-            // Edit (pencil) button — opens the Library Edit Entry sheet,
-            // matching the anime AniList page's toolbar.
+            // Edit (pencil) button — fetches fresh entry data before
+            // opening the edit sheet, so the sheet always shows the current
+            // status/progress/private state (not stale data from launch).
             ToolbarItem(placement: .topBarTrailing) {
                 if AniListAuthManager.shared.isLoggedIn || MALAuthManager.shared.isLoggedIn {
                     Button {
-                        showLibraryEdit = true
+                        Task {
+                            isLoadingEntry = true
+                            if AniListAuthManager.shared.isLoggedIn {
+                                if let raw = try? await AniListLibraryService.shared.fetchEntry(mediaId: mediaId, type: .manga) {
+                                    existingEntry = AniListProvider.shared.mapEntry(raw)
+                                }
+                            }
+                            isLoadingEntry = false
+                            showLibraryEdit = true
+                        }
                     } label: {
-                        Image(systemName: "pencil.circle")
-                            .font(.system(size: 17, weight: .medium))
-                            .foregroundStyle(.primary)
+                        if isLoadingEntry {
+                            ProgressView().scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "pencil.circle")
+                                .font(.system(size: 17, weight: .medium))
+                                .foregroundStyle(.primary)
+                        }
                     }
+                    .disabled(isLoadingEntry)
                 }
             }
         }
@@ -227,15 +256,18 @@ struct AniListMangaDetailView: View {
                     }
                     .buttonStyle(.plain)
 
-                    // Download button — opens chapter selection mode for
-                    // batch download (same as anime's download button).
+                    // Download button — same as anime's download icon.
+                    // Tapping it opens the chapter selection mode for batch
+                    // download. Uses a distinct icon from the jump button.
                     if !chapters.isEmpty {
                         Button {
-                            // Toggle chapter selection mode for downloads
-                            // Reuses the manga detail's selection mode
+                            if let item = resolvedItem {
+                                pendingDownloadItem = item
+                                downloadNavActive = true
+                            }
                         } label: {
-                            Image(systemName: "arrow.down.circle")
-                                .font(.system(size: 20, weight: .semibold))
+                            Image(systemName: "square.and.arrow.down")
+                                .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(.primary)
                                 .frame(width: 46, height: 46)
                                 .background(.ultraThinMaterial, in: Circle())
@@ -247,17 +279,17 @@ struct AniListMangaDetailView: View {
                         .buttonStyle(.plain)
                     }
 
-                    // Jump to first/last chapter button — same as anime's
-                    // episode jump button.
+                    // Jump to latest chapter — uses a distinct icon
+                    // (arrow.up.arrow.down) so it's visually different from
+                    // the download button.
                     if chapters.count > 1 {
                         Button {
-                            // Jump to the latest chapter
                             if let last = chapters.last {
                                 openReader(chapter: last, index: chapters.count - 1)
                             }
                         } label: {
-                            Image(systemName: "arrow.down.circle")
-                                .font(.system(size: 20, weight: .semibold))
+                            Image(systemName: "arrow.up.arrow.down")
+                                .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(.primary)
                                 .frame(width: 46, height: 46)
                                 .background(.ultraThinMaterial, in: Circle())
@@ -293,16 +325,8 @@ struct AniListMangaDetailView: View {
                 .padding(.top, 16)
                 .padding(.bottom, 8)
                 #endif
-                // Characters + Recommendations — directly below the synopsis.
-                // Data is preloaded from the resolve() call's raw AniList
-                // fetch, so these sections render without a second network
-                // call. Hidden if empty.
-                CharactersSection(mediaId: media.id, isManga: true,
-                                  preloaded: preloadedCharacters)
-                    .padding(.top, 16)
-                RecommendationsSection(mediaId: media.id, isManga: true,
-                                       preloaded: preloadedRecommendations)
-                    .padding(.top, 8)
+                // Section order matches the anime AniList page:
+                // Button row → Chapters → Characters → Recommendations
                 if selectedTab == 0 {
                     // Chapters view (default)
                     if let edges = media.relations?.edges {
@@ -356,6 +380,15 @@ struct AniListMangaDetailView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.top, 16)
                 }
+                // Characters + Recommendations — placed AFTER the chapters/
+                // connections section, matching the anime AniList page:
+                // Synopsis → Buttons → Episodes/Chapters → Characters → Recommendations
+                CharactersSection(mediaId: media.id, isManga: true,
+                                  preloaded: preloadedCharacters)
+                    .padding(.top, 16)
+                RecommendationsSection(mediaId: media.id, isManga: true,
+                                       preloaded: preloadedRecommendations)
+                    .padding(.top, 8)
             }
             .padding(.bottom, 30)
         }

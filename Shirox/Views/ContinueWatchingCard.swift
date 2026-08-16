@@ -293,16 +293,6 @@ struct ContinueWatchingSection: View {
 
     @ViewBuilder
     private func contextMenuItems(for item: ContinueWatchingItem) -> some View {
-        if let _ = item.detailHref, let mid = item.moduleId {
-            Button {
-                if let module = ModuleManager.shared.modules.first(where: { $0.id == mid }) {
-                    ModuleManager.shared.selectModule(module)
-                }
-                navTarget = .detail(item)
-            } label: {
-                Label("View Anime", systemImage: "list.bullet.below.rectangle")
-            }
-        }
         if item.aniListID != nil {
             Button {
                 navTarget = .anilist(item)

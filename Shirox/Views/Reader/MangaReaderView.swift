@@ -636,14 +636,21 @@ struct MangaReaderView: View {
     /// read. Backward: just show the earlier chapter's identity again.
     private func updateDisplayedChapter(for globalIdx: Int) {
         guard let item = strip[safe: globalIdx], item.chapterIdx != displayedChapterIndex else { return }
-        if item.chapterIdx > displayedChapterIndex {
-            for idx in displayedChapterIndex..<item.chapterIdx {
+        let oldIdx = displayedChapterIndex
+        if item.chapterIdx > oldIdx {
+            // Scrolling FORWARD — mark crossed chapters as read.
+            for idx in oldIdx..<item.chapterIdx {
                 markRead(chapterIdx: idx)
             }
         }
         displayedChapterIndex = item.chapterIdx
-        // Entered a new chapter — keep the strip one chapter ahead.
-        prepareUpcomingChapter()
+        // Only prefetch the next chapter when scrolling FORWARD.
+        // When scrolling UP (backward), appending to the strip shifts
+        // geometry frames and re-triggers onPreferenceChange, creating a
+        // feedback loop that teleports/jumps between pages.
+        if item.chapterIdx > oldIdx {
+            prepareUpcomingChapter()
+        }
     }
 
     /// Prev/next navigation. When the target chapter is already stitched into

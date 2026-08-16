@@ -543,17 +543,6 @@ struct LibraryView: View {
 
     @ViewBuilder
     private func libraryContextMenu(for entry: LibraryEntry) -> some View {
-        // Top action: open the detail page. Label auto-switches between
-        // "View Anime" and "View Manga" based on the entry's media type.
-        Button {
-            openEntryDetail(entry)
-        } label: {
-            Label(
-                entry.media.isManga ? "View Manga" : "View Anime",
-                systemImage: entry.media.isManga ? "book.circle" : "tv.circle"
-            )
-        }
-        Divider()
         ForEach(MediaListStatus.allCases) { status in
             if status != entry.status {
                 Button {
@@ -882,6 +871,7 @@ struct LibraryView: View {
                 entry: entry,
                 media: entry.media,
                 scoreFormatOverride: vm.isLocal ? scoreFormat : nil,
+                progressUnit: entry.media.isManga ? "chapter" : "episode",
                 onSave: { status, progress, score in
                     if status == .completed {
                         ContinueWatchingManager.shared.resetProgress(
