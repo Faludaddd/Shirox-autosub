@@ -1558,7 +1558,7 @@ struct AniListDetailView: View {
                                 vm.watchEpisode(ep)
                             },
                             onDownload: {
-                                pendingDownloadEpisodeNumber = DownloadEpisodeItem(episodeNumber: ep, mediaId: media.id, mediaTitle: media.title.searchTitle, coverImage: media.coverImage.best ?? "")
+                                pendingDownloadEpisodeNumber = DownloadEpisodeItem(episodeNumber: ep)
                             },
                             isSelectionMode: sel,
                             isSelected: selected
