@@ -178,12 +178,19 @@ struct LibraryView: View {
                 }
             }
         } label: {
-            HStack(spacing: 3) {
+            HStack(spacing: 6) {
                 Image(systemName: "arrow.up.arrow.down")
-                    .font(.subheadline)
+                    .font(.system(size: 13, weight: .semibold))
+                    .frame(width: 16, height: 16)
                 Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
-                    .font(.caption)
+                    .font(.system(size: 9, weight: .bold))
             }
+            .fixedSize(horizontal: true, vertical: false)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(.ultraThinMaterial, in: Capsule())
+            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 1))
+            .foregroundStyle(.primary)
         }
     }
 
@@ -308,8 +315,10 @@ struct LibraryView: View {
 
     @ViewBuilder
     private var filterCapsuleRow: some View {
-        HStack {
+        HStack(spacing: 8) {
             statusFilterMenu()
+            sortMenu
+                .labelStyle(.titleAndIcon)
             Spacer()
         }
     }

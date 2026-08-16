@@ -2520,6 +2520,7 @@ struct ScheduleDetailView: View {
     private var heroPoster: some View {
         ZStack(alignment: .top) {
             CachedAsyncImage(urlString: entry.coverImage ?? "")
+                .aspectRatio(2/3, contentMode: .fill)
                 .frame(maxWidth: .infinity)
                 .frame(height: 200)
                 .clipped()
@@ -2559,12 +2560,6 @@ struct ScheduleDetailView: View {
 
     private var contentSection: some View {
         VStack(alignment: .leading, spacing: 18) {
-            // Title — large bold.
-            Text(entry.title)
-                .font(.title.weight(.bold))
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
-
             // Episode number badge — slightly larger than the card's.
             Text(entry.episodeBadge)
                 .font(.subheadline.weight(.semibold))
