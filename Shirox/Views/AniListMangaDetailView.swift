@@ -321,9 +321,13 @@ struct AniListMangaDetailView: View {
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(isSelectionMode ? platformBackground : .primary)
                             .frame(width: 36, height: 36)
-                            .background(
-                                isSelectionMode ? Color.primary : .ultraThinMaterial,
-                                in: Circle()
+                            .background(.ultraThinMaterial, in: Circle())
+                            .overlay(
+                                // Active-state fill on top of the material
+                                // (can't use a ternary with Material vs Color
+                                // — they're different types, so layer instead).
+                                Circle()
+                                    .fill(isSelectionMode ? Color.primary : Color.clear)
                             )
                             .overlay(
                                 Circle()

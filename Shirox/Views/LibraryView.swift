@@ -319,8 +319,12 @@ struct LibraryView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 9)
         .frame(minHeight: 38)
-        .background(
-            Capsule().fill(isActive ? Color.primary.opacity(0.12) : .ultraThinMaterial)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay(
+            // Active-state tint on top of the material (can't use a
+            // ternary with Material vs Color inside .fill() — they're
+            // different types, so layer a Color over the Material instead).
+            Capsule().fill(isActive ? Color.primary.opacity(0.12) : Color.clear)
         )
         .overlay(
             Capsule().strokeBorder(
