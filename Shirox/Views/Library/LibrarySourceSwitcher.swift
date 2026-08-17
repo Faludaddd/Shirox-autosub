@@ -3,6 +3,10 @@ import SwiftUI
 /// Capsule-pill switcher for the Library tab. Always shows the local "My Library" pill,
 /// plus a pill for each signed-in provider. Hidden when only one source exists (logged out:
 /// local-only) so a lone pill isn't shown.
+///
+/// Every pill uses the shared `libraryCapsuleStyle` so it matches the status filter,
+/// sort menu, grid toggle, and media-type pills exactly — same height, padding,
+/// corner radius, background, and stroke.
 struct LibrarySourceSwitcher: View {
     let selected: LibrarySource
     let onSelect: (LibrarySource) -> Void
@@ -35,7 +39,7 @@ struct LibrarySourceSwitcher: View {
         // any width, and a horizontal ScrollView above the Library's List would steal the
         // `.searchable` bar's scroll-view association and break it across navigation.
         if !providerSources.isEmpty {
-            HStack(spacing: 8) {
+            HStack(spacing: LibraryDS.controlSpacing) {
                 pill(title: "My Library", isLocal: true, selected: isLocalSelected) {
                     onSelect(.local)
                 }
@@ -53,7 +57,7 @@ struct LibrarySourceSwitcher: View {
             }
             // No internal horizontal padding — call sites supply the 16pt inset (matching
             // `filterCapsuleRow`) so the pills sit flush-left with the List button + search bar.
-            .padding(.vertical, 8)
+            .padding(.vertical, 4)
         }
     }
 
@@ -65,10 +69,9 @@ struct LibrarySourceSwitcher: View {
                 if isLocal {
                     Image(systemName: "books.vertical.fill")
                         .font(.system(size: LibraryDS.pillIconSize, weight: .semibold))
-                        .frame(width: 16, height: 16)
                 } else if let iconURL {
                     CachedAsyncImage(urlString: iconURL)
-                        .frame(width: 16, height: 16)
+                        .frame(width: 18, height: 18)
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                 }
                 Text(title)
@@ -76,11 +79,7 @@ struct LibrarySourceSwitcher: View {
                     .lineLimit(1)
             }
             .fixedSize(horizontal: true, vertical: false)
-            .padding(.horizontal, LibraryDS.pillHorizontalPadding)
-            .padding(.vertical, LibraryDS.pillVerticalPadding)
-            .background(Capsule().fill(selected ? LibraryDS.pillSelectedFill() : LibraryDS.pillIdleFill))
-            .overlay(Capsule().strokeBorder(selected ? LibraryDS.pillSelectedBorder() : Color.clear, lineWidth: 1))
-            .foregroundStyle(selected ? Color.appAccent : .primary)
+            .libraryCapsuleStyle(isActive: selected)
         }
         .buttonStyle(.plain)
     }

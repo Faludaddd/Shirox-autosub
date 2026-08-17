@@ -3,9 +3,9 @@ import SwiftUI
 // MARK: - LibraryDesignSystem
 //
 // Centralized sizing/style tokens for the Library tab. Every button, dropdown,
-// pill, and chip in Library reads from these tokens so the whole surface
+// pill, chip, and toggle in Library reads from these tokens so the whole surface
 // looks like one cohesive design system — no random size drift between
-// filter chips, sort menus, source pills, etc.
+// filter chips, sort menus, source pills, media-type pills, etc.
 //
 // To re-tune the Library's visual density, change the numbers here and
 // every component picks up the new value automatically.
@@ -13,14 +13,11 @@ import SwiftUI
 enum LibraryDS {
     // MARK: Heights
 
-    /// Standard interactive height for all pills/chips/menus/toggles.
+    /// Standard interactive height for ALL pills/chips/menus/toggles.
     /// Used by: filter chip, sort menu, source pill, media-type pill,
-    /// grid/list toggle, view-mode segment.
-    static let controlHeight: CGFloat = 34
-
-    /// Smaller height for tightly-packed rows (e.g. the grid/list toggle
-    /// icon button — square, sits at the end of the filter row).
-    static let iconButtonSize: CGFloat = 30
+    /// grid/list toggle, view-mode segment. Every control in the Library
+    /// shares this exact height — no exceptions.
+    static let controlHeight: CGFloat = 38
 
     // MARK: Corner radii
 
@@ -32,20 +29,22 @@ enum LibraryDS {
 
     // MARK: Padding
 
-    /// Horizontal padding inside a pill/chip (text + icon → edge).
-    static let pillHorizontalPadding: CGFloat = 12
-    /// Vertical padding inside a pill/chip.
-    static let pillVerticalPadding: CGFloat = 7
+    /// Horizontal padding inside a pill/chip/capsule (text + icon → edge).
+    /// Shared by every control in the Library.
+    static let pillHorizontalPadding: CGFloat = 14
+    /// Vertical padding inside a pill/chip/capsule.
+    /// Shared by every control in the Library.
+    static let pillVerticalPadding: CGFloat = 9
 
     // MARK: Icon sizes
 
-    static let pillIconSize: CGFloat = 12
+    static let pillIconSize: CGFloat = 13
     static let chevronSize: CGFloat = 9
-    static let iconButtonIconSize: CGFloat = 13
+    static let iconButtonIconSize: CGFloat = 14
 
     // MARK: Font sizes
 
-    static let pillFont: Font = .system(size: 13, weight: .semibold)
+    static let pillFont: Font = .system(size: 14, weight: .medium)
     static let chipFont: Font = .system(size: 12, weight: .semibold)
     static let sectionHeaderFont: Font = .system(size: 15, weight: .bold)
     static let cardTitleFont: Font = .system(size: 15, weight: .semibold)
@@ -55,7 +54,7 @@ enum LibraryDS {
     // MARK: Spacing
 
     /// Spacing between controls in the same row (e.g. filter chip + sort menu).
-    static let controlSpacing: CGFloat = 8
+    static let controlSpacing: CGFloat = 10
     /// Spacing between cards in the list view.
     static let listCardSpacing: CGFloat = 8
     /// Spacing between sections in the sectioned list.
@@ -67,31 +66,86 @@ enum LibraryDS {
 
     // MARK: Colors
 
-    /// Background fill for an unselected pill.
-    static let pillIdleFill = Color.secondary.opacity(0.10)
-    /// Background fill for a selected pill (accent-tinted).
-    static func pillSelectedFill(_ color: Color = Color.appAccent) -> Color {
-        color.opacity(0.15)
-    }
+    /// Background fill for an unselected pill (layered over .ultraThinMaterial).
+    static let pillIdleTint = Color.clear
+    /// Background fill for a selected pill (layered over .ultraThinMaterial).
+    static let pillSelectedTint = Color.primary.opacity(0.12)
+    /// Border for an idle pill.
+    static let pillIdleBorder = Color.primary.opacity(0.2)
     /// Border for a selected pill.
-    static func pillSelectedBorder(_ color: Color = Color.appAccent) -> Color {
-        color.opacity(0.4)
-    }
+    static let pillSelectedBorder = Color.primary.opacity(0.3)
     /// Background fill for a card (list row).
     static let cardFill = Color.primary.opacity(0.04)
     /// Border for a card.
     static let cardBorder = Color.primary.opacity(0.07)
 }
 
+// MARK: - libraryCapsuleStyle (shared ViewModifier)
+//
+// The single source of truth for every capsule-style control in the Library.
+// Applied via `.libraryCapsuleStyle(isActive:)` — works on any view content
+// (Button labels, Menu labels, plain HStacks). Ensures every control shares
+// the EXACT same height, padding, corner radius, background, stroke, and
+// material — no drift between status filter, sort, grid toggle, media-type
+// pill, or source switcher pill.
+//
+// Usage:
+//   HStack { Image(...); Text(...) }
+//     .libraryCapsuleStyle(isActive: isSelected)
+//
+// Layout dimensions (calculated):
+//   Height:     LibraryDS.controlHeight (38pt, fixed)
+//   H padding:  LibraryDS.pillHorizontalPadding (14pt)
+//   V padding:  LibraryDS.pillVerticalPadding (9pt)
+//   Shape:      Capsule
+//   Background: .ultraThinMaterial + active tint overlay
+//   Stroke:     1pt, opacity 0.2 idle / 0.3 active
+//   Font:       LibraryDS.pillFont (.system 14 medium)
+
+struct LibraryCapsuleStyle: ViewModifier {
+    let isActive: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .font(LibraryDS.pillFont)
+            .foregroundStyle(.primary)
+            .padding(.horizontal, LibraryDS.pillHorizontalPadding)
+            .padding(.vertical, LibraryDS.pillVerticalPadding)
+            .frame(minHeight: LibraryDS.controlHeight)
+            .background(.ultraThinMaterial, in: Capsule())
+            .overlay(
+                // Active-state tint layered over the material (Material and
+                // Color are different types, so we can't use a ternary
+                // inside .fill() — layer a Color overlay instead).
+                Capsule().fill(isActive ? LibraryDS.pillSelectedTint : LibraryDS.pillIdleTint)
+            )
+            .overlay(
+                Capsule().strokeBorder(
+                    isActive ? LibraryDS.pillSelectedBorder : LibraryDS.pillIdleBorder,
+                    lineWidth: 1
+                )
+            )
+            .contentShape(Capsule())
+    }
+}
+
+extension View {
+    /// Apply the shared Library capsule style. Every control in the Library
+    /// filter/toolbar area uses this to guarantee identical height, padding,
+    /// corner radius, background, and stroke.
+    func libraryCapsuleStyle(isActive: Bool = false) -> some View {
+        modifier(LibraryCapsuleStyle(isActive: isActive))
+    }
+}
+
 // MARK: - Reusable LibraryPill
 //
-// One pill style for every tappable chip in the Library. Capsule shape,
-// fixed height, consistent icon+text+chevron layout. Used by:
-//   • status filter chip
-//   • sort menu
-//   • source switcher pill
+// One pill style for every tappable chip in the Library. Uses
+// `libraryCapsuleStyle` internally so it's guaranteed to match every
+// other capsule control. Used by:
+//   • source switcher pill (My Library / AniList / MAL)
 //   • media-type (Anime/Manga) pill
-//   • view-mode (Library/History) pill
+//   • any future standalone pill
 
 struct LibraryPill<Label: View>: View {
     let isSelected: Bool
@@ -114,21 +168,7 @@ struct LibraryPill<Label: View>: View {
     var body: some View {
         Button(action: action) {
             label()
-                .foregroundStyle(isSelected ? accentColor : .primary)
-                .frame(height: LibraryDS.controlHeight - 2 * LibraryDS.pillVerticalPadding)
-                .padding(.horizontal, LibraryDS.pillHorizontalPadding)
-                .padding(.vertical, LibraryDS.pillVerticalPadding)
-                .background(
-                    Capsule().fill(isSelected
-                        ? LibraryDS.pillSelectedFill(accentColor)
-                        : LibraryDS.pillIdleFill)
-                )
-                .overlay(
-                    Capsule().strokeBorder(
-                        isSelected ? LibraryDS.pillSelectedBorder(accentColor) : Color.clear,
-                        lineWidth: 1
-                    )
-                )
+                .libraryCapsuleStyle(isActive: isSelected)
         }
         .buttonStyle(.plain)
     }
@@ -143,7 +183,7 @@ struct LibraryPillContent: View {
     var accentColor: Color = Color.appAccent
 
     var body: some View {
-        HStack(spacing: 5) {
+        HStack(spacing: 6) {
             Image(systemName: systemImage)
                 .font(.system(size: LibraryDS.pillIconSize, weight: .semibold))
             Text(text)
@@ -152,17 +192,18 @@ struct LibraryPillContent: View {
             if showChevron {
                 Image(systemName: "chevron.down")
                     .font(.system(size: LibraryDS.chevronSize, weight: .bold))
+                    .foregroundStyle(.secondary)
             }
         }
-        .foregroundStyle(isSelected ? accentColor : .primary)
         .fixedSize(horizontal: true, vertical: false)
     }
 }
 
 // MARK: - Reusable LibraryIconButton
 //
-// Square icon button used for the grid/list toggle. Fixed size, circular
-// background, consistent with the pill row height.
+// Square icon button used for the grid/list toggle. Uses the same capsule
+// style as the pill row so it matches every other control's height and
+// background.
 
 struct LibraryIconButton: View {
     let systemImage: String
@@ -172,9 +213,7 @@ struct LibraryIconButton: View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.system(size: LibraryDS.iconButtonIconSize, weight: .semibold))
-                .frame(width: LibraryDS.iconButtonSize, height: LibraryDS.iconButtonSize)
-                .background(Circle().fill(LibraryDS.pillIdleFill))
-                .foregroundStyle(.primary)
+                .libraryCapsuleStyle()
         }
         .buttonStyle(.plain)
     }
