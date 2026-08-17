@@ -290,21 +290,25 @@ struct AniListMangaDetailView: View {
             // primary button the full row width AND colocates the actions
             // with the list they actually control.
             #if os(iOS)
-            HStack(spacing: 8) {
+            HStack(spacing: 10) {
                 Text("Chapters")
                     .font(.title3.weight(.bold))
+                    .lineLimit(1)
                 if !chapters.isEmpty {
                     Text("\(chapters.count)")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(platformBackground)
                         .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
-                        .background(Capsule().fill(Color.secondary.opacity(0.15)))
+                        .padding(.vertical, 3)
+                        .background(Color.primary, in: Capsule())
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
                 Spacer()
-                // Selection-mode / batch-download toggle. Same behavior as
-                // before — toggles isSelectionMode on the chapter list —
-                // just relocated from the hero row to here.
+                // Selection-mode / batch-download toggle. Sized to match
+                // anime's episodes section header (36×36, ultraThinMaterial
+                // background, 1pt stroke) — the previous 32×32 frame was
+                // too small and looked cramped against the Chapters title.
                 if !chapters.isEmpty {
                     Button {
                         Haptics.selection()
@@ -316,9 +320,9 @@ struct AniListMangaDetailView: View {
                         Image(systemName: isSelectionMode ? "checkmark.circle.fill" : "arrow.down.circle")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(isSelectionMode ? platformBackground : .primary)
-                            .frame(width: 32, height: 32)
+                            .frame(width: 36, height: 36)
                             .background(
-                                isSelectionMode ? Color.primary : Color.clear,
+                                isSelectionMode ? Color.primary : .ultraThinMaterial,
                                 in: Circle()
                             )
                             .overlay(
@@ -328,7 +332,9 @@ struct AniListMangaDetailView: View {
                     }
                     .buttonStyle(.plain)
                 }
-                // Invert chapter order — toggles newestFirst.
+                // Invert chapter order — toggles newestFirst. Fixes the
+                // index-mismatch bug where tapping chapter 25 in inverted
+                // mode opened chapter 1 (see chapterRow's realIndex).
                 if chapters.count > 1 {
                     Button {
                         Haptics.selection()
@@ -337,13 +343,11 @@ struct AniListMangaDetailView: View {
                         }
                     } label: {
                         Image(systemName: newestFirst ? "arrow.down" : "arrow.up")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(size: 14, weight: .bold))
                             .foregroundStyle(.primary)
-                            .frame(width: 32, height: 32)
-                            .overlay(
-                                Circle()
-                                    .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
-                            )
+                            .frame(width: 36, height: 36)
+                            .background(.ultraThinMaterial, in: Circle())
+                            .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
                     }
                     .buttonStyle(.plain)
                 }
@@ -355,18 +359,18 @@ struct AniListMangaDetailView: View {
                         showResetConfirmation = true
                     } label: {
                         Image(systemName: "arrow.counterclockwise")
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(.primary)
-                            .frame(width: 32, height: 32)
-                            .overlay(
-                                Circle()
-                                    .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
-                            )
+                            .frame(width: 36, height: 36)
+                            .background(.ultraThinMaterial, in: Circle())
+                            .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
                     }
                     .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 4)
             #else
             HStack {
                 Text("Chapters")
@@ -449,16 +453,26 @@ struct AniListMangaDetailView: View {
 
     @ViewBuilder
     private func chapterRow(_ chapter: MangaChapter, index: Int, isSelected: Bool = false) -> some View {
-        // Read status — mirrors the anime EpisodeRowView pattern: read
-        // chapters get a filled green circle with a white checkmark; unread
-        // chapters get a subtle empty outline circle. Previously this row
-        // rendered a 36×36 circle with the chapter NUMBER inside, but the
-        // number was already shown in the row title ("Chapter N"), so the
-        // circle was purely decorative and redundant — the user explicitly
-        // called this out as looking worse than the anime equivalent.
+        // Read status — mirrors anime's EpisodeRowView exactly: every row
+        // has a filled circle of the same size; unread chapters show the
+        // chapter number on a Color.primary fill, read chapters show a
+        // white checkmark on a Color.green fill (with a matching colored
+        // drop shadow). The previous batch's "remove the numbered pill"
+        // approach was wrong — anime keeps the numbered circle and just
+        // changes its fill + content for completed items, which is what
+        // we now do here too.
         let mangaHref = resolvedItem?.href ?? ""
         let isRead = MangaProgressManager.shared.isChapterRead(
             mangaHref: mangaHref, chapterHref: chapter.href)
+        // Real index in the ORIGINAL chapters array — needed because
+        // `index` (from ForEach over displayChapters) is the position in
+        // the possibly-reversed display order, but openReader's index
+        // parameter controls next/prev navigation within the reader and
+        // must correspond to the chapter's real position. Without this,
+        // inverting the order (newestFirst=true) made tapping chapter 25
+        // open chapter 1 (and vice versa) — the displayed position no
+        // longer matched the real position.
+        let realIndex = chapters.firstIndex(where: { $0.id == chapter.id }) ?? index
         Button {
             if isSelectionMode {
                 if selectedChapterHrefs.contains(chapter.href) {
@@ -467,7 +481,7 @@ struct AniListMangaDetailView: View {
                     selectedChapterHrefs.insert(chapter.href)
                 }
             } else {
-                openReader(chapter: chapter, index: index)
+                openReader(chapter: chapter, index: realIndex)
             }
         } label: {
             HStack(spacing: 12) {
@@ -481,25 +495,28 @@ struct AniListMangaDetailView: View {
                         Image(systemName: isSelected ? "checkmark" : "")
                             .font(.caption2.weight(.bold))
                             .foregroundStyle(.white)
-                    } else if isRead {
-                        // Read — filled green circle with white checkmark,
-                        // matching anime's EpisodeRowView "watched" state.
-                        Circle()
-                            .fill(Color.green)
-                            .frame(width: 28, height: 28)
-                            .shadow(color: Color.green.opacity(0.3), radius: 3, y: 1)
-                        Image(systemName: "checkmark")
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(.white)
                     } else {
-                        // Unread — subtle empty outline circle (no fill,
-                        // no redundant content). Acts as a visual anchor
-                        // so read and unread rows keep the same height and
-                        // left-edge alignment, without repeating the
-                        // chapter number that's already in the title.
+                        // Non-selection — same 36×36 filled circle for every
+                        // row, with fill + content varying by read status
+                        // (matches anime's EpisodeRowView conditional:
+                        // isComplete ? Color.green : Color.primary for fill,
+                        // checkmark vs. number for content).
                         Circle()
-                            .strokeBorder(Color.primary.opacity(0.18), lineWidth: 1.5)
-                            .frame(width: 28, height: 28)
+                            .fill(isRead ? Color.green : Color.primary)
+                            .frame(width: 36, height: 36)
+                            .shadow(color: (isRead ? Color.green : Color.primary).opacity(0.3),
+                                    radius: 4, y: 2)
+                        if isRead {
+                            Image(systemName: "checkmark")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(.white)
+                        } else {
+                            Text(chapter.displayNumber)
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(platformBackground)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.6)
+                        }
                     }
                 }
                 VStack(alignment: .leading, spacing: 2) {

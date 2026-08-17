@@ -75,6 +75,18 @@ struct LibraryView: View {
     /// context menu actions on anime entries.
     @State private var pendingAnimeMedia: Media? = nil
     @State private var animeLinkActive = false
+    /// Drives the hidden DetailView NavigationLink for anime entries
+    /// tapped in the Library list/grid. When the user taps an anime
+    /// that has no linked module source, we asynchronously resolve the
+    /// title through an installed anime module (see `openAnime`) and
+    /// push DetailView directly — so the user lands on a page WITH
+    /// episodes, instead of the episode-less AniListDetailView.
+    @State private var pendingAnimeDetailItem: SearchItem? = nil
+    @State private var pendingAnimeDetailModuleId: String? = nil
+    @State private var animeDetailLinkActive = false
+    /// Media ID of the anime currently being resolved through a module
+    /// (drives the row spinner overlay during async resolution).
+    @State private var resolvingAnimeId: Int? = nil
     #if os(iOS)
     @State private var presentationWindow: UIWindow?
     #endif
@@ -155,42 +167,6 @@ struct LibraryView: View {
         // there's always something to show; sign-in lives in the toolbar + Settings.
         NavigationStack {
             libraryContent
-        }
-    }
-
-    // MARK: - Sort menu
-
-    private var sortMenu: some View {
-        Menu {
-            Section("Sort by") {
-                ForEach(LibrarySortOrder.allCases) { order in
-                    Button {
-                        if sortOrder == order { sortAscending.toggle() }
-                        else { sortOrderRaw = order.rawValue; sortAscending = false }
-                    } label: {
-                        HStack {
-                            Text(order.rawValue)
-                            if sortOrder == order {
-                                Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
-                            }
-                        }
-                    }
-                }
-            }
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "arrow.up.arrow.down")
-                    .font(.system(size: 13, weight: .semibold))
-                    .frame(width: 16, height: 16)
-                Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
-                    .font(.system(size: 9, weight: .bold))
-            }
-            .fixedSize(horizontal: true, vertical: false)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(.ultraThinMaterial, in: Capsule())
-            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 1))
-            .foregroundStyle(.primary)
         }
     }
 
@@ -299,28 +275,126 @@ struct LibraryView: View {
     }
 
     @ViewBuilder
-    private func statusFilterMenu() -> some View {
-        Menu { statusMenuContent } label: {
-            LibraryFilterLabel(
-                systemImage: "line.3.horizontal.decrease",
-                text: vm.selectedCustomList ?? vm.selectedStatus.displayName(for: vm.mediaType),
-                isActive: isStatusFilterActive,
-                collapsed: false
+    private var filterCapsuleRow: some View {
+        // Deliberately-calculated filter row: every control (status
+        // filter, sort, grid-toggle) shares the SAME capsule style —
+        // same height (38pt), same horizontal/vertical padding, same
+        // corner radius (Capsule), same 1pt stroke, same ultraThinMaterial
+        // background, same 10pt spacing between siblings. The previous
+        // implementation let each control size itself independently
+        // (statusFilterMenu used LibraryFilterLabel's 16/8 padding,
+        // sortMenu used 12/7 padding, grid-toggle lived in the toolbar
+        // with no capsule at all) — resulting in a loose collection of
+        // controls at different heights that didn't read as one designed
+        // unit. The shared `libraryCapsule` helper below enforces the
+        // consistent style; each control supplies only its content.
+        HStack(spacing: 10) {
+            // Status filter — widest control (has text label).
+            statusFilterCapsule
+            // Sort menu — medium width (icon + chevron).
+            sortCapsule
+            Spacer(minLength: 8)
+            // Grid/list toggle — icon-only, moved here from the
+            // navigation toolbar so all list-control actions live in
+            // one place. Matches the rest of the row's capsule style.
+            gridToggleCapsule
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// Shared capsule style for every control in the filter row.
+    /// Enforces consistent height, padding, corner radius, stroke, and
+    /// background — so the row reads as one designed unit rather than a
+    /// loose collection of independently-sized controls.
+    @ViewBuilder
+    private func libraryCapsule<Content: View>(
+        isActive: Bool = false,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        HStack(spacing: 6) {
+            content()
+        }
+        .font(.subheadline.weight(.medium))
+        .foregroundStyle(.primary)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+        .frame(minHeight: 38)
+        .background(
+            Capsule().fill(isActive ? Color.primary.opacity(0.12) : .ultraThinMaterial)
+        )
+        .overlay(
+            Capsule().strokeBorder(
+                isActive ? Color.primary.opacity(0.3) : Color.primary.opacity(0.2),
+                lineWidth: 1
             )
+        )
+        .contentShape(Capsule())
+    }
+
+    /// Status filter capsule — uses the shared `libraryCapsule` style
+    /// so it matches the sort and grid-toggle capsules exactly.
+    @ViewBuilder
+    private var statusFilterCapsule: some View {
+        Menu { statusMenuContent } label: {
+            libraryCapsule(isActive: isStatusFilterActive) {
+                Image(systemName: "line.3.horizontal.decrease")
+                    .font(.system(size: 13, weight: .semibold))
+                Text(vm.selectedCustomList ?? vm.selectedStatus.displayName(for: vm.mediaType))
+                    .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.secondary)
+            }
         }
         .menuIndicator(.hidden)
-        .foregroundStyle(.primary)
         .buttonStyle(.plain)
     }
 
+    /// Sort capsule — uses the shared `libraryCapsule` style.
     @ViewBuilder
-    private var filterCapsuleRow: some View {
-        HStack(spacing: 8) {
-            statusFilterMenu()
-            sortMenu
-                .labelStyle(.titleAndIcon)
-            Spacer()
+    private var sortCapsule: some View {
+        Menu {
+            Section("Sort by") {
+                ForEach(LibrarySortOrder.allCases) { order in
+                    Button {
+                        if sortOrder == order { sortAscending.toggle() }
+                        else { sortOrderRaw = order.rawValue; sortAscending = false }
+                    } label: {
+                        HStack {
+                            Text(order.rawValue)
+                            if sortOrder == order {
+                                Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
+                            }
+                        }
+                    }
+                }
+            }
+        } label: {
+            libraryCapsule {
+                Image(systemName: "arrow.up.arrow.down")
+                    .font(.system(size: 13, weight: .semibold))
+                Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.secondary)
+            }
         }
+        .menuIndicator(.hidden)
+        .buttonStyle(.plain)
+    }
+
+    /// Grid/list layout toggle capsule — moved here from the navigation
+    /// toolbar so all list-control actions live in one designed row.
+    @ViewBuilder
+    private var gridToggleCapsule: some View {
+        Button {
+            isGridLayout.toggle()
+        } label: {
+            libraryCapsule {
+                Image(systemName: isGridLayout ? "list.bullet" : "square.grid.2x2")
+                    .font(.system(size: 14, weight: .semibold))
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     /// Anime | Manga capsule pills, matching `LibrarySourceSwitcher`'s pill style.
@@ -395,6 +469,23 @@ struct LibraryView: View {
         .hidden()
     }
 
+    /// Hidden link for anime DetailView (the page WITH episodes). Driven
+    /// by `openAnime` after async module resolution succeeds — pushes
+    /// DetailView with the resolved SearchItem + moduleId so the user
+    /// lands directly on the episode list, not the stats-only
+    /// AniListDetailView.
+    @ViewBuilder private var animeDetailNavLink: some View {
+        NavigationLink(
+            destination: Group {
+                if let item = pendingAnimeDetailItem {
+                    DetailView(item: item, moduleId: pendingAnimeDetailModuleId)
+                }
+            },
+            isActive: $animeDetailLinkActive
+        ) { EmptyView() }
+        .hidden()
+    }
+
     private func openManga(_ entry: LibraryEntry) {
         if let source = entry.localSource, source.kind == .module {
             pendingMangaItem = SearchItem(
@@ -405,6 +496,73 @@ struct LibraryView: View {
         } else {
             pendingAniListMangaMedia = entry.media
             aniListMangaLinkActive = true
+        }
+    }
+
+    /// Anime entries: tap resolves a module first (if none is linked to
+    /// the entry) and then pushes DetailView directly — so the user
+    /// lands on a page WITH episodes, not the episode-less
+    /// AniListDetailView. Mirrors `openManga`'s async-resolution
+    /// pattern. Falls back to AniListDetailView only when no anime
+    /// module is installed or no search results match the title.
+    private func openAnime(_ entry: LibraryEntry) {
+        // Branch 1: entry already has a linked module source — go
+        // straight to DetailView with that module (no resolution needed).
+        if let source = entry.localSource, source.kind == .module,
+           let href = source.detailHref, !href.isEmpty {
+            pendingAnimeDetailItem = SearchItem(
+                title: entry.media.title.displayTitle,
+                image: entry.media.coverImage.best ?? "",
+                href: href)
+            pendingAnimeDetailModuleId = source.moduleId
+            animeDetailLinkActive = true
+            return
+        }
+
+        // Branch 2: no linked module — try to resolve through an
+        // installed anime module. If the user has zero anime modules,
+        // fall back to AniListDetailView immediately (no async work).
+        let manager = ModuleManager.shared
+        guard let animeModule = AnimeModulePreference.pick(
+                active: manager.activeModule,
+                modules: manager.modules) else {
+            pendingAnimeMedia = entry.media
+            animeLinkActive = true
+            return
+        }
+
+        // Show a spinner on the tapped row during async resolution.
+        resolvingAnimeId = entry.media.id
+        Task {
+            // Switch to the chosen anime module if it isn't already active.
+            if manager.activeModule?.id != animeModule.id {
+                _ = await manager.selectAndAwaitReady(animeModule)
+            }
+            // Search the module for the title. Pick an exact
+            // case-insensitive match if available, else the first result.
+            let title = entry.media.title.searchTitle
+            let results = (try? await JSEngine.shared.search(keyword: title)) ?? []
+            let needle = title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let match = results.first { $0.title.lowercased() == needle } ?? results.first
+
+            // Always clear the spinner when done.
+            await MainActor.run { resolvingAnimeId = nil }
+
+            if let match {
+                await MainActor.run {
+                    pendingAnimeDetailItem = match
+                    pendingAnimeDetailModuleId = animeModule.id
+                    animeDetailLinkActive = true
+                }
+            } else {
+                // No search results — fall back to AniListDetailView so
+                // the user still sees stats/synopsis/relations (better
+                // than a dead-end "no results" toast).
+                await MainActor.run {
+                    pendingAnimeMedia = entry.media
+                    animeLinkActive = true
+                }
+            }
         }
     }
 
@@ -435,16 +593,11 @@ struct LibraryView: View {
 
     @ToolbarContentBuilder
     private var libraryToolbar: some ToolbarContent {
-        #if os(iOS)
-        ToolbarItem(placement: toolbarItemPlacement[0]) {
-            Button {
-                isGridLayout.toggle()
-            } label: {
-                Image(systemName: isGridLayout ? "list.bullet" : "square.grid.2x2")
-                    .font(.system(size: 17, weight: .medium))
-            }
-        }
-        #endif
+        // Grid/list toggle was moved into `filterCapsuleRow` so it sits
+        // alongside the other list-control actions in one designed row
+        // (consistent height/padding/corner radius with status filter
+        // and sort). The toolbar now only carries the profile/sign-in
+        // button on the trailing side.
         ToolbarItem(placement: toolbarItemPlacement[1]) {
             if isActiveProviderAuthenticated {
                 HStack(spacing: 10) {
@@ -615,40 +768,27 @@ struct LibraryView: View {
         }
     }
 
-    /// Module-scraped and AniList/MAL entries navigate to a detail screen (branched destination).
+    /// Module-scraped and AniList/MAL entries navigate to a detail screen
+    /// (branched destination). Anime rows use `openAnime` (async module
+    /// resolution → DetailView with episodes) instead of a synchronous
+    /// NavigationLink to AniListDetailView (which has no episode list).
     @ViewBuilder
     private func navigableRow(_ entry: LibraryEntry) -> some View {
-        ZStack {
-            NavigationLink(destination: rowDestination(entry)) {
-                EmptyView()
-            }
-            .opacity(0)
-
-            LibraryRowView(entry: entry, scoreFormat: scoreFormat) {
-                if !vm.isLocal && anilistAuth.isLoggedIn && malAuth.isLoggedIn && !dualSync {
-                    pendingEntry = entry
-                    showProviderPicker = true
-                } else {
-                    selectedEntry = entry
-                }
+        LibraryRowView(entry: entry, scoreFormat: scoreFormat) {
+            if !vm.isLocal && anilistAuth.isLoggedIn && malAuth.isLoggedIn && !dualSync {
+                pendingEntry = entry
+                showProviderPicker = true
+            } else {
+                selectedEntry = entry
             }
         }
-    }
-
-    @ViewBuilder
-    private func rowDestination(_ entry: LibraryEntry) -> some View {
-        if let source = entry.localSource, source.kind == .module {
-            DetailView(
-                item: SearchItem(
-                    title: entry.media.title.displayTitle,
-                    image: entry.media.coverImage.best ?? "",
-                    href: source.detailHref ?? ""
-                ),
-                moduleId: source.moduleId
-            )
-        } else {
-            AniListDetailView(mediaId: entry.media.id, preloadedMedia: entry.media)
+        .overlay(alignment: .center) {
+            if resolvingAnimeId == entry.media.id {
+                ProgressView()
+            }
         }
+        .contentShape(Rectangle())
+        .onTapGesture { openAnime(entry) }
     }
 
     /// Local imported files have no detail screen — tapping the row resumes playback.
@@ -736,8 +876,14 @@ struct LibraryView: View {
                 let columns = [GridItem(.adaptive(minimum: 100), spacing: 12)]
                 LazyVGrid(columns: columns, spacing: 16) {
                     ForEach(displayedEntries, id: \.media.id) { entry in
-                        NavigationLink {
-                            rowDestination(entry)
+                        Button {
+                            if entry.media.isManga {
+                                openManga(entry)
+                            } else if let source = entry.localSource, source.kind == .localFile {
+                                resumeLocalFile(source)
+                            } else {
+                                openAnime(entry)
+                            }
                         } label: {
                             libraryGridCard(entry)
                         }
@@ -838,6 +984,7 @@ struct LibraryView: View {
         .background { mangaNavLink }
         .background { aniListMangaNavLink }
         .background { animeNavLink }
+        .background { animeDetailNavLink }
         .toolbar { libraryToolbar }
         .task { await vm.autoRefreshIfNeeded() }
         #if os(iOS)

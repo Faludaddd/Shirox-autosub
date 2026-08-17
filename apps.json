@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "1.29",
+          "buildVersion": "1",
+          "date": "2026-08-17",
+          "localizedDescription": "Fixed: inverting manga chapter order no longer opens the wrong chapter — tapping chapter 25 in inverted mode now correctly opens chapter 25 (was opening chapter 1 due to an index mismatch between display order and real chapter position).\nFixed: manga chapter rows now show the numbered circle again (matching anime's episode row style), with a green-filled checkmark variant for completed chapters — the previous batch's removal of the numbered circle was incorrect; anime keeps the circle and just changes its fill color and content for completed items.\nFixed: section-header action buttons (download, invert, reset) in the manga Chapters section resized from cramped 32×32 to 36×36 with ultraThinMaterial background, matching anime's episodes section header exactly.\nFixed: Library filter row redesigned — status filter, sort, and grid/list toggle now share a single calculated capsule style (same height, padding, corner radius, spacing) instead of each control sizing itself independently. Grid toggle moved from the navigation toolbar into the filter row so all list controls live together as one designed unit.\nFixed: tapping an anime in Library with no linked module source now auto-resolves the title through an installed anime module and routes directly to the episode-list page (DetailView) — previously these entries landed on the stats-only AniListDetailView with no way to watch. Falls back to AniListDetailView only when no anime module is installed or no search results match.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 11040520,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.28",
           "buildVersion": "1",
           "date": "2026-08-17",
