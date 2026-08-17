@@ -32,7 +32,7 @@
           "date": "2026-08-17",
           "localizedDescription": "Fixed: Continue Chapter button on manga detail page no longer truncates to \"Con…\" — the hero button row was restructured so the primary button has full width (previously 5 fixed-width icon buttons crowded it).\nFixed: manga chapter rows now show a meaningful read/unread indicator (green checkmark for read, subtle outline circle for unread) instead of a redundant numbered circle pill that repeated the chapter number already shown in the title.\nAdded: long-press context menu on manga chapter rows to manually mark chapters as Read or Unread.\nRemoved: jump-to-latest-chapter button (low value, contributed to button row crowding).\nRemoved: connections/people toggle from manga detail page (relations are already shown above the chapters list, so the toggle just hid the chapters without adding new information).\nMoved: download/select-mode, invert-order, and reset-progress actions from the hero button row into the Chapters section header as a section-local toolbar — colocated with the list they actually control.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 11038965,
+          "size": 11036861,
           "minOSVersion": "15.0"
         },
         {
