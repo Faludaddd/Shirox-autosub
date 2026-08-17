@@ -37,9 +37,6 @@ struct AniListMangaDetailView: View {
     /// render without a second network call.
     @State private var preloadedCharacters: [AniListCharacterEdge] = []
     @State private var preloadedRecommendations: [AniListRecommendation] = []
-    /// 0 = chapters view, 1 = connections view (relations + reading order).
-    /// Toggled by the social/people icon button, matching the anime page.
-    @State private var selectedTab = 0
     @State private var showResetConfirmation = false
     @State private var newestFirst = false
     @State private var isSelectionMode = false
@@ -227,189 +224,43 @@ struct AniListMangaDetailView: View {
                     SynopsisSection(text: desc)
                         .padding(.top, 16)
                 }
-                // Continue/Read button + action icon buttons — matches the
-                // anime AniList page's button row layout.
+                // Primary read/continue button — full width, no icon siblings.
+                // Previously this row had 5 fixed-width 46×46 circle buttons
+                // competing for space (connections toggle, download/select
+                // mode, jump-to-latest, invert order, reset progress), which
+                // truncated the primary button's label to "Con…" even with
+                // .layoutPriority(1) and .minimumScaleFactor(0.7). The
+                // secondary actions now live in the Chapters section header
+                // itself (see `chaptersSection`) — colocated with the list
+                // they actually control, the same way a section-local toolbar
+                // sits next to its list. The jump-to-latest button was
+                // removed entirely (low value, contributed to crowding). The
+                // connections/people toggle was removed because the relations
+                // section is already shown above the chapters list — switching
+                // tabs just hid the chapters, it didn't surface any new info.
                 #if os(iOS)
-                HStack(spacing: 10) {
-                    readButton(media: media)
-
-                    // Social/connections icon — toggles between chapters view
-                    // and connections view (relations + reading order).
-                    // Does NOT open the edit sheet (that's the pencil button).
-                    Button {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                            selectedTab = selectedTab == 0 ? 1 : 0
-                        }
-                    } label: {
-                        Image(systemName: selectedTab == 0 ? "person.3.fill" : "list.bullet")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(selectedTab == 1 ? platformBackground : .primary)
-                            .frame(width: 46, height: 46)
-                            .background(
-                                selectedTab == 1
-                                    ? Color.primary
-                                    : Color.clear,
-                                in: Circle()
-                            )
-                            .background(.ultraThinMaterial, in: Circle())
-                            .overlay(
-                                Circle()
-                                    .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
-                            )
-                    }
-                    .buttonStyle(.plain)
-
-                    // Download button — opens chapter selection mode for
-                    // batch download. Toggles isSelectionMode on the
-                    // chapters section (same as MangaDetailView's flow).
-                    if !chapters.isEmpty {
-                        Button {
-                            Haptics.selection()
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                                isSelectionMode.toggle()
-                                if !isSelectionMode { selectedChapterHrefs.removeAll() }
-                            }
-                        } label: {
-                            Image(systemName: isSelectionMode ? "checkmark.circle.fill" : "arrow.down.circle")
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundStyle(isSelectionMode ? platformBackground : .primary)
-                                .frame(width: 46, height: 46)
-                                .background(
-                                    isSelectionMode ? Color.primary : Color.clear,
-                                    in: Circle()
-                                )
-                                .background(.ultraThinMaterial, in: Circle())
-                                .overlay(
-                                    Circle()
-                                        .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
-                                )
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    // Jump to latest chapter — uses a distinct icon
-                    // (arrow.up.arrow.down) so it's visually different from
-                    // the download button.
-                    if chapters.count > 1 {
-                        Button {
-                            if let last = chapters.last {
-                                openReader(chapter: last, index: chapters.count - 1)
-                            }
-                        } label: {
-                            Image(systemName: "arrow.up.arrow.down")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(.primary)
-                                .frame(width: 46, height: 46)
-                                .background(.ultraThinMaterial, in: Circle())
-                                .overlay(
-                                    Circle()
-                                        .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
-                                )
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    // Invert chapter order button — toggles newestFirst
-                    // (same as anime's episode invert button).
-                    if chapters.count > 1 {
-                        Button {
-                            Haptics.selection()
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                                newestFirst.toggle()
-                            }
-                        } label: {
-                            Image(systemName: newestFirst ? "arrow.down" : "arrow.up")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(.primary)
-                                .frame(width: 46, height: 46)
-                                .background(.ultraThinMaterial, in: Circle())
-                                .overlay(
-                                    Circle()
-                                        .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
-                                )
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    // Reset/recent progress button — same as anime's
-                    // reset progress button.
-                    if let item = resolvedItem,
-                       MangaProgressManager.shared.hasProgress(mangaHref: item.href) {
-                        Button {
-                            showResetConfirmation = true
-                        } label: {
-                            Image(systemName: "arrow.counterclockwise")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(.primary)
-                                .frame(width: 46, height: 46)
-                                .background(.ultraThinMaterial, in: Circle())
-                                .overlay(
-                                    Circle()
-                                        .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
-                                )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
-                .padding(.bottom, 8)
+                readButton(media: media)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
+                    .padding(.bottom, 8)
                 #endif
                 // Section order matches the anime AniList page:
-                // Button row → Chapters → Characters → Recommendations
-                if selectedTab == 0 {
-                    // Chapters view (default)
-                    if let edges = media.relations?.edges {
-                        let mangaRelations = edges.filter { $0.node.isManga }
-                        if !mangaRelations.isEmpty {
-                            relationsSection(mangaRelations)
-                                .padding(.top, 16)
-                        }
+                // Button → Relations → Chapters → Characters → Recommendations.
+                // (Previously this branched on a `selectedTab` toggle between
+                // a chapters view and a connections view. The connections view
+                // was redundant — the relations section is already shown
+                // above the chapters list in the default view, so switching
+                // tabs just hid the chapters. The toggle was removed.)
+                if let edges = media.relations?.edges {
+                    let mangaRelations = edges.filter { $0.node.isManga }
+                    if !mangaRelations.isEmpty {
+                        relationsSection(mangaRelations)
+                            .padding(.top, 16)
                     }
-                    // Chapters — fetched from the resolved manga module.
-                    chaptersSection
-                        .padding(.top, 16)
-                } else {
-                    // Connections view (tab 1) — reading order + relations.
-                    // Matches the anime page's Watch Order + Relations section.
-                    VStack(alignment: .leading, spacing: 20) {
-                        // Reading order — for manga this is the same as
-                        // relations (prequel → sequel chain). We reuse the
-                        // relations section since manga doesn't have a
-                        // separate "watch order" concept.
-                        if let edges = media.relations?.edges {
-                            let mangaRelations = edges.filter { $0.node.isManga }
-                            if !mangaRelations.isEmpty {
-                                relationsSection(mangaRelations)
-                                    .frame(maxWidth: .infinity)
-                            } else {
-                                VStack(spacing: 20) {
-                                    Image(systemName: "link.badge.plus")
-                                        .font(.system(size: 48))
-                                        .foregroundStyle(.secondary.opacity(0.5))
-                                    Text("No relations found")
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 60)
-                            }
-                        } else {
-                            VStack(spacing: 20) {
-                                Image(systemName: "link.badge.plus")
-                                    .font(.system(size: 48))
-                                    .foregroundStyle(.secondary.opacity(0.5))
-                                Text("No relations found")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 60)
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 16)
                 }
+                // Chapters — fetched from the resolved manga module.
+                chaptersSection
+                    .padding(.top, 16)
                 // Characters + Recommendations — placed AFTER the chapters/
                 // connections section, matching the anime AniList page:
                 // Synopsis → Buttons → Episodes/Chapters → Characters → Recommendations
@@ -431,6 +282,92 @@ struct AniListMangaDetailView: View {
     @ViewBuilder
     private var chaptersSection: some View {
         VStack(alignment: .leading, spacing: 12) {
+            // Section-local toolbar: title + count badge on the left,
+            // secondary action icons on the right. These actions were
+            // previously jammed into the hero button row above, where they
+            // crowded the primary "Continue Chapter" button and caused its
+            // label to truncate to "Con…". Moving them here gives the
+            // primary button the full row width AND colocates the actions
+            // with the list they actually control.
+            #if os(iOS)
+            HStack(spacing: 8) {
+                Text("Chapters")
+                    .font(.title3.weight(.bold))
+                if !chapters.isEmpty {
+                    Text("\(chapters.count)")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(Color.secondary.opacity(0.15)))
+                }
+                Spacer()
+                // Selection-mode / batch-download toggle. Same behavior as
+                // before — toggles isSelectionMode on the chapter list —
+                // just relocated from the hero row to here.
+                if !chapters.isEmpty {
+                    Button {
+                        Haptics.selection()
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            isSelectionMode.toggle()
+                            if !isSelectionMode { selectedChapterHrefs.removeAll() }
+                        }
+                    } label: {
+                        Image(systemName: isSelectionMode ? "checkmark.circle.fill" : "arrow.down.circle")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(isSelectionMode ? platformBackground : .primary)
+                            .frame(width: 32, height: 32)
+                            .background(
+                                isSelectionMode ? Color.primary : Color.clear,
+                                in: Circle()
+                            )
+                            .overlay(
+                                Circle()
+                                    .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+                // Invert chapter order — toggles newestFirst.
+                if chapters.count > 1 {
+                    Button {
+                        Haptics.selection()
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            newestFirst.toggle()
+                        }
+                    } label: {
+                        Image(systemName: newestFirst ? "arrow.down" : "arrow.up")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .frame(width: 32, height: 32)
+                            .overlay(
+                                Circle()
+                                    .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+                // Reset reading progress — only shows if the user actually
+                // has progress for this manga.
+                if let item = resolvedItem,
+                   MangaProgressManager.shared.hasProgress(mangaHref: item.href) {
+                    Button {
+                        showResetConfirmation = true
+                    } label: {
+                        Image(systemName: "arrow.counterclockwise")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.primary)
+                            .frame(width: 32, height: 32)
+                            .overlay(
+                                Circle()
+                                    .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 16)
+            #else
             HStack {
                 Text("Chapters")
                     .font(.title3.weight(.bold))
@@ -445,6 +382,7 @@ struct AniListMangaDetailView: View {
                 }
             }
             .padding(.horizontal, 16)
+            #endif
 
             if isLoadingChapters {
                 HStack(spacing: 8) {
@@ -511,6 +449,16 @@ struct AniListMangaDetailView: View {
 
     @ViewBuilder
     private func chapterRow(_ chapter: MangaChapter, index: Int, isSelected: Bool = false) -> some View {
+        // Read status — mirrors the anime EpisodeRowView pattern: read
+        // chapters get a filled green circle with a white checkmark; unread
+        // chapters get a subtle empty outline circle. Previously this row
+        // rendered a 36×36 circle with the chapter NUMBER inside, but the
+        // number was already shown in the row title ("Chapter N"), so the
+        // circle was purely decorative and redundant — the user explicitly
+        // called this out as looking worse than the anime equivalent.
+        let mangaHref = resolvedItem?.href ?? ""
+        let isRead = MangaProgressManager.shared.isChapterRead(
+            mangaHref: mangaHref, chapterHref: chapter.href)
         Button {
             if isSelectionMode {
                 if selectedChapterHrefs.contains(chapter.href) {
@@ -524,19 +472,34 @@ struct AniListMangaDetailView: View {
         } label: {
             HStack(spacing: 12) {
                 ZStack {
-                    Circle()
-                        .fill(isSelected ? Color.appAccent : Color.primary.opacity(0.08))
-                        .frame(width: 36, height: 36)
                     if isSelectionMode {
+                        // Selection mode — keep the existing checkmark
+                        // circle (legitimate use: communicates selection state).
+                        Circle()
+                            .fill(isSelected ? Color.appAccent : Color.primary.opacity(0.08))
+                            .frame(width: 36, height: 36)
                         Image(systemName: isSelected ? "checkmark" : "")
                             .font(.caption2.weight(.bold))
                             .foregroundStyle(.white)
+                    } else if isRead {
+                        // Read — filled green circle with white checkmark,
+                        // matching anime's EpisodeRowView "watched" state.
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: 28, height: 28)
+                            .shadow(color: Color.green.opacity(0.3), radius: 3, y: 1)
+                        Image(systemName: "checkmark")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(.white)
                     } else {
-                        Text(chapter.displayNumber)
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.6)
+                        // Unread — subtle empty outline circle (no fill,
+                        // no redundant content). Acts as a visual anchor
+                        // so read and unread rows keep the same height and
+                        // left-edge alignment, without repeating the
+                        // chapter number that's already in the title.
+                        Circle()
+                            .strokeBorder(Color.primary.opacity(0.18), lineWidth: 1.5)
+                            .frame(width: 28, height: 28)
                     }
                 }
                 VStack(alignment: .leading, spacing: 2) {
@@ -558,6 +521,27 @@ struct AniListMangaDetailView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        // Long-press context menu to manually toggle read/unread —
+        // matches MangaDetailView's MangaChapterRowView.
+        .contextMenu {
+            if !isSelectionMode {
+                if isRead {
+                    Button {
+                        MangaProgressManager.shared.markChapterUnread(
+                            mangaHref: mangaHref, chapterHref: chapter.href)
+                    } label: {
+                        Label("Mark as Unread", systemImage: "xmark.circle")
+                    }
+                } else {
+                    Button {
+                        MangaProgressManager.shared.markChapterRead(
+                            mangaHref: mangaHref, chapterHref: chapter.href)
+                    } label: {
+                        Label("Mark as Read", systemImage: "checkmark.circle")
+                    }
+                }
+            }
+        }
         if index < chapters.count - 1 {
             Divider()
                 .padding(.leading, 60)
