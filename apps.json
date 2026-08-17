@@ -32,7 +32,7 @@
           "date": "2026-08-17",
           "localizedDescription": "Fixed: Library filter row — ALL controls (status filter, sort, grid/list toggle, Anime/Manga pills, source switcher pills) now share one unified capsule style via a shared libraryCapsuleStyle ViewModifier. Every control has the exact same height (38pt), padding (14/9), corner radius (Capsule), background (ultraThinMaterial + active tint), and stroke (1pt). No control has its own custom sizing anymore.\nFixed: tapping an anime in Library now ALWAYS navigates to DetailView (the page with episodes) — the AniListDetailView fallback is removed entirely. If the entry has no linked module, the title is auto-resolved through an installed anime module. If no module is installed or search fails, DetailView still opens and shows its own state. No exceptions, no branching to a different page type.\nFixed: Toast close (X) button now works correctly — the X button's tap region is separated from the toast body's tap gesture so tapping X always dismisses without triggering the toast's own action. Previously both lived in the same HStack with a parent .onTapGesture covering the entire card, causing SwiftUI hit-testing conflicts. Stale doc comment about removed swipe gestures also updated.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 11040520,
+          "size": 11032801,
           "minOSVersion": "15.0"
         },
         {
