@@ -143,6 +143,22 @@ final class ProviderManager: ObservableObject {
             throw primaryError
         }
 
+        // If the fallback provider is NOT authenticated (e.g. user never
+        // connected a MAL account, or their token expired and was cleared),
+        // don't attempt the fallback — it will fail with
+        // "token refresh failed: unauthenticated" on every call, spamming
+        // the logs and leaving the page broken with no data from either
+        // provider. Throw the original error so the caller can surface a
+        // clear "AniList is rate-limited and no MAL account is linked"
+        // state to the user.
+        if !fallback.isAuthenticated {
+            Logger.shared.log(
+                "ProviderManager fallback \(fallback.providerType.rawValue) is not authenticated; skipping fallback",
+                type: "Provider"
+            )
+            throw primaryError
+        }
+
         fallbackActive = true
         Logger.shared.log(
             "ProviderManager switching to fallback: \(fallback.providerType.rawValue)",

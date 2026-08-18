@@ -54,6 +54,15 @@ final class AniListService {
     private let scheduleCacheTTL: TimeInterval = 60  // seconds
     private let scheduleCacheLock = NSLock()
 
+    /// In-flight detail request de-dupe. When the user rapidly opens multiple
+    /// anime/manga detail pages (or the same page repeatedly), this prevents
+    /// burning through rate-limit budget with near-simultaneous identical
+    /// requests. Keyed by `"\(type):\(id)"` — if a request for that key is
+    /// already in flight, the caller awaits and shares its result instead of
+    /// firing a duplicate.
+    private var inFlightDetailTasks: [String: Task<AniListMedia, Error>] = [:]
+    private let inFlightDetailLock = NSLock()
+
     private init() {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 15
@@ -62,6 +71,39 @@ final class AniListService {
             "Accept": "application/json"
         ]
         session = URLSession(configuration: config)
+    }
+
+    /// De-duplicates in-flight detail requests. If a request for `key` is
+    /// already running, the caller shares its result (success or failure)
+    /// instead of firing a duplicate. The task is removed from the map as
+    /// soon as it completes so subsequent calls fetch fresh data.
+    /// This prevents rapid page-browsing from burning through rate-limit
+    /// budget with near-simultaneous identical requests.
+    private func dedupeDetail(
+        key: String,
+        operation: @escaping () async throws -> AniListMedia
+    ) async throws -> AniListMedia {
+        // Check for an existing in-flight task.
+        let existing: Task<AniListMedia, Error>? = {
+            inFlightDetailLock.lock()
+            defer { inFlightDetailLock.unlock() }
+            return inFlightDetailTasks[key]
+        }()
+        if let existing { return try await existing.value }
+
+        // Create a new task for this key.
+        let task = Task<AniListMedia, Error> { try await operation() }
+        inFlightDetailLock.lock()
+        inFlightDetailTasks[key] = task
+        inFlightDetailLock.unlock()
+
+        defer {
+            inFlightDetailLock.lock()
+            inFlightDetailTasks[key] = nil
+            inFlightDetailLock.unlock()
+        }
+
+        return try await task.value
     }
 
     // MARK: - Public API
@@ -742,7 +784,17 @@ final class AniListService {
         return try await fetchPage(query: query, variables: variables)
     }
 
+    /// Fetches the full anime detail for `id`. Wraps `detailDirect` with an
+    /// in-flight de-dupe so rapid repeated calls for the same ID (e.g. user
+    /// quickly browsing multiple anime pages, or the same page reopening)
+    /// share a single network request instead of firing duplicates that burn
+    /// through rate-limit budget.
     func detail(id: Int) async throws -> AniListMedia {
+        let key = "anime:\(id)"
+        return try await dedupeDetail(key: key) { try await self.detailDirect(id: id) }
+    }
+
+    private func detailDirect(id: Int) async throws -> AniListMedia {
         let query = """
         query ($id: Int) {
           Media(id: $id, type: ANIME, isAdult: false) {
@@ -784,7 +836,7 @@ final class AniListService {
                   image { large medium }
                   description(asHtml: false)
                 }
-                voiceActors(language: JAPANESE, sort: ROLE) { VO_EXPANDED
+                voiceActors(language: JAPANESE, sort: ROLE) {
                   id
                   name { full native alternative alternativeSpoiler }
                   language
@@ -894,7 +946,14 @@ final class AniListService {
     /// #131 — Expanded field set so the manga detail page can render the same
     /// Statistics grid the anime page does: Type, Format, Status, Popularity,
     /// Chapters, Volumes, Score, Season, Start Date, Source, Studio/Publisher.
+    /// Fetches the full manga detail for `id`. Wraps `mangaDetailDirect`
+    /// with the same in-flight de-dupe as `detail(id:)`.
     func mangaDetail(id: Int) async throws -> AniListMedia {
+        let key = "manga:\(id)"
+        return try await dedupeDetail(key: key) { try await self.mangaDetailDirect(id: id) }
+    }
+
+    private func mangaDetailDirect(id: Int) async throws -> AniListMedia {
         let query = """
         query ($id: Int) {
           Media(id: $id, type: MANGA, isAdult: false) {
@@ -927,7 +986,7 @@ final class AniListService {
                   image { large medium }
                   description(asHtml: false)
                 }
-                voiceActors(language: JAPANESE, sort: ROLE) { VO_EXPANDED
+                voiceActors(language: JAPANESE, sort: ROLE) {
                   id
                   name { full native alternative alternativeSpoiler }
                   language

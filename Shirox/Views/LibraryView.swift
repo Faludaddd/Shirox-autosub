@@ -331,7 +331,9 @@ struct LibraryView: View {
         .buttonStyle(.plain)
     }
 
-    /// Sort capsule — uses the shared `.libraryCapsuleStyle()`.
+    /// Sort capsule — uses the shared `.libraryCapsuleStyle()`. Displays
+    /// as a TEXT label ("Sort: Recently Updated" etc.) instead of an
+    /// icon-only button so the current sort state is clear at a glance.
     @ViewBuilder
     private var sortCapsule: some View {
         Menu {
@@ -352,8 +354,9 @@ struct LibraryView: View {
             }
         } label: {
             HStack(spacing: 6) {
-                Image(systemName: "arrow.up.arrow.down")
-                    .font(.system(size: LibraryDS.pillIconSize, weight: .semibold))
+                Text("Sort: \(sortOrder.rawValue)")
+                    .font(LibraryDS.pillFont)
+                    .lineLimit(1)
                 Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
                     .font(.system(size: LibraryDS.chevronSize, weight: .bold))
                     .foregroundStyle(.secondary)

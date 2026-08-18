@@ -17,7 +17,7 @@ enum LibraryDS {
     /// Used by: filter chip, sort menu, source pill, media-type pill,
     /// grid/list toggle, view-mode segment. Every control in the Library
     /// shares this exact height — no exceptions.
-    static let controlHeight: CGFloat = 38
+    static let controlHeight: CGFloat = 44
 
     // MARK: Corner radii
 
@@ -31,20 +31,20 @@ enum LibraryDS {
 
     /// Horizontal padding inside a pill/chip/capsule (text + icon → edge).
     /// Shared by every control in the Library.
-    static let pillHorizontalPadding: CGFloat = 14
+    static let pillHorizontalPadding: CGFloat = 16
     /// Vertical padding inside a pill/chip/capsule.
     /// Shared by every control in the Library.
-    static let pillVerticalPadding: CGFloat = 9
+    static let pillVerticalPadding: CGFloat = 11
 
     // MARK: Icon sizes
 
-    static let pillIconSize: CGFloat = 13
-    static let chevronSize: CGFloat = 9
-    static let iconButtonIconSize: CGFloat = 14
+    static let pillIconSize: CGFloat = 14
+    static let chevronSize: CGFloat = 10
+    static let iconButtonIconSize: CGFloat = 16
 
     // MARK: Font sizes
 
-    static let pillFont: Font = .system(size: 14, weight: .medium)
+    static let pillFont: Font = .system(size: 15, weight: .medium)
     static let chipFont: Font = .system(size: 12, weight: .semibold)
     static let sectionHeaderFont: Font = .system(size: 15, weight: .bold)
     static let cardTitleFont: Font = .system(size: 15, weight: .semibold)

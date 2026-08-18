@@ -54,14 +54,25 @@ struct ContinueReadingSection: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: 12) {
                     ForEach(items) { item in
-                        Button { open(item) } label: {
-                            ContinueReadingCardDisplay(
-                                item: item,
-                                isLoading: loadingHref == item.mangaHref
-                            )
-                        }
-                        .buttonStyle(.plain)
+                        // Use .contentShape + .onTapGesture instead of Button
+                        // to avoid a known SwiftUI gesture conflict: Button
+                        // inside a LazyHStack with .contextMenu can have its
+                        // tap target misaligned with the visual card after
+                        // the LazyHStack recycles views during scroll. This
+                        // was causing "tapping the first poster opens the
+                        // second one" — the Button's captured `item` didn't
+                        // match the visual position after recycling.
+                        // .contentShape(Rectangle()) + .onTapGesture is
+                        // stable across LazyHStack recycling because the
+                        // gesture is attached to the view itself, not a
+                        // Button wrapper that SwiftUI might reuse.
+                        ContinueReadingCardDisplay(
+                            item: item,
+                            isLoading: loadingHref == item.mangaHref
+                        )
                         .frame(width: 130)
+                        .contentShape(Rectangle())
+                        .onTapGesture { open(item) }
                         .contextMenu {
                             if let aniListId = MangaMatchManager.shared.cachedMatch(mangaHref: item.mangaHref)?.aniListID {
                                 Button {

@@ -50,18 +50,23 @@ final class AniListDetailViewModel: ObservableObject {
         isLoading = true
         error = nil
         do {
-            // Always try AniList directly first — the detail query doesn't
-            // require authentication and returns the full field set
-            // (statistics, studio, source, duration, etc.). The
-            // ProviderManager.call path may route to MAL when AniList is
-            // rate-limited, but MAL's detail endpoint returns fewer fields,
-            // causing the incomplete Statistics section when unauthenticated.
+            // AniList is the EXCLUSIVE source for Characters and Statistics.
+            // MAL's detail endpoint returns fewer fields (no voice actors,
+            // incomplete statistics), which previously caused an incomplete
+            // Statistics section and a dead-end Characters section when the
+            // MAL fallback fired. The MAL dual-source merge for these two
+            // features has been removed — if AniList fails, the page shows
+            // the error state instead of rendering partial MAL data.
+            // (MAL fallback for other purposes — like the provider-level
+            // rate-limit fallback for the Watch flow — is a separate system
+            // and is NOT removed here.)
             let raw = try await AniListService.shared.detail(id: id)
             media = AniListProvider.shared.mapMedia(raw)
             // Pre-populate characters + recommendations from the same fetch.
             characters = raw.characters?.edges ?? []
             recommendations = raw.recommendations?.nodes ?? []
-            // MAL/Jikan has no banner art; reuse the already-cached TVDB fanart.
+            // AniList may not have banner art for every title; reuse the
+            // already-cached TVDB fanart as a fallback.
             if media?.bannerImage == nil {
                 let artwork = await TVDBMappingService.shared.getArtwork(for: id, provider: .anilist)
                 if let fanart = artwork.fanart {
@@ -69,24 +74,12 @@ final class AniListDetailViewModel: ObservableObject {
                 }
             }
         } catch {
-            // If AniList fails (rate-limited, offline), try the provider
-            // manager's fallback path as a last resort.
-            do {
-                media = try await ProviderManager.shared.call { try await $0.detail(id: id) }
-                if media?.provider == .mal, media?.bannerImage == nil {
-                    let artwork = await TVDBMappingService.shared.getArtwork(for: id, provider: .mal)
-                    if let fanart = artwork.fanart {
-                        media?.bannerImage = fanart
-                    }
-                }
-                // Still try to get characters from AniList (best-effort).
-                if let raw = try? await AniListService.shared.detail(id: id) {
-                    characters = raw.characters?.edges ?? []
-                    recommendations = raw.recommendations?.nodes ?? []
-                }
-            } catch {
-                self.error = error.localizedDescription
-            }
+            // AniList failed (rate-limited, offline, or 4xx) — don't fall
+            // back to MAL for the detail page. MAL's detail returns fewer
+            // fields, causing incomplete Statistics and no Characters data.
+            // Show the error so the user knows AniList is temporarily
+            // unavailable and can retry.
+            self.error = error.localizedDescription
         }
         isLoading = false
     }
