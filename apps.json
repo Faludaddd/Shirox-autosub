@@ -32,7 +32,7 @@
           "date": "2026-08-18",
           "localizedDescription": "Changed: Manga chapter layout now matches anime episode layout EXACTLY — same 40×40 circle, 14pt spacing, 14/12 padding, .callout font, card background, progress bar, play icon, and download button. No separate smaller design for manga anymore.\nChanged: Search page restored to simpler design — removed the Surprise Me toolbar icon and the 18 category chips. Now just one simple 'Surprise Me' button that picks a random anime from trending/popular. No duplicates in the same session.\nFixed: Anime notification detail — HTTP 400 error fixed (guarded against invalid mediaId). Added 'Released X ago' and exact release date/time. All requested info now shows: title, cover, episode number, release time, countdown to next episode, status, schedule, progress, statistics.\nChanged: Edit Entry and Modules buttons — both on the right side now. Modules first, Edit Entry at far right. Completely independent buttons.\nFixed: Library tab alignment — all filter items now uniformly left-aligned. Grid toggle removed from filter row and moved to top-right toolbar corner.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 11040520,
+          "size": 11094969,
           "minOSVersion": "15.0"
         },
         {
