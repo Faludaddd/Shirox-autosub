@@ -270,7 +270,8 @@ struct NotificationsView: View {
                 mediaId: mediaId,
                 episodeNumber: episode,
                 mediaTitle: title,
-                coverImageURL: coverURL
+                coverImageURL: coverURL,
+                notificationCreatedAt: notif.createdAt
             )
         case .activityMessage(let activityId, _, _), .activityReply(let activityId, _, _),
              .activityMention(let activityId, _, _), .activityLike(let activityId, _, _):

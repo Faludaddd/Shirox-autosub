@@ -13,11 +13,14 @@ struct AnimeNotificationDetailView: View {
     let episodeNumber: Int
     let mediaTitle: String?
     let coverImageURL: String?
+    /// Unix timestamp of when the notification was created (i.e. when the
+    /// episode aired). Used to show "Released X ago" and the exact release
+    /// date/time.
+    let notificationCreatedAt: Int
 
     @State private var media: Media?
     @State private var isLoading = true
     @State private var error: String?
-    @State private var timelineTimer: Timer?
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -156,8 +159,14 @@ struct AnimeNotificationDetailView: View {
 
             VStack(spacing: 0) {
                 infoRow(label: "Episode", value: "\(episodeNumber)")
-                if let total = media.episodes {
+                Divider().padding(.leading, 16)
+                if notificationCreatedAt > 0 {
+                    infoRow(label: "Released", value: formatTimeAgo(notificationCreatedAt))
                     Divider().padding(.leading, 16)
+                    infoRow(label: "Release Date", value: formatAirDate(notificationCreatedAt))
+                    Divider().padding(.leading, 16)
+                }
+                if let total = media.episodes {
                     infoRow(label: "Total Episodes", value: "\(total)")
                     Divider().padding(.leading, 16)
                     infoRow(label: "Progress", value: "\(episodeNumber) / \(total)")
@@ -329,7 +338,30 @@ struct AnimeNotificationDetailView: View {
         return formatter.string(from: date)
     }
 
+    /// Formats a Unix timestamp as "X ago" (e.g. "2h ago", "3d ago").
+    private func formatTimeAgo(_ timestamp: Int) -> String {
+        let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
+        let interval = Date().timeIntervalSince(date)
+        let seconds = Int(interval)
+        if seconds < 60 { return "Just now" }
+        let mins = seconds / 60
+        let hours = seconds / 3600
+        let days = seconds / 86400
+        if days > 0 { return "\(days)d ago" }
+        if hours > 0 { return "\(hours)h ago" }
+        if mins > 0 { return "\(mins)m ago" }
+        return "Just now"
+    }
+
     private func loadMedia() async {
+        // Guard against invalid mediaId — AniList returns 400 for id=0.
+        guard mediaId > 0 else {
+            await MainActor.run {
+                self.error = "Invalid anime ID."
+                isLoading = false
+            }
+            return
+        }
         do {
             let raw = try await AniListService.shared.detail(id: mediaId)
             await MainActor.run {

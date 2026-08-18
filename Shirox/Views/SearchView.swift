@@ -90,21 +90,6 @@ struct SearchView: View {
                             filterButton
                         }
                     }
-                    // Surprise Me — always accessible from the toolbar so
-                    // the user can trigger it at any time, not just from the
-                    // empty state. Uses a shuffle icon.
-                    ToolbarItem(placement: .automatic) {
-                        if !isLocalModule && !isJellyfinModule {
-                            Button {
-                                surpriseMe()
-                            } label: {
-                                Image(systemName: "shuffle.circle.fill")
-                                    .font(.system(size: 17, weight: .medium))
-                                    .foregroundStyle(.primary)
-                            }
-                            .disabled(isSurpriseLoading)
-                        }
-                    }
                 }
                 .modifier(ConditionalSearchable(enabled: !isLocalModule && !isJellyfinModule, text: $vm.query))
                 .onSubmit(of: .search) {
@@ -604,67 +589,9 @@ struct SearchView: View {
     @ViewBuilder
     private var surpriseMeSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Section header
-            HStack {
-                Image(systemName: "shuffle.circle.fill")
-                    .font(.title3)
-                    .foregroundStyle(Color.appAccent)
-                Text("Surprise Me")
-                    .font(.title3.weight(.bold))
-                Spacer()
-            }
-            .padding(.horizontal, 16)
-
-            Text("Pick one or more categories, then tap Surprise Me to discover anime you haven't seen yet.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 16)
-
-            // Category chips — multi-select, same style as the filter chips
-            // in SearchFilterSheet so the UI is consistent.
-            LazyVGrid(columns: [
-                GridItem(.adaptive(minimum: 100), spacing: 8)
-            ], spacing: 8) {
-                ForEach(surpriseCategories, id: \.genre) { cat in
-                    let isSelected = selectedSurpriseGenres.contains(cat.genre)
-                    Button {
-                        Haptics.selection()
-                        if isSelected {
-                            selectedSurpriseGenres.remove(cat.genre)
-                        } else {
-                            selectedSurpriseGenres.insert(cat.genre)
-                        }
-                    } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: cat.icon)
-                                .font(.system(size: 11, weight: .semibold))
-                            Text(cat.label)
-                                .font(.system(size: 12, weight: .semibold))
-                                .lineLimit(1)
-                        }
-                        .foregroundStyle(isSelected ? Color.appAccent : .primary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .frame(maxWidth: .infinity)
-                        .background(
-                            Capsule().fill(isSelected
-                                ? Color.appAccent.opacity(0.15)
-                                : Color.secondary.opacity(0.10))
-                        )
-                        .overlay(
-                            Capsule().strokeBorder(
-                                isSelected ? Color.appAccent.opacity(0.4) : Color.clear,
-                                lineWidth: 1
-                            )
-                        )
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 16)
-
-            // Surprise Me button — glow enabled. Disabled while loading or
-            // when no categories are selected.
+            // Simple one-button Surprise Me — no category chips, no filters.
+            // Picks a random anime from trending/popular on AniList.
+            // Tracks shown IDs so the same anime is never returned twice.
             Button {
                 surpriseMe()
             } label: {
@@ -684,21 +611,18 @@ struct SearchView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
                 .background(
-                    selectedSurpriseGenres.isEmpty
-                        ? Color.secondary.opacity(0.4)
-                        : Color.appAccent,
+                    Color.appAccent,
                     in: RoundedRectangle(cornerRadius: 14)
                 )
                 .shadow(
-                    color: !selectedSurpriseGenres.isEmpty && Color.glowEnabled
+                    color: Color.glowEnabled
                         ? Color.appAccent.opacity(Color.glowOpacity(0.7))
                         : .clear,
-                    radius: !selectedSurpriseGenres.isEmpty && Color.glowEnabled
-                        ? Color.glowRadiusLarge : 0
+                    radius: Color.glowEnabled ? Color.glowRadiusLarge : 0
                 )
             }
             .buttonStyle(.plain)
-            .disabled(selectedSurpriseGenres.isEmpty || isSurpriseLoading)
+            .disabled(isSurpriseLoading)
             .padding(.horizontal, 16)
 
             // Shown count — lets the user know how many they've explored.
@@ -711,41 +635,28 @@ struct SearchView: View {
         }
     }
 
-    /// Picks a random anime from AniList filtered by the selected genres.
-    /// Tracks shown IDs so the same anime is never returned twice in one
-    /// session. When the pool is exhausted, resets the exclusion list.
-    /// Fetches multiple pages (1-3) to build a larger pool so the same
-    /// popular shows don't keep getting picked. The pool is shuffled
-    /// before picking so the selection is truly random, not biased toward
-    /// the top of AniList's popularity-sorted results.
+    /// Picks a random anime from AniList. No category filters required —
+    /// just fetches trending + popular anime, shuffles the pool, and picks
+    /// one that hasn't been shown yet this session. When the pool is
+    /// exhausted, resets the exclusion list.
     private func surpriseMe() {
-        guard !selectedSurpriseGenres.isEmpty else { return }
         isSurpriseLoading = true
         Task {
-            let genres = Array(selectedSurpriseGenres)
             let type = isMangaMode ? "MANGA" : "ANIME"
             var results: [AniListMedia] = []
-            // Fetch pages 1-3 to get a larger, more diverse pool (up to 150
-            // results per genre). Previously only page 1 was fetched, which
-            // always returned the same top-50 popular shows — making the
-            // "random" selection feel like it kept favoring the same titles.
-            for genre in genres {
-                for page in 1...3 {
-                    if let batch = try? await AniListService.shared.browseByGenre(
-                        page: page, type: type, genres: [genre]) {
-                        results.append(contentsOf: batch)
-                    }
-                }
+            // Fetch from multiple sources to build a diverse pool.
+            if !isMangaMode {
+                if let t = try? await AniListService.shared.trending() { results.append(contentsOf: t) }
+                if let p = try? await AniListService.shared.popular() { results.append(contentsOf: p) }
+                if let r = try? await AniListService.shared.topRated() { results.append(contentsOf: r) }
+            } else {
+                if let t = try? await AniListService.shared.mangaTrending() { results.append(contentsOf: t) }
+                if let p = try? await AniListService.shared.mangaPopular() { results.append(contentsOf: p) }
             }
             // Deduplicate by ID
             var seen = Set<Int>()
             results = results.filter { seen.insert($0.id).inserted }
-            // Shuffle the entire pool so popularity order doesn't bias the
-            // random pick. Without this, Array.randomElement() still picks
-            // randomly, but the pool itself is sorted by popularity — so
-            // popular shows are disproportionately likely to be in the pool
-            // at all. Shuffling doesn't fix the pool bias, but it ensures
-            // that within the pool, every item has an equal chance.
+            // Shuffle for true randomness
             results.shuffle()
             // Exclude already-shown
             let pool = results.filter { !surpriseShownIds.contains($0.id) }
@@ -767,7 +678,7 @@ struct SearchView: View {
                 } else {
                     ToastManager.shared.show(
                         title: "Surprise Me",
-                        message: "No anime found for those categories. Try different ones.",
+                        message: "No anime found. Try again.",
                         icon: "shuffle.circle",
                         iconColor: .orange
                     )

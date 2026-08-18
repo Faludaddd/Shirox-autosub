@@ -41,6 +41,9 @@ struct AniListMangaDetailView: View {
     @State private var newestFirst = false
     @State private var isSelectionMode = false
     @State private var selectedChapterHrefs: Set<String> = []
+    #if os(iOS)
+    @ObservedObject private var mangaDownloads = MangaDownloadManager.shared
+    #endif
     /// When set, navigates to MangaDetailView for batch download selection.
     @State private var pendingDownloadItem: SearchItem?
     @State private var downloadNavActive = false
@@ -123,11 +126,13 @@ struct AniListMangaDetailView: View {
         .toolbarBackgroundHidden()
         .tint(.primary)
         .toolbar {
-            // Edit (pencil) button — moved to LEADING edge so it's physically
-            // separated from the Modules dropdown on the trailing edge.
-            // Previously both were on .topBarTrailing, making them look like
-            // one grouped component. Now each has its own side of the nav bar.
-            ToolbarItem(placement: .topBarLeading) {
+            // Both Modules and Edit Entry on the TRAILING (right) side.
+            // Modules comes first (left of Edit Entry), Edit Entry is at
+            // the far right. Each is its own independent ToolbarItem.
+            ToolbarItem(placement: .topBarTrailing) {
+                ModuleSelectorMenu(mediaType: .manga)
+            }
+            ToolbarItem(placement: .topBarTrailing) {
                 if AniListAuthManager.shared.isLoggedIn || MALAuthManager.shared.isLoggedIn {
                     Button {
                         Task {
@@ -151,11 +156,6 @@ struct AniListMangaDetailView: View {
                     }
                     .disabled(isLoadingEntry)
                 }
-            }
-            // Module selector — manga modules only. Stays on trailing edge,
-            // completely independent from the Edit button.
-            ToolbarItem(placement: .topBarTrailing) {
-                ModuleSelectorMenu(mediaType: .manga)
             }
         }
         .fullScreenCover(item: $readerContext) { ctx in
@@ -445,13 +445,15 @@ struct AniListMangaDetailView: View {
                 .padding(.vertical, 24)
             } else {
                 let displayChapters = newestFirst ? Array(chapters.reversed()) : chapters
-                LazyVStack(spacing: 0) {
+                // Spacing 8 between cards — matches anime's episode list
+                // spacing. No background/clipShape on the container because
+                // each row now has its own RoundedRectangle card background
+                // (matching EpisodeRowView's design).
+                LazyVStack(spacing: 8) {
                     ForEach(Array(displayChapters.enumerated()), id: \.element.id) { idx, chapter in
                         chapterRow(chapter, index: idx, isSelected: selectedChapterHrefs.contains(chapter.href))
                     }
                 }
-                .background(Color.secondary.opacity(0.05))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
                 .padding(.horizontal, 16)
             }
         }
@@ -459,26 +461,28 @@ struct AniListMangaDetailView: View {
 
     @ViewBuilder
     private func chapterRow(_ chapter: MangaChapter, index: Int, isSelected: Bool = false) -> some View {
-        // Read status — mirrors anime's EpisodeRowView exactly: every row
-        // has a filled circle of the same size; unread chapters show the
-        // chapter number on a Color.primary fill, read chapters show a
-        // white checkmark on a Color.green fill (with a matching colored
-        // drop shadow). The previous batch's "remove the numbered pill"
-        // approach was wrong — anime keeps the numbered circle and just
-        // changes its fill + content for completed items, which is what
-        // we now do here too.
+        // Matches anime's EpisodeRowView EXACTLY — same dimensions, spacing,
+        // fonts, circle size, download button, play icon, card background,
+        // progress bar, and press style. The only difference is the content
+        // text ("Chapter N" vs "Episode N"). No separate smaller design.
         let mangaHref = resolvedItem?.href ?? ""
         let isRead = MangaProgressManager.shared.isChapterRead(
             mangaHref: mangaHref, chapterHref: chapter.href)
-        // Real index in the ORIGINAL chapters array — needed because
-        // `index` (from ForEach over displayChapters) is the position in
-        // the possibly-reversed display order, but openReader's index
-        // parameter controls next/prev navigation within the reader and
-        // must correspond to the chapter's real position. Without this,
-        // inverting the order (newestFirst=true) made tapping chapter 25
-        // open chapter 1 (and vice versa) — the displayed position no
-        // longer matched the real position.
         let realIndex = chapters.firstIndex(where: { $0.id == chapter.id }) ?? index
+        // Reading progress fraction (0...1) for the progress bar — matches
+        // anime's `progress` parameter. Only shows for the last-read chapter
+        // and only when it's not yet complete (< 0.9).
+        let lastRead = MangaProgressManager.shared.lastRead(for: mangaHref)
+        let progress: Double? = {
+            guard let lastRead, lastRead.chapterHref == chapter.href, !isRead else { return nil }
+            return MangaProgressManager.progressFraction(
+                pageIndex: lastRead.pageIndex, totalPages: lastRead.totalPages)
+        }()
+
+        #if os(iOS)
+        let dlState = mangaDownloadState(for: chapter)
+        #endif
+
         Button {
             if isSelectionMode {
                 if selectedChapterHrefs.contains(chapter.href) {
@@ -490,62 +494,110 @@ struct AniListMangaDetailView: View {
                 openReader(chapter: chapter, index: realIndex)
             }
         } label: {
-            HStack(spacing: 12) {
-                ZStack {
+            VStack(spacing: 0) {
+                HStack(spacing: 14) {
                     if isSelectionMode {
-                        // Selection mode — keep the existing checkmark
-                        // circle (legitimate use: communicates selection state).
-                        Circle()
-                            .fill(isSelected ? Color.appAccent : Color.primary.opacity(0.08))
-                            .frame(width: 36, height: 36)
-                        Image(systemName: isSelected ? "checkmark" : "")
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(.white)
+                        ZStack {
+                            Circle()
+                                .strokeBorder(isSelected ? Color.primary : Color.secondary.opacity(0.35), lineWidth: 2)
+                                .frame(width: 40, height: 40)
+                            if isSelected {
+                                Circle()
+                                    .fill(Color.primary)
+                                    .frame(width: 40, height: 40)
+                                Image(systemName: "checkmark")
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(platformBackground)
+                            }
+                        }
                     } else {
-                        // Non-selection — same 36×36 filled circle for every
-                        // row, with fill + content varying by read status
-                        // (matches anime's EpisodeRowView conditional:
-                        // isComplete ? Color.green : Color.primary for fill,
-                        // checkmark vs. number for content).
-                        Circle()
-                            .fill(isRead ? Color.green : Color.primary)
-                            .frame(width: 36, height: 36)
-                            .shadow(color: (isRead ? Color.green : Color.primary).opacity(0.3),
-                                    radius: 4, y: 2)
-                        if isRead {
-                            Image(systemName: "checkmark")
-                                .font(.caption2.weight(.bold))
-                                .foregroundStyle(.white)
-                        } else {
-                            Text(chapter.displayNumber)
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(platformBackground)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.6)
+                        ZStack {
+                            Circle()
+                                .fill(isRead ? Color.green : Color.primary)
+                                .frame(width: 40, height: 40)
+                            if isRead {
+                                Image(systemName: "checkmark")
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(.white)
+                            } else {
+                                Text(chapter.displayNumber)
+                                    .font(.footnote.weight(.bold))
+                                    .foregroundStyle(platformBackground)
+                            }
+                        }
+                        .shadow(color: (isRead ? Color.green : Color.primary).opacity(0.3),
+                                radius: 4, y: 2)
+                    }
+
+                    Text((chapter.title?.isEmpty ?? true) ? "Chapter \(chapter.displayNumber)" : chapter.title!)
+                        .font(.callout.weight(.medium))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    Spacer()
+
+                    if !isSelectionMode {
+                        HStack(spacing: 8) {
+                            #if os(iOS)
+                            if let state = dlState {
+                                Group {
+                                    switch state {
+                                    case .completed:
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundStyle(.green)
+                                    case .downloading:
+                                        ProgressView().controlSize(.small)
+                                    case .pending:
+                                        Image(systemName: "hourglass")
+                                            .foregroundStyle(.secondary)
+                                    case .failed:
+                                        Image(systemName: "exclamationmark.circle.fill")
+                                            .foregroundStyle(.red)
+                                    }
+                                }
+                                .font(.system(size: 16))
+                            }
+                            #endif
+
+                            Image(systemName: "play.fill")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.primary)
+                                .padding(8)
+                                .background(Color.primary.opacity(0.1), in: Circle())
                         }
                     }
                 }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text((chapter.title?.isEmpty ?? true) ? "Chapter \(chapter.displayNumber)" : chapter.title!)
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                    Text("Chapter")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                .padding(.horizontal, 14)
+                .padding(.top, 12)
+                .padding(.bottom, (progress ?? 0) > 0 && !isRead && !isSelectionMode ? 6 : 12)
+
+                if let p = progress, p > 0, !isRead, !isSelectionMode {
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(Color.secondary.opacity(0.15))
+                            Capsule()
+                                .fill(Color.primary)
+                                .frame(width: geo.size.width * p)
+                        }
+                        .frame(height: 3)
+                    }
+                    .frame(height: 3)
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 8)
                 }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .contentShape(Rectangle())
+            .background(
+                isSelectionMode && isSelected
+                    ? Color.primary.opacity(0.08)
+                    : Color.secondary.opacity(0.07),
+                in: RoundedRectangle(cornerRadius: 14)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 14))
+            #if os(iOS)
+            .opacity(isSelectionMode && (dlState == .completed || dlState == .downloading || dlState == .pending) ? 0.5 : 1.0)
+            #endif
         }
-        .buttonStyle(.plain)
-        // Long-press context menu to manually toggle read/unread —
-        // matches MangaDetailView's MangaChapterRowView.
+        .buttonStyle(ChapterPressStyle())
         .contextMenu {
             if !isSelectionMode {
                 if isRead {
@@ -563,13 +615,51 @@ struct AniListMangaDetailView: View {
                         Label("Mark as Read", systemImage: "checkmark.circle")
                     }
                 }
+                #if os(iOS)
+                Divider()
+                if let onDownload = chapterDownloadAction(for: chapter, state: dlState) {
+                    if dlState == .completed {
+                        Button(role: .destructive) { onDownload() } label: {
+                            Label("Delete Download", systemImage: "trash")
+                        }
+                    } else {
+                        Button { onDownload() } label: {
+                            Label("Download Chapter", systemImage: "arrow.down.circle")
+                        }
+                        .disabled(dlState == .downloading || dlState == .pending)
+                    }
+                }
+                #endif
             }
         }
-        if index < chapters.count - 1 {
-            Divider()
-                .padding(.leading, 60)
+    }
+
+    #if os(iOS)
+    /// Returns the download state for a chapter, or nil if no download exists.
+    private func mangaDownloadState(for chapter: MangaChapter) -> MangaDownloadState? {
+        mangaDownloads.item(forChapterHref: chapter.href)?.state
+    }
+
+    /// Returns the appropriate download/delete action for a chapter based on
+    /// its current download state. Returns nil if no module is resolved.
+    private func chapterDownloadAction(for chapter: MangaChapter, state: MangaDownloadState?) -> (() -> Void)? {
+        guard let item = resolvedItem else { return nil }
+        let ctx = MangaDownloadContext(
+            mangaTitle: item.title,
+            mangaHref: item.href,
+            coverImage: item.image,
+            moduleId: moduleManager.activeModule?.id ?? "")
+        if state == .completed {
+            return {
+                if let it = mangaDownloads.item(forChapterHref: chapter.href) {
+                    mangaDownloads.remove(it)
+                }
+            }
+        } else {
+            return { mangaDownloads.download(chapter: chapter, context: ctx) }
         }
     }
+    #endif
 
     /// Opens the manga reader for a chapter. Builds a `ReaderContext` from
     /// the resolved `SearchItem` + the chapter list, then presents it via

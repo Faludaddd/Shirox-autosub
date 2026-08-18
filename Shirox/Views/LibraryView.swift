@@ -301,21 +301,18 @@ struct LibraryView: View {
 
     @ViewBuilder
     private var filterCapsuleRow: some View {
-        // Wrapped in a horizontal ScrollView so controls NEVER get cut off
-        // on narrow screens (e.g. iPhone SE with a long custom-list name).
-        // On wider screens everything fits naturally and the ScrollView
-        // doesn't scroll. All controls are in a natural left-to-right order:
-        // Status → Sort → GridToggle. No forced ".fixedSize" so text can
-        // truncate gracefully when space is tight.
+        // All filter controls in a horizontal ScrollView so they NEVER get
+        // cut off on narrow screens. Left-aligned — no centering.
+        // Grid toggle has been moved to the navigation toolbar (top-right
+        // corner) per user request — it's no longer part of this row.
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: LibraryDS.controlSpacing) {
                 statusFilterCapsule
                 sortCapsule
-                gridToggleCapsule
             }
             .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// Status filter capsule — uses the shared `.libraryCapsuleStyle()`
@@ -560,11 +557,20 @@ struct LibraryView: View {
 
     @ToolbarContentBuilder
     private var libraryToolbar: some ToolbarContent {
-        // Grid/list toggle was moved into `filterCapsuleRow` so it sits
-        // alongside the other list-control actions in one designed row
-        // (consistent height/padding/corner radius with status filter
-        // and sort). The toolbar now only carries the profile/sign-in
-        // button on the trailing side.
+        #if os(iOS)
+        // Grid/list toggle — in the top-right corner of the Library screen
+        // (navigation toolbar). Moved here from the filter row so it's
+        // easily accessible and doesn't interfere with filter alignment.
+        ToolbarItem(placement: toolbarItemPlacement[0]) {
+            Button {
+                isGridLayout.toggle()
+            } label: {
+                Image(systemName: isGridLayout ? "list.bullet" : "square.grid.2x2")
+                    .font(.system(size: 17, weight: .medium))
+            }
+        }
+        #endif
+        // Profile / Sign-In button on the trailing side.
         ToolbarItem(placement: toolbarItemPlacement[1]) {
             if isActiveProviderAuthenticated {
                 HStack(spacing: 10) {

@@ -234,16 +234,14 @@ struct AniListDetailView: View {
         }
         #if os(iOS)
         .toolbar {
-            // Edit Entry button — moved to LEADING edge so it's physically
-            // separated from the Modules dropdown on the trailing edge.
-            // Previously both were on .topBarTrailing, making them look like
-            // one grouped component. Now each has its own side of the nav bar.
-            ToolbarItem(placement: .topBarLeading) { editToolbarButton }
-            // Modules dropdown — stays on the trailing edge. Completely
-            // independent from the Edit button (own click area, own menu).
+            // Both Modules and Edit Entry on the TRAILING (right) side.
+            // Modules comes first (left of Edit Entry), Edit Entry is at
+            // the far right. Each is its own independent ToolbarItem with
+            // its own button and menu — completely separate click areas.
             ToolbarItem(placement: .topBarTrailing) {
                 ModuleSelectorMenu(mediaType: .anime)
             }
+            ToolbarItem(placement: .topBarTrailing) { editToolbarButton }
         }
         #endif
         .navigationDestinationCompat(item: $sequelMediaId) { id in
