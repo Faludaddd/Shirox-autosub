@@ -694,13 +694,13 @@
 		65DEED401AC5460BBD7ACFA0 /* GlowToggleStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70E689AB1618443DAA98CF4A /* GlowToggleStyle.swift */; };
 		B604CAF44B894ADC8DFCF40E /* GlowToggleStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70E689AB1618443DAA98CF4A /* GlowToggleStyle.swift */; };
 		C94290844B96D63AB48F746E /* AnimeNotificationDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83539AD56A87E95D0B97CAFD /* AnimeNotificationDetailView.swift */; };
-				4F053E6E871DD8A501DCC50C /* AnimeNotificationDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83539AD56A87E95D0B97CAFD /* AnimeNotificationDetailView.swift */; };
-				6BAA3DA7E2E722E5B6159A8F /* AnimeNotificationDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83539AD56A87E95D0B97CAFD /* AnimeNotificationDetailView.swift */; };
-				3C04C87F762887C0AF4A356D /* AnimeNotificationDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83539AD56A87E95D0B97CAFD /* AnimeNotificationDetailView.swift */; };
-				5703C0FFE4EE6FB06C424562 /* UpdateLogPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D3190485D774219690E87AD /* UpdateLogPage.swift */; };
-				A66C21D9758B528ED76D9835 /* UpdateLogPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D3190485D774219690E87AD /* UpdateLogPage.swift */; };
-				C843276266E1B02BC14E77A1 /* UpdateLogPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D3190485D774219690E87AD /* UpdateLogPage.swift */; };
-				EB141EEBA4B687995F0CBDB7 /* UpdateLogPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D3190485D774219690E87AD /* UpdateLogPage.swift */; };
+		4F053E6E871DD8A501DCC50C /* AnimeNotificationDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83539AD56A87E95D0B97CAFD /* AnimeNotificationDetailView.swift */; };
+		6BAA3DA7E2E722E5B6159A8F /* AnimeNotificationDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83539AD56A87E95D0B97CAFD /* AnimeNotificationDetailView.swift */; };
+		3C04C87F762887C0AF4A356D /* AnimeNotificationDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83539AD56A87E95D0B97CAFD /* AnimeNotificationDetailView.swift */; };
+		5703C0FFE4EE6FB06C424562 /* UpdateLogPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D3190485D774219690E87AD /* UpdateLogPage.swift */; };
+		A66C21D9758B528ED76D9835 /* UpdateLogPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D3190485D774219690E87AD /* UpdateLogPage.swift */; };
+		C843276266E1B02BC14E77A1 /* UpdateLogPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D3190485D774219690E87AD /* UpdateLogPage.swift */; };
+		EB141EEBA4B687995F0CBDB7 /* UpdateLogPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D3190485D774219690E87AD /* UpdateLogPage.swift */; };
 		/* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1634,7 +1634,9 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
 			F68950F5BF8543B59C2CA4A6 /* ModuleSelectorMenu.swift in Sources */,
 			103F64B93BFD4E1F84563AE1 /* CharactersAndRecommendations.swift in Sources */,
 			1E204182219043EB9AFC0A01 /* GlowToggleStyle.swift in Sources */,
-                        );
+                        				C94290844B96D63AB48F746E /* AnimeNotificationDetailView.swift in Sources */,
+				5703C0FFE4EE6FB06C424562 /* UpdateLogPage.swift in Sources */,
+);
                         runOnlyForDeploymentPostprocessing = 0;
                 };
                 121D9B342FCA5378000FF9B4 /* Sources */ = {
@@ -1844,7 +1846,9 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
 			F424A5B457A54915804DA4B0 /* ModuleSelectorMenu.swift in Sources */,
 			9C5EA46E33FB48A191991C24 /* CharactersAndRecommendations.swift in Sources */,
 			2930932D3A104AEE8C19FC74 /* GlowToggleStyle.swift in Sources */,
-                        );
+                        				4F053E6E871DD8A501DCC50C /* AnimeNotificationDetailView.swift in Sources */,
+				A66C21D9758B528ED76D9835 /* UpdateLogPage.swift in Sources */,
+);
                         runOnlyForDeploymentPostprocessing = 0;
                 };
                 71E452E51715804C32DE8FF0 /* Sources */ = {
@@ -2055,7 +2059,9 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
 			F27E4771D4E145CDAFEAAF42 /* ModuleSelectorMenu.swift in Sources */,
 			198ADC9EE85E423CAA4826DB /* CharactersAndRecommendations.swift in Sources */,
 			65DEED401AC5460BBD7ACFA0 /* GlowToggleStyle.swift in Sources */,
-                        );
+                        				6BAA3DA7E2E722E5B6159A8F /* AnimeNotificationDetailView.swift in Sources */,
+				C843276266E1B02BC14E77A1 /* UpdateLogPage.swift in Sources */,
+);
                         runOnlyForDeploymentPostprocessing = 0;
                 };
                 95DE5ABBF64ACBFE36B79FBD /* Sources */ = {
@@ -2266,7 +2272,9 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
 			D31F3AE1550D4325907AE96E /* ModuleSelectorMenu.swift in Sources */,
 			F5C81FEA82C540A693EF5418 /* CharactersAndRecommendations.swift in Sources */,
 			B604CAF44B894ADC8DFCF40E /* GlowToggleStyle.swift in Sources */,
-                        );
+                        				3C04C87F762887C0AF4A356D /* AnimeNotificationDetailView.swift in Sources */,
+				EB141EEBA4B687995F0CBDB7 /* UpdateLogPage.swift in Sources */,
+);
                         runOnlyForDeploymentPostprocessing = 0;
                 };
 /* End PBXSourcesBuildPhase section */
