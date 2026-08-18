@@ -53,7 +53,7 @@ struct AnimeNotificationDetailView: View {
         .tint(.primary)
         #endif
         .task { await loadMedia() }
-        .onDisappear { timelineTimer?.invalidate() }
+        .onDisappear { }
     }
 
     @ViewBuilder

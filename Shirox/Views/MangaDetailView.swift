@@ -1027,7 +1027,7 @@ private struct MangaChapterRowView: View {
     }
 }
 
-private struct ChapterPressStyle: ButtonStyle {
+struct ChapterPressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
