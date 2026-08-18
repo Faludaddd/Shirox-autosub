@@ -262,8 +262,16 @@ struct NotificationsView: View {
     @ViewBuilder
     private func destinationView(for notif: ProviderNotification) -> some View {
         switch notif.kind {
-        case .airing(_, _, let mediaId, _):
-            AniListDetailView(mediaId: mediaId, preloadedMedia: nil)
+        case .airing(let episode, let title, let mediaId, let coverURL):
+            // Custom anime notification detail UI — shows episode info,
+            // countdown, schedule, and stats rather than just opening the
+            // normal anime detail page.
+            AnimeNotificationDetailView(
+                mediaId: mediaId,
+                episodeNumber: episode,
+                mediaTitle: title,
+                coverImageURL: coverURL
+            )
         case .activityMessage(let activityId, _, _), .activityReply(let activityId, _, _),
              .activityMention(let activityId, _, _), .activityLike(let activityId, _, _):
             if let id = activityId { ActivityFetchView(activityId: id) }

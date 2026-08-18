@@ -693,7 +693,15 @@
 		2930932D3A104AEE8C19FC74 /* GlowToggleStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70E689AB1618443DAA98CF4A /* GlowToggleStyle.swift */; };
 		65DEED401AC5460BBD7ACFA0 /* GlowToggleStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70E689AB1618443DAA98CF4A /* GlowToggleStyle.swift */; };
 		B604CAF44B894ADC8DFCF40E /* GlowToggleStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70E689AB1618443DAA98CF4A /* GlowToggleStyle.swift */; };
-/* End PBXBuildFile section */
+		C94290844B96D63AB48F746E /* AnimeNotificationDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83539AD56A87E95D0B97CAFD /* AnimeNotificationDetailView.swift */; };
+				4F053E6E871DD8A501DCC50C /* AnimeNotificationDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83539AD56A87E95D0B97CAFD /* AnimeNotificationDetailView.swift */; };
+				6BAA3DA7E2E722E5B6159A8F /* AnimeNotificationDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83539AD56A87E95D0B97CAFD /* AnimeNotificationDetailView.swift */; };
+				3C04C87F762887C0AF4A356D /* AnimeNotificationDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83539AD56A87E95D0B97CAFD /* AnimeNotificationDetailView.swift */; };
+				5703C0FFE4EE6FB06C424562 /* UpdateLogPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D3190485D774219690E87AD /* UpdateLogPage.swift */; };
+				A66C21D9758B528ED76D9835 /* UpdateLogPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D3190485D774219690E87AD /* UpdateLogPage.swift */; };
+				C843276266E1B02BC14E77A1 /* UpdateLogPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D3190485D774219690E87AD /* UpdateLogPage.swift */; };
+				EB141EEBA4B687995F0CBDB7 /* UpdateLogPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D3190485D774219690E87AD /* UpdateLogPage.swift */; };
+		/* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
                 C226707E7AA5549144DA7C37 /* PBXContainerItemProxy */ = {
@@ -1203,6 +1211,7 @@
                 1279E4CB2FCA397700C9BA56 /* Profile */ = {
                         isa = PBXGroup;
                         children = (
+				83539AD56A87E95D0B97CAFD /* AnimeNotificationDetailView.swift */,
                                 1279E4C22FCA397700C9BA56 /* ActivityDetailView.swift */,
                                 1279E4C32FCA397700C9BA56 /* ComposeStatusView.swift */,
                                 1279E4C42FCA397700C9BA56 /* LikesSheetView.swift */,
@@ -1219,6 +1228,7 @@
                 1279E4D72FCA397700C9BA56 /* Shared */ = {
                         isa = PBXGroup;
                         children = (
+				2D3190485D774219690E87AD /* UpdateLogPage.swift */,
                                 1251C4582FCAE1AA002AD0B2 /* LegalWebView.swift */,
                                 F5A6B7C8D9E10000000000A1 /* AnimatedSplashView.swift */,
                                 1279E4CC2FCA397700C9BA56 /* CachedAsyncImage.swift */,
@@ -2295,7 +2305,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "@executable_path/Frameworks",
                                 );
                                 LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                                MARKETING_VERSION = 1.33;
+                                MARKETING_VERSION = 1.34;
                                 PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
                                 PRODUCT_NAME = "$(TARGET_NAME)";
                                 SDKROOT = appletvos;
@@ -2329,7 +2339,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "@executable_path/Frameworks",
                                 );
                                 LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                                MARKETING_VERSION = 1.33;
+                                MARKETING_VERSION = 1.34;
                                 PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
                                 PRODUCT_NAME = "$(TARGET_NAME)";
                                 SDKROOT = appletvos;
@@ -2445,7 +2455,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "$(inherited)",
                                         "@executable_path/Frameworks",
                                 );
-                                MARKETING_VERSION = 1.33;
+                                MARKETING_VERSION = 1.34;
                                 PRODUCT_NAME = Shirox;
                                 PROVISIONING_PROFILE_SPECIFIER = "";
                                 SDKROOT = iphoneos;
@@ -2490,7 +2500,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "@executable_path/../Frameworks",
                                 );
                                 MACOSX_DEPLOYMENT_TARGET = 14.0;
-                                MARKETING_VERSION = 1.33;
+                                MARKETING_VERSION = 1.34;
                                 PRODUCT_NAME = Shirox;
                                 SDKROOT = macosx;
                                 SUPPORTS_MACCATALYST = NO;
@@ -2515,7 +2525,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "$(inherited)",
                                         "@executable_path/Frameworks",
                                 );
-                                MARKETING_VERSION = 1.33;
+                                MARKETING_VERSION = 1.34;
                                 PRODUCT_NAME = Shirox;
                                 PROVISIONING_PROFILE_SPECIFIER = "";
                                 SDKROOT = iphoneos;
@@ -2605,7 +2615,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "@executable_path/../Frameworks",
                                 );
                                 MACOSX_DEPLOYMENT_TARGET = 14.0;
-                                MARKETING_VERSION = 1.33;
+                                MARKETING_VERSION = 1.34;
                                 PRODUCT_NAME = Shirox;
                                 SDKROOT = macosx;
                                 SUPPORTS_MACCATALYST = NO;

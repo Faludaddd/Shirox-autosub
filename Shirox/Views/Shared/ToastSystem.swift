@@ -154,38 +154,45 @@ struct ToastView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Tappable content area (icon + text + spacer). The tap
-            // gesture is scoped to ONLY this region — the X button below
-            // is a sibling, not a child, so its taps are never intercepted
-            // by this gesture.
-            HStack(spacing: 12) {
-                // Icon
-                ZStack {
-                    Circle().fill(toast.iconColor.opacity(0.2))
-                    Image(systemName: toast.icon).font(.system(size: 18, weight: .semibold)).foregroundStyle(toast.iconColor)
-                }
-                .frame(width: 36, height: 36)
-
-                // Text
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(toast.title).font(.subheadline.weight(.semibold)).foregroundStyle(.primary).lineLimit(1)
-                    Text(toast.message).font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                }
-                Spacer(minLength: 4)
-            }
-            .contentShape(Rectangle())
-            .onTapGesture {
+            // Content button (icon + text). Both the content area and the
+            // X button are SwiftUI Buttons — SwiftUI properly routes taps
+            // to adjacent Buttons without gesture conflicts. The previous
+            // approach used .onTapGesture on the content area, which could
+            // still intercept the X button's taps in some SwiftUI versions.
+            Button {
                 if let action = toast.action { action() }
                 ToastManager.shared.dismiss(toast.id)
-            }
+            } label: {
+                HStack(spacing: 12) {
+                    // Icon
+                    ZStack {
+                        Circle().fill(toast.iconColor.opacity(0.2))
+                        Image(systemName: toast.icon).font(.system(size: 18, weight: .semibold)).foregroundStyle(toast.iconColor)
+                    }
+                    .frame(width: 36, height: 36)
 
-            // X close button — OUTSIDE the tap-gesture region above.
-            // Its tap is handled exclusively by the Button's own action,
-            // with no parent .onTapGesture competing for the hit.
-            Button { ToastManager.shared.dismiss(toast.id) } label: {
+                    // Text
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(toast.title).font(.subheadline.weight(.semibold)).foregroundStyle(.primary).lineLimit(1)
+                        Text(toast.message).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                    }
+                    Spacer(minLength: 4)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            // X close button — its own independent Button. Tapping it
+            // dismisses the toast immediately without firing the content
+            // button's action.
+            Button {
+                ToastManager.shared.dismiss(toast.id)
+            } label: {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 22))
                     .foregroundStyle(.secondary)
+                    .frame(width: 32, height: 32)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
         }

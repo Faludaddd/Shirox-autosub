@@ -177,12 +177,17 @@ struct SettingsView: View {
                 }
             }
 
-            // Section 6: Update & About
+            // Section 6: Update Log & About
             Section {
+                NavigationLink {
+                    UpdateLogPage()
+                } label: {
+                    SettingsCategoryRow(icon: "list.bullet.clipboard.fill", title: "Update Log", subtitle: "See what's new, fixed, and changed")
+                }
                 NavigationLink {
                     UpdateSettingsPage()
                 } label: {
-                    SettingsCategoryRow(icon: "arrow.down.circle.fill", title: "Update", subtitle: "Check for updates, download, install")
+                    SettingsCategoryRow(icon: "arrow.down.circle.fill", title: "Check for Updates", subtitle: "Download and install new versions")
                 }
                 NavigationLink {
                     AboutSettingsPage()

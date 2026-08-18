@@ -234,13 +234,16 @@ struct AniListDetailView: View {
         }
         #if os(iOS)
         .toolbar {
-            // Module selector — sits next to the Add-to-Library / Edit pencil.
-            // Anime pages only show anime modules; the menu's Settings entry
-            // deep-links into ModulesSettingsPage (anime context).
+            // Edit Entry button — moved to LEADING edge so it's physically
+            // separated from the Modules dropdown on the trailing edge.
+            // Previously both were on .topBarTrailing, making them look like
+            // one grouped component. Now each has its own side of the nav bar.
+            ToolbarItem(placement: .topBarLeading) { editToolbarButton }
+            // Modules dropdown — stays on the trailing edge. Completely
+            // independent from the Edit button (own click area, own menu).
             ToolbarItem(placement: .topBarTrailing) {
                 ModuleSelectorMenu(mediaType: .anime)
             }
-            ToolbarItem(placement: .topBarTrailing) { editToolbarButton }
         }
         #endif
         .navigationDestinationCompat(item: $sequelMediaId) { id in

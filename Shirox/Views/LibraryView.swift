@@ -301,13 +301,21 @@ struct LibraryView: View {
 
     @ViewBuilder
     private var filterCapsuleRow: some View {
-        HStack(spacing: LibraryDS.controlSpacing) {
-            statusFilterCapsule
-            sortCapsule
-            Spacer(minLength: LibraryDS.controlSpacing)
-            gridToggleCapsule
+        // Wrapped in a horizontal ScrollView so controls NEVER get cut off
+        // on narrow screens (e.g. iPhone SE with a long custom-list name).
+        // On wider screens everything fits naturally and the ScrollView
+        // doesn't scroll. All controls are in a natural left-to-right order:
+        // Status → Sort → GridToggle. No forced ".fixedSize" so text can
+        // truncate gracefully when space is tight.
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: LibraryDS.controlSpacing) {
+                statusFilterCapsule
+                sortCapsule
+                gridToggleCapsule
+            }
+            .padding(.horizontal, 16)
         }
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// Status filter capsule — uses the shared `.libraryCapsuleStyle()`
@@ -324,11 +332,11 @@ struct LibraryView: View {
                     .font(.system(size: LibraryDS.chevronSize, weight: .bold))
                     .foregroundStyle(.secondary)
             }
-            .fixedSize(horizontal: true, vertical: false)
             .libraryCapsuleStyle(isActive: isStatusFilterActive)
         }
         .menuIndicator(.hidden)
         .buttonStyle(.plain)
+        .fixedSize(horizontal: true, vertical: false)
     }
 
     /// Sort capsule — uses the shared `.libraryCapsuleStyle()`. Displays
@@ -361,11 +369,11 @@ struct LibraryView: View {
                     .font(.system(size: LibraryDS.chevronSize, weight: .bold))
                     .foregroundStyle(.secondary)
             }
-            .fixedSize(horizontal: true, vertical: false)
             .libraryCapsuleStyle()
         }
         .menuIndicator(.hidden)
         .buttonStyle(.plain)
+        .fixedSize(horizontal: true, vertical: false)
     }
 
     /// Grid/list layout toggle capsule — uses the shared

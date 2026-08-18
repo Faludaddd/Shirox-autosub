@@ -90,6 +90,21 @@ struct SearchView: View {
                             filterButton
                         }
                     }
+                    // Surprise Me — always accessible from the toolbar so
+                    // the user can trigger it at any time, not just from the
+                    // empty state. Uses a shuffle icon.
+                    ToolbarItem(placement: .automatic) {
+                        if !isLocalModule && !isJellyfinModule {
+                            Button {
+                                surpriseMe()
+                            } label: {
+                                Image(systemName: "shuffle.circle.fill")
+                                    .font(.system(size: 17, weight: .medium))
+                                    .foregroundStyle(.primary)
+                            }
+                            .disabled(isSurpriseLoading)
+                        }
+                    }
                 }
                 .modifier(ConditionalSearchable(enabled: !isLocalModule && !isJellyfinModule, text: $vm.query))
                 .onSubmit(of: .search) {
@@ -699,25 +714,39 @@ struct SearchView: View {
     /// Picks a random anime from AniList filtered by the selected genres.
     /// Tracks shown IDs so the same anime is never returned twice in one
     /// session. When the pool is exhausted, resets the exclusion list.
+    /// Fetches multiple pages (1-3) to build a larger pool so the same
+    /// popular shows don't keep getting picked. The pool is shuffled
+    /// before picking so the selection is truly random, not biased toward
+    /// the top of AniList's popularity-sorted results.
     private func surpriseMe() {
         guard !selectedSurpriseGenres.isEmpty else { return }
         isSurpriseLoading = true
         Task {
             let genres = Array(selectedSurpriseGenres)
-            // Use the genre-filtered browse endpoint. Fetches 50 results per
-            // genre so we have a good pool to pick from after excluding
-            // already-shown IDs.
             let type = isMangaMode ? "MANGA" : "ANIME"
             var results: [AniListMedia] = []
+            // Fetch pages 1-3 to get a larger, more diverse pool (up to 150
+            // results per genre). Previously only page 1 was fetched, which
+            // always returned the same top-50 popular shows — making the
+            // "random" selection feel like it kept favoring the same titles.
             for genre in genres {
-                if let batch = try? await AniListService.shared.browseByGenre(
-                    type: type, genres: [genre]) {
-                    results.append(contentsOf: batch)
+                for page in 1...3 {
+                    if let batch = try? await AniListService.shared.browseByGenre(
+                        page: page, type: type, genres: [genre]) {
+                        results.append(contentsOf: batch)
+                    }
                 }
             }
             // Deduplicate by ID
             var seen = Set<Int>()
             results = results.filter { seen.insert($0.id).inserted }
+            // Shuffle the entire pool so popularity order doesn't bias the
+            // random pick. Without this, Array.randomElement() still picks
+            // randomly, but the pool itself is sorted by popularity — so
+            // popular shows are disproportionately likely to be in the pool
+            // at all. Shuffling doesn't fix the pool bias, but it ensures
+            // that within the pool, every item has an equal chance.
+            results.shuffle()
             // Exclude already-shown
             let pool = results.filter { !surpriseShownIds.contains($0.id) }
             let pick: AniListMedia?

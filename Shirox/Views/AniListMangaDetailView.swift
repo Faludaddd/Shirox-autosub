@@ -123,14 +123,11 @@ struct AniListMangaDetailView: View {
         .toolbarBackgroundHidden()
         .tint(.primary)
         .toolbar {
-            // Module selector — manga modules only.
-            ToolbarItem(placement: .topBarTrailing) {
-                ModuleSelectorMenu(mediaType: .manga)
-            }
-            // Edit (pencil) button — fetches fresh entry data before
-            // opening the edit sheet, so the sheet always shows the current
-            // status/progress/private state (not stale data from launch).
-            ToolbarItem(placement: .topBarTrailing) {
+            // Edit (pencil) button — moved to LEADING edge so it's physically
+            // separated from the Modules dropdown on the trailing edge.
+            // Previously both were on .topBarTrailing, making them look like
+            // one grouped component. Now each has its own side of the nav bar.
+            ToolbarItem(placement: .topBarLeading) {
                 if AniListAuthManager.shared.isLoggedIn || MALAuthManager.shared.isLoggedIn {
                     Button {
                         Task {
@@ -154,6 +151,11 @@ struct AniListMangaDetailView: View {
                     }
                     .disabled(isLoadingEntry)
                 }
+            }
+            // Module selector — manga modules only. Stays on trailing edge,
+            // completely independent from the Edit button.
+            ToolbarItem(placement: .topBarTrailing) {
+                ModuleSelectorMenu(mediaType: .manga)
             }
         }
         .fullScreenCover(item: $readerContext) { ctx in
