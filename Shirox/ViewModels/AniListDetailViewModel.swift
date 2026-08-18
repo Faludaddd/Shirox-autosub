@@ -6,6 +6,12 @@ final class AniListDetailViewModel: ObservableObject {
     @Published var media: Media?
     @Published var isLoading = true
     @Published var error: String?
+    /// True when the full-detail fetch failed. The preloaded media (from a
+    /// list query) may still be set for the hero/metadata, but it lacks
+    /// relations, characters, and recommendations. The UI uses this flag to
+    /// show a "Tap to retry" prompt in the Relations section specifically,
+    /// rather than hiding the whole page behind an error view.
+    @Published var detailFetchFailed = false
 
     /// Raw AniList characters + recommendations, fetched alongside `media`
     /// so `CharactersSection` / `RecommendationsSection` can render without
@@ -49,6 +55,7 @@ final class AniListDetailViewModel: ObservableObject {
         if let preloaded { media = preloaded }
         isLoading = true
         error = nil
+        detailFetchFailed = false
         do {
             // AniList is the EXCLUSIVE source for Characters and Statistics.
             // MAL's detail endpoint returns fewer fields (no voice actors,
@@ -74,12 +81,47 @@ final class AniListDetailViewModel: ObservableObject {
                 }
             }
         } catch {
-            // AniList failed (rate-limited, offline, or 4xx) — don't fall
-            // back to MAL for the detail page. MAL's detail returns fewer
-            // fields, causing incomplete Statistics and no Characters data.
-            // Show the error so the user knows AniList is temporarily
-            // unavailable and can retry.
-            self.error = error.localizedDescription
+            // If we have a preloaded media (from a list query), DON'T set
+            // self.error — that would hide the whole page behind an error
+            // view, even though the hero/metadata are usable. Instead, set
+            // detailFetchFailed so the Relations section can show a "Tap to
+            // retry" prompt. The preloaded media lacks relations, characters,
+            // and recommendations, but the hero/metadata/episodes are still
+            // functional.
+            // If we DON'T have a preloaded media, set self.error so the full
+            // error view shows (there's nothing else to display).
+            if preloaded != nil {
+                detailFetchFailed = true
+            } else {
+                self.error = error.localizedDescription
+            }
+        }
+        isLoading = false
+    }
+
+    /// Retries the detail fetch when the initial attempt failed (e.g. rate
+    /// limit, network error). Called by the "Tap to retry" button in the
+    /// Relations section when `detailFetchFailed` is true. Clears the flag,
+    /// re-fetches, and updates `media` with the full data (including relations).
+    func retryLoad(id: Int) async {
+        detailFetchFailed = false
+        isLoading = true
+        do {
+            let raw = try await AniListService.shared.detail(id: id)
+            media = AniListProvider.shared.mapMedia(raw)
+            characters = raw.characters?.edges ?? []
+            recommendations = raw.recommendations?.nodes ?? []
+            if media?.bannerImage == nil {
+                let artwork = await TVDBMappingService.shared.getArtwork(for: id, provider: .anilist)
+                if let fanart = artwork.fanart {
+                    media?.bannerImage = fanart
+                }
+            }
+            error = nil
+        } catch {
+            // Retry also failed — set the flag again so the user can retry
+            // once more.
+            detailFetchFailed = true
         }
         isLoading = false
     }

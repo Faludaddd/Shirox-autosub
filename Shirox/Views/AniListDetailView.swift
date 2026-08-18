@@ -757,6 +757,30 @@ struct AniListDetailView: View {
                         if let relations = media.relations?.edges, !relations.isEmpty {
                             relationsSection(relations: relations)
                                 .frame(maxWidth: .infinity)
+                        } else if vm.detailFetchFailed {
+                            // Detail fetch failed — the preloaded media (from
+                            // a list query) has no relations. Show a "Tap to
+                            // retry" button so the user can re-fetch the full
+                            // detail (which includes relations).
+                            Button {
+                                Task { await vm.retryLoad(id: mediaId) }
+                            } label: {
+                                VStack(spacing: 12) {
+                                    Image(systemName: "arrow.clockwise.circle")
+                                        .font(.system(size: 40))
+                                        .foregroundStyle(.secondary.opacity(0.6))
+                                    Text(vm.isLoading ? "Loading…" : "Couldn't load relations")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                    Text("Tap to retry")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(.primary)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 40)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(vm.isLoading)
                         } else if watchOrder.isEmpty {
                             VStack(spacing: 20) {
                                 Image(systemName: "link.badge.plus")
