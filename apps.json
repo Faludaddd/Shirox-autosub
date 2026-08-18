@@ -32,7 +32,7 @@
           "date": "2026-08-18",
           "localizedDescription": "Fixed: anime detail pages now show Relations correctly even when the initial detail fetch fails. Previously, when you opened an anime from a list (Trending, Popular, etc.) and the full detail fetch failed (rate limit, network error), the page would show the preloaded data without any relations — so the Relations tab appeared empty even for anime like Attack on Titan that definitely have sequels. Now the Relations tab shows a 'Couldn't load relations — Tap to retry' button that re-fetches the full detail on tap. The hero/metadata/episodes remain visible during the retry.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 11040520,
+          "size": 11037660,
           "minOSVersion": "15.0"
         },
         {
