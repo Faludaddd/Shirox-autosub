@@ -32,7 +32,7 @@
           "date": "2026-08-18",
           "localizedDescription": "Fixed: Library filter row — buttons no longer go outside the screen. The row is now wrapped in a horizontal ScrollView so nothing ever gets cut off, even on narrow screens with long custom-list names.\nFixed: Sort By dropdown — no longer hugging the right side. All filter controls (Status, Sort, Grid toggle) are in a natural left-to-right order inside the scrollable row.\nFixed: Edit Entry and Modules buttons — completely separated. Edit Entry is now on the leading edge of the nav bar, Modules dropdown stays on the trailing edge. Each has its own independent button and menu.\nFixed: Surprise Me — now always accessible from the Search toolbar (not just the empty state). Randomization improved: fetches pages 1-3 and shuffles the pool before picking. No duplicate anime in the same session.\nAdded: Custom anime notification detail UI — tapping an anime notification now opens a polished custom screen showing episode number, release time, countdown to next episode, anime status, schedule, episode count/progress, and statistics.\nFixed: Toast close (X) button — now works consistently. Both the content area and the X button are SwiftUI Buttons (was .onTapGesture + Button, which caused gesture conflicts).\nAdded: Update Log page in Settings — replaces the old Updates tab with a clean, organized log of all changes grouped by version and category (Added, Fixed, Changed, Improved).",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 11040520,
+          "size": 11094641,
           "minOSVersion": "15.0"
         },
         {
