@@ -964,6 +964,8 @@
 		71A75A1C89CB4572A122815F /* ModuleSelectorMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleSelectorMenu.swift; sourceTree = "<group>"; };
 		7DA313B576B24603A98BB0C4 /* CharactersAndRecommendations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CharactersAndRecommendations.swift; sourceTree = "<group>"; };
 		70E689AB1618443DAA98CF4A /* GlowToggleStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlowToggleStyle.swift; sourceTree = "<group>"; };
+		83539AD56A87E95D0B97CAFD /* AnimeNotificationDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimeNotificationDetailView.swift; sourceTree = "<group>"; };
+		2D3190485D774219690E87AD /* UpdateLogPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateLogPage.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
