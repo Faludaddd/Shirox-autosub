@@ -185,9 +185,9 @@ struct AnimeNotificationDetailView: View {
                 VStack(spacing: 0) {
                     infoRow(label: "Episode", value: "\(next.episode)")
                     Divider().padding(.leading, 16)
-                    infoRow(label: "Airs In", value: formatCountdown(next.timeUntilAiring))
+                    infoRow(label: "Airs In", value: formatCountdown(next.timeUntilAiring ?? 0))
                     Divider().padding(.leading, 16)
-                    infoRow(label: "Air Date", value: formatAirDate(next.airingAt))
+                    infoRow(label: "Air Date", value: formatAirDate(next.airingAt ?? 0))
                 }
                 .background(RoundedRectangle(cornerRadius: 12).fill(Color.secondary.opacity(0.08)))
                 .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
