@@ -382,12 +382,25 @@ final class AniListService {
           Page(page: 1, perPage: 20) {
             media(type: ANIME, sort: TRENDING_DESC, isAdult: false) {
               id
+              idMal
               title { romaji english native }
               coverImage { large extraLarge }
               bannerImage
-              averageScore
-              genres
               description(asHtml: false)
+              episodes
+              duration
+              status
+              source
+              format
+              season
+              seasonYear
+              startDate { year month day }
+              endDate { year month day }
+              nextAiringEpisode { episode airingAt timeUntilAiring }
+              averageScore
+              popularity
+              genres
+              studios { edges { isMain node { id name } } }
             }
           }
         }
@@ -402,12 +415,25 @@ final class AniListService {
           Page(page: 1, perPage: 20) {
             media(season: $season, seasonYear: $year, type: ANIME, sort: POPULARITY_DESC, isAdult: false) {
               id
+              idMal
               title { romaji english native }
               coverImage { large extraLarge }
               bannerImage
-              averageScore
-              genres
               description(asHtml: false)
+              episodes
+              duration
+              status
+              source
+              format
+              season
+              seasonYear
+              startDate { year month day }
+              endDate { year month day }
+              nextAiringEpisode { episode airingAt timeUntilAiring }
+              averageScore
+              popularity
+              genres
+              studios { edges { isMain node { id name } } }
             }
           }
         }
@@ -421,12 +447,25 @@ final class AniListService {
           Page(page: 1, perPage: 20) {
             media(type: ANIME, sort: POPULARITY_DESC, isAdult: false) {
               id
+              idMal
               title { romaji english native }
               coverImage { large extraLarge }
               bannerImage
-              averageScore
-              genres
               description(asHtml: false)
+              episodes
+              duration
+              status
+              source
+              format
+              season
+              seasonYear
+              startDate { year month day }
+              endDate { year month day }
+              nextAiringEpisode { episode airingAt timeUntilAiring }
+              averageScore
+              popularity
+              genres
+              studios { edges { isMain node { id name } } }
             }
           }
         }
@@ -440,12 +479,25 @@ final class AniListService {
           Page(page: 1, perPage: 20) {
             media(type: ANIME, sort: SCORE_DESC, isAdult: false) {
               id
+              idMal
               title { romaji english native }
               coverImage { large extraLarge }
               bannerImage
-              averageScore
-              genres
               description(asHtml: false)
+              episodes
+              duration
+              status
+              source
+              format
+              season
+              seasonYear
+              startDate { year month day }
+              endDate { year month day }
+              nextAiringEpisode { episode airingAt timeUntilAiring }
+              averageScore
+              popularity
+              genres
+              studios { edges { isMain node { id name } } }
             }
           }
         }
@@ -511,6 +563,7 @@ final class AniListService {
               startDate { year month day }
               endDate { year month day }
               averageScore
+              popularity
               genres
               studios { edges { isMain node { id name } } }
             }
@@ -539,6 +592,7 @@ final class AniListService {
               seasonYear
               startDate { year month day }
               averageScore
+              popularity
               genres
               studios { edges { isMain node { id name } } }
             }
@@ -771,12 +825,25 @@ final class AniListService {
           Page(page: $page, perPage: 20) {
             media(\(argList)) {
               id
+              idMal
               title { romaji english native }
               coverImage { large extraLarge }
               bannerImage
-              averageScore
-              genres
               description(asHtml: false)
+              episodes
+              duration
+              status
+              source
+              format
+              season
+              seasonYear
+              startDate { year month day }
+              endDate { year month day }
+              nextAiringEpisode { episode airingAt timeUntilAiring }
+              averageScore
+              popularity
+              genres
+              studios { edges { isMain node { id name } } }
             }
           }
         }
@@ -819,6 +886,7 @@ final class AniListService {
               timeUntilAiring
             }
             averageScore
+            popularity
             genres
             trailer { id site thumbnail }
             studios {

@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "1.32",
+          "buildVersion": "1",
+          "date": "2026-08-18",
+          "localizedDescription": "Fixed: anime detail pages now load correctly from ALL categories (Trending, Popular, Top Rated, Browse, Search) — not just Recently Completed. The list queries (trending, popular, topRated, seasonal, browse) were fetching only basic fields (id, title, cover, banner, score, genres, description) — NO episodes, status, format, season, studios, or nextAiringEpisode. When you tapped an anime from these categories, the preloaded media had no episode count, so the Watch button was disabled and the page appeared broken. Recently Completed worked because its query fetches the full field set. Fix: updated ALL list queries to match Recently Completed's field set — episodes, duration, status, source, format, season, seasonYear, startDate, endDate, nextAiringEpisode, averageScore, popularity, genres, studios. The Watch button now works immediately from any category, even before the full detail fetch completes.\nAlso added: popularity field to the detail query so the Statistics section shows the Popularity row for all anime, not just those loaded from list queries that already had it.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 11040520,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.31",
           "buildVersion": "1",
           "date": "2026-08-18",
