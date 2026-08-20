@@ -906,7 +906,7 @@ final class AniListService {
                 }
                 voiceActors(language: JAPANESE, sort: ROLE) {
                   id
-                  name { full native alternative alternativeSpoiler }
+                  name { full native alternative }
                   language
                   image { large medium }
                 }
@@ -1057,7 +1057,7 @@ final class AniListService {
                 }
                 voiceActors(language: JAPANESE, sort: ROLE) {
                   id
-                  name { full native alternative alternativeSpoiler }
+                  name { full native alternative }
                   language
                   image { large medium }
                 }

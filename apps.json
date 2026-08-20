@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "1.39",
+          "buildVersion": "1",
+          "date": "2026-08-21",
+          "localizedDescription": "FIXED: AniList 400 Bad Request — the anime and manga detail GraphQL queries requested 'alternativeSpoiler' on the voiceActors name field, but AniList's StaffName type does NOT have that field (only CharacterName does). This caused EVERY detail page request to return 400, which is why Characters and Recommendations never appeared. Removed the invalid field from both voiceActors blocks. Character name blocks correctly retain it.\nFIXED: Characters and Recommendations now load correctly on all anime and manga detail pages.\nFIXED: Notification custom UI 400 error — same root cause. The notification detail view calls the same detail query.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 11040520,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.38",
           "buildVersion": "1",
           "date": "2026-08-20",
