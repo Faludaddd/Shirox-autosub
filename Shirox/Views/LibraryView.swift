@@ -301,18 +301,16 @@ struct LibraryView: View {
 
     @ViewBuilder
     private var filterCapsuleRow: some View {
-        // All filter controls in a horizontal ScrollView so they NEVER get
-        // cut off on narrow screens. Left-aligned — no centering.
-        // Grid toggle has been moved to the navigation toolbar (top-right
-        // corner) per user request — it's no longer part of this row.
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: LibraryDS.controlSpacing) {
-                statusFilterCapsule
-                sortCapsule
-            }
-            .padding(.horizontal, 16)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        // All filter controls uniformly left-aligned. No ScrollView —
+        // use a plain HStack so alignment is predictable and consistent.
+        // Grid toggle is in the navigation toolbar now, so there's enough
+        // room for Status + Sort on one line.
+        HStack(spacing: LibraryDS.controlSpacing) {
+            statusFilterCapsule
+            sortCapsule
+            Spacer()
         }
+        .padding(.horizontal, 16)
     }
 
     /// Status filter capsule — uses the shared `.libraryCapsuleStyle()`
@@ -397,6 +395,7 @@ struct LibraryView: View {
             mediaTypePill(title: "Manga", systemImage: "book", kind: .manga)
             Spacer()
         }
+        .padding(.horizontal, 16)
         .padding(.vertical, 4)
     }
 
@@ -558,10 +557,10 @@ struct LibraryView: View {
     @ToolbarContentBuilder
     private var libraryToolbar: some ToolbarContent {
         #if os(iOS)
-        // Grid/list toggle — in the top-right corner of the Library screen
-        // (navigation toolbar). Moved here from the filter row so it's
-        // easily accessible and doesn't interfere with filter alignment.
-        ToolbarItem(placement: toolbarItemPlacement[0]) {
+        // Grid/list toggle — on the TRAILING (right) side, next to the
+        // profile button. Both are in separate ToolbarItems so SwiftUI
+        // renders them as two independent buttons with proper spacing.
+        ToolbarItem(placement: .topBarTrailing) {
             Button {
                 isGridLayout.toggle()
             } label: {
@@ -570,8 +569,9 @@ struct LibraryView: View {
             }
         }
         #endif
-        // Profile / Sign-In button on the trailing side.
-        ToolbarItem(placement: toolbarItemPlacement[1]) {
+        // Profile / Sign-In button — also on the trailing side, after the
+        // grid toggle. So the order is: [grid toggle] [profile] on the right.
+        ToolbarItem(placement: .topBarTrailing) {
             if isActiveProviderAuthenticated {
                 HStack(spacing: 10) {
                     Button {

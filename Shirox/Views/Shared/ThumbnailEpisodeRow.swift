@@ -97,7 +97,6 @@ struct ThumbnailEpisodeRow: View {
                             .font(.callout.weight(.semibold))
                             .foregroundStyle(.primary)
                             .lineLimit(1)
-                            .fixedSize(horizontal: true, vertical: false)
 
                         if let badge = Self.fillerBadge(for: fillerType) {
                             Text(badge.label)
@@ -107,7 +106,6 @@ struct ThumbnailEpisodeRow: View {
                                 .background(badge.tint.opacity(0.15), in: Capsule())
                                 .overlay(Capsule().strokeBorder(badge.tint.opacity(0.35), lineWidth: 0.5))
                                 .lineLimit(1)
-                                .fixedSize(horizontal: true, vertical: false)
                         }
                     }
 

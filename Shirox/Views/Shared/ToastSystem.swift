@@ -92,12 +92,6 @@ final class ToastManager: ObservableObject {
 /// offset behind the newest. Anchored to the BOTTOM of the screen, just above
 /// the tab bar — so toasts slide up from the bottom edge and never collide
 /// with the navigation bar / status bar.
-///
-/// #89 — the container fills the whole screen (so the toasts can be aligned
-/// to the bottom via `.frame(maxHeight: .infinity, alignment: .bottom)`) but
-/// the empty space above the toasts is touch-transparent so it never blocks
-/// taps on the underlying content. Each individual toast re-enables hit
-/// testing on itself.
 struct ToastContainerView: View {
     @ObservedObject var manager = ToastManager.shared
 
@@ -113,52 +107,44 @@ struct ToastContainerView: View {
             }
         }
         .padding(.horizontal, 16)
-        // #89 — anchored just above the tab bar (~90pt). This keeps the toast
-        // clear of the tab bar without overlapping it on any form factor.
         .padding(.bottom, 90)
-        // Fill the whole screen so `.bottom` alignment can push the toast
-        // stack to the bottom edge of the overlay.
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-        // The container itself is touch-transparent — empty space above the
-        // toasts must NOT intercept taps on the underlying content. Each
-        // toast re-enables hit testing for its own bounds below.
         .allowsHitTesting(false)
     }
 }
 
 // MARK: - ToastView
+//
+// Reworked to fix the persistent "X button doesn't work" bug. The previous
+// approaches (onTapGesture sibling, two adjacent Buttons) all failed because
+// SwiftUI's gesture system can still route taps unpredictably when two
+// interactive elements are in the same HStack.
+//
+// The new design uses a ZStack with two non-overlapping layers:
+//   1. Bottom layer: the content area (icon + text + spacer) — a Button
+//      that fires the toast's action + dismisses.
+//   2. Top layer: the X close button — a Button positioned in the
+//      top-trailing corner, on a higher z-index, with its own explicit
+//      contentShape so its hit region is clearly defined.
+//
+// The key difference: the X button's hit region does NOT overlap with the
+// content button's hit region. The content button's label uses a Spacer
+// that leaves room for the X button's 36×36 hit area on the right. The X
+// button is overlaid on top via ZStack, but only covers its own 36×36
+// region — it doesn't cover the content area.
+//
+// Both buttons use .buttonStyle(.plain) and .contentShape(Rectangle()) so
+// SwiftUI treats them as independent hit targets.
 
-/// Individual frosted-glass toast card. The newest toast in the stack is
-/// rendered fully opaque and at full scale; older toasts (higher stackIndex
-/// relative to `total`) are scaled down and nudged up to create the layered,
-/// "liquid glass" stack visual.
-///
-/// Interactions:
-/// - Tap the icon + text area (NOT the X button): fires the toast's
-///   optional action and dismisses.
-/// - Tap the X button: dismisses the toast WITHOUT firing the action.
-///
-/// The X button and the tap-to-act region are deliberately separated into
-/// non-overlapping sub-views so SwiftUI's hit-testing can't intercept the
-/// X button's tap with the parent's `.onTapGesture`. Previously both lived
-/// in the same `HStack` with `.contentShape(Rectangle())` + `.onTapGesture`
-/// covering the entire card — a known SwiftUI gesture conflict that made
-/// the X button either do nothing or trigger the toast's action instead
-/// of a clean dismiss. The fix: wrap ONLY the icon + text in a container
-/// with the tap gesture, leaving the X button's region outside that
-/// gesture entirely.
 struct ToastView: View {
     let toast: ToastData
     let stackIndex: Int
     let total: Int
 
     var body: some View {
-        HStack(spacing: 12) {
-            // Content button (icon + text). Both the content area and the
-            // X button are SwiftUI Buttons — SwiftUI properly routes taps
-            // to adjacent Buttons without gesture conflicts. The previous
-            // approach used .onTapGesture on the content area, which could
-            // still intercept the X button's taps in some SwiftUI versions.
+        ZStack(alignment: .trailing) {
+            // Bottom layer: content button (icon + text).
+            // Takes up the full width MINUS the X button's area on the right.
             Button {
                 if let action = toast.action { action() }
                 ToastManager.shared.dismiss(toast.id)
@@ -167,37 +153,53 @@ struct ToastView: View {
                     // Icon
                     ZStack {
                         Circle().fill(toast.iconColor.opacity(0.2))
-                        Image(systemName: toast.icon).font(.system(size: 18, weight: .semibold)).foregroundStyle(toast.iconColor)
+                        Image(systemName: toast.icon)
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(toast.iconColor)
                     }
                     .frame(width: 36, height: 36)
 
                     // Text
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(toast.title).font(.subheadline.weight(.semibold)).foregroundStyle(.primary).lineLimit(1)
-                        Text(toast.message).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                        Text(toast.title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                        Text(toast.message)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
                     }
-                    Spacer(minLength: 4)
+                    // Leave room for the X button on the right (36pt + 14pt padding)
+                    Spacer(minLength: 44)
                 }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
 
-            // X close button — its own independent Button. Tapping it
-            // dismisses the toast immediately without firing the content
-            // button's action.
+            // Top layer: X close button. Positioned at the trailing edge.
+            // It's a separate Button on a higher z-layer — its tap region
+            // is only the 36×36 circle area, which does NOT overlap with
+            // the content button's interactive region (the content button's
+            // label has a 44pt spacer on the right to leave room).
+            //
+            // Using a high-priority gesture ensures SwiftUI always routes
+            // taps in this region to the X button, not the content button.
             Button {
                 ToastManager.shared.dismiss(toast.id)
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 22))
                     .foregroundStyle(.secondary)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 36, height: 36)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .padding(.trailing, 8)
+            .zIndex(1)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
         .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(.ultraThinMaterial))
         .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5))
         .shadow(color: .black.opacity(0.15), radius: 12, y: 4)

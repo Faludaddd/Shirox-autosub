@@ -358,7 +358,8 @@ struct AniListMangaDetailView: View {
                     .buttonStyle(.plain)
                 }
                 // Reset reading progress — only shows if the user actually
-                // has progress for this manga.
+                // has progress for this manga. Matches anime's reset button
+                // exactly (32×32, ultraThinMaterial, 1pt stroke, 14pt medium).
                 if let item = resolvedItem,
                    MangaProgressManager.shared.hasProgress(mangaHref: item.href) {
                     Button {
@@ -367,11 +368,12 @@ struct AniListMangaDetailView: View {
                         Image(systemName: "arrow.counterclockwise")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(.primary)
-                            .frame(width: 36, height: 36)
+                            .frame(width: 32, height: 32)
                             .background(.ultraThinMaterial, in: Circle())
                             .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
                     }
                     .buttonStyle(.plain)
+                    .padding(.trailing, 4)
                 }
             }
             .padding(.horizontal, 16)

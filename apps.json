@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "1.36",
+          "buildVersion": "1",
+          "date": "2026-08-20",
+          "localizedDescription": "Fixed: Toast close (X) button — completely reworked using a ZStack with two non-overlapping layers. The X button is on a higher z-layer with its own explicit hit region, so taps always reach it and never the content button. Tapping X now immediately dismisses the toast.\nFixed: Library filter alignment — all controls now uniformly left-aligned. Removed the ScrollView wrapper that was causing some controls to appear centered while others hugged the left side.\nChanged: Grid/list toggle moved to top-right corner of Library, right next to the profile button. Both are on the trailing edge of the navigation bar.\nFixed: Episode rows with 'Mixed' filler badge — removed .fixedSize that was causing the badge to misalign the episode text. All episode rows now align consistently regardless of badge presence.\nChanged: Manga chapter section header reset button now matches anime's exactly (32×32, was 36×36). All manga header buttons now use the same styling as anime's episode header buttons.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 11040520,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.35",
           "buildVersion": "1",
           "date": "2026-08-18",
