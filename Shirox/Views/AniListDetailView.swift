@@ -1693,25 +1693,60 @@ struct SynopsisSection: View {
     @State private var expanded = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 10) {
-                Text("Synopsis")
-                    .font(.title3.weight(.bold))
-            }
-            .padding(.horizontal, 16)
+        VStack(alignment: .leading, spacing: 0) {
+            // Header with gradient fade when collapsed
+            Text("Synopsis")
+                .font(.title3.weight(.bold))
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
 
+            // Synopsis text in a card-like container for visual consistency
+            // with the rest of the detail page (statistics cards, episode
+            // rows all use rounded backgrounds).
             Text(text)
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.primary.opacity(0.85))
                 .lineLimit(expanded ? nil : 4)
-                .lineSpacing(2)
-                .padding(.horizontal, 16)
+                .lineSpacing(3)
+                .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.secondary.opacity(0.06))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5)
+                )
+                .padding(.horizontal, 16)
                 .onTapGesture {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                         expanded.toggle()
                     }
                 }
+
+            // "Show more" / "Show less" button — clean, subtle
+            if text.count > 200 {
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        expanded.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(expanded ? "Show less" : "Show more")
+                            .font(.caption.weight(.medium))
+                        Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                            .font(.caption2.weight(.bold))
+                    }
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 8)
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity, alignment: .center)
+            }
         }
     }
 }

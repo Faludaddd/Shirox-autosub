@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "1.38",
+          "buildVersion": "1",
+          "date": "2026-08-20",
+          "localizedDescription": "Fixed: Characters not appearing on Anime detail page — the self-fetch fallback in CharactersSection only triggered when preloaded was nil, but the parent VM always passes preloaded: vm.characters (a non-optional array that starts as []). Swift promotes [] to Optional([]) which is NOT nil — so the self-fetch never ran. Fixed by checking preloaded?.isEmpty ?? true.\nFixed: Recommendations not appearing — same root cause, same fix.\nFixed: Synopsis section redesigned — card-style background, proper line spacing, centered Show more/Show less button for long text.\nAdded: Loading spinner with 'Loading characters…' / 'Loading recommendations…' text while fetching.\nAdded: 'type' field to anime recommendations query so the type filter works correctly.\nGraceful empty state — if no character/recommendation data exists on AniList, the section renders nothing instead of a broken look.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 11040520,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.37",
           "buildVersion": "1",
           "date": "2026-08-20",

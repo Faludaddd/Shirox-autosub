@@ -927,6 +927,7 @@ final class AniListService {
                   season
                   seasonYear
                   genres
+                  type
                 }
               }
             }

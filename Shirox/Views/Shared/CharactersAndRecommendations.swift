@@ -22,6 +22,7 @@ struct CharactersSection: View {
 
     @State private var fetchedCharacters: [AniListCharacterEdge] = []
     @State private var didFetch = false
+    @State private var isLoading = false
     @State private var selectedCharacter: AniListCharacterEdge?
 
     /// The characters to display — prefers preloaded data (passed from the
@@ -62,15 +63,44 @@ struct CharactersSection: View {
                     }
                 }
                 .padding(.top, 8)
+            } else if isLoading {
+                // Loading state — show section header + spinner so the user
+                // knows characters are being fetched.
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("Characters")
+                            .font(.title3.weight(.bold))
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                        Text("Loading characters…")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 20)
+                }
+                .padding(.top, 8)
             }
+            // If not loading and displayCharacters is empty, render nothing —
+            // the anime genuinely has no character data on AniList.
         }
         .navigationDestinationCompat(item: $selectedCharacter) { edge in
             CharacterDetailView(edge: edge)
         }
         .task {
-            // Only fetch if the parent didn't pass preloaded data.
-            // If preloaded is nil or empty, we fetch ourselves.
-            if preloaded == nil && !didFetch {
+            // Self-fetch when preloaded is nil OR empty. The parent VM
+            // passes preloaded: vm.characters (a non-optional [AniListCharacterEdge]
+            // that starts as []). Swift promotes [] → Optional([]), which is
+            // NOT nil — so the old check `preloaded == nil` never fired.
+            // Now we check `preloaded?.isEmpty ?? true` so the section
+            // self-fetches when the VM's fetch hasn't populated data yet
+            // (e.g. detail fetch failed, or preloaded media from a list
+            // query has no character data).
+            if (preloaded?.isEmpty ?? true) && !didFetch {
                 await loadCharacters()
             }
         }
@@ -113,6 +143,7 @@ struct CharactersSection: View {
 
     private func loadCharacters() async {
         didFetch = true
+        isLoading = true
         // Use the right endpoint for the media type. The anime detail query
         // (AniListService.detail) uses `type: ANIME`; the manga detail query
         // (AniListService.mangaDetail) uses `type: MANGA`. Calling the wrong
@@ -130,6 +161,7 @@ struct CharactersSection: View {
             // Best-effort — leave fetchedCharacters empty if the fetch fails.
             fetchedCharacters = []
         }
+        isLoading = false
     }
 }
 
@@ -422,6 +454,7 @@ struct RecommendationsSection: View {
 
     @State private var fetchedRecommendations: [AniListRecommendation] = []
     @State private var didFetch = false
+    @State private var isLoading = false
 
     /// Computed: prefers preloaded data, falls back to self-fetched. Same
     /// pattern as CharactersSection — using a computed property means the
@@ -460,11 +493,34 @@ struct RecommendationsSection: View {
                     }
                 }
                 .padding(.top, 8)
+            } else if isLoading {
+                // Loading state — show section header + spinner.
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("Recommendations")
+                            .font(.title3.weight(.bold))
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                        Text("Loading recommendations…")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 20)
+                }
+                .padding(.top, 8)
             }
+            // If not loading and displayRecommendations is empty, render nothing.
         }
         .task {
             // Only fetch if the parent didn't pass preloaded data.
-            if preloaded == nil && !didFetch {
+            // Self-fetch when preloaded is nil OR empty (same fix as
+            // CharactersSection — see comment there).
+            if (preloaded?.isEmpty ?? true) && !didFetch {
                 await loadRecommendations()
             }
         }
@@ -547,10 +603,7 @@ struct RecommendationsSection: View {
 
     private func loadRecommendations() async {
         didFetch = true
-        // Use the right endpoint for the media type. The anime detail query
-        // includes recommendations; the manga detail query now does too
-        // (added in this batch). Both return a `recommendations` connection
-        // we filter by type.
+        isLoading = true
         do {
             let media: AniListMedia
             if isManga {
@@ -559,10 +612,6 @@ struct RecommendationsSection: View {
                 media = try await AniListService.shared.detail(id: mediaId)
             }
             let all = media.recommendations?.nodes ?? []
-            // Filter by type so anime pages only show anime recs and manga
-            // pages only show manga recs. The recommendation payload's
-            // `type` field is now included in both queries; if it's missing
-            // we fall back to showing the rec (better than an empty section).
             if isManga {
                 fetchedRecommendations = all.filter { rec in
                     guard let t = rec.mediaRecommendation?.type else { return true }
@@ -575,8 +624,8 @@ struct RecommendationsSection: View {
                 }
             }
         } catch {
-            // Best-effort — leave fetchedRecommendations empty if the fetch fails.
             fetchedRecommendations = []
         }
+        isLoading = false
     }
 }
