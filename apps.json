@@ -32,7 +32,7 @@
           "date": "2026-08-20",
           "localizedDescription": "Fixed: Toast close button — root cause was .allowsHitTesting(false) on the container disabling ALL hit-testing. Completely reworked.\nFixed: Surprise Me pool exhaustion — resets exclusion list on API failure.\nFixed: Manga posters now same size as anime posters (image fills 2:3 card).\nFixed: Library alignment — removed double-padding causing misaligned rows.\nRemoved: Auto Pick Module feature completely (was causing long loading + CF errors).\nRemoved: Updates tab from Settings (Update Log replaces it).\nChanged: Grid toggle separate from profile in top-right toolbar.\nAdded: AniList 400 error logging for diagnosis.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 11040520,
+          "size": 11088191,
           "minOSVersion": "15.0"
         },
         {
