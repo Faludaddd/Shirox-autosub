@@ -185,11 +185,6 @@ struct SettingsView: View {
                     SettingsCategoryRow(icon: "list.bullet.clipboard.fill", title: "Update Log", subtitle: "See what's new, fixed, and changed")
                 }
                 NavigationLink {
-                    UpdateSettingsPage()
-                } label: {
-                    SettingsCategoryRow(icon: "arrow.down.circle.fill", title: "Check for Updates", subtitle: "Download and install new versions")
-                }
-                NavigationLink {
                     AboutSettingsPage()
                 } label: {
                     SettingsCategoryRow(icon: "info.circle.fill", title: "About", subtitle: "Version, licenses")

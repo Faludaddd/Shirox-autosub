@@ -169,7 +169,7 @@ struct MangaSection: View {
                             } label: {
                                 MangaPosterCard(media: media)
                                     .equatable()
-                                    .frame(width: 130)
+                                    .frame(width: 155)
                             }
                             .buttonStyle(CardPressStyle())
                             .contextMenu {
@@ -223,43 +223,59 @@ struct MangaPosterCard: View, Equatable {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            CachedAsyncImage(urlString: media.coverImage.extraLarge ?? media.coverImage.large ?? "")
-                .aspectRatio(2/3, contentMode: .fill)
-                .frame(maxWidth: .infinity)
-                .frame(height: 190)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.1)))
-                .overlay(alignment: .topTrailing) {
-                    if let score = media.averageScore {
-                        Label("\(score)%", systemImage: "star.fill")
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(.yellow)
-                            .lineLimit(1)
-                            .fixedSize(horizontal: true, vertical: false)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(.black.opacity(0.55), in: Capsule())
-                            .padding(6)
-                    }
+        // Matches AniListCardView's pattern: the entire card IS the image
+        // (2:3 aspect ratio), with the title overlaid on a gradient at the
+        // bottom and the score badge at the top-trailing. This makes manga
+        // posters the SAME size as anime posters.
+        Color.clear
+            .aspectRatio(2/3, contentMode: .fit)
+            .overlay(
+                CachedAsyncImage(urlString: media.coverImage.extraLarge ?? media.coverImage.large ?? "")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+            )
+            .overlay(alignment: .topTrailing) {
+                if let score = media.averageScore {
+                    Text("\(score)%")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.yellow)
+                        .padding(.horizontal, 6).padding(.vertical, 3)
+                        .background(.black.opacity(0.55), in: Capsule())
+                        .padding(4)
                 }
-
-            Text(media.title.displayTitle)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.primary)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
-
-            if let chapters = media.episodes {
-                Text("\(chapters) ch")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            } else if let status = media.statusDisplay {
-                Text(status)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
             }
-        }
+            .overlay(alignment: .bottom) {
+                LinearGradient(
+                    stops: [
+                        .init(color: .clear, location: 0.0),
+                        .init(color: .black.opacity(0.85), location: 1.0)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 80)
+                .overlay(alignment: .bottomLeading) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(media.title.displayTitle)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .lineLimit(2)
+                        if let chapters = media.episodes {
+                            Text("\(chapters) ch")
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.8))
+                        } else if let status = media.statusDisplay {
+                            Text(status)
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.8))
+                        }
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 8)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .shadow(color: .black.opacity(0.3), radius: 6, x: 0, y: 3)
     }
 }
 
@@ -405,8 +421,9 @@ struct MangaLibraryView: View {
         VStack(alignment: .leading, spacing: 6) {
             ZStack(alignment: .bottomLeading) {
                 CachedAsyncImage(urlString: entry.media.coverImage.extraLarge ?? entry.media.coverImage.large ?? "")
-                    .frame(height: 180)
+                    .aspectRatio(2/3, contentMode: .fill)
                     .frame(maxWidth: .infinity)
+                    .clipped()
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.1)))
 

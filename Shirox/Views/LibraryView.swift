@@ -301,16 +301,13 @@ struct LibraryView: View {
 
     @ViewBuilder
     private var filterCapsuleRow: some View {
-        // All filter controls uniformly left-aligned. No ScrollView —
-        // use a plain HStack so alignment is predictable and consistent.
-        // Grid toggle is in the navigation toolbar now, so there's enough
-        // room for Status + Sort on one line.
+        // All filter controls uniformly left-aligned. No internal padding
+        // — callers provide padding via listRowInsets or external .padding.
         HStack(spacing: LibraryDS.controlSpacing) {
             statusFilterCapsule
             sortCapsule
             Spacer()
         }
-        .padding(.horizontal, 16)
     }
 
     /// Status filter capsule — uses the shared `.libraryCapsuleStyle()`
@@ -371,21 +368,6 @@ struct LibraryView: View {
         .fixedSize(horizontal: true, vertical: false)
     }
 
-    /// Grid/list layout toggle capsule — uses the shared
-    /// `.libraryCapsuleStyle()`. Moved here from the navigation toolbar
-    /// so all list-control actions live in one designed row.
-    @ViewBuilder
-    private var gridToggleCapsule: some View {
-        Button {
-            isGridLayout.toggle()
-        } label: {
-            Image(systemName: isGridLayout ? "list.bullet" : "square.grid.2x2")
-                .font(.system(size: LibraryDS.iconButtonIconSize, weight: .semibold))
-                .libraryCapsuleStyle()
-        }
-        .buttonStyle(.plain)
-    }
-
     /// Anime | Manga capsule pills. Uses the same `.libraryCapsuleStyle()` as
     /// the filter row and source switcher so every control in the Library
     /// shares identical height/padding/corner radius.
@@ -395,7 +377,6 @@ struct LibraryView: View {
             mediaTypePill(title: "Manga", systemImage: "book", kind: .manga)
             Spacer()
         }
-        .padding(.horizontal, 16)
         .padding(.vertical, 4)
     }
 
@@ -492,41 +473,17 @@ struct LibraryView: View {
             return
         }
 
-        // Branch 2: no linked module — auto-resolve through an installed
-        // anime module. ALWAYS ends at DetailView regardless of outcome.
-        resolvingAnimeId = entry.media.id
-        Task {
-            let manager = ModuleManager.shared
-            let animeModule = AnimeModulePreference.pick(
-                active: manager.activeModule,
-                modules: manager.modules)
-
-            // Switch to the anime module if one is available.
-            if let animeModule, manager.activeModule?.id != animeModule.id {
-                _ = await manager.selectAndAwaitReady(animeModule)
-            }
-
-            // Search the module for the title (only if we have a module).
-            let title = entry.media.title.searchTitle
-            let results = (try? await JSEngine.shared.search(keyword: title)) ?? []
-            let needle = title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            let match = results.first { $0.title.lowercased() == needle } ?? results.first
-
-            // ALWAYS go to DetailView — use the match if we found one,
-            // otherwise pass a placeholder SearchItem with the media
-            // title and empty href. DetailView will handle the "no
-            // results" / "no module" case itself. The user always lands
-            // on the same page type, regardless of entry state.
-            await MainActor.run {
-                resolvingAnimeId = nil
-                pendingAnimeDetailItem = match ?? SearchItem(
-                    title: entry.media.title.displayTitle,
-                    image: entry.media.coverImage.best ?? "",
-                    href: "")
-                pendingAnimeDetailModuleId = animeModule?.id
-                animeDetailLinkActive = true
-            }
-        }
+        // Branch 2: no linked module — go straight to DetailView with a
+        // placeholder SearchItem. DetailView will handle module selection
+        // via its own UI (Watch button → module picker). No automatic
+        // module switching/searching here — that was causing long loading
+        // times and Cloudflare rejections.
+        pendingAnimeDetailItem = SearchItem(
+            title: entry.media.title.displayTitle,
+            image: entry.media.coverImage.best ?? "",
+            href: "")
+        pendingAnimeDetailModuleId = nil
+        animeDetailLinkActive = true
     }
 
     /// Manga entries: tap opens the reader detail (resolving a module first for

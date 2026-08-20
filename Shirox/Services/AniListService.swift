@@ -1379,8 +1379,16 @@ final class AniListService {
             case 200:
                 return data
             case 429:
+                Logger.shared.log("[AniList] 429 rate limited", type: "Error")
                 throw AniListError.rateLimited
+            case 400:
+                // Log the actual GraphQL error message so we can diagnose
+                // what's wrong with the query (malformed field, bad variable, etc.)
+                let responseBody = String(data: data, encoding: .utf8) ?? "(no body)"
+                Logger.shared.log("[AniList] 400 Bad Request — response: \(responseBody)", type: "Error")
+                throw AniListError.httpError(400)
             default:
+                Logger.shared.log("[AniList] HTTP \(http.statusCode)", type: "Error")
                 throw AniListError.httpError(http.statusCode)
             }
         }

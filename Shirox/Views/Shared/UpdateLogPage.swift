@@ -97,26 +97,40 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
-        version: "1.34",
-        date: "2026-08-18",
-        added: [
-            "Surprise Me button is now always accessible from the Search toolbar — no longer hidden in the empty state only.",
-            "Custom anime notification detail UI — tapping an anime notification now opens a polished custom screen showing episode number, release time, countdown to next episode, anime status, schedule, episode count/progress, and statistics.",
-            "Update Log page in Settings — replaces the old Updates tab with a clean, organized log of all changes grouped by version and category (Added, Fixed, Changed, Improved)."
-        ],
+        version: "1.37",
+        date: "2026-08-20",
+        added: [],
         fixed: [
-            "Library filter row — buttons no longer go outside the screen on narrow devices. The row is now wrapped in a horizontal ScrollView as a safety net so nothing ever gets cut off.",
-            "Sort By dropdown — no longer hugging the right side. All filter controls (Status, Sort, Grid toggle) are now in a natural left-to-right order inside the scrollable row.",
-            "Edit Entry and Modules buttons — completely separated. Edit Entry is now on the leading edge of the nav bar, Modules dropdown stays on the trailing edge. Each has its own independent button, click area, and menu. Opening one no longer interferes with the other.",
-            "Toast close (X) button — now works consistently. Both the content area and the X button are SwiftUI Buttons (was .onTapGesture + Button, which caused gesture conflicts in some SwiftUI versions). Tapping X now always dismisses immediately.",
-            "Surprise Me randomization — now fetches pages 1-3 (up to 150 results per genre) and shuffles the pool before picking. Previously only page 1 was fetched, which always returned the same top-50 popular shows — making the 'random' selection feel biased toward the same titles."
+            "Toast close (X) button — completely reworked. The root cause was that ToastContainerView had .allowsHitTesting(false) on the parent, which disabled hit-testing for the ENTIRE view tree. SwiftUI's hit-testing is a one-way gate — child views CANNOT re-enable it. Removed the parent gate and used a GeometryReader + Spacer approach so empty space naturally passes taps through while toasts remain fully interactive. The X button now works every time.",
+            "Surprise Me pool exhaustion — when the AniList API failed (empty results), the exclusion list (surpriseShownIds) was never reset, causing 'No anime found' to repeat after 2 uses. Now resets the exclusion list on API failure so the next attempt starts fresh.",
+            "Manga posters — were smaller than anime posters because MangaPosterCard used .frame(height: 190) + text below, while AniListCardView made the image fill the entire 2:3 card. Rewrote MangaPosterCard to match AniListCardView exactly: image fills the entire 2:3 card, title overlaid on a gradient at the bottom, score badge at top-trailing. Manga posters are now the SAME size as anime posters.",
+            "Library alignment — fixed double-padding issue. filterCapsuleRow and mediaTypeSegment had internal .padding(.horizontal, 16) that compounded with external padding, causing 32pt leading offset while LibrarySourceSwitcher sat at 16pt. Removed internal padding so all rows align at the same left edge.",
+            "AniList HTTP 400 errors — added error logging that prints the actual GraphQL error response body so we can diagnose malformed queries instead of silently throwing."
         ],
         changed: [
-            "Settings — the Updates tab has been completely replaced with an Update Log. The old update-checking functionality (check for updates, download, install) still works but is now part of the About page."
+            "Removed Auto Pick Module feature completely. This feature automatically switched to an anime module and searched for the title when opening anime from Library — it was causing long loading times and Cloudflare rejections from repeated module searches. Library now goes straight to DetailView; module selection happens via the Watch button's normal flow.",
+            "Removed the Updates tab from Settings completely. The Update Log replaces it. No dead code left behind.",
+            "Library grid toggle — moved to top-right toolbar, completely separate from the profile button. Each has its own independent ToolbarItem with its own click area.",
+            "Manga section card width increased from 130pt to 155pt to match anime section width."
         ],
         improved: [
-            "Surprise Me — no duplicate anime in the same session. Already-shown IDs are tracked and excluded. When the pool is exhausted, the exclusion list resets automatically."
+            "Surprise Me — no duplicate anime in the same session. Already-shown IDs are tracked and excluded. When the pool is exhausted, the exclusion list resets automatically.",
+            "AniList detail request logging — 400 errors now log the response body for diagnosis instead of failing silently."
         ]
+    ),
+    UpdateLogEntry(
+        version: "1.36",
+        date: "2026-08-20",
+        added: [],
+        fixed: [
+            "Toast close (X) button — reworked using ZStack with non-overlapping hit regions.",
+            "Library filter alignment — all controls uniformly left-aligned.",
+            "Episode 'Mixed' badge alignment — removed .fixedSize causing misalignment."
+        ],
+        changed: [
+            "Grid/list toggle moved to top-right corner of Library."
+        ],
+        improved: []
     ),
     UpdateLogEntry(
         version: "1.33",

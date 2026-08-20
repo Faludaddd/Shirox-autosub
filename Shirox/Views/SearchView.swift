@@ -639,12 +639,13 @@ struct SearchView: View {
     /// just fetches trending + popular anime, shuffles the pool, and picks
     /// one that hasn't been shown yet this session. When the pool is
     /// exhausted, resets the exclusion list.
+    /// FIX: When the API fails (results is empty), we ALSO reset
+    /// surpriseShownIds so stale exclusion state doesn't persist. This
+    /// prevents the "No anime found" error from repeating after 2 uses.
     private func surpriseMe() {
         isSurpriseLoading = true
         Task {
-            let type = isMangaMode ? "MANGA" : "ANIME"
             var results: [AniListMedia] = []
-            // Fetch from multiple sources to build a diverse pool.
             if !isMangaMode {
                 if let t = try? await AniListService.shared.trending() { results.append(contentsOf: t) }
                 if let p = try? await AniListService.shared.popular() { results.append(contentsOf: p) }
@@ -658,18 +659,23 @@ struct SearchView: View {
             results = results.filter { seen.insert($0.id).inserted }
             // Shuffle for true randomness
             results.shuffle()
-            // Exclude already-shown
-            let pool = results.filter { !surpriseShownIds.contains($0.id) }
+
             let pick: AniListMedia?
-            if let random = pool.randomElement() {
-                pick = random
-                surpriseShownIds.insert(random.id)
-            } else if let random = results.randomElement() {
-                // Pool exhausted — reset and pick from the full set
-                surpriseShownIds = [random.id]
-                pick = random
-            } else {
+            if results.isEmpty {
+                // API failure — reset exclusion list so next attempt starts fresh.
+                surpriseShownIds.removeAll()
                 pick = nil
+            } else {
+                // Exclude already-shown
+                let pool = results.filter { !surpriseShownIds.contains($0.id) }
+                if let random = pool.randomElement() {
+                    pick = random
+                    surpriseShownIds.insert(random.id)
+                } else {
+                    // Pool exhausted — reset and pick from the full set
+                    surpriseShownIds = [results[0].id]
+                    pick = results[0]
+                }
             }
             await MainActor.run {
                 isSurpriseLoading = false
