@@ -32,7 +32,7 @@
           "date": "2026-08-22",
           "localizedDescription": "Fixed: Manga downloads — all manga download rows (in-progress, completed, failed) are now tappable and open the custom manga detail page with offline chapters loaded from disk.\nAdded: Structured diagnostic logging with deduplication. Logs now include feature, operation, provider, content ID, endpoint, HTTP status, error, and response snippets.\nFixed: Synopsis — increased line limit and lower threshold for Show More button.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 11040520,
+          "size": 11117594,
           "minOSVersion": "15.0"
         },
         {
