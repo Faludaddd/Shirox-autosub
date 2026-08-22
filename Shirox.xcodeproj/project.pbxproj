@@ -963,6 +963,7 @@
 		70E689AB1618443DAA98CF4A /* GlowToggleStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlowToggleStyle.swift; sourceTree = "<group>"; };
 		83539AD56A87E95D0B97CAFD /* AnimeNotificationDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimeNotificationDetailView.swift; sourceTree = "<group>"; };
 		2D3190485D774219690E87AD /* UpdateLogPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateLogPage.swift; sourceTree = "<group>"; };
+		DC272D4B21A0374FC3081540 /* StaffAndVideosSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffAndVideosSections.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
