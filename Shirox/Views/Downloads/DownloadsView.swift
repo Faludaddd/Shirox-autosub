@@ -219,17 +219,27 @@ struct DownloadsView: View {
                         if !mangaInProgress.isEmpty {
                             Section("Downloading Manga") {
                                 ForEach(mangaInProgress) { item in
-                                    MangaDownloadProgressRow(item: item)
-                                        .swipeActions(edge: .trailing) {
-                                            Button(role: .destructive) { mdm.remove(item) } label: {
-                                                Label("Cancel", systemImage: "xmark")
-                                            }.tint(.red)
-                                        }
+                                    NavigationLink {
+                                        MangaDetailView(
+                                            item: SearchItem(title: item.mangaTitle, image: item.coverImage, href: item.mangaHref),
+                                            offlineChapters: mdm.downloadedChapters(forMangaHref: item.mangaHref))
+                                    } label: {
+                                        MangaDownloadProgressRow(item: item)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .swipeActions(edge: .trailing) {
+                                        Button(role: .destructive) { mdm.remove(item) } label: {
+                                            Label("Cancel", systemImage: "xmark")
+                                        }.tint(.red)
+                                    }
                                 }
                             }
                         }
 
                         // Manga — completed (module → manga → chapters)
+                        // Tapping opens MangaDetailView (the custom manga
+                        // detail page) in offline mode with downloaded
+                        // chapters from disk.
                         ForEach(mangaModuleGroups) { moduleGroup in
                             Section {
                                 ForEach(moduleGroup.mangaGroups) { g in
@@ -250,12 +260,19 @@ struct DownloadsView: View {
                         if !mangaFailed.isEmpty {
                             Section("Failed Manga") {
                                 ForEach(mangaFailed) { item in
-                                    MangaDownloadProgressRow(item: item)
-                                        .swipeActions(edge: .trailing) {
-                                            Button(role: .destructive) { mdm.remove(item) } label: {
-                                                Label("Delete", systemImage: "trash")
-                                            }.tint(.red)
-                                        }
+                                    NavigationLink {
+                                        MangaDetailView(
+                                            item: SearchItem(title: item.mangaTitle, image: item.coverImage, href: item.mangaHref),
+                                            offlineChapters: mdm.downloadedChapters(forMangaHref: item.mangaHref))
+                                    } label: {
+                                        MangaDownloadProgressRow(item: item)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .swipeActions(edge: .trailing) {
+                                        Button(role: .destructive) { mdm.remove(item) } label: {
+                                            Label("Delete", systemImage: "trash")
+                                        }.tint(.red)
+                                    }
                                 }
                             }
                         }

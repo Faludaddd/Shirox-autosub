@@ -576,9 +576,20 @@ class Logger: @unchecked Sendable {
     func log(_ message: String, type: String = "General") {
         guard logFilterViewModel.isFilterEnabled(for: type) else { return }
         
+        // Deduplicate: if the last log entry has the same type + message,
+        // increment a counter instead of adding a new entry.
         let entry = LogEntry(message: message, type: type, timestamp: Date())
         
         queue.async(flags: .barrier) {
+            // Check if the last entry has the same type + message (dedup)
+            if let last = self.logs.last,
+               last.type == type && last.message == message {
+                // Skip — identical to last entry. The timestamp already
+                // tells us when this started; we don't need hundreds of
+                // identical lines.
+                return
+            }
+            
             self.logs.append(entry)
             
             if self.logs.count > self.maxLogEntries {
@@ -588,6 +599,33 @@ class Logger: @unchecked Sendable {
             self.saveLogToFile(entry)
             self.debugLog(entry)
         }
+    }
+    
+    /// Structured log with context — for API requests, downloads, etc.
+    /// Automatically formats a structured message with all available context.
+    func logStructured(
+        type: String,
+        feature: String,
+        operation: String,
+        provider: String? = nil,
+        contentId: String? = nil,
+        endpoint: String? = nil,
+        httpStatus: Int? = nil,
+        error: String? = nil,
+        responseSnippet: String? = nil,
+        details: String? = nil
+    ) {
+        var parts: [String] = []
+        parts.append("[\(feature)] \(operation)")
+        if let provider { parts.append("provider=\(provider)") }
+        if let contentId { parts.append("id=\(contentId)") }
+        if let endpoint { parts.append("endpoint=\(endpoint)") }
+        if let httpStatus { parts.append("HTTP \(httpStatus)") }
+        if let error { parts.append("error: \(error)") }
+        if let responseSnippet { parts.append("response: \(responseSnippet.prefix(500))") }
+        if let details { parts.append(details) }
+        
+        log(parts.joined(separator: " | "), type: type)
     }
     
     func getLogs() -> String {

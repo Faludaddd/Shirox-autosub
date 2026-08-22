@@ -1705,7 +1705,7 @@ struct SynopsisSection: View {
             Text(text)
                 .font(.subheadline)
                 .foregroundStyle(.primary.opacity(0.85))
-                .lineLimit(expanded ? nil : 4)
+                .lineLimit(expanded ? nil : 6)
                 .lineSpacing(3)
                 .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
@@ -1727,8 +1727,8 @@ struct SynopsisSection: View {
                     }
                 }
 
-            // "Show more" / "Show less" button — clean, subtle
-            if text.count > 200 {
+            // "Show more" / "Show less" button — shows when text is long
+            if text.count > 150 {
                 Button {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                         expanded.toggle()

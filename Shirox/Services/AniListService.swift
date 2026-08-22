@@ -1367,29 +1367,70 @@ final class AniListService {
         let bodyDict: [String: Any] = ["query": query, "variables": variables]
         request.httpBody = try JSONSerialization.data(withJSONObject: bodyDict, options: [])
 
-        Logger.shared.log("AniList Request: \(bodyDict)", type: "Network")
+        // Extract the operation name from the query for logging
+        let opName: String = {
+            if let range = query.range(of: #"query\s+(\w+)"#, options: .regularExpression) {
+                let match = query[range]
+                if let nameStart = match.firstIndex(of: " ") {
+                    let name = match[match.index(after: nameStart)...]
+                    return String(name)
+                }
+            }
+            return "unknown"
+        }()
+        let idStr = variables["id"].map { "\($0)" } ?? "nil"
+
+        Logger.shared.logStructured(
+            type: "Network",
+            feature: "AniList",
+            operation: "GraphQL \(opName)",
+            endpoint: endpoint.absoluteString,
+            contentId: idStr,
+            details: "variables=\(variables)"
+        )
 
         let (data, response) = try await session.data(for: request)
-
-        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            Logger.shared.log("AniList Response: \(json)", type: "Network")
-        }
 
         if let http = response as? HTTPURLResponse {
             switch http.statusCode {
             case 200:
+                Logger.shared.logStructured(
+                    type: "Network",
+                    feature: "AniList",
+                    operation: "GraphQL \(opName) ✓",
+                    contentId: idStr,
+                    httpStatus: 200
+                )
                 return data
             case 429:
-                Logger.shared.log("[AniList] 429 rate limited", type: "Error")
+                Logger.shared.logStructured(
+                    type: "Error",
+                    feature: "AniList",
+                    operation: "GraphQL \(opName) rate limited",
+                    contentId: idStr,
+                    httpStatus: 429
+                )
                 throw AniListError.rateLimited
             case 400:
-                // Log the actual GraphQL error message so we can diagnose
-                // what's wrong with the query (malformed field, bad variable, etc.)
                 let responseBody = String(data: data, encoding: .utf8) ?? "(no body)"
-                Logger.shared.log("[AniList] 400 Bad Request — response: \(responseBody)", type: "Error")
+                Logger.shared.logStructured(
+                    type: "Error",
+                    feature: "AniList",
+                    operation: "GraphQL \(opName) 400 Bad Request",
+                    contentId: idStr,
+                    httpStatus: 400,
+                    error: "Bad Request",
+                    responseSnippet: responseBody
+                )
                 throw AniListError.httpError(400)
             default:
-                Logger.shared.log("[AniList] HTTP \(http.statusCode)", type: "Error")
+                Logger.shared.logStructured(
+                    type: "Error",
+                    feature: "AniList",
+                    operation: "GraphQL \(opName) HTTP \(http.statusCode)",
+                    contentId: idStr,
+                    httpStatus: http.statusCode
+                )
                 throw AniListError.httpError(http.statusCode)
             }
         }
