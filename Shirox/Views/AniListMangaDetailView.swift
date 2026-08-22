@@ -394,6 +394,7 @@ struct AniListMangaDetailView: View {
                 }
                 Spacer()
                 // Invert chapter order — toggles newestFirst.
+                // 46×46 to match the action-button row's buttons.
                 if chapters.count > 1 {
                     Button {
                         Haptics.selection()
@@ -404,15 +405,14 @@ struct AniListMangaDetailView: View {
                         Image(systemName: newestFirst ? "arrow.down" : "arrow.up")
                             .font(.system(size: 14, weight: .bold))
                             .foregroundStyle(.primary)
-                            .frame(width: 36, height: 36)
+                            .frame(width: 46, height: 46)
                             .background(.ultraThinMaterial, in: Circle())
                             .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
                     }
                     .buttonStyle(.plain)
                 }
                 // Reset reading progress — only shows if the user actually
-                // has progress for this manga. Matches anime's reset button
-                // exactly (32×32, ultraThinMaterial, 1pt stroke, 14pt medium).
+                // has progress for this manga. 46×46 to match the rest.
                 if let item = resolvedItem,
                    MangaProgressManager.shared.hasProgress(mangaHref: item.href) {
                     Button {
@@ -421,12 +421,11 @@ struct AniListMangaDetailView: View {
                         Image(systemName: "arrow.counterclockwise")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(.primary)
-                            .frame(width: 32, height: 32)
+                            .frame(width: 46, height: 46)
                             .background(.ultraThinMaterial, in: Circle())
                             .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
                     }
                     .buttonStyle(.plain)
-                    .padding(.trailing, 4)
                 }
             }
             .padding(.horizontal, 16)
@@ -500,6 +499,31 @@ struct AniListMangaDetailView: View {
                 .padding(.vertical, 24)
             } else {
                 let displayChapters = newestFirst ? Array(chapters.reversed()) : chapters
+                // Selection bar — appears when selection mode is active.
+                // Has a "Download N" button that initiates batch download
+                // of selected chapters via MangaDownloadManager.
+                if isSelectionMode && !selectedChapterHrefs.isEmpty {
+                    HStack {
+                        Text("\(selectedChapterHrefs.count) selected")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                        Spacer()
+                        Button {
+                            downloadSelectedChapters()
+                        } label: {
+                            Label("Download \(selectedChapterHrefs.count)", systemImage: "arrow.down.circle.fill")
+                                .font(.subheadline.weight(.bold))
+                                .foregroundStyle(platformBackground)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.primary)
+                        .controlSize(.small)
+                        .clipShape(Capsule())
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
                 // Spacing 8 between cards — matches anime's episode list
                 // spacing. No background/clipShape on the container because
                 // each row now has its own RoundedRectangle card background
@@ -690,6 +714,32 @@ struct AniListMangaDetailView: View {
     }
 
     #if os(iOS)
+    /// Downloads all selected chapters via MangaDownloadManager.
+    /// Called by the "Download N" button in the selection bar.
+    private func downloadSelectedChapters() {
+        guard let item = resolvedItem else { return }
+        let ctx = MangaDownloadContext(
+            mangaTitle: item.title,
+            mangaHref: item.href,
+            coverImage: item.image,
+            moduleId: moduleManager.activeModule?.id ?? "")
+        let toDownload = chapters.filter { selectedChapterHrefs.contains($0.href) }
+        for chapter in toDownload {
+            mangaDownloads.download(chapter: chapter, context: ctx)
+        }
+        // Exit selection mode after initiating downloads.
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            isSelectionMode = false
+            selectedChapterHrefs.removeAll()
+        }
+        ToastManager.shared.show(
+            title: "Downloads",
+            message: "Started \(toDownload.count) chapter\(toDownload.count == 1 ? "" : "s")",
+            icon: "arrow.down.circle.fill",
+            iconColor: .green
+        )
+    }
+
     /// Returns the download state for a chapter, or nil if no download exists.
     private func mangaDownloadState(for chapter: MangaChapter) -> MangaDownloadState? {
         mangaDownloads.item(forChapterHref: chapter.href)?.state

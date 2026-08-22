@@ -1328,12 +1328,11 @@ struct AniListDetailView: View {
                     Image(systemName: isReversed ? "arrow.down" : "arrow.up")
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(.primary)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 46, height: 46)
                         .background(.ultraThinMaterial, in: Circle())
                         .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
                 }
                 .buttonStyle(.plain)
-                .padding(.trailing, 4)
 
                 // Reset progress button (only when not in selection mode)
                 #if os(iOS)
@@ -1345,7 +1344,7 @@ struct AniListDetailView: View {
                             Image(systemName: "arrow.counterclockwise")
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(.primary)
-                                .frame(width: 32, height: 32)
+                                .frame(width: 46, height: 46)
                                 .background(.ultraThinMaterial, in: Circle())
                                 .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
                         }
@@ -1360,7 +1359,7 @@ struct AniListDetailView: View {
                         Image(systemName: "arrow.counterclockwise")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(.primary)
-                            .frame(width: 32, height: 32)
+                            .frame(width: 46, height: 46)
                             .background(.ultraThinMaterial, in: Circle())
                             .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
                     }

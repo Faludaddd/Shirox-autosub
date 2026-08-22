@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "1.42",
+          "buildVersion": "1",
+          "date": "2026-08-22",
+          "localizedDescription": "Added: Manga batch download — selecting chapters and tapping the 'Download N' button now starts downloading selected chapters. Previously the download icon entered selection mode but there was no way to initiate the download.\nFixed: Chapter/episode invert and reset buttons are now 46×46 — same size as all other action buttons. Previously they were smaller.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 11040520,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.41",
           "buildVersion": "1",
           "date": "2026-08-22",

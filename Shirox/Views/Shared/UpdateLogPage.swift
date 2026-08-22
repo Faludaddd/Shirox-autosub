@@ -97,6 +97,18 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "1.42",
+        date: "2026-08-22",
+        added: [
+            "Manga batch download — selecting chapters and tapping the 'Download N' button now actually starts downloading the selected chapters via MangaDownloadManager. Previously the download icon entered selection mode but there was no way to initiate the download."
+        ],
+        fixed: [
+            "Chapter/episode invert and reset buttons are now 46×46 — same size as all other action buttons. Previously they were 36×32 (manga) and 36×32 (anime), smaller than the rest."
+        ],
+        changed: [],
+        improved: []
+    ),
+    UpdateLogEntry(
         version: "1.41",
         date: "2026-08-22",
         added: [],
