@@ -239,6 +239,7 @@ final class AniListLibraryService {
             var request = URLRequest(url: endpoint)
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("shirox/1.51 (iOS)", forHTTPHeaderField: "User-Agent")
             if let token = await AniListAuthManager.shared.accessToken {
                 request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             }

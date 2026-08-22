@@ -1364,6 +1364,8 @@ final class AniListService {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("shirox/1.51 (iOS)", forHTTPHeaderField: "User-Agent")
 
         let bodyDict: [String: Any] = ["query": query, "variables": variables]
         request.httpBody = try JSONSerialization.data(withJSONObject: bodyDict, options: [])
