@@ -109,22 +109,47 @@ struct DownloadsView: View {
 
     // MARK: - Body
 
-    /// Builds a DetailView for any DownloadItem — the full anime detail
-    /// page with offlineSnapshot so it shows downloaded episodes and can
-    /// play them directly from disk.
+    /// Builds the appropriate detail view for a DownloadItem.
+    /// - If a DownloadedMediaSnapshot exists, opens DetailView in offline mode.
+    /// - If no snapshot but the item has an aniListID, opens AniListDetailView
+    ///   (which has its own data loading and will show episodes via the module).
+    /// - If no snapshot and no aniListID, falls back to DownloadDetailView
+    ///   (the file-manager page with file info, Find File, etc.).
     @ViewBuilder
     private func detailDestination(for item: DownloadItem) -> some View {
         let snapshot = DownloadedMediaSnapshotStore.shared.snapshot(
             mediaTitle: item.mediaTitle,
             moduleId: item.moduleId)
-        DetailView(
-            item: SearchItem(
-                title: item.mediaTitle,
-                image: item.imageUrl,
-                href: item.detailHref ?? ""),
-            offlineSnapshot: snapshot,
-            moduleId: item.moduleId,
-            aniListID: item.aniListID)
+
+        if let snapshot {
+            // Offline mode: DetailView with downloaded episodes from disk.
+            DetailView(
+                item: SearchItem(
+                    title: item.mediaTitle,
+                    image: item.imageUrl,
+                    href: item.detailHref ?? ""),
+                offlineSnapshot: snapshot,
+                moduleId: item.moduleId,
+                aniListID: item.aniListID)
+        } else if let aniListID = item.aniListID, aniListID > 0 {
+            // No snapshot but have AniList ID — open AniListDetailView
+            // which loads its own data and can play via the module.
+            AniListDetailView(mediaId: aniListID)
+        } else if let href = item.detailHref, !href.isEmpty {
+            // No snapshot, no AniList ID, but have a module href —
+            // open DetailView which will load from the module.
+            DetailView(
+                item: SearchItem(
+                    title: item.mediaTitle,
+                    image: item.imageUrl,
+                    href: href),
+                moduleId: item.moduleId,
+                aniListID: item.aniListID)
+        } else {
+            // No snapshot, no AniList ID, no module href —
+            // fall back to the download detail file-manager page.
+            DownloadDetailView(item: item)
+        }
     }
 
     var body: some View {

@@ -97,17 +97,13 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
-        version: "1.48",
-        date: "2026-08-22",
+        version: "1.49",
+        date: "2026-08-23",
         added: [],
         fixed: [
-            "Character description — stripped Markdown formatting artifacts (__, ~~, !~, *, HTML tags, [links](url)) from MAL/Jikan 'about' text. Previously showed raw __bold__ and ~~strikethrough~~ markers.",
-            "Character detail page — removed the black navigation bar with the character name at the top. The hero section already shows the name, so the nav bar was redundant.",
-            "Schedule posters — increased from 56×80 to 84×112 to match the notification section poster size."
+            "Downloaded anime — the custom detail page was not appearing because DownloadedMediaSnapshotStore returned nil (no snapshot exists for the anime). Now has a 4-tier fallback: (1) snapshot exists → DetailView offline mode, (2) no snapshot but has AniList ID → AniListDetailView, (3) no snapshot, no AniList ID, but has module href → DetailView with module, (4) nothing → DownloadDetailView (file-manager page). Previously all downloads with no snapshot hit a blank page."
         ],
-        changed: [
-            "App renamed from 'Shirox' to 'shirox' (lowercase) in PRODUCT_NAME and apps.json."
-        ],
+        changed: [],
         improved: []
     ),
     UpdateLogEntry(
