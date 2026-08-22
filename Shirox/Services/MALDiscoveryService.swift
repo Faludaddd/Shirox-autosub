@@ -166,7 +166,7 @@ final class MALDiscoveryService {
 
     // MARK: - Jikan character models
 
-    struct JikanCharacter: Decodable, Identifiable {
+    struct JikanCharacter: Decodable {
         let mal_id: Int
         let name: String?
         let name_kanji: String?
