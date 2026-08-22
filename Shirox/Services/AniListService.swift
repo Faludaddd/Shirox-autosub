@@ -66,11 +66,10 @@ final class AniListService {
     private init() {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 15
-        config.httpAdditionalHeaders = [
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "User-Agent": "shirox/1.50 (iOS)"
-        ]
+        // Don't set Content-Type/Accept/User-Agent in httpAdditionalHeaders
+        // because iOS doesn't reliably send session-level headers on
+        // per-request URLRequest calls. Instead, set them directly on
+        // each request in post().
         session = URLSession(configuration: config)
     }
 
@@ -1365,7 +1364,12 @@ final class AniListService {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("shirox/1.51 (iOS)", forHTTPHeaderField: "User-Agent")
+        // Use a browser-like User-Agent — AniList is behind Cloudflare,
+        // which blocks non-browser UAs (like "shirox/1.51") with 403.
+        // Every other service in the app uses a browser UA via
+        // URLSession.randomUserAgent. We use a static one for AniList
+        // to avoid unnecessary UA rotation (AniList doesn't need it).
+        request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36", forHTTPHeaderField: "User-Agent")
 
         let bodyDict: [String: Any] = ["query": query, "variables": variables]
         request.httpBody = try JSONSerialization.data(withJSONObject: bodyDict, options: [])
@@ -1427,12 +1431,17 @@ final class AniListService {
                 )
                 throw AniListError.httpError(400)
             default:
+                let responseBody = String(data: data, encoding: .utf8) ?? "(no body)"
+                // Check if this is a Cloudflare challenge (HTML response)
+                let isCloudflare = responseBody.contains("cloudflare") || responseBody.contains("cf-")
                 Logger.shared.logStructured(
                     type: "Error",
                     feature: "AniList",
-                    operation: "GraphQL \(opName) HTTP \(http.statusCode)",
+                    operation: "GraphQL \(opName) HTTP \(http.statusCode)\(isCloudflare ? " (Cloudflare)" : "")",
                     contentId: idStr,
-                    httpStatus: http.statusCode
+                    httpStatus: http.statusCode,
+                    error: isCloudflare ? "Cloudflare block" : "HTTP \(http.statusCode)",
+                    responseSnippet: responseBody
                 )
                 throw AniListError.httpError(http.statusCode)
             }
