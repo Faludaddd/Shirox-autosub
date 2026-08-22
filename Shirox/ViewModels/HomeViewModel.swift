@@ -67,11 +67,6 @@ final class HomeViewModel: ObservableObject {
     }
 
     private func loadTrending() async {
-<<<<<<< HEAD
-        do { trending = try await ProviderManager.shared.call { try await $0.trending() } }
-        catch {
-            if trending.isEmpty { self.error = "AniList API is temporarily unavailable. Pull to retry." }
-=======
         // Try AniList first; if it fails (e.g. API disabled), fall back to Jikan/MAL.
         do {
             trending = try await ProviderManager.shared.call { try await $0.trending() }
@@ -88,7 +83,6 @@ final class HomeViewModel: ObservableObject {
             } else {
                 if trending.isEmpty { self.error = "AniList API is temporarily unavailable. Pull to retry." }
             }
->>>>>>> 03769c9 (v1.78: Fall back to Jikan/MAL when AniList API is down)
         }
     }
 
