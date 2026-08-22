@@ -29,10 +29,10 @@
         {
           "version": "1.54",
           "buildVersion": "1",
-          "date": "2026-08-23",
+          "date": "2026-08-22",
           "localizedDescription": "FIXED: AniList API was temporarily disabled on their end ('severe stability issues'). The app now detects this response and: (1) caches the disabled state for 60s to avoid hammering a down API, (2) skips provider fallback when the API is disabled (MAL won't have the same data), (3) shows a user-friendly error message 'AniList API is temporarily unavailable. Pull to retry.' on the Home screen instead of a blank page. When AniList comes back online, the app will automatically resume normal operation.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/shirox.ipa",
-          "size": 11040520,
+          "size": 11183019,
           "minOSVersion": "15.0"
         },
         {
