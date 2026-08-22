@@ -69,7 +69,7 @@ final class HomeViewModel: ObservableObject {
     private func loadTrending() async {
         do { trending = try await ProviderManager.shared.call { try await $0.trending() } }
         catch {
-            if trending.isEmpty { error = "AniList API is temporarily unavailable. Pull to retry." }
+            if trending.isEmpty { self.error = "AniList API is temporarily unavailable. Pull to retry." }
         }
     }
 

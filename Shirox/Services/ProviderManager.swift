@@ -224,7 +224,7 @@ final class ProviderManager: ObservableObject {
         if error is CancellationError { return false }
         // If AniList API is known to be disabled, don't bother with
         // fallback — MAL won't have the same data and it just adds noise.
-        if let disabled = AniListService.shared.isApiDisabled(), disabled {
+        if AniListService.shared.isApiDisabled() {
             return false
         }
         if let pe = error as? ProviderError { return pe.isFallbackEligible }
