@@ -1980,12 +1980,6 @@ struct NotificationsSettingsPage: View {
             } label: {
                 Label("Remove All Pending", systemImage: "trash")
                     .frame(maxWidth: .infinity)
-                    .shadow(
-                        color: Color.glowEnabled
-                            ? Color.red.opacity(Color.glowOpacity(0.4)) : .clear,
-                        radius: Color.glowEnabled
-                            ? Color.glowRadiusSmall : 0
-                    )
             }
             .buttonStyle(.bordered)
             .disabled(pendingCount == 0)
@@ -3144,10 +3138,10 @@ private struct StoreModuleTile: View {
 }
 
 /// Button style for the Store tile "Install" button. Mimics the system
-/// `.bordered` look (tinted capsule background + tinted label) and adds an
-/// accent glow while the button is pressed. The glow is gated by the global
-/// `Color.glowEnabled` flag and scaled by `Color.glowIntensity`, matching the
-/// pattern used elsewhere in the app (e.g. `ModulesSettingsPage`).
+/// `.bordered` look (tinted capsule background + tinted label). The glow
+/// shadow was removed — it was applied to a text-heavy button which made
+/// the label feel visually overwhelming. Module/source glows elsewhere
+/// in the app are unaffected.
 private struct GlowingInstallButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -3160,14 +3154,6 @@ private struct GlowingInstallButtonStyle: ButtonStyle {
             )
             .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
             .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
-            .shadow(
-                color: configuration.isPressed && Color.glowEnabled
-                    ? Color.appAccent.opacity(Color.glowOpacity(0.5))
-                    : .clear,
-                radius: configuration.isPressed && Color.glowEnabled
-                    ? Color.glowRadiusSmall
-                    : 0
-            )
     }
 }
 
@@ -4493,11 +4479,6 @@ struct BackupRestoreSettingsPage: View {
                     }
                     .buttonStyle(.bordered)
                     .tint(.appAccent)
-                    .shadow(
-                        color: Color.glowEnabled
-                            ? Color.appAccent.opacity(Color.glowOpacity(0.5)) : .clear,
-                        radius: Color.glowEnabled ? Color.glowRadiusSelection : 0
-                    )
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding()

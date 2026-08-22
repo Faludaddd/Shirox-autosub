@@ -613,12 +613,6 @@ struct SearchView: View {
                     Color.appAccent,
                     in: RoundedRectangle(cornerRadius: 14)
                 )
-                .shadow(
-                    color: Color.glowEnabled
-                        ? Color.appAccent.opacity(Color.glowOpacity(0.7))
-                        : .clear,
-                    radius: Color.glowEnabled ? Color.glowRadiusLarge : 0
-                )
             }
             .buttonStyle(.plain)
             .disabled(isSurpriseLoading)

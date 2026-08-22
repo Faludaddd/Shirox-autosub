@@ -41,9 +41,6 @@ struct AniListDetailView: View {
     @State private var selectedRangeIndex = 0
     @State private var isReversed = false
     @State private var selectedTab = 0
-    @State private var charactersExpanded = true
-    @State private var staffExpanded = true
-    @State private var recommendationsExpanded = true
     @State private var sequelMediaId: Int? = nil
     @State private var watchOrder: [TVDBMappingService.AniraMediaEntry] = []
     /// Tracks whether the detail scroll view has scrolled past the hero header.
@@ -680,40 +677,23 @@ struct AniListDetailView: View {
 
                 // NOTE: Characters → Staff → Recommendations → Videos
                 // are placed ABOVE the episodes section. Each is independently
-                // collapsible.
-                // Characters (collapsible)
-                VStack(alignment: .leading, spacing: 0) {
-                    collapsibleHeader("Characters", isExpanded: $charactersExpanded)
-                    if charactersExpanded {
-                        CharactersSection(mediaId: media.id, isManga: false,
-                                          preloaded: vm.characters)
-                            .frame(maxWidth: .infinity)
-                    }
-                }
-                .padding(.top, 20)
+                // collapsible (the section renders its own header with a
+                // chevron — collapsed by default).
+                CharactersSection(mediaId: media.id, isManga: false,
+                                  preloaded: vm.characters)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 20)
 
-                // Staff (collapsible)
                 #if os(iOS)
-                VStack(alignment: .leading, spacing: 0) {
-                    collapsibleHeader("Staff", isExpanded: $staffExpanded)
-                    if staffExpanded {
-                        StaffSection(mediaId: media.id, malId: media.idMal)
-                            .frame(maxWidth: .infinity)
-                    }
-                }
-                .padding(.top, 8)
+                StaffSection(mediaId: media.id, malId: media.idMal)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 8)
                 #endif
 
-                // Recommendations (collapsible)
-                VStack(alignment: .leading, spacing: 0) {
-                    collapsibleHeader("Recommendations", isExpanded: $recommendationsExpanded)
-                    if recommendationsExpanded {
-                        RecommendationsSection(mediaId: media.id, isManga: false,
-                                               preloaded: vm.recommendations)
-                            .frame(maxWidth: .infinity)
-                    }
-                }
-                .padding(.top, 8)
+                RecommendationsSection(mediaId: media.id, isManga: false,
+                                      preloaded: vm.recommendations)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 8)
 
                 #if os(iOS)
                 VideosSection(mediaId: media.id, malId: media.idMal)
@@ -905,6 +885,15 @@ struct AniListDetailView: View {
         }()
         let label = item != nil && !item!.streamUrl.isEmpty ? "Continue Ep \(nextEp)" : "Watch Ep \(nextEp)"
 
+        // The button UI is decoupled from `vm.isResolving`. The button is
+        // ALWAYS rendered immediately with the play icon + label, so the
+        // user can see and tap it the moment they open an episode. Background
+        // stream resolution kicks off when the user TAPS the button — the
+        // loading state then happens inside the player flow (a Toast shows
+        // "Loading streams…" via the existing watch flow), NOT on the button
+        // itself. Tapping an episode in the list no longer flips the Watch
+        // button into a "Loading…" spinner; the button stays steady and
+        // interactive while the resolve happens off-screen.
         Button {
             if let item {
                 resumeWatching(item: item)
@@ -913,15 +902,9 @@ struct AniListDetailView: View {
             }
         } label: {
             HStack(spacing: 10) {
-                if vm.isResolving {
-                    ProgressView()
-                        .tint(.primary)
-                        .scaleEffect(0.8)
-                } else {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 13, weight: .bold))
-                }
-                Text(vm.isResolving ? "Loading…" : label)
+                Image(systemName: "play.fill")
+                    .font(.system(size: 13, weight: .bold))
+                Text(label)
                     .font(.system(size: 15, weight: .bold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -937,7 +920,7 @@ struct AniListDetailView: View {
             .foregroundStyle(.primary)
         }
         .buttonStyle(.plain)
-        .disabled(total == 0 || vm.isResolving)
+        .disabled(total == 0)
     }
 
     private func resumeWatching(item: ContinueWatchingItem) {
@@ -1656,30 +1639,6 @@ struct AniListDetailView: View {
         } message: {
             Text("This will clear all watched history and progress for \(media.title.displayTitle).")
         }
-    }
-
-    // MARK: - Collapsible header
-
-    @ViewBuilder
-    private func collapsibleHeader(_ title: String, isExpanded: Binding<Bool>) -> some View {
-        Button {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                isExpanded.wrappedValue.toggle()
-            }
-        } label: {
-            HStack {
-                Text(title)
-                    .font(.title3.weight(.bold))
-                Spacer()
-                Image(systemName: isExpanded.wrappedValue ? "chevron.down" : "chevron.right")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 
     // MARK: - Tabs

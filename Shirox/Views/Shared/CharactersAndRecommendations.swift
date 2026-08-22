@@ -27,6 +27,10 @@ struct CharactersSection: View {
     /// When true, character data came from MAL/Jikan (for anime) which
     /// provides anime-specific character images and descriptions.
     @State private var usingJikanCharacters = false
+    /// Collapsed by default — the user taps the chevron to expand the
+    /// character strip. Keeping it collapsed on first render avoids an
+    /// overwhelming wall of character art on the detail page.
+    @State private var isExpanded = false
 
     /// The characters to display — prefers preloaded data (passed from the
     /// parent VM), falls back to any we fetched ourselves. Using a computed
@@ -43,26 +47,22 @@ struct CharactersSection: View {
         Group {
             if !displayCharacters.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text("Characters")
-                            .font(.title3.weight(.bold))
-                        Spacer()
-                    }
-                    .padding(.horizontal, 16)
-
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            ForEach(displayCharacters) { edge in
-                                Button {
-                                    Haptics.light()
-                                    selectedCharacter = edge
-                                } label: {
-                                    characterCard(edge)
+                    sectionHeader
+                    if isExpanded {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 12) {
+                                ForEach(displayCharacters) { edge in
+                                    Button {
+                                        Haptics.light()
+                                        selectedCharacter = edge
+                                    } label: {
+                                        characterCard(edge)
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
                             }
+                            .padding(.horizontal, 16)
                         }
-                        .padding(.horizontal, 16)
                     }
                 }
                 .padding(.top, 8)
@@ -70,21 +70,18 @@ struct CharactersSection: View {
                 // Loading state — show section header + spinner so the user
                 // knows characters are being fetched.
                 VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text("Characters")
-                            .font(.title3.weight(.bold))
-                        Spacer()
+                    sectionHeader
+                    if isExpanded {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Loading characters…")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 20)
                     }
-                    .padding(.horizontal, 16)
-                    HStack(spacing: 8) {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                        Text("Loading characters…")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 20)
                 }
                 .padding(.top, 8)
             }
@@ -107,6 +104,31 @@ struct CharactersSection: View {
                 await loadCharacters()
             }
         }
+    }
+
+    /// Section header with chevron — tapping toggles `isExpanded`.
+    /// Visually identical to the parent page's `collapsibleHeader` so the
+    /// section reads as a single titled unit (no duplicate "Characters
+    /// Characters" label).
+    private var sectionHeader: some View {
+        Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                isExpanded.toggle()
+            }
+        } label: {
+            HStack {
+                Text("Characters")
+                    .font(.title3.weight(.bold))
+                Spacer()
+                Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
@@ -682,6 +704,10 @@ struct RecommendationsSection: View {
     @State private var fetchedRecommendations: [AniListRecommendation] = []
     @State private var didFetch = false
     @State private var isLoading = false
+    /// Collapsed by default — the user taps the chevron to expand the
+    /// recommendation strip. Matches the collapse-by-default behaviour
+    /// of CharactersSection.
+    @State private var isExpanded = false
 
     /// Computed: prefers preloaded data, falls back to self-fetched. Same
     /// pattern as CharactersSection — using a computed property means the
@@ -696,48 +722,41 @@ struct RecommendationsSection: View {
         Group {
             if !displayRecommendations.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text("Recommendations")
-                            .font(.title3.weight(.bold))
-                        Spacer()
-                    }
-                    .padding(.horizontal, 16)
-
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            ForEach(displayRecommendations) { rec in
-                                if let media = rec.mediaRecommendation {
-                                    NavigationLink {
-                                        destination(for: media)
-                                    } label: {
-                                        recommendationCard(media)
+                    sectionHeader
+                    if isExpanded {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 12) {
+                                ForEach(displayRecommendations) { rec in
+                                    if let media = rec.mediaRecommendation {
+                                        NavigationLink {
+                                            destination(for: media)
+                                        } label: {
+                                            recommendationCard(media)
+                                        }
+                                        .buttonStyle(.plain)
                                     }
-                                    .buttonStyle(.plain)
                                 }
                             }
+                            .padding(.horizontal, 16)
                         }
-                        .padding(.horizontal, 16)
                     }
                 }
                 .padding(.top, 8)
             } else if isLoading {
                 // Loading state — show section header + spinner.
                 VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text("Recommendations")
-                            .font(.title3.weight(.bold))
-                        Spacer()
+                    sectionHeader
+                    if isExpanded {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Loading recommendations…")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 20)
                     }
-                    .padding(.horizontal, 16)
-                    HStack(spacing: 8) {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                        Text("Loading recommendations…")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 20)
                 }
                 .padding(.top, 8)
             }
@@ -751,6 +770,28 @@ struct RecommendationsSection: View {
                 await loadRecommendations()
             }
         }
+    }
+
+    /// Section header with chevron — tapping toggles `isExpanded`.
+    private var sectionHeader: some View {
+        Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                isExpanded.toggle()
+            }
+        } label: {
+            HStack {
+                Text("Recommendations")
+                    .font(.title3.weight(.bold))
+                Spacer()
+                Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder

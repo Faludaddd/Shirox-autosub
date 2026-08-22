@@ -109,47 +109,28 @@ struct DownloadsView: View {
 
     // MARK: - Body
 
-    /// Builds the appropriate detail view for a DownloadItem.
-    /// - If a DownloadedMediaSnapshot exists, opens DetailView in offline mode.
-    /// - If no snapshot but the item has an aniListID, opens AniListDetailView
-    ///   (which has its own data loading and will show episodes via the module).
-    /// - If no snapshot and no aniListID, falls back to DownloadDetailView
-    ///   (the file-manager page with file info, Find File, etc.).
+    /// Builds the destination view for a tapped DownloadItem.
+    ///
+    /// The custom Anime Downloads page (`DownloadDetailView`) is the
+    /// single destination for ANY anime download tap — in-progress,
+    /// completed, or failed. It renders the circular progress ring,
+    /// file metadata, ETA/speed, "Find File" / "Share File" actions,
+    /// Retry (failed) / Cancel (downloading) / Delete (completed)
+    /// buttons, and the existing `DownloadItem` data is passed straight
+    /// through — so the downloaded episode's metadata, file name, and
+    /// progress are preserved.
+    ///
+    /// Previously this used a 4-tier fallback (snapshot → DetailView,
+    /// aniListID → AniListDetailView, href → DetailView, else →
+    /// DownloadDetailView). The fallback paths opened the "Offline
+    /// Reading" page (`DetailView` with `offlineSnapshot`) which only
+    /// shows downloaded episodes — that is NOT the custom download page
+    /// the user wants. All anime download rows now route to the custom
+    /// `DownloadDetailView`. Manga rows continue to route to
+    /// `MangaDetailView` with `offlineChapters` (see `body`).
     @ViewBuilder
     private func detailDestination(for item: DownloadItem) -> some View {
-        let snapshot = DownloadedMediaSnapshotStore.shared.snapshot(
-            mediaTitle: item.mediaTitle,
-            moduleId: item.moduleId)
-
-        if let snapshot {
-            // Offline mode: DetailView with downloaded episodes from disk.
-            DetailView(
-                item: SearchItem(
-                    title: item.mediaTitle,
-                    image: item.imageUrl,
-                    href: item.detailHref ?? ""),
-                offlineSnapshot: snapshot,
-                moduleId: item.moduleId,
-                aniListID: item.aniListID)
-        } else if let aniListID = item.aniListID, aniListID > 0 {
-            // No snapshot but have AniList ID — open AniListDetailView
-            // which loads its own data and can play via the module.
-            AniListDetailView(mediaId: aniListID)
-        } else if let href = item.detailHref, !href.isEmpty {
-            // No snapshot, no AniList ID, but have a module href —
-            // open DetailView which will load from the module.
-            DetailView(
-                item: SearchItem(
-                    title: item.mediaTitle,
-                    image: item.imageUrl,
-                    href: href),
-                moduleId: item.moduleId,
-                aniListID: item.aniListID)
-        } else {
-            // No snapshot, no AniList ID, no module href —
-            // fall back to the download detail file-manager page.
-            DownloadDetailView(item: item)
-        }
+        DownloadDetailView(item: item)
     }
 
     var body: some View {

@@ -97,6 +97,22 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "1.79",
+        date: "2026-08-23",
+        added: [],
+        fixed: [
+            "Characters / Staff / Recommendations — duplicate section titles (e.g. 'Characters Characters') removed. The anime detail page previously rendered a parent collapsible header AND the section's own internal header, producing two identical titles stacked on top of each other. The parent collapsibleHeader wrapper is gone; each section now renders its own single header with the chevron. Same cleanup applied to Staff and Videos.",
+            "Characters / Staff / Recommendations — were opening expanded by default on the anime detail page. All four sections (Characters, Staff, Recommendations, Videos) are now collapsed by default; the user taps the chevron to expand. The collapsed state is visually clean and compact — just the title + chevron, no body.",
+            "Staff section not loading — root cause: StaffSection required a non-nil malId, but the preloaded Media passed from the AniList list query often has no idMal (only the full detail query populates it). When malId was nil, StaffSection silently skipped the fetch and rendered nothing. Now resolves the MAL id through IDMappingService.shared.cachedMalId(forAnilistId:) as a fallback — works for any anime whose Arm mapping is cached. Same fallback added to VideosSection.loadVideos() so videos load too.",
+            "Downloads — custom Anime Downloads page was not being opened. Tapping a downloaded anime opened the 'Offline Reading' page (DetailView with offlineSnapshot) which only shows the downloaded episodes — that is NOT the custom download page. The 4-tier fallback (snapshot → DetailView, aniListID → AniListDetailView, href → DetailView, else → DownloadDetailView) is replaced with a single destination: DownloadDetailView. The custom page (circular progress ring, ETA, speed, file info, Find File / Share File buttons, Retry / Cancel / Delete actions) now opens for every anime download tap. The existing DownloadItem data is passed straight through, so the episode title, file name, progress, and metadata are preserved. Manga downloads are unchanged — they already route to MangaDetailView with offlineChapters.",
+            "Watch Episode button loading state — tapping an episode no longer flips the Watch Episode button into a 'Loading…' spinner. The button now always renders the play icon + 'Watch Ep N' / 'Continue Ep N' label immediately and stays interactive. The vm.isResolving flag (used internally to prevent duplicate resolve cycles) is no longer tied to the button UI. Stream resolution still kicks off when the user taps an episode or presses the Watch button, but the loading state happens off-screen — the user doesn't see a disabled button."
+        ],
+        changed: [
+            "Glow effects — removed from regular text-heavy buttons. The 'Surprise Me' button (SearchView), 'Remove All Pending' button (Notifications settings), 'Export Backup' button (Backup & Restore), and the module-store 'Install' button no longer cast a glow shadow — their labels read cleanly without the halo. Intentional glow on Modules (active module tile + active module list row), Sources (connected provider icons), the MangaHome layout/direction selector cards, the HomePressStyle card-press feedback, the Notification status circle, and all Toggle-on glow effects is preserved unchanged."
+        ],
+        improved: []
+    ),
+    UpdateLogEntry(
         version: "1.51",
         date: "2026-08-23",
         added: [

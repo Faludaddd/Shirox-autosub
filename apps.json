@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "1.79",
+          "buildVersion": "1",
+          "date": "2026-08-23",
+          "localizedDescription": "Fixed: Characters/Staff/Recommendations duplicate section titles (e.g. 'Characters Characters') removed — each section now has one header. All four sections (Characters, Staff, Recommendations, Videos) are collapsed by default on the anime detail page; tap the chevron to expand.\nFixed: Staff section not loading — now resolves the MAL id via IDMappingService when the preloaded media has no idMal. Videos section also benefits.\nFixed: Downloads — custom Anime Downloads page (progress ring, file info, Find/Share buttons, Retry/Cancel/Delete) now opens for every anime download tap. Previously opened the 'Offline Reading' page instead. Manga downloads unchanged.\nFixed: Watch Episode button — no longer shows a 'Loading…' spinner when you tap an episode. The button is always interactive; stream resolution happens off-screen.\nChanged: Glow effects removed from regular text-heavy buttons (Surprise Me, Remove All Pending, Export Backup, module-store Install). Intentional glow on Modules, Sources, selector cards, and Toggles preserved.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/shirox.ipa",
+          "size": 11040520,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.55",
           "buildVersion": "1",
           "date": "2026-08-22",

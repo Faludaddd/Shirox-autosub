@@ -10,44 +10,41 @@ struct StaffSection: View {
     @State private var staff: [MALDiscoveryService.JikanStaffEdge] = []
     @State private var isLoading = false
     @State private var didFetch = false
+    /// Collapsed by default — matches CharactersSection and
+    /// RecommendationsSection so the detail page doesn't open with three
+    /// expanded strips stacked on top of each other.
+    @State private var isExpanded = false
 
     var body: some View {
         Group {
             if !staff.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text("Staff")
-                            .font(.title3.weight(.bold))
-                        Spacer()
-                    }
-                    .padding(.horizontal, 16)
-
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            ForEach(staff.indices, id: \.self) { idx in
-                                staffCard(staff[idx])
+                    sectionHeader
+                    if isExpanded {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 12) {
+                                ForEach(staff.indices, id: \.self) { idx in
+                                    staffCard(staff[idx])
+                                }
                             }
+                            .padding(.horizontal, 16)
                         }
-                        .padding(.horizontal, 16)
                     }
                 }
                 .padding(.top, 8)
             } else if isLoading {
                 VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text("Staff")
-                            .font(.title3.weight(.bold))
-                        Spacer()
+                    sectionHeader
+                    if isExpanded {
+                        HStack(spacing: 8) {
+                            ProgressView().scaleEffect(0.8)
+                            Text("Loading staff…")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 20)
                     }
-                    .padding(.horizontal, 16)
-                    HStack(spacing: 8) {
-                        ProgressView().scaleEffect(0.8)
-                        Text("Loading staff…")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 20)
                 }
                 .padding(.top, 8)
             }
@@ -55,6 +52,28 @@ struct StaffSection: View {
         .task {
             if !didFetch { await loadStaff() }
         }
+    }
+
+    /// Section header with chevron — tapping toggles `isExpanded`.
+    private var sectionHeader: some View {
+        Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                isExpanded.toggle()
+            }
+        } label: {
+            HStack {
+                Text("Staff")
+                    .font(.title3.weight(.bold))
+                Spacer()
+                Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
@@ -87,9 +106,21 @@ struct StaffSection: View {
     private func loadStaff() async {
         didFetch = true
         isLoading = true
-        guard let malId, malId > 0 else { isLoading = false; return }
+        // Resolve the MAL id: prefer the explicit idMal passed in; otherwise
+        // fall back to the IDMappingService cache (filled by Arm mappings
+        // prefetch). Without this fallback, anime whose preloaded media had
+        // no idMal (e.g. list-query media) would silently skip the staff
+        // fetch — leaving the Staff section blank.
+        var resolvedMalId = malId
+        if resolvedMalId == nil || resolvedMalId == 0 {
+            resolvedMalId = IDMappingService.shared.cachedMalId(forAnilistId: mediaId)
+        }
+        guard let resolved = resolvedMalId, resolved > 0 else {
+            isLoading = false
+            return
+        }
         do {
-            staff = try await MALDiscoveryService.shared.staff(malId: malId)
+            staff = try await MALDiscoveryService.shared.staff(malId: resolved)
         } catch {
             staff = []
         }
@@ -106,44 +137,39 @@ struct VideosSection: View {
     @State private var videos: [MALDiscoveryService.JikanVideo] = []
     @State private var isLoading = false
     @State private var didFetch = false
+    /// Collapsed by default — matches the other detail-page sections.
+    @State private var isExpanded = false
 
     var body: some View {
         Group {
             if !videos.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text("Videos")
-                            .font(.title3.weight(.bold))
-                        Spacer()
-                    }
-                    .padding(.horizontal, 16)
-
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            ForEach(videos) { video in
-                                videoCard(video)
+                    sectionHeader
+                    if isExpanded {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 12) {
+                                ForEach(videos) { video in
+                                    videoCard(video)
+                                }
                             }
+                            .padding(.horizontal, 16)
                         }
-                        .padding(.horizontal, 16)
                     }
                 }
                 .padding(.top, 8)
             } else if isLoading {
                 VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text("Videos")
-                            .font(.title3.weight(.bold))
-                        Spacer()
+                    sectionHeader
+                    if isExpanded {
+                        HStack(spacing: 8) {
+                            ProgressView().scaleEffect(0.8)
+                            Text("Loading videos…")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 20)
                     }
-                    .padding(.horizontal, 16)
-                    HStack(spacing: 8) {
-                        ProgressView().scaleEffect(0.8)
-                        Text("Loading videos…")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 20)
                 }
                 .padding(.top, 8)
             }
@@ -151,6 +177,28 @@ struct VideosSection: View {
         .task {
             if !didFetch { await loadVideos() }
         }
+    }
+
+    /// Section header with chevron — tapping toggles `isExpanded`.
+    private var sectionHeader: some View {
+        Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                isExpanded.toggle()
+            }
+        } label: {
+            HStack {
+                Text("Videos")
+                    .font(.title3.weight(.bold))
+                Spacer()
+                Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
@@ -203,9 +251,18 @@ struct VideosSection: View {
     private func loadVideos() async {
         didFetch = true
         isLoading = true
-        guard let malId, malId > 0 else { isLoading = false; return }
+        // Resolve MAL id same way as StaffSection — fall back to the
+        // IDMappingService cache when the caller didn't pass one.
+        var resolvedMalId = malId
+        if resolvedMalId == nil || resolvedMalId == 0 {
+            resolvedMalId = IDMappingService.shared.cachedMalId(forAnilistId: mediaId)
+        }
+        guard let resolved = resolvedMalId, resolved > 0 else {
+            isLoading = false
+            return
+        }
         do {
-            videos = try await MALDiscoveryService.shared.videos(malId: malId)
+            videos = try await MALDiscoveryService.shared.videos(malId: resolved)
         } catch {
             videos = []
         }
