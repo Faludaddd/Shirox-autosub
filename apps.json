@@ -29,10 +29,10 @@
         {
           "version": "1.51",
           "buildVersion": "1",
-          "date": "2026-08-23",
+          "date": "2026-08-22",
           "localizedDescription": "FIXED: AniList HTTP 403 — AniListService was not sending a User-Agent header, which AniList requires. This was causing ALL AniList data to fail (carousel, categories, manga, characters, recommendations, etc.). Now sends 'shirox/1.50 (iOS)' UA.\nFIXED: Carousel and Categories now appear again (were empty due to 403).\nFIXED: Manga now loads (was empty due to 403).\nFIXED: Provider fallback spam — 'fallback not authenticated' log throttled to once per 30s.\nADDED: Collapsible Characters, Staff, and Recommendations sections on anime detail page — each has its own expand/collapse arrow.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/shirox.ipa",
-          "size": 11040520,
+          "size": 11182318,
           "minOSVersion": "15.0"
         },
         {
