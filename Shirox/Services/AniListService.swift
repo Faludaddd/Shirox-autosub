@@ -62,6 +62,19 @@ final class AniListService {
     /// firing a duplicate.
     private var inFlightDetailTasks: [String: Task<AniListMedia, Error>] = [:]
     private let inFlightDetailLock = NSLock()
+    /// When AniList returns "API temporarily disabled", we cache the
+    /// disabled state for 60 seconds to avoid hammering a down API.
+    private var aniListApiDisabledUntil: Date?
+
+    /// True if AniList API is known to be temporarily disabled (from a
+    /// previous "API temporarily disabled" response). Used by
+    /// ProviderManager to skip fallback when the API itself is down.
+    func isApiDisabled() -> Bool {
+        guard let until = aniListApiDisabledUntil else { return false }
+        if Date() < until { return true }
+        aniListApiDisabledUntil = nil
+        return false
+    }
 
     private init() {
         let config = URLSessionConfiguration.default
@@ -1360,6 +1373,13 @@ final class AniListService {
     }
 
     private func post(query: String, variables: [String: Any]) async throws -> Data {
+        // If AniList API is known to be disabled, skip the request entirely
+        // instead of hammering a down API. The 60s cooldown is set when we
+        // receive the "temporarily disabled" response.
+        if let disabledUntil = aniListApiDisabledUntil, Date() < disabledUntil {
+            throw AniListError.httpError(403)
+        }
+
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -1434,13 +1454,22 @@ final class AniListService {
                 let responseBody = String(data: data, encoding: .utf8) ?? "(no body)"
                 // Check if this is a Cloudflare challenge (HTML response)
                 let isCloudflare = responseBody.contains("cloudflare") || responseBody.contains("cf-")
+                // Check if AniList API itself is disabled
+                let isApiDisabled = responseBody.contains("temporarily disabled")
+
+                if isApiDisabled {
+                    // AniList API is down — cache this state so we don't
+                    // keep hammering it with every request.
+                    aniListApiDisabledUntil = Date().addingTimeInterval(60)
+                }
+
                 Logger.shared.logStructured(
                     type: "Error",
                     feature: "AniList",
-                    operation: "GraphQL \(opName) HTTP \(http.statusCode)\(isCloudflare ? " (Cloudflare)" : "")",
+                    operation: "GraphQL \(opName) HTTP \(http.statusCode)\(isCloudflare ? " (Cloudflare)" : "")\(isApiDisabled ? " (API Disabled)" : "")",
                     contentId: idStr,
                     httpStatus: http.statusCode,
-                    error: isCloudflare ? "Cloudflare block" : "HTTP \(http.statusCode)",
+                    error: isApiDisabled ? "AniList API temporarily disabled" : (isCloudflare ? "Cloudflare block" : "HTTP \(http.statusCode)"),
                     responseSnippet: responseBody
                 )
                 throw AniListError.httpError(http.statusCode)

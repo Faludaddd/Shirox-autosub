@@ -68,7 +68,9 @@ final class HomeViewModel: ObservableObject {
 
     private func loadTrending() async {
         do { trending = try await ProviderManager.shared.call { try await $0.trending() } }
-        catch { /* individual failures don't block other sections */ }
+        catch {
+            if trending.isEmpty { error = "AniList API is temporarily unavailable. Pull to retry." }
+        }
     }
 
     private func loadSeasonal() async {
