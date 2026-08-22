@@ -27,48 +27,21 @@
       },
       "versions": [
         {
-          "version": "1.54",
+          "version": "1.55",
           "buildVersion": "1",
-          "date": "2026-08-22",
-          "localizedDescription": "FIXED: AniList API was temporarily disabled on their end ('severe stability issues'). The app now detects this response and: (1) caches the disabled state for 60s to avoid hammering a down API, (2) skips provider fallback when the API is disabled (MAL won't have the same data), (3) shows a user-friendly error message 'AniList API is temporarily unavailable. Pull to retry.' on the Home screen instead of a blank page. When AniList comes back online, the app will automatically resume normal operation.",
+          "date": "2026-08-23",
+          "localizedDescription": "FIXED: When AniList API is down, the app now falls back to Jikan/MAL for Home screen data (trending, seasonal, popular, top rated) and manga data (trending, popular). The carousel and sections will show data from MAL/Jikan when AniList is unavailable. When AniList comes back online, pull to refresh and it will switch back automatically.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/shirox.ipa",
-          "size": 11183019,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "1.53",
-          "buildVersion": "1",
-          "date": "2026-08-22",
-          "localizedDescription": "FIXED: AniList 403 — Cloudflare was blocking the custom 'shirox/1.51 (iOS)' User-Agent because it doesn't look like a browser. Changed to a standard Chrome browser User-Agent (matching what every other service in the app already uses). Also removed session-level httpAdditionalHeaders that weren't being sent on per-request URLRequests, and added response body logging for 403 errors to identify Cloudflare blocks.",
-          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/shirox.ipa",
-          "size": 11182221,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "1.52",
-          "buildVersion": "1",
-          "date": "2026-08-22",
-          "localizedDescription": "FIXED: AniList 403 — User-Agent was set on URLSession config but not on each URLRequest. iOS's URLSession doesn't always inherit httpAdditionalHeaders for per-request calls. Now sets User-Agent directly on every URLRequest in both AniListService.post() and AniListLibraryService.post().",
-          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/shirox.ipa",
-          "size": 11182127,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "1.51",
-          "buildVersion": "1",
-          "date": "2026-08-22",
-          "localizedDescription": "FIXED: AniList HTTP 403 — AniListService was not sending a User-Agent header, which AniList requires. This was causing ALL AniList data to fail (carousel, categories, manga, characters, recommendations, etc.). Now sends 'shirox/1.50 (iOS)' UA.\nFIXED: Carousel and Categories now appear again (were empty due to 403).\nFIXED: Manga now loads (was empty due to 403).\nFIXED: Provider fallback spam — 'fallback not authenticated' log throttled to once per 30s.\nADDED: Collapsible Characters, Staff, and Recommendations sections on anime detail page — each has its own expand/collapse arrow.",
-          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/shirox.ipa",
-          "size": 11182318,
+          "size": 11040520,
           "minOSVersion": "15.0"
         },
         {
           "version": "1.50",
           "buildVersion": "1",
-          "date": "2026-08-22",
+          "date": "2026-08-23",
           "localizedDescription": "Added: Anime Staff section — directors, producers, animators, composers from MAL/Jikan.\nAdded: Anime Videos section — PVs, trailers, openings, endings with YouTube links from MAL/Jikan.\nAdded: Character Animeography — 'Appears In' section on character detail showing all anime the character appears in.\nAdded: Voice Actor full profile — tapping a VA opens a detail page with their bio, birthday, website, and all anime roles.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/shirox.ipa",
-          "size": 11175179,
+          "size": 11040520,
           "minOSVersion": "15.0"
         },
         {

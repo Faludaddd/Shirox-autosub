@@ -67,39 +67,87 @@ final class HomeViewModel: ObservableObject {
     }
 
     private func loadTrending() async {
+<<<<<<< HEAD
         do { trending = try await ProviderManager.shared.call { try await $0.trending() } }
         catch {
             if trending.isEmpty { self.error = "AniList API is temporarily unavailable. Pull to retry." }
+=======
+        // Try AniList first; if it fails (e.g. API disabled), fall back to Jikan/MAL.
+        do {
+            trending = try await ProviderManager.shared.call { try await $0.trending() }
+        } catch {
+            // AniList failed — try Jikan/MAL as fallback for the data.
+            if AniListService.shared.isApiDisabled() {
+                Logger.shared.logStructured(type: "Provider", feature: "Home", operation: "Trending fallback to Jikan", error: "AniList API disabled")
+                do {
+                    let results = try await MALDiscoveryService.shared.trending()
+                    trending = results.map { MALDiscoveryService.shared.mapToMedia($0) }
+                } catch {
+                    if trending.isEmpty { self.error = "AniList API is temporarily unavailable. Pull to retry." }
+                }
+            } else {
+                if trending.isEmpty { self.error = "AniList API is temporarily unavailable. Pull to retry." }
+            }
+>>>>>>> 03769c9 (v1.78: Fall back to Jikan/MAL when AniList API is down)
         }
     }
 
     private func loadSeasonal() async {
-        do { seasonal = try await ProviderManager.shared.call { try await $0.seasonal() } }
-        catch { }
+        do {
+            seasonal = try await ProviderManager.shared.call { try await $0.seasonal() }
+        } catch {
+            if AniListService.shared.isApiDisabled() {
+                do {
+                    let results = try await MALDiscoveryService.shared.seasonal()
+                    seasonal = results.map { MALDiscoveryService.shared.mapToMedia($0) }
+                } catch { }
+            }
+        }
     }
 
     private func loadPopular() async {
-        do { popular = try await ProviderManager.shared.call { try await $0.popular() } }
-        catch { }
+        do {
+            popular = try await ProviderManager.shared.call { try await $0.popular() }
+        } catch {
+            if AniListService.shared.isApiDisabled() {
+                do {
+                    let results = try await MALDiscoveryService.shared.popular()
+                    popular = results.map { MALDiscoveryService.shared.mapToMedia($0) }
+                } catch { }
+            }
+        }
     }
 
     private func loadTopRated() async {
-        do { topRated = try await ProviderManager.shared.call { try await $0.topRated() } }
-        catch { }
+        do {
+            topRated = try await ProviderManager.shared.call { try await $0.topRated() }
+        } catch {
+            if AniListService.shared.isApiDisabled() {
+                do {
+                    let results = try await MALDiscoveryService.shared.topRated()
+                    topRated = results.map { MALDiscoveryService.shared.mapToMedia($0) }
+                } catch { }
+            }
+        }
     }
 
     private func loadRecentlyCompleted() async {
         do {
             let media = try await AniListService.shared.recentlyCompletedLastSeason()
             recentlyCompleted = media.map { AniListProvider.shared.mapMedia($0) }
-        } catch { recentlyCompleted = [] }
+        } catch {
+            // AniList-only feature — no Jikan equivalent for "recently completed last season"
+            recentlyCompleted = []
+        }
     }
 
     private func loadUpcoming() async {
         do {
             let media = try await AniListService.shared.upcoming()
             upcoming = media.map { AniListProvider.shared.mapMedia($0) }
-        } catch { upcoming = [] }
+        } catch {
+            upcoming = []
+        }
     }
 
     func reload() async {

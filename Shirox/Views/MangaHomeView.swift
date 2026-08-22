@@ -115,12 +115,11 @@ final class MangaHomeViewModel: ObservableObject {
     @Published var error: String?
 
     func load() async {
-        // Only skip if ALL sections already have data (not just trending).
-        // Previously the guard was `trending.isEmpty` which blocked recovery
-        // when trending loaded but other sections failed.
         guard trending.isEmpty || popular.isEmpty else { return }
         isLoading = true
         error = nil
+
+        // Try AniList first
         async let trendingRes = try? AniListService.shared.mangaTrending()
         async let popularRes = try? AniListService.shared.mangaPopular()
         async let topRatedRes = try? AniListService.shared.mangaTopRated()
@@ -130,9 +129,25 @@ final class MangaHomeViewModel: ObservableObject {
         popular = (p ?? []).map { AniListProvider.shared.mapMangaMedia($0) }
         topRated = (r ?? []).map { AniListProvider.shared.mapMangaMedia($0) }
         latest = (l ?? []).map { AniListProvider.shared.mapMangaMedia($0) }
+
+        // If AniList is disabled/failed and we got no data, try Jikan/MAL
+        if trending.isEmpty && popular.isEmpty && topRated.isEmpty && latest.isEmpty
+            && AniListService.shared.isApiDisabled() {
+            Logger.shared.logStructured(type: "Provider", feature: "MangaHome", operation: "Fallback to Jikan for manga", error: "AniList API disabled")
+            do {
+                let mangaTrending = try await MALDiscoveryService.shared.fetchList("top/manga",
+                    queryItems: [URLQueryItem(name: "filter", value: "bypopularity"), URLQueryItem(name: "limit", value: "20")])
+                trending = mangaTrending.map { MALDiscoveryService.shared.mapToMedia($0) }
+                try await Task.sleep(nanoseconds: 400_000_000)
+                let mangaPopular = try await MALDiscoveryService.shared.fetchList("top/manga",
+                    queryItems: [URLQueryItem(name: "filter", value: "favorite"), URLQueryItem(name: "limit", value: "20")])
+                popular = mangaPopular.map { MALDiscoveryService.shared.mapToMedia($0) }
+            } catch {
+                // Jikan also failed
+            }
+        }
+
         isLoading = false
-        // Show error UI when all fetches fail so the user sees a Retry button
-        // instead of silently empty sections.
         if trending.isEmpty && popular.isEmpty && topRated.isEmpty && latest.isEmpty {
             error = "Couldn't load manga. Check your connection and try again."
         }
