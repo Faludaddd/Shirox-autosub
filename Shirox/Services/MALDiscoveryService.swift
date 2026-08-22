@@ -65,7 +65,7 @@ final class MALDiscoveryService {
 
     // MARK: - Fetch helpers
 
-    private func fetchList(_ path: String, queryItems: [URLQueryItem] = [], retrying: Bool = false) async throws -> [JikanAnime] {
+    func fetchList(_ path: String, queryItems: [URLQueryItem] = [], retrying: Bool = false) async throws -> [JikanAnime] {
         var components = URLComponents(url: base.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "sfw", value: "true")] + queryItems
         let (data, response) = try await session.data(from: components.url!)
