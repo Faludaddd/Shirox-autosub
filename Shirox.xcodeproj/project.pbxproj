@@ -696,6 +696,10 @@
 		A66C21D9758B528ED76D9835 /* UpdateLogPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D3190485D774219690E87AD /* UpdateLogPage.swift */; };
 		C843276266E1B02BC14E77A1 /* UpdateLogPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D3190485D774219690E87AD /* UpdateLogPage.swift */; };
 		EB141EEBA4B687995F0CBDB7 /* UpdateLogPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D3190485D774219690E87AD /* UpdateLogPage.swift */; };
+				485457D1871AC64945A3A565 /* StaffAndVideosSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC272D4B21A0374FC3081540 /* StaffAndVideosSections.swift */; };
+				C6CE1B5A31348C73AABA02CD /* StaffAndVideosSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC272D4B21A0374FC3081540 /* StaffAndVideosSections.swift */; };
+				756F68CD2C046ACE7EC4FB28 /* StaffAndVideosSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC272D4B21A0374FC3081540 /* StaffAndVideosSections.swift */; };
+				229BEF165B3FC43B3A3A3E37 /* StaffAndVideosSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC272D4B21A0374FC3081540 /* StaffAndVideosSections.swift */; };
 		/* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1223,6 +1227,7 @@
                 1279E4D72FCA397700C9BA56 /* Shared */ = {
                         isa = PBXGroup;
                         children = (
+				DC272D4B21A0374FC3081540 /* StaffAndVideosSections.swift */,
 				2D3190485D774219690E87AD /* UpdateLogPage.swift */,
                                 1251C4582FCAE1AA002AD0B2 /* LegalWebView.swift */,
                                 F5A6B7C8D9E10000000000A1 /* AnimatedSplashView.swift */,
@@ -2301,7 +2306,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "@executable_path/Frameworks",
                                 );
                                 LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                                MARKETING_VERSION = 1.49;
+                                MARKETING_VERSION = 1.50;
                                 PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
                                 PRODUCT_NAME = "$(TARGET_NAME)";
                                 SDKROOT = appletvos;
@@ -2335,7 +2340,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "@executable_path/Frameworks",
                                 );
                                 LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                                MARKETING_VERSION = 1.49;
+                                MARKETING_VERSION = 1.50;
                                 PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
                                 PRODUCT_NAME = "$(TARGET_NAME)";
                                 SDKROOT = appletvos;
@@ -2451,7 +2456,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "$(inherited)",
                                         "@executable_path/Frameworks",
                                 );
-                                MARKETING_VERSION = 1.49;
+                                MARKETING_VERSION = 1.50;
                                 PRODUCT_NAME = shirox;
                                 PROVISIONING_PROFILE_SPECIFIER = "";
                                 SDKROOT = iphoneos;
@@ -2496,7 +2501,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "@executable_path/../Frameworks",
                                 );
                                 MACOSX_DEPLOYMENT_TARGET = 14.0;
-                                MARKETING_VERSION = 1.49;
+                                MARKETING_VERSION = 1.50;
                                 PRODUCT_NAME = shirox;
                                 SDKROOT = macosx;
                                 SUPPORTS_MACCATALYST = NO;
@@ -2521,7 +2526,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "$(inherited)",
                                         "@executable_path/Frameworks",
                                 );
-                                MARKETING_VERSION = 1.49;
+                                MARKETING_VERSION = 1.50;
                                 PRODUCT_NAME = shirox;
                                 PROVISIONING_PROFILE_SPECIFIER = "";
                                 SDKROOT = iphoneos;
@@ -2611,7 +2616,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "@executable_path/../Frameworks",
                                 );
                                 MACOSX_DEPLOYMENT_TARGET = 14.0;
-                                MARKETING_VERSION = 1.49;
+                                MARKETING_VERSION = 1.50;
                                 PRODUCT_NAME = shirox;
                                 SDKROOT = macosx;
                                 SUPPORTS_MACCATALYST = NO;

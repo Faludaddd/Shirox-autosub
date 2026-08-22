@@ -675,19 +675,29 @@ struct AniListDetailView: View {
                         .padding(.top, 16)
                 }
 
-                // NOTE: Characters + Recommendations are placed ABOVE
-                // the episodes section so users see them immediately
-                // without scrolling past the episode list.
-                // Order: Synopsis → Characters → Recommendations → Episodes.
+                // NOTE: Characters → Staff → Recommendations → Videos
+                // are placed ABOVE the episodes section.
                 CharactersSection(mediaId: media.id, isManga: false,
                                   preloaded: vm.characters)
                     .frame(maxWidth: .infinity)
                     .padding(.top, 20)
 
+                #if os(iOS)
+                StaffSection(mediaId: media.id, malId: media.idMal)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 8)
+                #endif
+
                 RecommendationsSection(mediaId: media.id, isManga: false,
                                        preloaded: vm.recommendations)
                     .frame(maxWidth: .infinity)
                     .padding(.top, 8)
+
+                #if os(iOS)
+                VideosSection(mediaId: media.id, malId: media.idMal)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 8)
+                #endif
 
                 #if os(iOS)
                 HStack(spacing: 10) {

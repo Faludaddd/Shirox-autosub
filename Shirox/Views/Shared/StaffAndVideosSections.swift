@@ -1,0 +1,214 @@
+import SwiftUI
+
+/// Staff section — shows directors, producers, animators, composers
+/// for the anime. Fetched from MAL/Jikan's /anime/{id}/staff endpoint.
+/// Placed after Characters, before Recommendations.
+struct StaffSection: View {
+    let mediaId: Int
+    let malId: Int?
+
+    @State private var staff: [MALDiscoveryService.JikanStaffEdge] = []
+    @State private var isLoading = false
+    @State private var didFetch = false
+
+    var body: some View {
+        Group {
+            if !staff.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("Staff")
+                            .font(.title3.weight(.bold))
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(staff.indices, id: \.self) { idx in
+                                staffCard(staff[idx])
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                    }
+                }
+                .padding(.top, 8)
+            } else if isLoading {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("Staff")
+                            .font(.title3.weight(.bold))
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    HStack(spacing: 8) {
+                        ProgressView().scaleEffect(0.8)
+                        Text("Loading staff…")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 20)
+                }
+                .padding(.top, 8)
+            }
+        }
+        .task {
+            if !didFetch { await loadStaff() }
+        }
+    }
+
+    @ViewBuilder
+    private func staffCard(_ edge: MALDiscoveryService.JikanStaffEdge) -> some View {
+        if let person = edge.person {
+            VStack(alignment: .leading, spacing: 6) {
+                CachedAsyncImage(urlString: person.images?.jpg?.image_url ?? "")
+                    .aspectRatio(1, contentMode: .fill)
+                    .frame(width: 100, height: 100)
+                    .clipShape(Circle())
+                    .overlay(Circle().strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(person.name ?? "Unknown")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+                        .frame(width: 100, alignment: .leading)
+                    if let positions = edge.positions, !positions.isEmpty {
+                        Text(positions.joined(separator: ", "))
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                            .frame(width: 100, alignment: .leading)
+                    }
+                }
+            }
+        }
+    }
+
+    private func loadStaff() async {
+        didFetch = true
+        isLoading = true
+        guard let malId, malId > 0 else { isLoading = false; return }
+        do {
+            staff = try await MALDiscoveryService.shared.staff(malId: malId)
+        } catch {
+            staff = []
+        }
+        isLoading = false
+    }
+}
+
+/// Videos section — shows PVs, trailers, openings, endings (YouTube links)
+/// for the anime. Fetched from MAL/Jikan's /anime/{id}/videos endpoint.
+struct VideosSection: View {
+    let mediaId: Int
+    let malId: Int?
+
+    @State private var videos: [MALDiscoveryService.JikanVideo] = []
+    @State private var isLoading = false
+    @State private var didFetch = false
+
+    var body: some View {
+        Group {
+            if !videos.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("Videos")
+                            .font(.title3.weight(.bold))
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(videos) { video in
+                                videoCard(video)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                    }
+                }
+                .padding(.top, 8)
+            } else if isLoading {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("Videos")
+                            .font(.title3.weight(.bold))
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    HStack(spacing: 8) {
+                        ProgressView().scaleEffect(0.8)
+                        Text("Loading videos…")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 20)
+                }
+                .padding(.top, 8)
+            }
+        }
+        .task {
+            if !didFetch { await loadVideos() }
+        }
+    }
+
+    @ViewBuilder
+    private func videoCard(_ video: MALDiscoveryService.JikanVideo) -> some View {
+        let thumbnail = video.thumbnail ?? video.images?.jpg?.image_url ?? ""
+        let videoURL = video.url ?? ""
+
+        VStack(alignment: .leading, spacing: 6) {
+            ZStack {
+                if !thumbnail.isEmpty {
+                    CachedAsyncImage(urlString: thumbnail)
+                        .aspectRatio(16/9, contentMode: .fill)
+                        .frame(width: 160, height: 90)
+                        .clipped()
+                } else {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.secondary.opacity(0.1))
+                        .frame(width: 160, height: 90)
+                }
+                Image(systemName: "play.circle.fill")
+                    .font(.system(size: 32))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .shadow(color: .black.opacity(0.5), radius: 4)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
+
+            VStack(alignment: .leading, spacing: 2) {
+                if let type = video.type, !type.isEmpty {
+                    Text(type)
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(Color.appAccent)
+                }
+                Text(video.title ?? "Untitled")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                    .frame(width: 160, alignment: .leading)
+            }
+        }
+        .onTapGesture {
+            #if os(iOS)
+            if let url = URL(string: videoURL) {
+                UIApplication.shared.open(url)
+            }
+            #endif
+        }
+    }
+
+    private func loadVideos() async {
+        didFetch = true
+        isLoading = true
+        guard let malId, malId > 0 else { isLoading = false; return }
+        do {
+            videos = try await MALDiscoveryService.shared.videos(malId: malId)
+        } catch {
+            videos = []
+        }
+        isLoading = false
+    }
+}

@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "1.50",
+          "buildVersion": "1",
+          "date": "2026-08-23",
+          "localizedDescription": "Added: Anime Staff section — directors, producers, animators, composers from MAL/Jikan.\nAdded: Anime Videos section — PVs, trailers, openings, endings with YouTube links from MAL/Jikan.\nAdded: Character Animeography — 'Appears In' section on character detail showing all anime the character appears in.\nAdded: Voice Actor full profile — tapping a VA opens a detail page with their bio, birthday, website, and all anime roles.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/shirox.ipa",
+          "size": 11040520,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.49",
           "buildVersion": "1",
           "date": "2026-08-22",

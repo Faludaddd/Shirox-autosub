@@ -97,12 +97,15 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
-        version: "1.49",
+        version: "1.50",
         date: "2026-08-23",
-        added: [],
-        fixed: [
-            "Downloaded anime — the custom detail page was not appearing because DownloadedMediaSnapshotStore returned nil (no snapshot exists for the anime). Now has a 4-tier fallback: (1) snapshot exists → DetailView offline mode, (2) no snapshot but has AniList ID → AniListDetailView, (3) no snapshot, no AniList ID, but has module href → DetailView with module, (4) nothing → DownloadDetailView (file-manager page). Previously all downloads with no snapshot hit a blank page."
+        added: [
+            "Anime Staff section — shows directors, producers, animators, and composers from MAL/Jikan. Placed between Characters and Recommendations on the anime detail page.",
+            "Anime Videos section — shows PVs, trailers, openings, and endings with YouTube links from MAL/Jikan. Placed after Recommendations. Tapping a video opens it in the browser/YouTube.",
+            "Character Animeography — 'Appears In' section on the character detail page showing all anime the character appears in, with poster, title, and role. Tapping opens that anime's detail page.",
+            "Voice Actor full profile — tapping a voice actor in the character detail page opens a full profile with their photo, name, bio (about), birthday, website link, and a horizontal scroll of all anime they've voiced characters in."
         ],
+        fixed: [],
         changed: [],
         improved: []
     ),

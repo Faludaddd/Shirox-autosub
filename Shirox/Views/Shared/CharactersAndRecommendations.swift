@@ -251,6 +251,9 @@ struct CharacterDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var character: AniListCharacter?
     @State private var isLoading = false
+    /// Animeography — all anime this character appears in (from Jikan)
+    @State private var animeography: [MALDiscoveryService.JikanCharacterAnimeEntry] = []
+    @State private var isLoadingAnimeography = false
 
     private var displayCharacter: AniListCharacter { character ?? edge.node }
 
@@ -268,11 +271,8 @@ struct CharacterDetailView: View {
                     roleSection(role: role)
                         .padding(.top, 16)
                 }
-                // Additional info section — gender, age, birthday, favourites.
                 infoSection
                     .padding(.top, 16)
-                // Anime appearances section — shows what anime this character
-                // appears in (if available from the edge data).
                 if let siteUrl = displayCharacter.siteUrl, !siteUrl.isEmpty {
                     Link(destination: URL(string: siteUrl)!) {
                         HStack(spacing: 6) {
@@ -289,10 +289,12 @@ struct CharacterDetailView: View {
                     voiceActorsSection(vas: vas)
                         .padding(.top, 16)
                 }
-                // Character stats card — shows quick stats in a card layout
                 characterStatsCard
                     .padding(.top, 16)
                     .padding(.horizontal, 16)
+                // Animeography — all anime this character appears in
+                animeographySection
+                    .padding(.top, 16)
                 Spacer().frame(height: 32)
             }
         }
@@ -304,6 +306,7 @@ struct CharacterDetailView: View {
         .tint(.primary)
         #endif
         .task { await loadFullCharacter() }
+        .task { await loadAnimeography() }
     }
 
     // MARK: - Hero
@@ -480,34 +483,39 @@ struct CharacterDetailView: View {
 
     @ViewBuilder
     private func voiceActorCard(_ va: AniListVoiceActor) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            CachedAsyncImage(urlString: va.image?.large ?? va.image?.medium ?? "")
-                .aspectRatio(contentMode: .fill)
-                .frame(width: 90, height: 135)
-                .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5)
-                )
-                .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 2)
+        NavigationLink {
+            VoiceActorDetailView(voiceActor: va)
+        } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                CachedAsyncImage(urlString: va.image?.large ?? va.image?.medium ?? "")
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 90, height: 135)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5)
+                    )
+                    .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 2)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(va.name?.full ?? "Unknown")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(width: 90, alignment: .leading)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(va.name?.full ?? "Unknown")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(width: 90, alignment: .leading)
 
-                if let lang = va.language, !lang.isEmpty {
-                    Text(lang.capitalized)
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    if let lang = va.language, !lang.isEmpty {
+                        Text(lang.capitalized)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                 }
             }
         }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Load
@@ -578,11 +586,82 @@ struct CharacterDetailView: View {
     private func loadFullCharacter() async {
         guard character == nil else { return }
         isLoading = true
-        // AniList doesn't have a dedicated "fetch character by id" endpoint
-        // in our service, but the edge already carries description in most
-        // cases. We skip the extra call and just use the edge data.
         character = edge.node
         isLoading = false
+    }
+
+    // MARK: - Animeography (all anime this character appears in)
+
+    @ViewBuilder
+    private var animeographySection: some View {
+        if !animeography.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Appears In")
+                    .font(.headline)
+                    .padding(.horizontal, 16)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(animeography.indices, id: \.self) { idx in
+                            if let anime = animeography[idx].anime {
+                                NavigationLink {
+                                    AniListDetailView(mediaId: anime.mal_id, preloadedMedia: MALDiscoveryService.shared.mapToMedia(anime))
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        CachedAsyncImage(urlString: anime.images?.jpg?.large_image_url ?? anime.images?.jpg?.image_url ?? "")
+                                            .aspectRatio(2/3, contentMode: .fill)
+                                            .frame(width: 80, height: 120)
+                                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                                        Text(anime.title ?? "Unknown")
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(.primary)
+                                            .lineLimit(2)
+                                            .frame(width: 80, alignment: .leading)
+                                        if let role = animeography[idx].role, !role.isEmpty {
+                                            Text(role)
+                                                .font(.system(size: 10, weight: .medium))
+                                                .foregroundStyle(.secondary)
+                                                .lineLimit(1)
+                                        }
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                }
+            }
+        } else if isLoadingAnimeography {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Appears In")
+                    .font(.headline)
+                    .padding(.horizontal, 16)
+                HStack(spacing: 8) {
+                    ProgressView().scaleEffect(0.8)
+                    Text("Loading appearances…")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, 20)
+            }
+        }
+    }
+
+    /// Fetches all anime this character appears in from MAL/Jikan.
+    private func loadAnimeography() async {
+        // Use the MAL character ID. For Jikan-sourced characters, the
+        // id is the MAL character ID. For AniList-sourced characters,
+        // we don't have a MAL ID, so skip (no animeography).
+        let charId = edge.node.id
+        guard charId > 0 else { return }
+        isLoadingAnimeography = true
+        do {
+            animeography = try await MALDiscoveryService.shared.characterAnime(characterId: charId)
+        } catch {
+            animeography = []
+        }
+        isLoadingAnimeography = false
     }
 }
 
@@ -773,6 +852,199 @@ struct RecommendationsSection: View {
             }
         } catch {
             fetchedRecommendations = []
+        }
+        isLoading = false
+    }
+}
+
+// MARK: - VoiceActorDetailView
+//
+// Full profile for a voice actor/person. Shows their photo, name,
+// bio (about), birthday, website link, and a horizontal scroll of
+// all anime they've voiced characters in. Fetched from MAL/Jikan's
+// /people/{id}/anime endpoint.
+
+struct VoiceActorDetailView: View {
+    let voiceActor: AniListVoiceActor
+
+    @State private var person: MALDiscoveryService.JikanPerson?
+    @State private var animeRoles: [MALDiscoveryService.JikanPersonAnimeEntry] = []
+    @State private var isLoading = false
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                // Hero with VA photo
+                ZStack(alignment: .bottomLeading) {
+                    CachedAsyncImage(urlString: voiceActor.image?.large ?? voiceActor.image?.medium ?? "")
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 280)
+                        .clipped()
+                        .overlay(
+                            LinearGradient(
+                                stops: [
+                                    .init(color: .clear, location: 0.3),
+                                    .init(color: Color(.systemBackground).opacity(0.9), location: 1)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                    VStack(alignment: .leading, spacing: 4) {
+                        Spacer()
+                        Text(voiceActor.name?.full ?? "Unknown")
+                            .font(.title2.weight(.bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 16)
+                    }
+                }
+                .frame(height: 280)
+
+                // About / bio
+                if let about = person?.about, !about.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("About")
+                            .font(.headline)
+                            .padding(.horizontal, 16)
+                            .padding(.top, 16)
+                        Text(about.cleanMarkdownAndHTML())
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .lineSpacing(4)
+                            .padding(.horizontal, 16)
+                    }
+                }
+
+                // Info section
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Information")
+                        .font(.headline)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 16)
+                    if let birthday = person?.birthday, !birthday.isEmpty {
+                        infoRow("calendar", "Birthday", birthday)
+                    }
+                    if let website = person?.website, !website.isEmpty {
+                        if let url = URL(string: website) {
+                            Link(destination: url) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "globe")
+                                        .foregroundStyle(.secondary)
+                                    Text("Website")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text(website)
+                                        .font(.subheadline.weight(.medium))
+                                        .foregroundStyle(Color.appAccent)
+                                        .lineLimit(1)
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 6)
+                            }
+                        }
+                    }
+                }
+
+                // Anime roles — all anime this person voiced characters in
+                if !animeRoles.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Anime Roles")
+                            .font(.headline)
+                            .padding(.horizontal, 16)
+                            .padding(.top, 16)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 12) {
+                                ForEach(animeRoles.indices, id: \.self) { idx in
+                                    if let anime = animeRoles[idx].anime {
+                                        NavigationLink {
+                                            AniListDetailView(
+                                                mediaId: anime.mal_id,
+                                                preloadedMedia: MALDiscoveryService.shared.mapToMedia(anime))
+                                        } label: {
+                                            VStack(alignment: .leading, spacing: 4) {
+                                                CachedAsyncImage(urlString: anime.images?.jpg?.large_image_url ?? anime.images?.jpg?.image_url ?? "")
+                                                    .aspectRatio(2/3, contentMode: .fill)
+                                                    .frame(width: 80, height: 120)
+                                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                                Text(anime.title ?? "Unknown")
+                                                    .font(.caption.weight(.semibold))
+                                                    .foregroundStyle(.primary)
+                                                    .lineLimit(2)
+                                                    .frame(width: 80, alignment: .leading)
+                                                if let char = animeRoles[idx].character {
+                                                    Text(char.name ?? "")
+                                                        .font(.system(size: 10, weight: .medium))
+                                                        .foregroundStyle(.secondary)
+                                                        .lineLimit(1)
+                                                }
+                                            }
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                        }
+                    }
+                } else if isLoading {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Anime Roles")
+                            .font(.headline)
+                            .padding(.horizontal, 16)
+                            .padding(.top, 16)
+                        HStack(spacing: 8) {
+                            ProgressView().scaleEffect(0.8)
+                            Text("Loading roles…")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 20)
+                    }
+                }
+
+                Spacer().frame(height: 32)
+            }
+        }
+        .ignoresSafeArea(edges: .top)
+        .navigationTitle("")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackgroundHidden()
+        .tint(.primary)
+        #endif
+        .task { await loadData() }
+    }
+
+    private func infoRow(_ icon: String, _ label: String, _ value: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .foregroundStyle(.secondary)
+            Text(label)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(value)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.primary)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
+    }
+
+    private func loadData() async {
+        isLoading = true
+        let personId = voiceActor.id
+        guard personId > 0 else { isLoading = false; return }
+        do {
+            async let p = MALDiscoveryService.shared.person(personId: personId)
+            async let roles = MALDiscoveryService.shared.personAnime(personId: personId)
+            person = try await p
+            animeRoles = try await roles
+        } catch {
+            // Best-effort
         }
         isLoading = false
     }

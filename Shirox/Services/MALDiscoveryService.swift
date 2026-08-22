@@ -217,6 +217,140 @@ final class MALDiscoveryService {
         return try JSONDecoder().decode(JikanCharacterData.self, from: data).data
     }
 
+    // MARK: - Jikan Staff models
+
+    struct JikanStaffPerson: Decodable {
+        let mal_id: Int
+        let name: String?
+        let given_name: String?
+        let family_name: String?
+        let images: JikanCharacterImages?
+        let about: String?
+        let website: String?
+        let birthday: String?
+    }
+
+    struct JikanStaffEdge: Decodable {
+        let person: JikanStaffPerson?
+        let positions: [String]?
+    }
+
+    struct JikanStaffData: Decodable {
+        let data: [JikanStaffEdge]
+    }
+
+    /// Fetches anime staff (directors, producers, animators, composers)
+    /// from MAL/Jikan.
+    func staff(malId: Int) async throws -> [JikanStaffEdge] {
+        let url = base.appendingPathComponent("anime/\(malId)/staff")
+        let (data, _) = try await session.data(for: URLRequest(url: url))
+        return try JSONDecoder().decode(JikanStaffData.self, from: data).data
+    }
+
+    // MARK: - Jikan Video models
+
+    struct JikanVideo: Decodable, Identifiable {
+        let mal_id: Int
+        let title: String?
+        let url: String?
+        let thumbnail: String?
+        let type: String? // "OP", "ED", "PV", "CM", "Other"
+        let images: JikanVideoImages?
+        var id: Int { mal_id }
+    }
+
+    struct JikanVideoImages: Decodable {
+        let jpg: JikanVideoImageSet?
+        }
+
+    struct JikanVideoImageSet: Decodable {
+        let image_url: String?
+    }
+
+    struct JikanVideoData: Decodable {
+        let data: [JikanVideo]
+    }
+
+    /// Fetches anime videos (PVs, trailers, openings, endings) from
+    /// MAL/Jikan. Returns video entries with title, URL, thumbnail,
+    /// and type.
+    func videos(malId: Int) async throws -> [JikanVideo] {
+        let url = base.appendingPathComponent("anime/\(malId)/videos")
+        let (data, _) = try await session.data(for: URLRequest(url: url))
+        return try JSONDecoder().decode(JikanVideoData.self, from: data).data
+    }
+
+    // MARK: - Jikan Person (Voice Actor) models
+
+    struct JikanPerson: Decodable {
+        let mal_id: Int
+        let name: String?
+        let given_name: String?
+        let family_name: String?
+        let images: JikanCharacterImages?
+        let about: String?
+        let website: String?
+        let birthday: String?
+    }
+
+    struct JikanPersonAnimeEntry: Decodable {
+        let anime: JikanAnime?
+        let character: JikanPersonAnimeCharacter?
+        let role: String?
+    }
+
+    struct JikanPersonAnimeCharacter: Decodable {
+        let mal_id: Int
+        let name: String?
+        let images: JikanCharacterImages?
+    }
+
+    struct JikanPersonData: Decodable {
+        let data: [JikanPersonAnimeEntry]
+    }
+
+    /// Fetches a person's (voice actor's) anime roles — all anime they
+    /// voiced characters in, with character name and role.
+    func personAnime(personId: Int) async throws -> [JikanPersonAnimeEntry] {
+        let url = base.appendingPathComponent("people/\(personId)/anime")
+        let (data, _) = try await session.data(for: URLRequest(url: url))
+        return try JSONDecoder().decode(JikanPersonData.self, from: data).data
+    }
+
+    /// Fetches a person's (voice actor's) full profile from Jikan.
+    func person(personId: Int) async throws -> JikanPerson {
+        let url = base.appendingPathComponent("people/\(personId)/full")
+        let (data, _) = try await session.data(for: URLRequest(url: url))
+        struct Wrapper: Decodable { let data: JikanPerson }
+        return try JSONDecoder().decode(Wrapper.self, from: data).data
+    }
+
+    // MARK: - Jikan Character Animeography models
+
+    struct JikanCharacterAnimeEntry: Decodable {
+        let anime: JikanAnime?
+        let role: String?
+    }
+
+    struct JikanCharacterAnimeData: Decodable {
+        let data: [JikanCharacterAnimeEntry]
+    }
+
+    /// Fetches all anime a character appears in (animeography).
+    func characterAnime(characterId: Int) async throws -> [JikanCharacterAnimeEntry] {
+        let url = base.appendingPathComponent("characters/\(characterId)/anime")
+        let (data, _) = try await session.data(for: URLRequest(url: url))
+        return try JSONDecoder().decode(JikanCharacterAnimeData.self, from: data).data
+    }
+
+    /// Fetches a character's full profile from Jikan.
+    func character(characterId: Int) async throws -> JikanCharacter {
+        let url = base.appendingPathComponent("characters/\(characterId)/full")
+        let (data, _) = try await session.data(for: URLRequest(url: url))
+        struct Wrapper: Decodable { let data: JikanCharacter }
+        return try JSONDecoder().decode(Wrapper.self, from: data).data
+    }
+
     /// Fetches episode titles from Jikan (up to 100 per page).
     func episodes(malId: Int, page: Int = 1) async throws -> [JikanEpisode] {
         var components = URLComponents(url: base.appendingPathComponent("anime/\(malId)/episodes"), resolvingAgainstBaseURL: false)!
