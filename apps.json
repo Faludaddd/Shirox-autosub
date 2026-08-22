@@ -1,5 +1,5 @@
 {
-  "name": "Shirox",
+  "name": "shirox",
   "identifier": "com.shirox.altstore",
   "sourceURL": "https://raw.githubusercontent.com/Faludaddd/Shirox-autosub/main/apps.json",
   "subtitle": "Personal anime & manga library manager for iOS",
@@ -10,7 +10,7 @@
   ],
   "apps": [
     {
-      "name": "Shirox",
+      "name": "shirox",
       "bundleIdentifier": "com.shirox.app",
       "developerName": "Faludaddd",
       "subtitle": "Personal anime & manga library manager for iOS",
@@ -26,6 +26,15 @@
         "privacy": {}
       },
       "versions": [
+        {
+          "version": "1.48",
+          "buildVersion": "1",
+          "date": "2026-08-22",
+          "localizedDescription": "Changed: App renamed from 'Shirox' to 'shirox' (lowercase).\nFixed: Character descriptions — stripped Markdown formatting artifacts (__, ~~, !~, *, HTML tags) from MAL/Jikan text.\nFixed: Removed black navigation bar with character name from character detail page.\nFixed: Schedule posters increased from 56×80 to 84×112 to match notification poster size.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/shirox.ipa",
+          "size": 11040520,
+          "minOSVersion": "15.0"
+        },
         {
           "version": "1.47",
           "buildVersion": "1",

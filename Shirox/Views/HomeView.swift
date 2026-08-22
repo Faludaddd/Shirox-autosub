@@ -2147,9 +2147,9 @@ private struct MangaScheduleCard: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            // Poster
+            // Poster — matches notification section size (84×112)
             CachedAsyncImage(urlString: entry.coverImage ?? "")
-                .frame(width: 56, height: 80)
+                .frame(width: 84, height: 112)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.1)))
 
@@ -2263,9 +2263,9 @@ private struct ScheduleCard: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            // Poster
+            // Poster — matches notification section size (84×112)
             CachedAsyncImage(urlString: entry.coverImage ?? "")
-                .frame(width: 56, height: 80)
+                .frame(width: 84, height: 112)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .background(
                     RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.1))

@@ -97,16 +97,16 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
-        version: "1.47",
+        version: "1.48",
         date: "2026-08-22",
-        added: [
-            "Character detail page — added Quick Stats card showing favourites, AniList ID, gender, age, blood type, and alternative names in a grid layout with icons.",
-            "Character detail page — added 'View on AniList' link button when siteUrl is available."
+        added: [],
+        fixed: [
+            "Character description — stripped Markdown formatting artifacts (__, ~~, !~, *, HTML tags, [links](url)) from MAL/Jikan 'about' text. Previously showed raw __bold__ and ~~strikethrough~~ markers.",
+            "Character detail page — removed the black navigation bar with the character name at the top. The hero section already shows the name, so the nav bar was redundant.",
+            "Schedule posters — increased from 56×80 to 84×112 to match the notification section poster size."
         ],
-        fixed: [],
         changed: [
-            "Characters and Recommendations sections moved ABOVE the Episodes section on the anime detail page — users can now see them immediately without scrolling past the episode list.",
-            "Anime character data source changed from AniList to MAL/Jikan — MAL shows anime-specific character artwork (not manga artwork) which looks cleaner. Falls back to AniList if MAL/Jikan is unavailable or the anime has no MAL ID. Manga characters remain sourced from AniList (unchanged)."
+            "App renamed from 'Shirox' to 'shirox' (lowercase) in PRODUCT_NAME and apps.json."
         ],
         improved: []
     ),

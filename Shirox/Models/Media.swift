@@ -254,4 +254,29 @@ extension String {
         }
         return result
     }
+
+    /// Strips Markdown formatting artifacts (__, ~, !, *, etc.) and HTML
+    /// tags from text (e.g. MAL/Jikan character "about" fields). Converts
+    /// __bold__ to just the text, removes ~~strikethrough~~, strips
+    /// !~...!~ wrappers, removes remaining HTML tags, and decodes entities.
+    func cleanMarkdownAndHTML() -> String {
+        var result = self
+        // Remove Markdown bold/underline markers: __text__ → text
+        result = result.replacingOccurrences(of: #"__([^_]+)__"#, with: "$1", options: .regularExpression)
+        // Remove Markdown strikethrough: ~~text~~ → text
+        result = result.replacingOccurrences(of: #"~~([^~]+)~~"#, with: "$1", options: .regularExpression)
+        // Remove !~...!~ wrappers (MAL's custom spoiler/strikethrough)
+        result = result.replacingOccurrences(of: #"!~([^!]+)!~"#, with: "$1", options: .regularExpression)
+        // Remove single * markers (italic/bold)
+        result = result.replacingOccurrences(of: #"\*([^*]+)\*"#, with: "$1", options: .regularExpression)
+        // Remove remaining HTML tags
+        result = result.replacingOccurrences(of: #"<[^>]+>"#, with: "", options: .regularExpression)
+        // Remove Markdown links [text](url) → text
+        result = result.replacingOccurrences(of: #"\[([^\]]+)\]\([^)]+\)"#, with: "$1", options: .regularExpression)
+        // Decode HTML entities
+        result = result.decodingHTMLEntities()
+        // Clean up multiple consecutive newlines
+        result = result.replacingOccurrences(of: #"\n{3,}"#, with: "\n\n", options: .regularExpression)
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 }

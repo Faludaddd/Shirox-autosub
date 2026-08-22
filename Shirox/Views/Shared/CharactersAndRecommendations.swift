@@ -297,7 +297,7 @@ struct CharacterDetailView: View {
             }
         }
         .ignoresSafeArea(edges: .top)
-        .navigationTitle(displayCharacter.name?.full ?? "Character")
+        .navigationTitle("")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundHidden()
@@ -437,7 +437,7 @@ struct CharacterDetailView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Description")
                 .font(.headline)
-            Text(desc.decodingHTMLEntities())
+            Text(desc.cleanMarkdownAndHTML())
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .lineSpacing(4)
