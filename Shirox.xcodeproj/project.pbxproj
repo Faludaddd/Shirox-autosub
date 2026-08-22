@@ -2304,6 +2304,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 );
                                 GENERATE_INFOPLIST_FILE = YES;
                                 INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
+                                INFOPLIST_KEY_CFBundleDisplayName = "Shirox+";
                                 INFOPLIST_KEY_UILaunchScreen_Generation = YES;
                                 INFOPLIST_KEY_UIUserInterfaceStyle = Automatic;
                                 LD_RUNPATH_SEARCH_PATHS = (
@@ -2338,6 +2339,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 GCC_C_LANGUAGE_STANDARD = gnu17;
                                 GENERATE_INFOPLIST_FILE = YES;
                                 INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
+                                INFOPLIST_KEY_CFBundleDisplayName = "Shirox+";
                                 INFOPLIST_KEY_UILaunchScreen_Generation = YES;
                                 INFOPLIST_KEY_UIUserInterfaceStyle = Automatic;
                                 LD_RUNPATH_SEARCH_PATHS = (
@@ -2457,6 +2459,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 ENABLE_TESTABILITY = YES;
                                 INFOPLIST_FILE = Shirox/Info.plist;
                                 INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
+                                INFOPLIST_KEY_CFBundleDisplayName = "Shirox+";
                                 LD_RUNPATH_SEARCH_PATHS = (
                                         "$(inherited)",
                                         "@executable_path/Frameworks",
@@ -2501,6 +2504,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 DEAD_CODE_STRIPPING = YES;
                                 INFOPLIST_FILE = Shirox/Info.plist;
                                 INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
+                                INFOPLIST_KEY_CFBundleDisplayName = "Shirox+";
                                 LD_RUNPATH_SEARCH_PATHS = (
                                         "$(inherited)",
                                         "@executable_path/../Frameworks",
@@ -2527,6 +2531,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 DEVELOPMENT_TEAM = JRMTH65Z3H;
                                 INFOPLIST_FILE = Shirox/Info.plist;
                                 INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
+                                INFOPLIST_KEY_CFBundleDisplayName = "Shirox+";
                                 LD_RUNPATH_SEARCH_PATHS = (
                                         "$(inherited)",
                                         "@executable_path/Frameworks",
@@ -2616,6 +2621,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 DEAD_CODE_STRIPPING = YES;
                                 INFOPLIST_FILE = Shirox/Info.plist;
                                 INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
+                                INFOPLIST_KEY_CFBundleDisplayName = "Shirox+";
                                 LD_RUNPATH_SEARCH_PATHS = (
                                         "$(inherited)",
                                         "@executable_path/../Frameworks",

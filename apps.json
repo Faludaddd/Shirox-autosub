@@ -1,20 +1,20 @@
 {
-  "name": "shirox",
+  "name": "Shirox+",
   "identifier": "com.shirox.altstore",
   "sourceURL": "https://raw.githubusercontent.com/Faludaddd/Shirox-autosub/main/apps.json",
   "subtitle": "Personal anime & manga library manager for iOS",
-  "description": "Shirox is a free, source-available personal anime & manga library manager for iOS 15+.\n\nOrganize and track your anime and manga collection using community-built modules. AniList and MyAnimeList integration for library management and discovery. Full Reading Mode for manga with dedicated reader, schedule, and settings.",
+  "description": "Shirox+ is a free, source-available personal anime & manga library manager for iOS 15+.\n\nOrganize and track your anime and manga collection using community-built modules. AniList and MyAnimeList integration for library management and discovery. Full Reading Mode for manga with dedicated reader, schedule, and settings.",
   "website": "https://github.com/Faludaddd/Shirox-autosub",
   "featuredApps": [
     "com.shirox.app"
   ],
   "apps": [
     {
-      "name": "shirox",
+      "name": "Shirox+",
       "bundleIdentifier": "com.shirox.app",
       "developerName": "Faludaddd",
       "subtitle": "Personal anime & manga library manager for iOS",
-      "localizedDescription": "Shirox is a free, source-available personal anime & manga library manager for iOS 15+.\n\n• Organize your anime and manga collection with community-built modules\n• AniList and MyAnimeList integration for library management and discovery\n• Full Reading Mode for manga with dedicated reader\n• Continue Watching / Continue Reading: pick up right where you left off\n• Picture-in-Picture and AirPlay support\n• Subtitle support\n• Manga schedule with chapter release tracking\n• Unified History system for anime and manga",
+      "localizedDescription": "Shirox+ is a free, source-available personal anime & manga library manager for iOS 15+.\n\n• Organize your anime and manga collection with community-built modules\n• AniList and MyAnimeList integration for library management and discovery\n• Full Reading Mode for manga with dedicated reader\n• Continue Watching / Continue Reading: pick up right where you left off\n• Picture-in-Picture and AirPlay support\n• Subtitle support\n• Manga schedule with chapter release tracking\n• Unified History system for anime and manga",
       "iconURL": "https://raw.githubusercontent.com/Faludaddd/Shirox-autosub/main/Shirox/shirox-icon.icon/Assets/白-shiro.png",
       "tintColor": "ef4444",
       "category": "entertainment",
@@ -30,7 +30,7 @@
           "version": "1.79",
           "buildVersion": "1",
           "date": "2026-08-23",
-          "localizedDescription": "Fixed: Characters/Staff/Recommendations duplicate section titles (e.g. 'Characters Characters') removed — each section now has one header. All four sections (Characters, Staff, Recommendations, Videos) are collapsed by default on the anime detail page; tap the chevron to expand.\nFixed: Staff section not loading — now resolves the MAL id via IDMappingService when the preloaded media has no idMal. Videos section also benefits.\nFixed: Downloads — custom Anime Downloads page (progress ring, file info, Find/Share buttons, Retry/Cancel/Delete) now opens for every anime download tap. Previously opened the 'Offline Reading' page instead. Manga downloads unchanged.\nFixed: Watch Episode button — no longer shows a 'Loading…' spinner when you tap an episode. The button is always interactive; stream resolution happens off-screen.\nChanged: Glow effects removed from regular text-heavy buttons (Surprise Me, Remove All Pending, Export Backup, module-store Install). Intentional glow on Modules, Sources, selector cards, and Toggles preserved.",
+          "localizedDescription": "Renamed: App is now 'Shirox+' (springboard icon label, sidebar header, launch wordmark, About page, AltStore listing).\nFixed: Characters/Staff/Recommendations duplicate section titles (e.g. 'Characters Characters') removed — each section now has one header. All four sections (Characters, Staff, Recommendations, Videos) are collapsed by default on the anime detail page; tap the chevron to expand.\nFixed: Staff section not loading — now resolves the MAL id via IDMappingService when the preloaded media has no idMal. Videos section also benefits.\nFixed: Downloads — custom Anime Downloads page (progress ring, file info, Find/Share buttons, Retry/Cancel/Delete) now opens for every anime download tap. Previously opened the 'Offline Reading' page instead. Manga downloads unchanged.\nFixed: Watch Episode button — no longer shows a 'Loading…' spinner when you tap an episode. The button is always interactive; stream resolution happens off-screen.\nChanged: Glow effects removed from regular text-heavy buttons (Surprise Me, Remove All Pending, Export Backup, module-store Install). Intentional glow on Modules, Sources, selector cards, and Toggles preserved.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/shirox.ipa",
           "size": 11040520,
           "minOSVersion": "15.0"

@@ -66,7 +66,7 @@
 
     <!-- Chromecast Permissions -->
     <key>NSLocalNetworkUsageDescription</key>
-    <string>Shirox uses the local network to discover and cast to Chromecast devices.</string>
+    <string>Shirox+ uses the local network to discover and cast to Chromecast devices.</string>
     <key>NSBonjourServices</key>
     <array>
         <string>_googlecast._tcp</string>

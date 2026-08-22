@@ -4232,7 +4232,7 @@ struct AboutSettingsPage: View {
                 .clipShape(RoundedRectangle(cornerRadius: 18))
 
             VStack(spacing: 4) {
-                Text("Shirox")
+                Text("Shirox+")
                     .font(.system(size: 28, weight: .bold))
                 Text("Version \(version) (\(build))")
                     .font(.subheadline.monospacedDigit())

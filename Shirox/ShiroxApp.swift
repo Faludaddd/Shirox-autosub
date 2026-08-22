@@ -406,7 +406,7 @@ private struct MacSidebarView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Shirox")
+            Text("Shirox+")
                 .font(.title2.bold())
                 .padding(.horizontal, 16)
                 .padding(.top, 20)

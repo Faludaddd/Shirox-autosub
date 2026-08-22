@@ -65,7 +65,7 @@ struct AnimatedSplashView: View {
                     .scaleEffect(isPulsing ? 1.05 : 1.0)
 
                 // ── Wordmark ───────────────────────────────────────────
-                Text("Shirox")
+                Text("Shirox+")
                     .font(.system(size: 44, weight: .heavy, design: .rounded))
                     .foregroundStyle(.white)
 
