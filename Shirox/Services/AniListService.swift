@@ -1384,8 +1384,8 @@ final class AniListService {
             type: "Network",
             feature: "AniList",
             operation: "GraphQL \(opName)",
-            endpoint: endpoint.absoluteString,
             contentId: idStr,
+            endpoint: endpoint.absoluteString,
             details: "variables=\(variables)"
         )
 
