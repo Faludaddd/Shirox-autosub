@@ -963,12 +963,6 @@ private struct AnimeSection: View {
                             } label: {
                                 Label("Mark as Completed", systemImage: "checkmark.circle")
                             }
-                            Divider()
-                            NavigationLink {
-                                AniListDetailView(mediaId: media.id, preloadedMedia: media)
-                            } label: {
-                                Label("View on AniList", systemImage: "info.circle")
-                            }
                         }
                     }
                 }
@@ -1388,12 +1382,6 @@ struct ScheduleView: View {
                                 } label: {
                                     Label("Add to Reading", systemImage: "book.circle")
                                 }
-                                Divider()
-                                Button {
-                                    detailEntry = entry
-                                } label: {
-                                    Label("View on AniList", systemImage: "info.circle")
-                                }
                             }
                         }
                     }
@@ -1540,8 +1528,7 @@ struct ScheduleView: View {
                                     isNotificationOn: scheduledIds.contains(entry.id),
                                     onToggleNotification: { toggleNotification(for: entry) },
                                     onAddToPlanning:     { addToLibrary(entry, status: .planning) },
-                                    onAddToWatching:     { addToLibrary(entry, status: .current) },
-                                    onViewDetails:       { detailEntry = entry }
+                                    onAddToWatching:     { addToLibrary(entry, status: .current) }
                                 )
                             }
                             .buttonStyle(.plain)
@@ -2239,7 +2226,6 @@ private struct ScheduleCard: View {
     let onToggleNotification: () -> Void
     let onAddToPlanning: () -> Void
     let onAddToWatching: () -> Void
-    let onViewDetails: () -> Void
 
     private var timeZone: TimeZone {
         useUTC ? (TimeZone(identifier: "UTC") ?? .current) : .current
@@ -2378,8 +2364,7 @@ private struct ScheduleCard: View {
         .modifier(ScheduleCardContextMenu(
             entry: entry,
             onAddToPlanning: onAddToPlanning,
-            onAddToWatching: onAddToWatching,
-            onViewDetails: onViewDetails
+            onAddToWatching: onAddToWatching
         ))
     }
 }
@@ -2396,7 +2381,6 @@ private struct ScheduleCardContextMenu: ViewModifier {
     let entry: UnifiedScheduleEntry
     let onAddToPlanning: () -> Void
     let onAddToWatching: () -> Void
-    let onViewDetails: () -> Void
 
     @ViewBuilder private var menuItems: some View {
         Button {
@@ -2408,11 +2392,6 @@ private struct ScheduleCardContextMenu: ViewModifier {
             onAddToWatching()
         } label: {
             Label("Add to Watching", systemImage: "play.circle")
-        }
-        Button {
-            onViewDetails()
-        } label: {
-            Label("View on AniList", systemImage: "info.circle")
         }
     }
 

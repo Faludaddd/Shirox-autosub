@@ -41,6 +41,9 @@ struct AniListMangaDetailView: View {
     @State private var newestFirst = false
     @State private var isSelectionMode = false
     @State private var selectedChapterHrefs: Set<String> = []
+    /// 0 = chapters view, 1 = connections view (relations + reading order).
+    /// Toggled by the people/social icon button, matching the anime page.
+    @State private var selectedTab = 0
     #if os(iOS)
     @ObservedObject private var mangaDownloads = MangaDownloadManager.shared
     #endif
@@ -226,43 +229,94 @@ struct AniListMangaDetailView: View {
                     SynopsisSection(text: desc)
                         .padding(.top, 16)
                 }
-                // Primary read/continue button — full width, no icon siblings.
-                // Previously this row had 5 fixed-width 46×46 circle buttons
-                // competing for space (connections toggle, download/select
-                // mode, jump-to-latest, invert order, reset progress), which
-                // truncated the primary button's label to "Con…" even with
-                // .layoutPriority(1) and .minimumScaleFactor(0.7). The
-                // secondary actions now live in the Chapters section header
-                // itself (see `chaptersSection`) — colocated with the list
-                // they actually control, the same way a section-local toolbar
-                // sits next to its list. The jump-to-latest button was
-                // removed entirely (low value, contributed to crowding). The
-                // connections/people toggle was removed because the relations
-                // section is already shown above the chapters list — switching
-                // tabs just hid the chapters, it didn't surface any new info.
+                // Primary read/continue button + social/connections toggle —
+                // matches the anime AniList page's button row layout. The
+                // people/social icon opens the Connections section (relations
+                // + reading order), same as the anime page.
                 #if os(iOS)
-                readButton(media: media)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
-                    .padding(.bottom, 8)
-                #endif
-                // Section order matches the anime AniList page:
-                // Button → Relations → Chapters → Characters → Recommendations.
-                // (Previously this branched on a `selectedTab` toggle between
-                // a chapters view and a connections view. The connections view
-                // was redundant — the relations section is already shown
-                // above the chapters list in the default view, so switching
-                // tabs just hid the chapters. The toggle was removed.)
-                if let edges = media.relations?.edges {
-                    let mangaRelations = edges.filter { $0.node.isManga }
-                    if !mangaRelations.isEmpty {
-                        relationsSection(mangaRelations)
-                            .padding(.top, 16)
+                HStack(spacing: 10) {
+                    readButton(media: media)
+
+                    // Social/connections icon — toggles between chapters view
+                    // and connections view (relations + reading order).
+                    // Mirrors the anime AniList page's button exactly.
+                    Button {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            selectedTab = selectedTab == 0 ? 1 : 0
+                        }
+                    } label: {
+                        Image(systemName: selectedTab == 0 ? "person.3.fill" : "list.bullet")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(selectedTab == 1 ? platformBackground : .primary)
+                            .frame(width: 46, height: 46)
+                            .background(
+                                selectedTab == 1
+                                    ? Color.primary
+                                    : Color.clear,
+                                in: Circle()
+                            )
+                            .background(.ultraThinMaterial, in: Circle())
+                            .overlay(
+                                Circle()
+                                    .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
+                            )
                     }
+                    .buttonStyle(.plain)
                 }
-                // Chapters — fetched from the resolved manga module.
-                chaptersSection
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 8)
+                #endif
+                // Section order: when selectedTab == 0, show Relations +
+                // Chapters. When selectedTab == 1, show Connections view
+                // (relations + reading order). Matches anime page.
+                if selectedTab == 0 {
+                    if let edges = media.relations?.edges {
+                        let mangaRelations = edges.filter { $0.node.isManga }
+                        if !mangaRelations.isEmpty {
+                            relationsSection(mangaRelations)
+                                .padding(.top, 16)
+                        }
+                    }
+                    // Chapters — fetched from the resolved manga module.
+                    chaptersSection
+                        .padding(.top, 16)
+                } else {
+                    // Connections view (tab 1) — relations + reading order.
+                    VStack(alignment: .leading, spacing: 20) {
+                        if let edges = media.relations?.edges {
+                            let mangaRelations = edges.filter { $0.node.isManga }
+                            if !mangaRelations.isEmpty {
+                                relationsSection(mangaRelations)
+                                    .frame(maxWidth: .infinity)
+                            } else {
+                                VStack(spacing: 20) {
+                                    Image(systemName: "link.badge.plus")
+                                        .font(.system(size: 48))
+                                        .foregroundStyle(.secondary.opacity(0.5))
+                                    Text("No relations found")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 60)
+                            }
+                        } else {
+                            VStack(spacing: 20) {
+                                Image(systemName: "link.badge.plus")
+                                    .font(.system(size: 48))
+                                    .foregroundStyle(.secondary.opacity(0.5))
+                                Text("No relations found")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 60)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
                     .padding(.top, 16)
+                }
                 // Characters + Recommendations — placed AFTER the chapters/
                 // connections section, matching the anime AniList page:
                 // Synopsis → Buttons → Episodes/Chapters → Characters → Recommendations

@@ -148,6 +148,18 @@ final class MangaHomeViewModel: ObservableObject {
 struct MangaSection: View {
     let title: String
     let items: [Media]
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
+    /// Same responsive card width as AnimeSection — 190pt on iPad,
+    /// 155pt on iPhone. This ensures manga and anime posters are the
+    /// SAME size on the Home screen.
+    private var cardWidth: CGFloat {
+        #if os(iOS)
+        return sizeClass == .regular ? 190 : 155
+        #else
+        return 190
+        #endif
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -169,7 +181,7 @@ struct MangaSection: View {
                             } label: {
                                 MangaPosterCard(media: media)
                                     .equatable()
-                                    .frame(width: 155)
+                                    .frame(width: cardWidth)
                             }
                             .buttonStyle(CardPressStyle())
                             .contextMenu {
@@ -196,12 +208,6 @@ struct MangaSection: View {
                                     }
                                 } label: {
                                     Label("Mark as Completed", systemImage: "checkmark.circle")
-                                }
-                                Divider()
-                                NavigationLink {
-                                    AniListMangaDetailView(mediaId: media.id, preloadedMedia: media)
-                                } label: {
-                                    Label("View on AniList", systemImage: "info.circle")
                                 }
                             }
                         }

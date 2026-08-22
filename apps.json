@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "1.40",
+          "buildVersion": "1",
+          "date": "2026-08-22",
+          "localizedDescription": "Added: People/social (Connections) button on individual manga AniList pages — opens relations + reading order, matching the anime page.\nFixed: Poster size now consistent across anime and manga sections on the Home screen — both use the same responsive card width (155pt iPhone / 190pt iPad).\nFixed: Continue Reading poster size now matches Trending Manga / All-Time Popular posters (was 130pt, now 155/190pt).\nChanged: Removed 'View on AniList' from the long-press context menu on Home and Library (both anime and manga). The option remains in Continue Watching / Continue Reading sections unchanged.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 11040520,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.39",
           "buildVersion": "1",
           "date": "2026-08-20",

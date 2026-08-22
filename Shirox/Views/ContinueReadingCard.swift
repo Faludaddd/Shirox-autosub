@@ -38,6 +38,18 @@ struct ContinueReadingSection: View {
     @Binding var readerContext: ReaderContext?
     @Binding var navTarget: ContinueReadingNavTarget?
     @State private var loadingHref: String?
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
+    /// Same responsive card width as MangaSection and AnimeSection —
+    /// 190pt on iPad, 155pt on iPhone. This ensures the Continue Reading
+    /// poster size matches the posters in Trending Manga / All-Time Popular.
+    private var cardWidth: CGFloat {
+        #if os(iOS)
+        return sizeClass == .regular ? 190 : 155
+        #else
+        return 190
+        #endif
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -70,7 +82,7 @@ struct ContinueReadingSection: View {
                             item: item,
                             isLoading: loadingHref == item.mangaHref
                         )
-                        .frame(width: 130)
+                        .frame(width: cardWidth)
                         .contentShape(Rectangle())
                         .onTapGesture { open(item) }
                         .contextMenu {
