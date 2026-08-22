@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "1.45",
+          "buildVersion": "1",
+          "date": "2026-08-22",
+          "localizedDescription": "Fixed: Downloaded anime now correctly shows the anime detail page with downloaded episodes. Two bugs were preventing the offline data from showing: (1) vm.load(item:) was being called even when offlineSnapshot was set, overwriting the offline data with an online fetch. (2) episodesSection was checking 'all hrefs empty' which could fail if the online load had already run. Both fixed.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 11040520,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.44",
           "buildVersion": "1",
           "date": "2026-08-22",

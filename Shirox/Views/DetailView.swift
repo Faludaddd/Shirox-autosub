@@ -161,14 +161,22 @@ struct DetailView: View {
                 }
             }
 
-            if let mid = moduleId, ModuleManager.shared.activeModule?.id != mid,
-               let module = ModuleManager.shared.modules.first(where: { $0.id == mid }) {
-                Task {
-                    ModuleManager.shared.selectModule(module)
+            // Only load from the module if we DON'T have an offline snapshot.
+            // When offlineSnapshot is set, loadOffline() already populated
+            // the detail + episodes from the downloaded data. Calling
+            // vm.load(item:) would try to fetch from the module's JS engine,
+            // which would either fail (no network) or overwrite the offline
+            // data with online data — neither is what we want.
+            if offlineSnapshot == nil {
+                if let mid = moduleId, ModuleManager.shared.activeModule?.id != mid,
+                   let module = ModuleManager.shared.modules.first(where: { $0.id == mid }) {
+                    Task {
+                        ModuleManager.shared.selectModule(module)
+                        vm.load(item: item)
+                    }
+                } else {
                     vm.load(item: item)
                 }
-            } else {
-                vm.load(item: item)
             }
             
             let moduleId = ModuleManager.shared.activeModule?.id
@@ -1179,12 +1187,12 @@ struct DetailView: View {
 
     private func episodesSection(detail: MediaDetail) -> some View {
         #if os(iOS)
-        // Use the downloaded-only path only when we have a snapshot AND the episode list
-        // contains nothing usable for online streaming (all hrefs empty = snapshot fallback).
-        if let captured = offlineSnapshot,
-           detail.episodes.allSatisfy({ $0.href.isEmpty }) {
-            // Read the freshest copy from the store so re-enriched titles/thumbnails
-            // render live (the captured value is stale once reenrichIfStale runs).
+        // Use the offline episodes section when we have a snapshot.
+        // The previous check (detail.episodes.allSatisfy({ $0.href.isEmpty }))
+        // was too strict — loadOffline creates EpisodeLinks with empty hrefs,
+        // but if vm.load(item:) also ran (overwriting the offline data),
+        // the hrefs might be non-empty and the offline path would be skipped.
+        if let captured = offlineSnapshot {
             let snap = snapshotStore.snapshot(mediaKey: captured.mediaKey) ?? captured
             return AnyView(offlineEpisodesSection(detail: detail, snapshot: snap))
         }

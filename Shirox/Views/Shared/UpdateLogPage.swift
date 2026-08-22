@@ -97,17 +97,14 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
-        version: "1.44",
+        version: "1.45",
         date: "2026-08-22",
         added: [],
         fixed: [
-            "Downloaded anime now opens the full anime DetailView (the custom anime detail page with episode list, synopsis, characters, recommendations) instead of the old DownloadDetailView (file manager page). The DetailView uses offlineSnapshot to show downloaded episodes and can play them directly from disk.",
-            "In-progress and failed anime downloads also open the DetailView now, same as completed downloads."
+            "Downloaded anime — DetailView was calling vm.load(item:) even when offlineSnapshot was set, overwriting the offline data with an online module fetch (which would fail offline or replace the downloaded episodes). Now vm.load(item:) is skipped when offlineSnapshot is present — the offline data from loadOffline() is preserved.",
+            "Downloaded anime — episodesSection was checking 'all hrefs empty' before using the offline episode list, which could fail if vm.load() had already overwritten the episodes. Now uses the offline episodes section whenever offlineSnapshot is set, unconditionally."
         ],
-        changed: [
-            "Removed dead code: UpdateSettingsPage.swift (old Updates tab — no longer referenced), AnimeModulePreferenceTests.swift (test for removed feature), pendingDownloadItem/downloadNavActive state in AniListMangaDetailView (unused NavigationLink), selectedSurpriseGenres in SearchView (unused state from old genre-based Surprise Me).",
-            "DownloadDetailView.swift still exists but is no longer the tap destination for downloaded anime. It may be used elsewhere or can be removed in a future cleanup."
-        ],
+        changed: [],
         improved: []
     ),
     UpdateLogEntry(
