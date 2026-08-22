@@ -68,7 +68,8 @@ final class AniListService {
         config.timeoutIntervalForRequest = 15
         config.httpAdditionalHeaders = [
             "Content-Type": "application/json",
-            "Accept": "application/json"
+            "Accept": "application/json",
+            "User-Agent": "shirox/1.50 (iOS)"
         ]
         session = URLSession(configuration: config)
     }

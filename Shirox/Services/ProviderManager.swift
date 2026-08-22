@@ -31,6 +31,9 @@ final class ProviderManager: ObservableObject {
     /// succeeds so we don't leave `fallbackActive = true` dangling while a
     /// new operation is in flight.
     private var fallbackResetTask: Task<Void, Never>?
+    /// Timestamp of the last "fallback not authenticated" log, to throttle
+    /// duplicate log spam when MAL is unauthenticated.
+    private var fallbackUnauthLoggedAt: Date?
 
     private let orderKey = "providerOrder"
 
@@ -151,7 +154,14 @@ final class ProviderManager: ObservableObject {
         // provider. Throw the original error so the caller can surface a
         // clear "AniList is rate-limited and no MAL account is linked"
         // state to the user.
+        // Use a cooldown to avoid logging this on every single request.
         if !fallback.isAuthenticated {
+            let now = Date()
+            if let last = fallbackUnauthLoggedAt, now.timeIntervalSince(last) < 30 {
+                // Already logged recently — just throw silently
+                throw primaryError
+            }
+            fallbackUnauthLoggedAt = now
             Logger.shared.log(
                 "ProviderManager fallback \(fallback.providerType.rawValue) is not authenticated; skipping fallback",
                 type: "Provider"

@@ -97,17 +97,21 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
-        version: "1.50",
+        version: "1.51",
         date: "2026-08-23",
         added: [
-            "Anime Staff section — shows directors, producers, animators, and composers from MAL/Jikan. Placed between Characters and Recommendations on the anime detail page.",
-            "Anime Videos section — shows PVs, trailers, openings, and endings with YouTube links from MAL/Jikan. Placed after Recommendations. Tapping a video opens it in the browser/YouTube.",
-            "Character Animeography — 'Appears In' section on the character detail page showing all anime the character appears in, with poster, title, and role. Tapping opens that anime's detail page.",
-            "Voice Actor full profile — tapping a voice actor in the character detail page opens a full profile with their photo, name, bio (about), birthday, website link, and a horizontal scroll of all anime they've voiced characters in."
+            "Collapsible sections — Characters, Staff, and Recommendations on the anime detail page each have their own expand/collapse arrow. Clicking the arrow toggles that section independently. State is remembered while the page is open."
         ],
-        fixed: [],
+        fixed: [
+            "AniList HTTP 403 errors — root cause: AniListService.post() was NOT sending a User-Agent header. AniList's API requires one and returns 403 for requests without it. Added 'shirox/1.50 (iOS)' User-Agent to the URLSession configuration. This fixes the carousel, categories, manga loading, and all other AniList data that was failing.",
+            "Manga not loading — same 403 root cause. All manga queries go through AniListService.post() which was 403'ing. Now that the User-Agent is set, manga loads normally.",
+            "Carousel and Categories disappeared — same 403 root cause. The data arrays were empty because every AniList request was being rejected. Now that the 403 is fixed, data loads and the carousel + sections appear.",
+            "Provider fallback spam — when MAL is not authenticated, the 'fallback not authenticated' log was firing on every single request. Added a 30-second cooldown so it only logs once every 30 seconds instead of spamming."
+        ],
         changed: [],
-        improved: []
+        improved: [
+            "Provider fallback log deduplication — identical 'fallback not authenticated' messages are throttled to once per 30 seconds."
+        ]
     ),
     UpdateLogEntry(
         version: "1.43",
