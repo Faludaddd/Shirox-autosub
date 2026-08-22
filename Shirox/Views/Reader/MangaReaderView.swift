@@ -332,7 +332,7 @@ struct MangaReaderView: View {
             // This ensures chapter boundaries are detected after a fast
             // scroll-up, without the teleporting that happened when we
             // updated currentPage DURING the scroll.
-            .onReceive(NotificationCenter.default.publisher(for: UIScrollView.didEndDeceleratingNotification)) { _ in
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("UIScrollViewDidEndDecelerating"))) { _ in
                 guard let scrollView = verticalScrollView,
                       !scrollView.isDragging, !scrollView.isDecelerating,
                       verticalResumeTarget == nil,
