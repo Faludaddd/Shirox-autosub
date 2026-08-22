@@ -584,12 +584,12 @@ struct MangaSettingsView: View {
                 }
             }
 
-            // Section 6: Update (universal)
+            // Section 6: Update Log (universal)
             Section {
                 NavigationLink {
-                    UpdateSettingsPage()
+                    UpdateLogPage()
                 } label: {
-                    MangaSettingsCategoryRow(icon: "arrow.down.circle.fill", title: "Update", subtitle: "Check for updates, download")
+                    MangaSettingsCategoryRow(icon: "list.bullet.clipboard.fill", title: "Update Log", subtitle: "See what's new, fixed, and changed")
                 }
             }
 
