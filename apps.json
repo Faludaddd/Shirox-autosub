@@ -29,10 +29,10 @@
         {
           "version": "1.53",
           "buildVersion": "1",
-          "date": "2026-08-23",
+          "date": "2026-08-22",
           "localizedDescription": "FIXED: AniList 403 — Cloudflare was blocking the custom 'shirox/1.51 (iOS)' User-Agent because it doesn't look like a browser. Changed to a standard Chrome browser User-Agent (matching what every other service in the app already uses). Also removed session-level httpAdditionalHeaders that weren't being sent on per-request URLRequests, and added response body logging for 403 errors to identify Cloudflare blocks.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/shirox.ipa",
-          "size": 11040520,
+          "size": 11182221,
           "minOSVersion": "15.0"
         },
         {
