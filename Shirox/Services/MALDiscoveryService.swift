@@ -164,6 +164,59 @@ final class MALDiscoveryService {
         let title: String?
     }
 
+    // MARK: - Jikan character models
+
+    struct JikanCharacter: Decodable, Identifiable {
+        let mal_id: Int
+        let name: String?
+        let name_kanji: String?
+        let images: JikanCharacterImages?
+        let about: String?
+    }
+
+    struct JikanCharacterImages: Decodable {
+        let jpg: JikanCharacterImageSet?
+        let webp: JikanCharacterImageSet?
+    }
+
+    struct JikanCharacterImageSet: Decodable {
+        let image_url: String?
+    }
+
+    struct JikanCharacterVoiceActor: Decodable {
+        let person: JikanVoiceActorPerson?
+        let language: String?
+    }
+
+    struct JikanVoiceActorPerson: Decodable {
+        let mal_id: Int
+        let name: String?
+        let images: JikanCharacterImages?
+    }
+
+    struct JikanCharacterEdge: Decodable {
+        let character: JikanCharacter?
+        let role: String?
+        let voice_actors: [JikanCharacterVoiceActor]?
+    }
+
+    struct JikanCharacterData: Decodable {
+        let data: [JikanCharacterEdge]
+    }
+
+    /// Fetches anime characters from MAL/Jikan. Returns character edges
+    /// with name, image, about, role, and voice actors. This is used
+    /// instead of AniList for anime characters because MAL shows anime
+    /// characters (not manga characters) which looks cleaner.
+    func characters(malId: Int) async throws -> [JikanCharacterEdge] {
+        let url = base.appendingPathComponent("anime/\(malId)/characters")
+        let (data, response) = try await session.data(for: URLRequest(url: url))
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw URLError(.badServerResponse)
+        }
+        return try JSONDecoder().decode(JikanCharacterData.self, from: data).data
+    }
+
     /// Fetches episode titles from Jikan (up to 100 per page).
     func episodes(malId: Int, page: Int = 1) async throws -> [JikanEpisode] {
         var components = URLComponents(url: base.appendingPathComponent("anime/\(malId)/episodes"), resolvingAgainstBaseURL: false)!

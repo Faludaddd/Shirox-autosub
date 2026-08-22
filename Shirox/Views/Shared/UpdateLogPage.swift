@@ -97,18 +97,16 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
-        version: "1.46",
+        version: "1.47",
         date: "2026-08-22",
-        added: [],
-        fixed: [
-            "Manga poster percentage badge now matches anime's size — uses Label with star.fill icon, .caption2.bold font, 8H/4V padding + 10pt outer inset (was plain Text, 9pt, 6H/3V + 4pt).",
-            "Anime poster image source — switched from TVDBPosterImage (which could async-swap to a TVDB image that doesn't match AniList) to direct CachedAsyncImage with coverImage.extraLarge, matching manga's approach exactly.",
-            "Library anime tap — no longer opens a blank page. Entries without a linked module now open AniListDetailView (which has its own data loading) instead of DetailView with an empty href (which caused blank because DetailViewModel.load() has guard !item.href.isEmpty).",
-            "Library list — removed duplicate personal rating from the right-side info column. Personal score now shows only on the poster badge. Community average still shows on the right side.",
-            "Notification section posters — all visual types (avatar, cover, plain icon) now share the same 84×112 outer frame so rows align in a single straight line. Posters are also modestly larger (80×80 avatar, 78×112 cover, was 72×72 / 72×108)."
+        added: [
+            "Character detail page — added Quick Stats card showing favourites, AniList ID, gender, age, blood type, and alternative names in a grid layout with icons.",
+            "Character detail page — added 'View on AniList' link button when siteUrl is available."
         ],
+        fixed: [],
         changed: [
-            "Library list posters increased from 70pt to 80pt wide (modest increase)."
+            "Characters and Recommendations sections moved ABOVE the Episodes section on the anime detail page — users can now see them immediately without scrolling past the episode list.",
+            "Anime character data source changed from AniList to MAL/Jikan — MAL shows anime-specific character artwork (not manga artwork) which looks cleaner. Falls back to AniList if MAL/Jikan is unavailable or the anime has no MAL ID. Manga characters remain sourced from AniList (unchanged)."
         ],
         improved: []
     ),

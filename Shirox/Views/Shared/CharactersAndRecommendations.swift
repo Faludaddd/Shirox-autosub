@@ -24,6 +24,9 @@ struct CharactersSection: View {
     @State private var didFetch = false
     @State private var isLoading = false
     @State private var selectedCharacter: AniListCharacterEdge?
+    /// When true, character data came from MAL/Jikan (for anime) which
+    /// provides anime-specific character images and descriptions.
+    @State private var usingJikanCharacters = false
 
     /// The characters to display — prefers preloaded data (passed from the
     /// parent VM), falls back to any we fetched ourselves. Using a computed
@@ -144,11 +147,81 @@ struct CharactersSection: View {
     private func loadCharacters() async {
         didFetch = true
         isLoading = true
-        // Use the right endpoint for the media type. The anime detail query
-        // (AniListService.detail) uses `type: ANIME`; the manga detail query
-        // (AniListService.mangaDetail) uses `type: MANGA`. Calling the wrong
-        // one returns nothing, which is why characters never appeared on
-        // manga pages.
+        // For ANIME: use MAL/Jikan characters endpoint which shows
+        // anime-specific character artwork (not manga artwork) and
+        // includes about/description text. For MANGA: use AniList's
+        // mangaDetail query as before.
+        if !isManga {
+            await loadJikanCharacters()
+        } else {
+            await loadAniListCharacters()
+        }
+        isLoading = false
+    }
+
+    /// Loads anime characters from MAL/Jikan — shows anime-specific
+    /// character images (not manga images) and includes about text.
+    private func loadJikanCharacters() async {
+        do {
+            // We need the MAL ID. Try to get it from the AniList media's idMal,
+            // or from IDMappingService if not directly available.
+            let raw: AniListMedia
+            raw = try await AniListService.shared.detail(id: mediaId)
+
+            let malId = raw.idMal ?? 0
+            guard malId > 0 else {
+                // No MAL ID — fall back to AniList characters
+                await loadAniListCharacters()
+                return
+            }
+
+            let edges = try await MALDiscoveryService.shared.characters(malId: malId)
+            // Convert Jikan edges to AniListCharacterEdge for display
+            fetchedCharacters = edges.compactMap { edge in
+                guard let char = edge.character else { return nil }
+                return AniListCharacterEdge(
+                    role: edge.role,
+                    node: AniListCharacter(
+                        id: char.mal_id,
+                        name: AniListCharacterName(
+                            full: char.name,
+                            native: char.name_kanji,
+                            alternative: nil,
+                            alternativeSpoiler: nil),
+                        image: AniListCharacterImage(
+                            large: char.images?.jpg?.image_url,
+                            medium: char.images?.jpg?.image_url),
+                        description: char.about,
+                        gender: nil,
+                        dateOfBirth: nil,
+                        age: nil,
+                        bloodType: nil,
+                        favourites: nil,
+                        siteUrl: nil),
+                    voiceActors: edge.voice_actors?.compactMap { va in
+                        guard let person = va.person else { return nil }
+                        return AniListVoiceActor(
+                            id: person.mal_id,
+                            name: AniListCharacterName(
+                                full: person.name,
+                                native: nil,
+                                alternative: nil,
+                                alternativeSpoiler: nil),
+                            language: va.language,
+                            image: AniListCharacterImage(
+                                large: person.images?.jpg?.image_url,
+                                medium: person.images?.jpg?.image_url))
+                    })
+            }
+            usingJikanCharacters = true
+        } catch {
+            // Jikan failed — fall back to AniList
+            await loadAniListCharacters()
+        }
+    }
+
+    /// Loads characters from AniList (used for manga, or as fallback for anime)
+    private func loadAniListCharacters() async {
         do {
             let media: AniListMedia
             if isManga {
@@ -157,11 +230,10 @@ struct CharactersSection: View {
                 media = try await AniListService.shared.detail(id: mediaId)
             }
             fetchedCharacters = media.characters?.edges ?? []
+            usingJikanCharacters = false
         } catch {
-            // Best-effort — leave fetchedCharacters empty if the fetch fails.
             fetchedCharacters = []
         }
-        isLoading = false
     }
 }
 
@@ -199,10 +271,28 @@ struct CharacterDetailView: View {
                 // Additional info section — gender, age, birthday, favourites.
                 infoSection
                     .padding(.top, 16)
+                // Anime appearances section — shows what anime this character
+                // appears in (if available from the edge data).
+                if let siteUrl = displayCharacter.siteUrl, !siteUrl.isEmpty {
+                    Link(destination: URL(string: siteUrl)!) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "safari.fill")
+                            Text("View on AniList")
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.appAccent)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 16)
+                    }
+                }
                 if let vas = edge.voiceActors, !vas.isEmpty {
                     voiceActorsSection(vas: vas)
                         .padding(.top, 16)
                 }
+                // Character stats card — shows quick stats in a card layout
+                characterStatsCard
+                    .padding(.top, 16)
+                    .padding(.horizontal, 16)
                 Spacer().frame(height: 32)
             }
         }
@@ -421,6 +511,64 @@ struct CharacterDetailView: View {
     }
 
     // MARK: - Load
+
+    /// Character stats card — shows a quick summary of key character info
+    /// in a visually appealing card layout.
+    @ViewBuilder
+    private var characterStatsCard: some View {
+        let items = statsCardItems
+        if !items.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Quick Stats")
+                    .font(.headline)
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                    ForEach(items, id: \.0) { item in
+                        HStack(spacing: 6) {
+                            Image(systemName: item.2)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.0)
+                                    .font(.caption2.weight(.medium))
+                                    .foregroundStyle(.secondary)
+                                    .textCase(.uppercase)
+                                Text(item.1)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.primary)
+                                    .lineLimit(2)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(8)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.06)))
+                    }
+                }
+            }
+        }
+    }
+
+    private var statsCardItems: [(String, String, String)] {
+        var items: [(String, String, String)] = []
+        if let fav = displayCharacter.favourites, fav > 0 {
+            items.append(("Favourites", "\(fav)", "heart.fill"))
+        }
+        if let id = displayCharacter.siteUrl?.components(separatedBy: "/").last, !id.isEmpty {
+            items.append(("AniList ID", id, "number"))
+        }
+        if let gender = displayCharacter.gender, !gender.isEmpty {
+            items.append(("Gender", gender.capitalized, "person.fill"))
+        }
+        if let age = displayCharacter.age, !age.isEmpty {
+            items.append(("Age", age, "calendar"))
+        }
+        if let blood = displayCharacter.bloodType, !blood.isEmpty {
+            items.append(("Blood", blood, "drop.fill"))
+        }
+        if let alt = displayCharacter.name?.alternative, !alt.isEmpty {
+            items.append(("Also known as", alt.joined(separator: ", "), "tag.fill"))
+        }
+        return items
+    }
 
     /// The character edge from the parent already has name + image + role +
     /// voiceActors, but the description may be missing (AniList sometimes

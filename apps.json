@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "1.47",
+          "buildVersion": "1",
+          "date": "2026-08-22",
+          "localizedDescription": "Changed: Characters and Recommendations moved ABOVE Episodes on the anime detail page — visible immediately without scrolling.\nChanged: Anime character data source switched from AniList to MAL/Jikan — shows anime-specific character artwork (not manga). Falls back to AniList if unavailable. Manga unchanged.\nAdded: Character detail page — Quick Stats card with favourites, AniList ID, gender, age, blood type, alternative names.\nAdded: 'View on AniList' link on character detail when available.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 11040520,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.46",
           "buildVersion": "1",
           "date": "2026-08-22",
