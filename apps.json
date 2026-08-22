@@ -29,10 +29,10 @@
         {
           "version": "1.52",
           "buildVersion": "1",
-          "date": "2026-08-23",
+          "date": "2026-08-22",
           "localizedDescription": "FIXED: AniList 403 — User-Agent was set on URLSession config but not on each URLRequest. iOS's URLSession doesn't always inherit httpAdditionalHeaders for per-request calls. Now sets User-Agent directly on every URLRequest in both AniListService.post() and AniListLibraryService.post().",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/shirox.ipa",
-          "size": 11040520,
+          "size": 11182127,
           "minOSVersion": "15.0"
         },
         {
