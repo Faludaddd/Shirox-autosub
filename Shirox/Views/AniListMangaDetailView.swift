@@ -188,6 +188,12 @@ struct AniListMangaDetailView: View {
                         }
                     } : nil,
                     onTogglePrivate: { newValue in
+                        // Optimistically update the local entry so the toggle
+                        // reflects immediately, then push to AniList.
+                        if var e = existingEntry {
+                            e.isPrivate = newValue
+                            existingEntry = e
+                        }
                         Task {
                             try? await AniListLibraryService.shared.updateEntry(
                                 mediaId: mediaId,
@@ -229,10 +235,12 @@ struct AniListMangaDetailView: View {
                     SynopsisSection(text: desc)
                         .padding(.top, 16)
                 }
-                // Primary read/continue button + social/connections toggle —
-                // matches the anime AniList page's button row layout. The
-                // people/social icon opens the Connections section (relations
-                // + reading order), same as the anime page.
+                // Primary read/continue button + social/connections icon +
+                // download icon — matches the anime AniList page's button row
+                // layout exactly: Continue → people/social → download.
+                // Previously the download button was in the chaptersSection
+                // header — moving it here matches anime and fixes the
+                // "duplicate download button" bug.
                 #if os(iOS)
                 HStack(spacing: 10) {
                     readButton(media: media)
@@ -262,6 +270,33 @@ struct AniListMangaDetailView: View {
                             )
                     }
                     .buttonStyle(.plain)
+
+                    // Download / selection-mode toggle — in the action row,
+                    // matching anime. Only shown when chapters are available.
+                    if !chapters.isEmpty {
+                        Button {
+                            Haptics.selection()
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                isSelectionMode.toggle()
+                                if !isSelectionMode { selectedChapterHrefs.removeAll() }
+                            }
+                        } label: {
+                            Image(systemName: isSelectionMode ? "arrow.down.circle.fill" : "arrow.down.circle")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(isSelectionMode ? platformBackground : .primary)
+                                .frame(width: 46, height: 46)
+                                .background(
+                                    isSelectionMode ? Color.primary : Color.clear,
+                                    in: Circle()
+                                )
+                                .background(.ultraThinMaterial, in: Circle())
+                                .overlay(
+                                    Circle()
+                                        .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
@@ -338,13 +373,10 @@ struct AniListMangaDetailView: View {
     @ViewBuilder
     private var chaptersSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Section-local toolbar: title + count badge on the left,
-            // secondary action icons on the right. These actions were
-            // previously jammed into the hero button row above, where they
-            // crowded the primary "Continue Chapter" button and caused its
-            // label to truncate to "Con…". Moving them here gives the
-            // primary button the full row width AND colocates the actions
-            // with the list they actually control.
+            // Chapters section header: title + count badge on the left,
+            // invert-order + reset-progress on the right. The download/
+            // selection-mode toggle has been moved to the action-button row
+            // above (matching the anime page's layout).
             #if os(iOS)
             HStack(spacing: 10) {
                 Text("Chapters")
@@ -361,40 +393,7 @@ struct AniListMangaDetailView: View {
                         .fixedSize(horizontal: true, vertical: false)
                 }
                 Spacer()
-                // Selection-mode / batch-download toggle. Sized to match
-                // anime's episodes section header (36×36, ultraThinMaterial
-                // background, 1pt stroke) — the previous 32×32 frame was
-                // too small and looked cramped against the Chapters title.
-                if !chapters.isEmpty {
-                    Button {
-                        Haptics.selection()
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                            isSelectionMode.toggle()
-                            if !isSelectionMode { selectedChapterHrefs.removeAll() }
-                        }
-                    } label: {
-                        Image(systemName: isSelectionMode ? "checkmark.circle.fill" : "arrow.down.circle")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(isSelectionMode ? platformBackground : .primary)
-                            .frame(width: 36, height: 36)
-                            .background(.ultraThinMaterial, in: Circle())
-                            .overlay(
-                                // Active-state fill on top of the material
-                                // (can't use a ternary with Material vs Color
-                                // — they're different types, so layer instead).
-                                Circle()
-                                    .fill(isSelectionMode ? Color.primary : Color.clear)
-                            )
-                            .overlay(
-                                Circle()
-                                    .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
-                            )
-                    }
-                    .buttonStyle(.plain)
-                }
-                // Invert chapter order — toggles newestFirst. Fixes the
-                // index-mismatch bug where tapping chapter 25 in inverted
-                // mode opened chapter 1 (see chapterRow's realIndex).
+                // Invert chapter order — toggles newestFirst.
                 if chapters.count > 1 {
                     Button {
                         Haptics.selection()
@@ -900,8 +899,6 @@ struct AniListMangaDetailView: View {
                     chapters.firstIndex(where: { $0.href == last.chapterHref })
                 } ?? 0
                 openReader(chapter: chapters[idx], index: idx)
-            } else if let first = chapters.first {
-                openReader(chapter: first, index: 0)
             }
         } label: {
             HStack(spacing: 8) {

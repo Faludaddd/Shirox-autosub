@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "1.41",
+          "buildVersion": "1",
+          "date": "2026-08-22",
+          "localizedDescription": "Fixed: Manga AniList page — duplicate/broken download button removed. Moved download button to the action-button row (matching anime page). Removed dead-code duplicate in readButton.\nFixed: Manga edit button — wrong status ('Watching' instead of 'Reading') from the Library list's cross-provider edit sheet. Added missing progressUnit parameter.\nFixed: Manga edit button — stale status on fresh app launch. Privacy toggle now optimistically updates the local entry.\nFixed: Manga reader — scrolling up quickly no longer teleports/jumps between pages. Skips currentPage updates during active scroll, does a final pass after scrolling settles.\nFixed: Privacy sync for manga — onTogglePrivate now optimistically updates the local entry.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 11040520,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.40",
           "buildVersion": "1",
           "date": "2026-08-22",

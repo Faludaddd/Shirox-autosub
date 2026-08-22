@@ -285,6 +285,20 @@ struct MangaReaderView: View {
                 // small geometry shifts that re-trigger this callback.
                 // Only track when not actively pinching or settling.
                 guard !pinching, !isSettling else { return }
+                // Also skip while the scroll view is actively being dragged
+                // or decelerating — this prevents rapid currentPage updates
+                // during fast scroll-up that cause teleporting/jumping.
+                if let scrollView = verticalScrollView,
+                   scrollView.isDragging || scrollView.isDecelerating {
+                    // Still track the visible page for save purposes, but
+                    // don't update currentPage (which triggers chapter
+                    // boundary logic and strip mutations).
+                    if let top = frames.first(where: { $0.value.minY <= 0 && $0.value.minY + $0.value.height > 0 }) {
+                        geomStore.topPage = top.key
+                        geomStore.topFraction = ReaderPageMapping.inPageFraction(minY: top.value.minY, height: top.value.height)
+                    }
+                    return
+                }
                 // Pixel-exact save anchor: the page under the viewport's TOP
                 // edge and how far into it the top sits. (The display page
                 // below uses a mid-screen rule, which can be one panel ahead
@@ -311,6 +325,24 @@ struct MangaReaderView: View {
                 verticalProxy = proxy
                 if let target = verticalResumeTarget {
                     performVerticalResume(proxy, target: target, attempt: 0)
+                }
+            }
+            // After scrolling settles (dragging/decelerating stops), do a
+            // final pass to update currentPage with the correct position.
+            // This ensures chapter boundaries are detected after a fast
+            // scroll-up, without the teleporting that happened when we
+            // updated currentPage DURING the scroll.
+            .onReceive(NotificationCenter.default.publisher(for: UIScrollView.didEndDeceleratingNotification)) { _ in
+                guard let scrollView = verticalScrollView,
+                      !scrollView.isDragging, !scrollView.isDecelerating,
+                      verticalResumeTarget == nil,
+                      !pinching, !isSettling else { return }
+                // Re-evaluate the current page from the stored geometry.
+                let frames = geomStore.geoms
+                let mid = UIScreen.main.bounds.height * 0.5
+                guard let page = frames.filter({ $0.value.minY <= mid }).max(by: { $0.value.minY < $1.value.minY })?.key else { return }
+                if currentPage != page {
+                    currentPage = page
                 }
             }
             .ignoresSafeArea()

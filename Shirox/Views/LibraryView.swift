@@ -665,22 +665,6 @@ struct LibraryView: View {
         }
     }
 
-    /// Opens the detail page for an entry — shared by the context menu's
-    /// "View Anime"/"View Manga" action. Anime entries always route through
-    /// `openAnime` (which always goes to DetailView with episodes). Manga
-    /// entries route through `openManga`. Local files resume playback.
-    private func openEntryDetail(_ entry: LibraryEntry) {
-        if entry.media.isManga {
-            openManga(entry)
-        } else if let source = entry.localSource, source.kind == .localFile {
-            resumeLocalFile(source)
-        } else {
-            // All anime entries (with or without a linked module) go
-            // through openAnime → DetailView. No AniListDetailView branch.
-            openAnime(entry)
-        }
-    }
-
     private func statusIcon(_ status: MediaListStatus) -> String {
         switch status {
         case .current:   return "play.circle"
@@ -1046,6 +1030,7 @@ struct LibraryView: View {
                 LibraryEntryEditSheet(
                     entry: otherEntry,
                     media: media,
+                    progressUnit: media.isManga ? "chapter" : "episode",
                     onSave: { status, progress, score in
                         Task {
                             if media.provider == .mal {

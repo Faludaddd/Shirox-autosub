@@ -97,6 +97,23 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "1.41",
+        date: "2026-08-22",
+        added: [],
+        fixed: [
+            "Manga AniList page — duplicate/broken download button removed. The download button was in the chapters section header instead of the action-button row. Moved it to the action row (next to Continue + social icon) to match the anime page. Removed the dead-code duplicate 'else if' branch in readButton that did nothing.",
+            "Manga edit button — wrong status ('Watching' instead of 'Reading') from the Library list's cross-provider edit sheet. The second LibraryEntryEditSheet call site was missing the progressUnit parameter, so it defaulted to 'episode' (anime). Added progressUnit: media.isManga ? 'chapter' : 'episode'.",
+            "Manga edit button — stale status on fresh app launch. The onTogglePrivate callback now optimistically updates existingEntry.isPrivate immediately, so the toggle reflects instantly instead of waiting for the server round-trip.",
+            "Manga reader — scrolling up quickly no longer teleports/jumps between pages. The onPreferenceChange callback was updating currentPage during active dragging/decelerating, which triggered onChangeOf(currentPage) → updateDisplayedChapter, causing geometry shifts. Now skips currentPage updates during active scroll and does a final pass after scrolling settles.",
+            "Privacy sync for manga — the onTogglePrivate callback on the manga detail page now optimistically updates the local entry, so toggling private reflects immediately. The AniList fetch path already correctly populates isPrivate from the API response."
+        ],
+        changed: [
+            "Removed dead 'openEntryDetail' function from LibraryView — was defined but never called.",
+            "Manga chapters section header no longer has a download/selection-mode button — it's now in the action-button row above (matching anime)."
+        ],
+        improved: []
+    ),
+    UpdateLogEntry(
         version: "1.40",
         date: "2026-08-22",
         added: [
