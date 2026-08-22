@@ -578,7 +578,6 @@ struct SearchView: View {
     ]
 
     /// Genres the user has selected for Surprise Me. Multi-select.
-    @State private var selectedSurpriseGenres: Set<String> = []
     /// IDs of anime already shown by Surprise Me in this session. Tracked
     /// so pressing Surprise Me again never returns the same anime twice.
     /// Reset when the user clears their selection or exhausts the pool.

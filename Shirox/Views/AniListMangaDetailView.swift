@@ -47,9 +47,6 @@ struct AniListMangaDetailView: View {
     #if os(iOS)
     @ObservedObject private var mangaDownloads = MangaDownloadManager.shared
     #endif
-    /// When set, navigates to MangaDetailView for batch download selection.
-    @State private var pendingDownloadItem: SearchItem?
-    @State private var downloadNavActive = false
     @AppStorage("showStatistics") private var showStatistics = true
     @EnvironmentObject private var moduleManager: ModuleManager
     @Environment(\.dismiss) private var dismiss
@@ -95,17 +92,6 @@ struct AniListMangaDetailView: View {
             }
         }
         .task { await resolve() }
-        .background {
-            NavigationLink(
-                destination: Group {
-                    if let item = pendingDownloadItem {
-                        MangaDetailView(item: item)
-                    }
-                },
-                isActive: $downloadNavActive
-            ) { EmptyView() }
-            .hidden()
-        }
         // Reload chapters when the user switches manga modules via the
         // ModuleSelectorMenu. Without this, selecting a different source
         // from the dropdown does nothing — the chapter list stays stuck

@@ -109,11 +109,22 @@ struct DownloadsView: View {
 
     // MARK: - Body
 
-    /// Builds a DownloadDetailView for any DownloadItem — the custom download
-    /// manager detail with circular progress ring, ETA, speed, and Find File.
+    /// Builds a DetailView for any DownloadItem — the full anime detail
+    /// page with offlineSnapshot so it shows downloaded episodes and can
+    /// play them directly from disk.
     @ViewBuilder
-    private func downloadDetailDestination(for item: DownloadItem) -> some View {
-        DownloadDetailView(item: item)
+    private func detailDestination(for item: DownloadItem) -> some View {
+        let snapshot = DownloadedMediaSnapshotStore.shared.snapshot(
+            mediaTitle: item.mediaTitle,
+            moduleId: item.moduleId)
+        DetailView(
+            item: SearchItem(
+                title: item.mediaTitle,
+                image: item.imageUrl,
+                href: item.detailHref ?? ""),
+            offlineSnapshot: snapshot,
+            moduleId: item.moduleId,
+            aniListID: item.aniListID)
     }
 
     var body: some View {
@@ -127,13 +138,13 @@ struct DownloadsView: View {
                     )
                 } else {
                     List {
-                        // Downloading / Pending — tappable so the user can jump into the
-                        // anime's detail page to see all downloads for it in one place.
+                        // Downloading / Pending — tappable to open the anime
+                        // DetailView with offlineSnapshot.
                         if !inProgress.isEmpty {
                             Section("Downloading") {
                                 ForEach(inProgress) { item in
                                     NavigationLink {
-                                        downloadDetailDestination(for: item)
+                                        detailDestination(for: item)
                                     } label: {
                                         DownloadProgressRow(item: item)
                                     }
@@ -153,13 +164,17 @@ struct DownloadsView: View {
                             }
                         }
 
-                        // Completed — grouped by module, each episode as its own row
+                        // Completed — grouped by module → media → episodes.
+                        // Tapping an episode opens the anime DetailView (the
+                        // full anime detail page) with offlineSnapshot so it
+                        // shows the episode list in offline mode and can play
+                        // the downloaded file directly.
                         ForEach(moduleGroups) { moduleGroup in
                             Section {
                                 ForEach(moduleGroup.mediaGroups) { mediaGroup in
                                     ForEach(mediaGroup.items) { item in
                                         NavigationLink {
-                                            downloadDetailDestination(for: item)
+                                            detailDestination(for: item)
                                         } label: {
                                             DownloadProgressRow(item: item)
                                         }
@@ -186,13 +201,13 @@ struct DownloadsView: View {
                             }
                         }
 
-                        // Failed — also tappable so the user can retry from the detail
-                        // page or inspect what failed.
+                        // Failed — tappable to open DetailView for retry or
+                        // to inspect what failed.
                         if !failed.isEmpty {
                             Section("Failed") {
                                 ForEach(failed) { item in
                                     NavigationLink {
-                                        downloadDetailDestination(for: item)
+                                        detailDestination(for: item)
                                     } label: {
                                         DownloadProgressRow(item: item)
                                     }
