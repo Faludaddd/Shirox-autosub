@@ -29,10 +29,10 @@
         {
           "version": "1.55",
           "buildVersion": "1",
-          "date": "2026-08-23",
+          "date": "2026-08-22",
           "localizedDescription": "FIXED: When AniList API is down, the app now falls back to Jikan/MAL for Home screen data (trending, seasonal, popular, top rated) and manga data (trending, popular). The carousel and sections will show data from MAL/Jikan when AniList is unavailable. When AniList comes back online, pull to refresh and it will switch back automatically.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/shirox.ipa",
-          "size": 11040520,
+          "size": 11188242,
           "minOSVersion": "15.0"
         },
         {
