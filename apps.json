@@ -32,7 +32,7 @@
           "date": "2026-08-22",
           "localizedDescription": "Fixed: Downloaded anime now opens the full anime DetailView (with episode list, synopsis, characters, recommendations) instead of the old file-manager page. Uses offlineSnapshot to show downloaded episodes and play them from disk.\nRemoved: Dead code — UpdateSettingsPage, AnimeModulePreferenceTests, unused state variables, unused NavigationLink.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 11040520,
+          "size": 11041582,
           "minOSVersion": "15.0"
         },
         {
