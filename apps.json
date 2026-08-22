@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "1.46",
+          "buildVersion": "1",
+          "date": "2026-08-22",
+          "localizedDescription": "Fixed: Manga poster percentage badge now matches anime's size.\nFixed: Anime poster image source — now uses AniList coverImage.extraLarge directly (was TVDBPosterImage which could show wrong artwork).\nFixed: Library anime tap — no longer opens blank page. Now opens AniListDetailView.\nFixed: Library list — removed duplicate personal rating (was shown on poster AND right side; now poster only).\nFixed: Notification section posters — all aligned in single straight line, modestly larger.\nChanged: Library list posters increased from 70pt to 80pt wide.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 11040520,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.45",
           "buildVersion": "1",
           "date": "2026-08-22",

@@ -80,6 +80,10 @@ struct LibraryView: View {
     @State private var pendingAnimeDetailItem: SearchItem? = nil
     @State private var pendingAnimeDetailModuleId: String? = nil
     @State private var animeDetailLinkActive = false
+    /// Drives the hidden AniListDetailView NavigationLink for anime
+    /// entries tapped in the Library list/grid (when no linked module).
+    @State private var pendingAnimeMedia: Media? = nil
+    @State private var animeLinkActive = false
     /// Media ID of the anime currently being resolved through a module
     /// (drives the row spinner overlay during async resolution).
     @State private var resolvingAnimeId: Int? = nil
@@ -439,6 +443,22 @@ struct LibraryView: View {
         .hidden()
     }
 
+    /// Hidden link for anime entries without a linked module: opens
+    /// AniListDetailView (which has its own data loading — no module
+    /// href needed). This prevents the blank page that occurred when
+    /// pushing DetailView with an empty href.
+    @ViewBuilder private var animeNavLink: some View {
+        NavigationLink(
+            destination: Group {
+                if let m = pendingAnimeMedia {
+                    AniListDetailView(mediaId: m.id, preloadedMedia: m)
+                }
+            },
+            isActive: $animeLinkActive
+        ) { EmptyView() }
+        .hidden()
+    }
+
     private func openManga(_ entry: LibraryEntry) {
         if let source = entry.localSource, source.kind == .module {
             pendingMangaItem = SearchItem(
@@ -473,17 +493,14 @@ struct LibraryView: View {
             return
         }
 
-        // Branch 2: no linked module — go straight to DetailView with a
-        // placeholder SearchItem. DetailView will handle module selection
-        // via its own UI (Watch button → module picker). No automatic
-        // module switching/searching here — that was causing long loading
-        // times and Cloudflare rejections.
-        pendingAnimeDetailItem = SearchItem(
-            title: entry.media.title.displayTitle,
-            image: entry.media.coverImage.best ?? "",
-            href: "")
-        pendingAnimeDetailModuleId = nil
-        animeDetailLinkActive = true
+        // Branch 2: no linked module — open AniListDetailView which has
+        // its own data loading (doesn't need a module href). This is the
+        // same page that Search/Browse/Home navigate to for anime.
+        // Previously this pushed DetailView with an empty href, which
+        // caused a blank page because DetailViewModel.load() has
+        // `guard !item.href.isEmpty else { return }`.
+        pendingAnimeMedia = entry.media
+        animeLinkActive = true
     }
 
     /// Manga entries: tap opens the reader detail (resolving a module first for
@@ -892,6 +909,7 @@ struct LibraryView: View {
         .background { mangaNavLink }
         .background { aniListMangaNavLink }
         .background { animeDetailNavLink }
+        .background { animeNavLink }
         .toolbar { libraryToolbar }
         .task { await vm.autoRefreshIfNeeded() }
         #if os(iOS)
@@ -1079,7 +1097,7 @@ private struct LibraryRowView: View {
             // Cover image — AniListCardView style
             Color.clear
                 .aspectRatio(2/3, contentMode: .fit)
-                .frame(width: 70)
+                .frame(width: 80)
                 .overlay(
                     ZStack {
                         CachedAsyncImage(urlString: entry.media.coverImage.best ?? "")
@@ -1139,19 +1157,8 @@ private struct LibraryRowView: View {
                         }
                         .foregroundStyle(.blue)
                     }
-                    if entry.score > 0 {
-                        HStack(spacing: 3) {
-                            if scoreFormat != .point3 {
-                                Image(systemName: "star.fill")
-                                    .font(.system(size: 9))
-                            }
-                            scoreFormat.scoreText(for: entry.displayScore(in: scoreFormat))
-                                .font(.caption2.weight(.semibold))
-                                .lineLimit(1)
-                                .fixedSize(horizontal: true, vertical: false)
-                        }
-                        .foregroundStyle(.yellow)
-                    }
+                    // Personal score is shown on the poster badge only —
+                    // removed from the right-side info to avoid duplication.
                     if let ts = entry.updatedAt {
                         Text(Date(timeIntervalSince1970: TimeInterval(ts)).formatted(.relative(presentation: .named)))
                             .font(.caption2)

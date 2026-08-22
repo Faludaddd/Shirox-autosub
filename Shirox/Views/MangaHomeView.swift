@@ -242,12 +242,15 @@ struct MangaPosterCard: View, Equatable {
             )
             .overlay(alignment: .topTrailing) {
                 if let score = media.averageScore {
-                    Text("\(score)%")
-                        .font(.system(size: 9, weight: .bold))
+                    Label("\(score)%", systemImage: "star.fill")
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(.yellow)
-                        .padding(.horizontal, 6).padding(.vertical, 3)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
                         .background(.black.opacity(0.55), in: Capsule())
-                        .padding(4)
+                        .padding(10)
                 }
             }
             .overlay(alignment: .bottom) {

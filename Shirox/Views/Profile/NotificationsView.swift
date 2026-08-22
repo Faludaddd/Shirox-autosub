@@ -476,7 +476,7 @@ private struct NotificationRowContent: View {
             case .avatar(let url):
                 ZStack(alignment: .bottomTrailing) {
                     CachedAsyncImage(urlString: url)
-                        .frame(width: 72, height: 72)
+                        .frame(width: 80, height: 80)
                         .clipShape(Circle())
                         .overlay(
                             Circle().strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
@@ -489,12 +489,12 @@ private struct NotificationRowContent: View {
                         .overlay(Circle().strokeBorder(.white, lineWidth: 2))
                         .offset(x: 4, y: 4)
                 }
-                .frame(width: 78, height: 78)
+                .frame(width: 84, height: 112)
             case .cover(let url):
                 ZStack(alignment: .bottomTrailing) {
                     CachedAsyncImage(urlString: url)
                         .aspectRatio(2/3, contentMode: .fill)
-                        .frame(width: 72, height: 108)
+                        .frame(width: 78, height: 112)
                         .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                         .overlay(
                             RoundedRectangle(cornerRadius: 9, style: .continuous)
@@ -509,16 +509,17 @@ private struct NotificationRowContent: View {
                         .overlay(Circle().strokeBorder(.white, lineWidth: 2))
                         .offset(x: 4, y: 4)
                 }
-                .frame(width: 78, height: 112)
+                .frame(width: 84, height: 112)
             }
         } else {
-            // Plain icon notification — bigger circle for stronger visual.
+            // Plain icon notification — same outer height as the other
+            // branches so all rows align on a single baseline.
             Image(systemName: symbol)
-                .font(.system(size: 24, weight: .bold))
+                .font(.system(size: 28, weight: .bold))
                 .foregroundStyle(.white)
-                .frame(width: 60, height: 60)
-                .background(Circle().fill(color))
-                .overlay(Circle().strokeBorder(Color.primary.opacity(0.1), lineWidth: 1))
+                .frame(width: 84, height: 112)
+                .background(RoundedRectangle(cornerRadius: 9).fill(color))
+                .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(Color.primary.opacity(0.1), lineWidth: 1))
                 .shadow(color: color.opacity(0.35), radius: 5, x: 0, y: 2)
         }
     }

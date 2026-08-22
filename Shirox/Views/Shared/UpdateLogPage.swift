@@ -97,14 +97,19 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
-        version: "1.45",
+        version: "1.46",
         date: "2026-08-22",
         added: [],
         fixed: [
-            "Downloaded anime — DetailView was calling vm.load(item:) even when offlineSnapshot was set, overwriting the offline data with an online module fetch (which would fail offline or replace the downloaded episodes). Now vm.load(item:) is skipped when offlineSnapshot is present — the offline data from loadOffline() is preserved.",
-            "Downloaded anime — episodesSection was checking 'all hrefs empty' before using the offline episode list, which could fail if vm.load() had already overwritten the episodes. Now uses the offline episodes section whenever offlineSnapshot is set, unconditionally."
+            "Manga poster percentage badge now matches anime's size — uses Label with star.fill icon, .caption2.bold font, 8H/4V padding + 10pt outer inset (was plain Text, 9pt, 6H/3V + 4pt).",
+            "Anime poster image source — switched from TVDBPosterImage (which could async-swap to a TVDB image that doesn't match AniList) to direct CachedAsyncImage with coverImage.extraLarge, matching manga's approach exactly.",
+            "Library anime tap — no longer opens a blank page. Entries without a linked module now open AniListDetailView (which has its own data loading) instead of DetailView with an empty href (which caused blank because DetailViewModel.load() has guard !item.href.isEmpty).",
+            "Library list — removed duplicate personal rating from the right-side info column. Personal score now shows only on the poster badge. Community average still shows on the right side.",
+            "Notification section posters — all visual types (avatar, cover, plain icon) now share the same 84×112 outer frame so rows align in a single straight line. Posters are also modestly larger (80×80 avatar, 78×112 cover, was 72×72 / 72×108)."
         ],
-        changed: [],
+        changed: [
+            "Library list posters increased from 70pt to 80pt wide (modest increase)."
+        ],
         improved: []
     ),
     UpdateLogEntry(
