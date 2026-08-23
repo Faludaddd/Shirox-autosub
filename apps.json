@@ -32,7 +32,7 @@
           "date": "2026-08-23",
           "localizedDescription": "Fixed: Manga and Schedule not loading when AniList is down (403 'API temporarily disabled'). Added Jikan/MAL fallback for the manga schedule tab (was missing). Added topRated to manga home Jikan fallback. Jikan fallback errors are now logged.\nAniList's 403 is a server-side issue — the API itself is down. The app falls back to Jikan/MAL. When AniList comes back, pull-to-refresh switches back automatically.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 11040520,
+          "size": 11413447,
           "minOSVersion": "15.0"
         },
         {
