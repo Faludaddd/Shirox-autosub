@@ -152,7 +152,7 @@ final class AniListDetailViewModel: ObservableObject {
         if autoPickEnabled {
             // Guard: prevent duplicate Auto Pick execution.
             if autoPickInProgress != nil {
-                Logger.shared.log("[AutoPick:\(requestId)] Duplicate trigger ignored — request already active for EP \(autoPickInProgress!)", type: "Warning")
+                Logger.shared.log("[AutoPick] Duplicate trigger ignored — request already active for EP \(autoPickInProgress!)", type: "Warning")
                 return
             }
             autoPickInProgress = number
