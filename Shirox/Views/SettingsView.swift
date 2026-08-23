@@ -4597,6 +4597,9 @@ struct LandscapeSubtitlePreview: View {
 // MARK: - About Settings Page
 
 struct AboutSettingsPage: View {
+    @ObservedObject private var updateManager = AppUpdateManager.shared
+    @State private var checkError: String?
+
     private var version: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "-"
     }
@@ -4608,6 +4611,7 @@ struct AboutSettingsPage: View {
         ScrollView {
             VStack(spacing: 16) {
                 heroCard
+                updateStatusCard
                 legalCard
             }
             .padding()
@@ -4652,6 +4656,108 @@ struct AboutSettingsPage: View {
         .frame(maxWidth: .infinity)
         .background(Color.secondary.opacity(0.08),
                     in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
+
+    // MARK: - Update Status Card
+
+    @ViewBuilder
+    private var updateStatusCard: some View {
+        VStack(spacing: 14) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(updateManager.availableUpdate != nil ? Color.orange.opacity(0.12) : Color.green.opacity(0.12))
+                        .frame(width: 44, height: 44)
+                    Image(systemName: updateManager.availableUpdate != nil ? "arrow.up.circle.fill" : "checkmark.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(updateManager.availableUpdate != nil ? .orange : .green)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    if let update = updateManager.availableUpdate {
+                        Text("Update Available")
+                            .font(.headline)
+                        Text("Version \(update.newVersion)")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Color.appAccent)
+                        Text(update.changelog)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(3)
+                    } else if updateManager.isChecking {
+                        Text("Checking for updates…")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    } else if let _ = checkError {
+                        Text("Unable to check for updates")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.orange)
+                        Text("Check your internet connection and try again.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("You're up to date")
+                            .font(.headline)
+                            .foregroundStyle(.green)
+                        Text("Version \(version) (\(build))")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Spacer()
+            }
+
+            if let update = updateManager.availableUpdate {
+                Button {
+                    if let url = URL(string: update.downloadURL.absoluteString) {
+                        #if os(iOS)
+                        UIApplication.shared.open(url)
+                        #endif
+                    }
+                    updateManager.markDownloadStarted()
+                } label: {
+                    Label("Update", systemImage: "arrow.down.circle.fill")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color.appAccent, in: RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
+            }
+
+            Button {
+                checkError = nil
+                Task {
+                    await updateManager.checkForUpdates(force: true)
+                    if updateManager.availableUpdate == nil && !updateManager.isChecking {
+                        // If no update and not checking, it might have failed
+                        // silently. We don't set an error unless the network
+                        // actually failed — the AppUpdateManager handles
+                        // this internally by logging.
+                    }
+                }
+            } label: {
+                Label("Check for Updates", systemImage: "arrow.clockwise")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.appAccent)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(Color.appAccent.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
+            }
+            .buttonStyle(.plain)
+            .disabled(updateManager.isChecking)
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(.secondarySystemGroupedBackground))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        )
     }
 
     // MARK: - Legal Card

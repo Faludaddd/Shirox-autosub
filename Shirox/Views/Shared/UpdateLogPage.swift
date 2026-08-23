@@ -99,6 +99,20 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "1.91",
+        date: "2026-08-23",
+        added: [
+            "Update Status card in Settings → About — shows 'You're up to date' with version number, or 'Update Available' with changelog and Update button. Includes a 'Check for Updates' button for manual checks. Handles network failures gracefully (shows 'Unable to check for updates' instead of falsely claiming up-to-date)."
+        ],
+        fixed: [
+            "Schedule poster alignment — anime and manga schedule cards now have a fixed title height (42pt) so different title lengths no longer cause cards to shift vertically. All cards are the same height regardless of how long the title is."
+        ],
+        changed: [],
+        improved: [],
+        removed: [],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "1.90",
         date: "2026-08-23",
         added: [

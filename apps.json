@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "1.91",
+          "buildVersion": "1",
+          "date": "2026-08-23",
+          "localizedDescription": "Fixed: Schedule poster alignment — cards now have a fixed title height so different title lengths don't break the grid.\nAdded: Update Status card in Settings → About — shows 'You're up to date' or 'Update Available' with a Check for Updates button.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 11040520,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.90",
           "buildVersion": "1",
           "date": "2026-08-23",

@@ -2192,7 +2192,8 @@ private struct MangaScheduleCard: View {
                     .font(.system(size: 17, weight: .semibold))
                     .lineLimit(2)
                     .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(height: 42, alignment: .top)
 
                 // Badges — chapter count + format only (one tag per metadata
                 // type; no duplicate badges). The "Manga" source badge is
@@ -2310,7 +2311,8 @@ private struct ScheduleCard: View {
                     .font(.system(size: 17, weight: .semibold))
                     .lineLimit(2)
                     .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(height: 42, alignment: .top)
 
                 // Badges — all `.fixedSize()` so they sit on one row instead of stacking.
                 HStack(spacing: 6) {
