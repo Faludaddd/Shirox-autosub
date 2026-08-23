@@ -32,7 +32,7 @@
           "date": "2026-08-23",
           "localizedDescription": "Fixed: Manga section not loading due to AniList 429 rate-limit errors. Added 90-second rate-limit cooldown so the app stops hammering AniList when rate-limited. Manga and anime home now fall back to MAL/Jikan when AniList is rate-limited.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 11040520,
+          "size": 11385635,
           "minOSVersion": "15.0"
         },
         {
