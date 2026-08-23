@@ -3516,7 +3516,7 @@ struct StorageManagementPage: View {
         let mangaDir = docs.appendingPathComponent("MangaDownloads")
         let anime = directorySize(at: animeDir)
         let manga = directorySize(at: mangaDir)
-        let cache = CacheManager.shared.imageCacheSize()
+        let cache = CacheManager.shared.imageCacheSize
         await MainActor.run {
             animeDownloadSize = anime
             mangaDownloadSize = manga
