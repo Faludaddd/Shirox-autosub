@@ -1638,20 +1638,18 @@ struct StreamingSettingsPage: View {
 
                     Divider().opacity(0.3)
 
-                    Toggle("Auto Pick Module (Testing)", isOn: $autoPickModuleTesting)
-                        .tint(Color.appAccent)
-                    Text("Testing only — automatically selects a module and stream without manual input. Disabled by default. Does not affect the normal manual workflow unless explicitly enabled.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
                     NavigationLink {
                         AutoPickSettingsPage()
                             .environmentObject(moduleManager)
                     } label: {
                         HStack {
-                            Text("Auto Pick Settings")
-                                .font(.subheadline.weight(.semibold))
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Auto Pick Module (Experimental)")
+                                    .font(.subheadline.weight(.semibold))
+                                Text("Automatically selects module and stream. Disabled by default.")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .font(.caption.weight(.semibold))

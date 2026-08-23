@@ -99,6 +99,22 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "1.93",
+        date: "2026-08-23",
+        added: [],
+        fixed: [
+            "Schedule posters cut off on the left — restored the navigation title ('Schedule' / 'Releases') which was removed in v1.82. The empty title caused the content to extend under the safe area, clipping the leftmost poster. Posters are now fully visible with proper safe area insets.",
+            "Duplicate Auto Pick settings — removed the inline toggle from the Streaming settings Advanced card. Now there's only ONE entry point: a NavigationLink to the full Auto Pick Settings page (which has its own master toggle). No more duplicate toggles for the same setting."
+        ],
+        changed: [],
+        improved: [],
+        removed: [],
+        other: [
+            "Playback investigation — confirmed the 403/502 errors reported by the user are provider-side failures (pp.animex.one returning 403, multiple modules returning 502). The Auto Pick code does NOT touch the normal playback path — AniListDetailViewModel.watchEpisode() simply opens ModuleStreamPickerView (the manual picker), exactly as before. No Auto Pick code is referenced in the ViewModel, ModuleStreamPickerView, or DownloadModulePickerView. The normal manual workflow (Episode → Change Stream → Choose Module → Choose Stream → Watch) is completely unaffected by the Auto Pick toggle when it's OFF (the default).",
+            "Update system verified — AppUpdateManager uses proper semantic version comparison (splits on '.', compares numeric components, handles 1.10 > 1.9 correctly). Network failures are handled gracefully. Manual 'Check for Updates' works. Cached results prevent spam."
+        ]
+    ),
+    UpdateLogEntry(
         version: "1.92",
         date: "2026-08-23",
         added: [

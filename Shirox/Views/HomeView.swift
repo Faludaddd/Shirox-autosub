@@ -1230,7 +1230,7 @@ struct ScheduleView: View {
                 #if os(iOS)
                 .background(Color(.systemBackground))
                 #endif
-                .navigationTitle("")
+                .navigationTitle(appMode.mode == .reading ? "Releases" : "Schedule")
                 #if os(iOS)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar { scheduleToolbar }
