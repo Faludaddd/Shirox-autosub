@@ -702,7 +702,7 @@ private struct ModuleCard: View {
                     .padding(.bottom, 2)
                 }
                 if rowVm.cloudflareURL != nil {
-                    CloudflareVerifyInlineButton { rowVm.verifyAndRetry() }
+                    CloudflareVerifyInlineButton(onVerify: { rowVm.verifyAndRetry() })
                 }
             }
 
@@ -739,7 +739,7 @@ private struct ModuleCard: View {
                     Label("Blocked by Cloudflare", systemImage: "shield.lefthalf.filled")
                         .font(.caption)
                         .foregroundStyle(.orange)
-                    CloudflareVerifyInlineButton { rowVm.verifyAndRetry() }
+                    CloudflareVerifyInlineButton(onVerify: { rowVm.verifyAndRetry() })
                 } else {
                     Label("No results found", systemImage: "magnifyingglass")
                         .font(.caption)
@@ -805,29 +805,6 @@ private struct EmptyStateView: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(Color.secondary.opacity(0.05))
         )
-    }
-}
-
-// MARK: - Cloudflare verify inline button
-
-private struct CloudflareVerifyInlineButton: View {
-    let action: () -> Void
-
-    var body: some View {
-        Button {
-            Haptics.light()
-            action()
-        } label: {
-            Label("Verify Cloudflare", systemImage: "checkmark.shield")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .background(
-                    Capsule().fill(Color.appAccent)
-                )
-        }
-        .buttonStyle(.plain)
     }
 }
 
