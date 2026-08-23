@@ -23,7 +23,13 @@ struct BookmarkButton: View {
             } label: {
                 Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(isSaved ? Color.accentColor : .primary)
+                    // Use Color.appAccent explicitly (not Color.accentColor)
+                    // so the icon follows the user's chosen accent color,
+                    // not the system tint. When unsaved, use .primary so
+                    // it's visible in both light and dark mode. Was
+                    // previously using Color.accentColor which could render
+                    // white in certain toolbar contexts.
+                    .foregroundStyle(isSaved ? Color.appAccent : .primary)
             }
             .buttonStyle(.plain)
             .adaptiveSheet(isPresented: $showCollections) {

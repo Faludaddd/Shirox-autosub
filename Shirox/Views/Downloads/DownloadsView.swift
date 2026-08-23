@@ -372,7 +372,7 @@ private struct DownloadProgressRow: View {
                 Text(item.mediaTitle)
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
-                Text(item.episodeTitle ?? "Episode \(item.episodeNumber)")
+                Text(item.episodeTitle ?? "EP \\(item.episodeNumber\)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)

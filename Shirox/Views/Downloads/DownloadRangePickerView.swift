@@ -232,7 +232,8 @@ struct DownloadRangePickerView: View {
     }
 
     /// A single endpoint (From / To) card with a big number, +/- buttons,
-    /// and a slider for quick scrubbing. No Apple default picker used.
+    /// a manual text field for typing the number directly, and a slider
+    /// for quick scrubbing. No Apple default picker used.
     @ViewBuilder
     private func rangeEndpointCard(label: String, value: Binding<Int>, range: ClosedRange<Int>) -> some View {
         VStack(spacing: 8) {
@@ -253,10 +254,35 @@ struct DownloadRangePickerView: View {
                 .buttonStyle(.plain)
                 .disabled(value.wrappedValue <= range.lowerBound)
 
-                Text("\(value.wrappedValue)")
-                    .font(.system(size: 28, weight: .heavy, design: .rounded))
-                    .foregroundStyle(.primary)
-                    .frame(minWidth: 50)
+                // Manual number input — lets the user type the number
+                // directly instead of only using +/- buttons or the
+                // slider. Numeric keyboard on mobile.
+                TextField("", text: Binding(
+                    get: { String(value.wrappedValue) },
+                    set: { newText in
+                        let trimmed = newText.filter(\.isNumber)
+                        if trimmed.isEmpty {
+                            value.wrappedValue = range.lowerBound
+                        } else if let n = Int(trimmed) {
+                            value.wrappedValue = max(range.lowerBound, min(range.upperBound, n))
+                        }
+                    }
+                ))
+                .keyboardType(.numberPad)
+                .font(.system(size: 28, weight: .heavy, design: .rounded))
+                .foregroundStyle(.primary)
+                .multilineTextAlignment(.center)
+                .frame(minWidth: 50)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color.secondary.opacity(0.1))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(Color.appAccent.opacity(0.3), lineWidth: 1)
+                )
 
                 Button {
                     Haptics.light()

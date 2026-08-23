@@ -146,7 +146,7 @@ struct ContinueWatchingSection: View {
         }
 
         let stream = StreamResult(
-            title: item.streamTitle ?? item.episodeTitle ?? "Episode \(item.episodeNumber)",
+            title: item.streamTitle ?? item.episodeTitle ?? "EP \\(item.episodeNumber\)",
             url: url,
             headers: item.headers ?? [:],
             subtitle: item.subtitle,

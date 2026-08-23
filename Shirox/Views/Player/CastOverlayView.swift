@@ -60,7 +60,7 @@ struct CastOverlayView: View {
                         .lineLimit(2)
 
                     if let ep = episodeNumber {
-                        Text("Episode \(ep)")
+                        Text("EP \\(ep\)")
                             .font(.subheadline)
                             .foregroundStyle(.white.opacity(0.65))
                     }

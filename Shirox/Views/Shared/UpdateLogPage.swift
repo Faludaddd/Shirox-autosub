@@ -99,6 +99,23 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "1.87",
+        date: "2026-08-23",
+        added: [
+            "Manual number input in Download Range — the From and To fields now accept typed numbers. Tap the field and type (e.g. 50 → 53) using the numeric keyboard. Validates the range and prevents invalid input like 53 → 50."
+        ],
+        fixed: [
+            "Download → Change Stream UI — clicking Download now opens the new custom Change Stream UI (the same one used by the Watch / Change Stream flow). Previously opened the old default iOS List picker. The custom picker handles module selection, stream selection, and single-stream auto-selection — no Auto Pick Module.",
+            "Collection icon color — the Add to Collection (bookmark) icon was rendering white in some toolbar contexts. Now uses Color.appAccent explicitly when saved, and .primary when unsaved, so it's always visible and follows the user's chosen accent color."
+        ],
+        changed: [
+            "Episode labels now show 'EP N' instead of 'Episode N' everywhere (episode rows, download rows, player subtitles, stream picker, cast overlay). Manga chapter labels are unchanged — they continue using 'Chapter N'."
+        ],
+        improved: [],
+        removed: [],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "1.86",
         date: "2026-08-23",
         added: [

@@ -667,7 +667,7 @@ struct PlayerView: View {
                     .font(.title3.weight(.semibold)).foregroundStyle(.white)
                     .multilineTextAlignment(.center).lineLimit(2)
                 if let ep = currentContext?.episodeNumber {
-                    Text("Episode \(ep)").font(.subheadline).foregroundStyle(.white.opacity(0.65))
+                    Text("EP \\(ep\)").font(.subheadline).foregroundStyle(.white.opacity(0.65))
                 }
 
                 VStack(spacing: 8) {
@@ -1759,8 +1759,8 @@ struct PlayerView: View {
         let epTitle = tvdbEpisodeTitle ?? currentContext?.episodeTitle
         let subtitleString: String
         if let n = epNumber {
-            if let t = epTitle { subtitleString = "Episode \(n) - \(t)" }
-            else { subtitleString = "Episode \(n)" }
+            if let t = epTitle { subtitleString = "EP \(n) - \(t)" }
+            else { subtitleString = "EP \\(n\)" }
         } else {
             subtitleString = epTitle ?? ""
         }

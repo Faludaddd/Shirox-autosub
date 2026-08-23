@@ -38,51 +38,27 @@ struct DownloadModulePickerView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            List {
-                ForEach(moduleManager.modules) { module in
-                    DownloadModuleRow(
-                        module: module,
-                        mediaId: mediaId,
-                        animeTitle: animeTitle,
-                        episodeNumber: episodeNumber,
-                        rowVm: vmStore.get(for: module, mediaId: mediaId, animeTitle: animeTitle, episodeNumber: episodeNumber)
-                    ) { streams, episodeHref in
-                        streamPickerItem = StreamPickerItem(streams: streams, episodeHref: episodeHref, module: module)
-                    }
+        // Reuse the new custom ModuleStreamPickerView (the same one used
+        // by the Change Stream / Watch flow). Adapts the download callback
+        // to the picker's onStreamsLoaded signature.
+        // The picker handles module selection, stream selection, and
+        // auto-selection of single streams internally — no Auto Pick Module.
+        ModuleStreamPickerView(
+            mediaId: mediaId,
+            animeTitle: animeTitle,
+            episodeNumber: episodeNumber,
+            onDismiss: { onDismiss() },
+            onStreamsLoaded: { streams, selectedStream, showHref, availableCount, episodeHref in
+                // The picker calls this when the user has selected a stream
+                // (or when there's only one stream, which is auto-selected).
+                // Pass the selected stream back to the download flow.
+                let stream = selectedStream ?? streams.first
+                if let stream {
+                    onStreamsLoaded([stream], episodeHref)
                 }
             }
-            .listStyle(.insetGrouped)
-            .navigationTitle("Download Episode \(episodeNumber)")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { onDismiss() }
-                }
-            }
-            .adaptiveSheet(item: $streamPickerItem, onDismiss: {
-                guard let stream = chosenStream, let pickerItem = chosenPickerItem else { return }
-                chosenStream = nil
-                chosenPickerItem = nil
-                moduleManager.selectModule(pickerItem.module)
-                onDismiss()
-                onStreamsLoaded([stream], pickerItem.episodeHref)
-            }) { pickerItem in
-                DownloadStreamPickerView(streams: pickerItem.streams) { stream in
-                    chosenStream = stream
-                    chosenPickerItem = pickerItem
-                    streamPickerItem = nil
-                }
-            }
-        }
-        #if os(iOS)
-        .adaptivePresentationDetents([.medium, .large])
-
-        #else
-
-        .frame(minWidth: 480, minHeight: 360)
-
-        #endif
+        )
+        .environmentObject(moduleManager)
     }
 }
 
