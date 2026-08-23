@@ -1227,48 +1227,52 @@ struct ScheduleView: View {
     var body: some View {
         NavigationStack {
             scheduleGroup
-            #if os(iOS)
-            .background(Color(.systemBackground))
-            #endif
-            .navigationTitle("")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.hidden, for: .navigationBar)
-            .toolbar {
-                // Settings gear is shown in BOTH modes. Anime Mode opens
-                // ScheduleSettingsPage; Reading Mode opens a manga-specific
-                // settings page. Both are always reachable from the schedule.
-                ToolbarItem(placement: .primaryAction) {
-                    NavigationLink {
-                        if appMode.mode == .anime {
-                            ScheduleSettingsPage()
-                        } else {
-                            MangaScheduleSettingsPage()
-                        }
-                    } label: {
-                        Image(systemName: "gearshape")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(.primary)
-                    }
+                #if os(iOS)
+                .background(Color(.systemBackground))
+                #endif
+                .navigationTitle("")
+                #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { scheduleToolbar }
+                #endif
+                .navigationDestinationCompat(item: $detailEntry) { entry in
+                    ScheduleDetailView(
+                        entry: entry,
+                        useUTC: useUTC,
+                        isNotificationOn: scheduledIds.contains(entry.id),
+                        onToggleNotification: { toggleNotification(for: entry) }
+                    )
                 }
-            }
-            #endif
-            .navigationDestinationCompat(item: $detailEntry) { entry in
-                ScheduleDetailView(
-                    entry: entry,
-                    useUTC: useUTC,
-                    isNotificationOn: scheduledIds.contains(entry.id),
-                    onToggleNotification: { toggleNotification(for: entry) }
-                )
-            }
-            .task { await scheduleLoad() }
-            .refreshable { await scheduleLoad() }
-            .onChange(of: mode) { _ in Task { await load() } }
-            .onChange(of: windowDays) { _ in Task { await load() } }
-            .onChange(of: useUTC) { _ in resetCalendarToToday() }
-            .onChange(of: appMode.mode) { _ in Task { await scheduleLoad() } }
+                .task { await scheduleLoad() }
+                .refreshable { await scheduleLoad() }
+                .onChange(of: mode) { _ in Task { await load() } }
+                .onChange(of: windowDays) { _ in Task { await load() } }
+                .onChange(of: useUTC) { _ in resetCalendarToToday() }
+                .onChange(of: appMode.mode) { _ in Task { await scheduleLoad() } }
         }
     }
+
+    #if os(iOS)
+    @ToolbarContentBuilder
+    private var scheduleToolbar: some ToolbarContent {
+        // Settings gear is shown in BOTH modes. Anime Mode opens
+        // ScheduleSettingsPage; Reading Mode opens a manga-specific
+        // settings page. Both are always reachable from the schedule.
+        ToolbarItem(placement: .primaryAction) {
+            NavigationLink {
+                if appMode.mode == .anime {
+                    ScheduleSettingsPage()
+                } else {
+                    MangaScheduleSettingsPage()
+                }
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.primary)
+            }
+        }
+    }
+    #endif
 
     @ViewBuilder
     private var scheduleGroup: some View {
