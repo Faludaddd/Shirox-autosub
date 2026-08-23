@@ -277,6 +277,15 @@ struct CharacterDetailView: View {
     @State private var animeography: [MALDiscoveryService.JikanCharacterAnimeEntry] = []
     @State private var isLoadingAnimeography = false
 
+    /// Collapsible section state — matches the Change Stream UI's card
+    /// pattern. Description and Animeography default to collapsed so the
+    /// page doesn't open with a wall of text. Info and Voice Actors default
+    /// to expanded since they're compact and high-value.
+    @State private var descriptionExpanded = false
+    @State private var infoExpanded = true
+    @State private var voiceActorsExpanded = true
+    @State private var animeographyExpanded = false
+
     private var displayCharacter: AniListCharacter { character ?? edge.node }
 
     var body: some View {
@@ -459,14 +468,50 @@ struct CharacterDetailView: View {
 
     @ViewBuilder
     private func descriptionSection(desc: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Description")
-                .font(.headline)
-            Text(desc.cleanMarkdownAndHTML())
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .lineSpacing(4)
+        // Collapsible card — matches the Change Stream UI's card design.
+        // Collapsed by default since character bios can be very long.
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    descriptionExpanded.toggle()
+                }
+            } label: {
+                HStack {
+                    Image(systemName: "text.alignleft")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    Text("Description")
+                        .font(.headline)
+                    Spacer()
+                    Image(systemName: descriptionExpanded ? "chevron.down" : "chevron.right")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 14)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if descriptionExpanded {
+                Text(desc.cleanMarkdownAndHTML())
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineSpacing(4)
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 14)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(.secondarySystemGroupedBackground))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
         .padding(.horizontal, 16)
     }
 
@@ -616,58 +661,111 @@ struct CharacterDetailView: View {
 
     @ViewBuilder
     private var animeographySection: some View {
-        if !animeography.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Appears In")
-                    .font(.headline)
-                    .padding(.horizontal, 16)
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        ForEach(animeography.indices, id: \.self) { idx in
-                            if let anime = animeography[idx].anime {
-                                NavigationLink {
-                                    AniListDetailView(mediaId: anime.mal_id, preloadedMedia: MALDiscoveryService.shared.mapToMedia(anime))
-                                } label: {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        CachedAsyncImage(urlString: anime.images?.jpg?.large_image_url ?? anime.images?.jpg?.image_url ?? "")
-                                            .aspectRatio(2/3, contentMode: .fill)
-                                            .frame(width: 80, height: 120)
-                                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                                        Text(anime.title ?? "Unknown")
-                                            .font(.caption.weight(.semibold))
-                                            .foregroundStyle(.primary)
-                                            .lineLimit(2)
-                                            .frame(width: 80, alignment: .leading)
-                                        if let role = animeography[idx].role, !role.isEmpty {
-                                            Text(role)
-                                                .font(.system(size: 10, weight: .medium))
-                                                .foregroundStyle(.secondary)
-                                                .lineLimit(1)
-                                        }
-                                    }
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 16)
+        // Collapsible card — matches the Change Stream UI's card design.
+        // Collapsed by default since the animeography list can be long.
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    animeographyExpanded.toggle()
                 }
-            }
-        } else if isLoadingAnimeography {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Appears In")
-                    .font(.headline)
-                    .padding(.horizontal, 16)
-                HStack(spacing: 8) {
-                    ProgressView().scaleEffect(0.8)
-                    Text("Loading appearances…")
-                        .font(.subheadline)
+            } label: {
+                HStack {
+                    Image(systemName: "film.stack")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    Text("Appears In")
+                        .font(.headline)
+                    Spacer()
+                    if !animeography.isEmpty {
+                        Text("\(animeography.count)")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(Color.secondary.opacity(0.15)))
+                    }
+                    Image(systemName: animeographyExpanded ? "chevron.down" : "chevron.right")
+                        .font(.caption.weight(.bold))
                         .foregroundStyle(.secondary)
                 }
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.vertical, 20)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 14)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if animeographyExpanded {
+                if !animeography.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(animeography.indices, id: \.self) { idx in
+                                if let anime = animeography[idx].anime {
+                                    NavigationLink {
+                                        AniListDetailView(mediaId: anime.mal_id, preloadedMedia: MALDiscoveryService.shared.mapToMedia(anime))
+                                    } label: {
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            CachedAsyncImage(urlString: anime.images?.jpg?.large_image_url ?? anime.images?.jpg?.image_url ?? "")
+                                                .aspectRatio(2/3, contentMode: .fill)
+                                                .frame(width: 80, height: 120)
+                                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                            Text(anime.title ?? "Unknown")
+                                                .font(.caption.weight(.semibold))
+                                                .foregroundStyle(.primary)
+                                                .lineLimit(2)
+                                                .frame(width: 80, alignment: .leading)
+                                            if let role = animeography[idx].role, !role.isEmpty {
+                                                Text(role)
+                                                    .font(.system(size: 10, weight: .medium))
+                                                    .foregroundStyle(.secondary)
+                                                    .lineLimit(1)
+                                            }
+                                        }
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.bottom, 14)
+                    }
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                } else if isLoadingAnimeography {
+                    HStack(spacing: 8) {
+                        ProgressView().scaleEffect(0.8)
+                        Text("Loading appearances…")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 20)
+                    .padding(.horizontal, 14)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                } else {
+                    HStack(spacing: 8) {
+                        Image(systemName: "film.stack")
+                            .font(.system(size: 18))
+                            .foregroundStyle(.secondary)
+                        Text("No appearance data available.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 20)
+                    .padding(.horizontal, 14)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
             }
         }
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(.secondarySystemGroupedBackground))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+        .padding(.horizontal, 16)
     }
 
     /// Fetches all anime this character appears in from MAL/Jikan.

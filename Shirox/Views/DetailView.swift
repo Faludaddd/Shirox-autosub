@@ -83,11 +83,18 @@ struct DetailView: View {
                 errorView(error)
             }
         }
-        .overlay(alignment: .bottomTrailing) {
-            BookmarkButton(media: bookmarkMedia, localSource: bookmarkSource)
-                .padding(.trailing, 16)
-                .padding(.bottom, 24)
+        // Collection (Bookmark) button — was previously a floating
+        // `.overlay(alignment: .bottomTrailing)` that overlapped the
+        // episodes header's inversion arrow button when scrolled.
+        // Moved to a fixed toolbar position so it has its own
+        // consistent location at the top of the screen.
+        #if os(iOS)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                BookmarkButton(media: bookmarkMedia, localSource: bookmarkSource)
+            }
         }
+        #endif
     }
 
     private func detailScrollView(detail: MediaDetail) -> some View {

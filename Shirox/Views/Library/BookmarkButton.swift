@@ -22,12 +22,8 @@ struct BookmarkButton: View {
                 showCollections = true
             } label: {
                 Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(isSaved ? Color.accentColor : .primary)
-                    .frame(width: 52, height: 52)
-                    .background(.ultraThinMaterial, in: Circle())
-                    .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
-                    .shadow(color: .black.opacity(0.2), radius: 6, x: 0, y: 3)
             }
             .buttonStyle(.plain)
             .adaptiveSheet(isPresented: $showCollections) {

@@ -16,39 +16,51 @@ struct StaffSection: View {
     @State private var isExpanded = false
 
     var body: some View {
-        Group {
-            if !staff.isEmpty {
-                VStack(alignment: .leading, spacing: 12) {
-                    sectionHeader
-                    if isExpanded {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 12) {
-                                ForEach(staff.indices, id: \.self) { idx in
-                                    staffCard(staff[idx])
-                                }
+        // Always render the section header so the user can see Staff
+        // exists (even when staff is empty after a failed fetch).
+        // Previously the entire section vanished when staff was empty,
+        // making it look like Staff had been removed from the page.
+        VStack(alignment: .leading, spacing: 12) {
+            sectionHeader
+            if isExpanded {
+                if !staff.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(staff.indices, id: \.self) { idx in
+                                staffCard(staff[idx])
                             }
-                            .padding(.horizontal, 16)
                         }
+                        .padding(.horizontal, 16)
                     }
-                }
-                .padding(.top, 8)
-            } else if isLoading {
-                VStack(alignment: .leading, spacing: 12) {
-                    sectionHeader
-                    if isExpanded {
-                        HStack(spacing: 8) {
-                            ProgressView().scaleEffect(0.8)
-                            Text("Loading staff…")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.vertical, 20)
+                } else if isLoading {
+                    HStack(spacing: 8) {
+                        ProgressView().scaleEffect(0.8)
+                        Text("Loading staff…")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                     }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 20)
+                } else if didFetch {
+                    // Loading completed but staff is empty — could be
+                    // (a) the anime has no staff data on MAL/Jikan, or
+                    // (b) the MAL id couldn't be resolved. Either way,
+                    // show a clean empty state so the section doesn't
+                    // look broken.
+                    HStack(spacing: 8) {
+                        Image(systemName: "person.crop.rectangle.stack")
+                            .font(.system(size: 18))
+                            .foregroundStyle(.secondary)
+                        Text("No staff data available for this title.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 20)
                 }
-                .padding(.top, 8)
             }
         }
+        .padding(.top, 8)
         .task {
             if !didFetch { await loadStaff() }
         }

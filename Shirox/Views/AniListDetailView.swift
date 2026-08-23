@@ -227,11 +227,6 @@ struct AniListDetailView: View {
 
     private var navContent: AnyView {
         AnyView(navTitled
-        .overlay(alignment: .bottomTrailing) {
-            BookmarkButton(media: vm.media)
-                .padding(.trailing, 16)
-                .padding(.bottom, 24)
-        }
         #if os(iOS)
         .toolbar {
             // Both Modules and Edit Entry on the TRAILING (right) side.
@@ -242,6 +237,14 @@ struct AniListDetailView: View {
                 ModuleSelectorMenu(mediaType: .anime)
             }
             ToolbarItem(placement: .topBarTrailing) { editToolbarButton }
+            // Collection (Bookmark) button — was previously a floating
+            // `.overlay(alignment: .bottomTrailing)` that overlapped the
+            // episodes header's inversion arrow button when scrolled.
+            // Moved to a fixed toolbar position so it has its own
+            // consistent location at the top of the screen.
+            ToolbarItem(placement: .topBarTrailing) {
+                BookmarkButton(media: vm.media)
+            }
         }
         #endif
         .navigationDestinationCompat(item: $sequelMediaId) { id in

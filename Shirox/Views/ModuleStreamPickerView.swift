@@ -400,6 +400,26 @@ struct ModuleStreamPickerView: View {
                 Text("\(visibleModules.count) available")
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.secondary)
+
+                // Settings button — opens the existing Modules Settings page
+                // (where the user can install / remove / reorder modules).
+                // Uses the same custom design language as the rest of the
+                // Change Stream UI: 36×36 ultraThinMaterial circle with a
+                // 15%-opacity strokeBorder. Subtle scale-up on press.
+                #if os(iOS)
+                NavigationLink {
+                    ModulesSettingsPage()
+                } label: {
+                    Image(systemName: "gearshape.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 36, height: 36)
+                        .background(.ultraThinMaterial, in: Circle())
+                        .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .simultaneousGesture(TapGesture().onEnded { Haptics.light() })
+                #endif
             }
             .padding(.horizontal, 4)
 
@@ -456,12 +476,26 @@ struct ModuleStreamPickerView: View {
                             onSelect: {
                                 Haptics.light()
                                 withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                    selectedModuleId = module.id
+                                    // TOGGLE — was previously a one-way "set"
+                                    // (always assigned module.id, never
+                                    // collapsed). Now: tapping a selected
+                                    // module collapses it; tapping a different
+                                    // module expands it. Multiple modules
+                                    // stay independent because only one
+                                    // selectedModuleId is set at a time.
+                                    if selectedModuleId == module.id {
+                                        selectedModuleId = nil
+                                    } else {
+                                        selectedModuleId = module.id
+                                    }
                                 }
-                                // Kick off search on first selection.
-                                let vm = vmStore.get(for: module, mediaId: mediaId, animeTitle: animeTitle, episodeNumber: episodeNumber)
-                                if case .idle = vm.state {
-                                    vm.startFind()
+                                // Kick off search on first expansion.
+                                // If we're collapsing, no need to start a search.
+                                if selectedModuleId == module.id {
+                                    let vm = vmStore.get(for: module, mediaId: mediaId, animeTitle: animeTitle, episodeNumber: episodeNumber)
+                                    if case .idle = vm.state {
+                                        vm.startFind()
+                                    }
                                 }
                             },
                             onStreamSelected: { stream, allStreams, href, count, episodeHref in

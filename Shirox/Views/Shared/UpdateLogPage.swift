@@ -99,6 +99,24 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "1.83",
+        date: "2026-08-23",
+        added: [
+            "Module Settings icon — added a gear-shaped settings button to the top-right of the Change Stream UI's Modules header. Tapping it opens the existing Module Settings page (where you install/remove/reorder modules). Uses the same custom card design language as the rest of the Change Stream UI — 36×36 ultraThinMaterial circle with a subtle border."
+        ],
+        fixed: [
+            "Module expand/collapse bug — once a module was expanded in the Change Stream UI, tapping it again wouldn't collapse it. Root cause: the code always set selectedModuleId to the module's ID, never toggled it. Now tapping a selected module collapses it; tapping a different module switches to it. Multiple modules maintain independent states.",
+            "Staff section disappearing — the Staff section between Characters and Recommendations on the anime detail page would vanish entirely when staff data was empty (e.g. Jikan returned no results). Root cause: the section only rendered when staff was non-empty, so a failed/empty fetch made it look like Staff had been removed. Now the Staff header always renders; if staff data is empty after loading, a clean 'No staff data available' message appears inside the expanded section.",
+            "Collection icon floating — the bookmark/collection icon was a floating overlay on the bottom-right of the anime detail page, which overlapped the episode sort/invert arrow button when scrolled. Moved to a fixed toolbar position at the top of the screen alongside the Modules and Edit Entry buttons. Consistent positioning across Anime detail pages."
+        ],
+        changed: [
+            "Character Details UI upgraded — Description and 'Appears In' (animeography) sections now use collapsible cards matching the Change Stream UI's design language (rounded corners, subtle shadow, accent border, chevron toggle). Description defaults to collapsed since character bios can be very long. Each card has an icon, title, count badge, and expand/collapse chevron."
+        ],
+        improved: [],
+        removed: [],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "1.82",
         date: "2026-08-23",
         added: [],
