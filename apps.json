@@ -32,7 +32,7 @@
           "date": "2026-08-23",
           "localizedDescription": "Added: Storage Management page (Settings → Storage) — see download sizes and bulk-delete.\nAdded: Per-Show Playback Settings — player remembers your speed per anime. Settings → Streaming has clear instructions.\nAdded: Module Health Indicators — colored status dots on each module (green/yellow/red/orange).\nAdded: Episode Release Notifications UI — toggles now have descriptive subtitles.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 11040520,
+          "size": 11266562,
           "minOSVersion": "15.0"
         },
         {
