@@ -32,7 +32,7 @@
           "date": "2026-08-23",
           "localizedDescription": "Added: Custom Long Action UI — long-press an anime poster to see a custom action sheet with poster, title, score, and action cards (Add to Planning, Add to Watching, Mark as Completed). Matches the Change Stream UI design. No more Apple default context menu.\nAdded: Collapsible Player Settings — Source, Quality, Audio, Subtitles, and Playback Speed are now hidden behind a single toggle button. Main controls (Fullscreen, Next Episode) stay visible.\nChanged: Blue is now the default theme (was red).\nChanged: Random Anime (Surprise Me) now uses genres — picks 4 random genres and fetches ~150-200 titles (was ~60 from 3 fixed categories). Much harder to exhaust.\nFixed: Player portrait title too small — increased from 14pt to 20pt.\nRemoved: Duplicate Apply Filter bar in Search — only one Apply button now.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 11040520,
+          "size": 11238910,
           "minOSVersion": "15.0"
         },
         {
