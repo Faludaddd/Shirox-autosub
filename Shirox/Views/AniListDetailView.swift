@@ -416,15 +416,15 @@ struct AniListDetailView: View {
                     title: media.title.displayTitle,
                     imageUrl: media.coverImage.best ?? "",
                     total: total,
+                    onAnimeRangeSelected: { numbers in
+                        selectedEpisodeNumbers = numbers
+                        showBatchDownloadPicker = true
+                    },
                     isEpisodeDownloaded: { ep in
                         DownloadManager.shared.items.contains {
                             $0.aniListID == media.id && $0.episodeNumber == ep
                                 && $0.state == .completed
                         }
-                    },
-                    onAnimeRangeSelected: { numbers in
-                        selectedEpisodeNumbers = numbers
-                        showBatchDownloadPicker = true
                     }
                 )
             }

@@ -257,7 +257,6 @@ struct DownloadRangePickerView: View {
                     .font(.system(size: 28, weight: .heavy, design: .rounded))
                     .foregroundStyle(.primary)
                     .frame(minWidth: 50)
-                    .contentTransition(.numericText())
 
                 Button {
                     Haptics.light()

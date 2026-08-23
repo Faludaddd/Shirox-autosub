@@ -198,32 +198,40 @@ struct MangaDetailView: View {
             }
         }
         .adaptiveSheet(isPresented: $showDownloadRangePicker) {
-            if let detail = vm.detail {
-                let visible = liveChapters(for: detail)
-                let total = max(1, visible.count)
-                DownloadRangePickerView(
-                    contentType: .manga,
-                    title: detail.title,
-                    imageUrl: detail.image,
-                    total: total,
-                    chapters: visible,
-                    isChapterDownloaded: { href in
-                        mangaDownloads.items.contains {
-                            $0.mangaHref == item.href && $0.chapterHref == href
-                                && $0.state == .completed
-                        }
-                    },
-                    onMangaRangeSelected: { chapters in
-                        let ctx = downloadContext(detail)
-                        mangaDownloads.batchDownload(chapters: chapters, context: ctx)
-                    }
-                )
-            }
+            mangaDownloadRangeSheet
         }
         #endif
     }
 
     // MARK: - Edit sheets (extracted to keep type-checker happy)
+
+    #if os(iOS)
+    /// Download range sheet — extracted to keep the type-checker happy.
+    @ViewBuilder
+    private var mangaDownloadRangeSheet: some View {
+        if let detail = vm.detail {
+            let visible = liveChapters(for: detail)
+            let total = max(1, visible.count)
+            DownloadRangePickerView(
+                contentType: .manga,
+                title: detail.title,
+                imageUrl: detail.image,
+                total: total,
+                onMangaRangeSelected: { chapters in
+                    let ctx = downloadContext(detail)
+                    mangaDownloads.batchDownload(chapters: chapters, context: ctx)
+                },
+                chapters: visible,
+                isChapterDownloaded: { href in
+                    mangaDownloads.items.contains {
+                        $0.mangaHref == item.href && $0.chapterHref == href
+                            && $0.state == .completed
+                    }
+                }
+            )
+        }
+    }
+    #endif
 
     @ViewBuilder
     private func aniListEditSheet(aid: Int, detail: MangaDetail) -> some View {
