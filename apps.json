@@ -32,7 +32,7 @@
           "date": "2026-08-23",
           "localizedDescription": "Added: Module Settings icon in the Change Stream UI — tap the gear button to open the existing Module Settings page.\nFixed: Module expand/collapse bug — tapping a module now properly toggles it open/closed (was one-way: once open, couldn't close).\nFixed: Staff section disappearing from anime detail page when staff data was empty — now always shows the header with a clean empty state inside.\nFixed: Collection (bookmark) icon floating over the episode sort button — moved to a fixed toolbar position at the top of the screen.\nChanged: Character Details UI upgraded — Description and 'Appears In' sections now use collapsible cards matching the Change Stream UI design.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 11040520,
+          "size": 11218178,
           "minOSVersion": "15.0"
         },
         {
