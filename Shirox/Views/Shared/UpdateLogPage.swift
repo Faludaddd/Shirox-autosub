@@ -97,6 +97,26 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "1.80",
+        date: "2026-08-23",
+        added: [],
+        fixed: [
+            "Watching anime — tapping an episode now opens the manual module and stream picker. Previously the app automatically picked a module and tried to auto-play the best stream, which was hitting Cloudflare blocks and leaving you unable to watch. Now you choose the module, then choose the stream, then playback starts.",
+            "Change Stream button — long-press an episode and tap Change Stream now opens the same manual picker so you can pick a different module and stream. Previously this button did nothing useful because the auto-pick flow had already committed to a stream."
+        ],
+        changed: [
+            "Episode tap flow restored to the original manual workflow — Click Episode → Choose Module → Choose Stream → Watch. Long-press → Change Stream → Choose Module → Choose Stream → Watch. No automatic module or stream selection anywhere in the process."
+        ],
+        improved: [],
+        removed: [
+            "Auto Pick Module feature — completely removed. The app no longer automatically selects a module or auto-plays a stream when you tap an episode.",
+            "Auto-pick Last Stream toggle — removed from Settings → Streaming.",
+            "Auto-pick Last Search Result toggle — removed from Settings → Streaming.",
+            "Use Default Extension Only toggle — removed from Settings → Search. The module picker now always shows every installed anime module so you can pick whichever one you want."
+        ],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "1.79",
         date: "2026-08-23",
         added: [],

@@ -885,15 +885,10 @@ struct AniListDetailView: View {
         }()
         let label = item != nil && !item!.streamUrl.isEmpty ? "Continue Ep \(nextEp)" : "Watch Ep \(nextEp)"
 
-        // The button UI is decoupled from `vm.isResolving`. The button is
-        // ALWAYS rendered immediately with the play icon + label, so the
-        // user can see and tap it the moment they open an episode. Background
-        // stream resolution kicks off when the user TAPS the button — the
-        // loading state then happens inside the player flow (a Toast shows
-        // "Loading streams…" via the existing watch flow), NOT on the button
-        // itself. Tapping an episode in the list no longer flips the Watch
-        // button into a "Loading…" spinner; the button stays steady and
-        // interactive while the resolve happens off-screen.
+        // The Watch button always renders immediately and opens the
+        // manual module-and-stream picker — no auto-resolve, no loading
+        // spinner on the button itself. Stream/module selection happens
+        // in the picker sheet that opens on tap.
         Button {
             if let item {
                 resumeWatching(item: item)

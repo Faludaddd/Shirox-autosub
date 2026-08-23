@@ -250,14 +250,12 @@ final class DetailViewModel: ObservableObject {
                 let streams = try await JSEngine.shared.fetchStreams(episodeUrl: episode.href)
                 guard !Task.isCancelled else { return }
                 let sorted = streams.sorted { $0.title < $1.title }
+                // Single stream → it's the only choice, auto-select it.
+                // Multiple streams → ALWAYS show the manual picker. No
+                // "auto-pick last stream" shortcut — the user must
+                // explicitly choose which stream to play.
                 if sorted.count == 1 {
                     pendingStream = sorted[0]
-                    showStreamPicker = false
-                } else if UserDefaults.standard.bool(forKey: "autoPickLastStream"),
-                          let moduleId = ModuleManager.shared.activeModule?.id,
-                          let savedTitle = ModuleSearchAliasManager.shared.getLastStreamTitle(moduleId: moduleId),
-                          let match = sorted.first(where: { $0.title == savedTitle }) {
-                    pendingStream = match
                     showStreamPicker = false
                 } else {
                     streamOptions = sorted
@@ -322,18 +320,13 @@ final class DetailViewModel: ObservableObject {
                 let sorted = streams.sorted { $0.title < $1.title }
                 isLoadingStreams = false
 
-                let autoPickLastStream = UserDefaults.standard.bool(forKey: "autoPickLastStream")
-                let moduleId = ModuleManager.shared.activeModule?.id ?? ""
-                let savedTitle = ModuleSearchAliasManager.shared.getLastStreamTitle(moduleId: moduleId)
-
+                // Single stream → it's the only choice, auto-select it.
+                // Multiple streams → ALWAYS show the manual picker. No
+                // "auto-pick last stream" shortcut — the user must
+                // explicitly choose which stream to download.
                 if sorted.count == 1 {
                     pendingStreams = sorted
                     downloadWithSelectedStream(sorted[0])
-                } else if autoPickLastStream,
-                          let title = savedTitle,
-                          let match = sorted.first(where: { $0.title == title }) {
-                    pendingStreams = sorted
-                    downloadWithSelectedStream(match)
                 } else {
                     pendingStreams = sorted
                     showDownloadStreamPicker = true

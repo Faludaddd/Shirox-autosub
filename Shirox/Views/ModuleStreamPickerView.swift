@@ -25,14 +25,13 @@ struct ModuleStreamPickerView: View {
     let onStreamsLoaded: ([StreamResult], StreamResult?, String?, Int?, String?) -> Void  // allStreams, selectedStream, showHref, availableCount, episodeHref
 
     @EnvironmentObject private var moduleManager: ModuleManager
-    @AppStorage("useDefaultExtension") private var useDefaultExtension = false
     @StateObject private var vmStore = ModuleStreamVMStore()
 
+    /// Always show every installed anime module — no hidden filtering,
+    /// no "use default extension only" toggle. The user manually picks
+    /// which module to search against.
     private var visibleModules: [ModuleDefinition] {
-        if useDefaultExtension, let active = moduleManager.activeModule {
-            return [active]
-        }
-        return moduleManager.modules
+        moduleManager.modules
     }
 
     var body: some View {
@@ -152,16 +151,10 @@ private final class ModuleStreamRowViewModel: ObservableObject {
     func startFind() {
         guard case .idle = state else { return }
         persistSearchTitle()
-        let lastUsed = UserDefaults.standard.string(forKey: "lastUsedModuleId")
-        let isPreferred = lastUsed != nil ? lastUsed == module.id : ModuleManager.shared.activeModule?.id == module.id
-        if UserDefaults.standard.bool(forKey: "autoPickLastSearchResult"),
-           isPreferred,
-           let savedHref = ModuleSearchAliasManager.shared.getLastSearchResultHref(
-               mediaId: mediaId, animeTitle: originalAnimeTitle, moduleId: module.id) {
-            currentTask = Task { await findFast(savedHref: savedHref) }
-        } else {
-            currentTask = Task { await find() }
-        }
+        // Always run a fresh search — no fast-path skipping via the
+        // saved search-result href. The user explicitly opened the
+        // picker, so they want to see live results from the module.
+        currentTask = Task { await find() }
     }
 
     func startSelectResult(_ item: SearchItem, targetEpisodeNumber: Int) {
@@ -189,50 +182,6 @@ private final class ModuleStreamRowViewModel: ObservableObject {
     private func seasonOffset() async -> Int {
         guard let mediaId else { return 0 }
         return await SeasonChainMapper.shared.resolveOffset(anchorAniListID: mediaId, anchorMALID: nil) ?? 0
-    }
-
-    // Fast path: skip search entirely, go straight to episodes using the saved href.
-    // Falls back to full search if the href no longer works.
-    func findFast(savedHref: String) async {
-        state = .loading
-        readyStreams = nil
-
-        let r = ModuleJSRunner()
-        runner = r
-
-        do {
-            try await r.load(module: module)
-            var episodes = try await r.fetchEpisodes(url: savedHref)
-            if episodes.isEmpty {
-                try await Task.sleep(nanoseconds: 800_000_000)
-                if Task.isCancelled { return }
-                episodes = try await r.fetchEpisodes(url: savedHref)
-            }
-            availableCount = episodes.count
-            currentSearchResultHref = savedHref
-
-            if let matched = matchEpisode(from: episodes, target: targetEpisodeNumber, seasonOffset: await seasonOffset()) {
-                state = .loadingStreams
-                selectedEpisodeHref = savedHref
-                selectedEpisodeActualHref = matched.href
-                let streams = try await r.fetchStreams(episodeUrl: matched.href)
-                if streams.isEmpty {
-                    settle(.error("No streams found for episode \(targetEpisodeNumber)"))
-                } else {
-                    readyStreams = streams
-                }
-            } else {
-                // Saved result doesn't contain the target episode (wrong series entry or stale href).
-                // Clear the bad saved href and fall back to full search.
-                ModuleSearchAliasManager.shared.setLastSearchResultHref(
-                    mediaId: mediaId, animeTitle: originalAnimeTitle, moduleId: module.id, href: "")
-                await find()
-            }
-        } catch {
-            if (error as? CancellationError) != nil { return }
-            // Stale href — fall back to full search
-            await find()
-        }
     }
 
     func find() async {
@@ -401,7 +350,6 @@ private struct ModuleStreamRow: View {
     @ObservedObject var rowVm: ModuleStreamRowViewModel
     @State private var showAllResults = false
     @State private var showStreamPicker = false
-    @AppStorage("autoPickLastStream") private var autoPickLastStream = false
 
     init(
         module: ModuleDefinition,
@@ -417,11 +365,6 @@ private struct ModuleStreamRow: View {
         self.episodeNumber = episodeNumber
         self.onStreamsLoaded = onStreamsLoaded
         self._rowVm = ObservedObject(wrappedValue: rowVm)
-    }
-
-    private var isPreferredModule: Bool {
-        let lastUsed = UserDefaults.standard.string(forKey: "lastUsedModuleId")
-        return lastUsed != nil ? lastUsed == module.id : ModuleManager.shared.activeModule?.id == module.id
     }
 
     private func fireStreamsLoaded(_ streams: [StreamResult], selected: StreamResult?, href: String?, count: Int?, episodeHref: String?) {
@@ -444,13 +387,12 @@ private struct ModuleStreamRow: View {
         .onChangeOf(rowVm.readyStreams) { streams in
             guard let streams else { return }
 
+            // Single stream → it's the only choice, auto-select it.
+            // Multiple streams → ALWAYS show the manual picker. No
+            // "auto-pick last stream" shortcut — the user must
+            // explicitly choose which stream to play.
             if streams.count == 1 {
                 fireStreamsLoaded(streams, selected: streams[0], href: rowVm.selectedEpisodeHref, count: rowVm.availableCount, episodeHref: rowVm.selectedEpisodeActualHref)
-            } else if autoPickLastStream,
-               isPreferredModule,
-               let savedTitle = ModuleSearchAliasManager.shared.getLastStreamTitle(moduleId: module.id),
-               let match = streams.first(where: { $0.title == savedTitle }) {
-                fireStreamsLoaded(streams, selected: match, href: rowVm.selectedEpisodeHref, count: rowVm.availableCount, episodeHref: rowVm.selectedEpisodeActualHref)
             } else {
                 showStreamPicker = true
             }

@@ -94,7 +94,7 @@ enum SettingsSearchIndex {
         .init("Picture-in-Picture", aliases: ["pip", "floating video", "mini player"], category: "Playback", page: .pip, anchor: "pip", icon: "pip.fill"),
         .init("Auto-Pause on Interruption", aliases: ["pause on call", "pause on alarm", "audio interruption"], category: "Playback", page: .pip, anchor: "autoPauseInterruption", icon: "pause.circle.fill"),
         .init("Auto-Pause on Control Center", aliases: ["control centre", "control center", "pause on swipe", "cc pause"], category: "Playback", page: .pip, anchor: "autoPauseControlCenter", icon: "pause.circle.fill"),
-        .init("Streaming", aliases: ["auto pick stream", "watched percentage", "stream picker"], category: "Playback", page: .streaming, anchor: "streaming", icon: "antenna.radiowaves.left.and.right"),
+        .init("Streaming", aliases: ["watched percentage", "stream picker"], category: "Playback", page: .streaming, anchor: "streaming", icon: "antenna.radiowaves.left.and.right"),
 
         // Subtitles
         .init("Subtitles", aliases: ["captions", "subs", "subtitle style"], category: "Subtitles", page: .subtitles, anchor: "subtitles", icon: "captions.bubble.fill"),

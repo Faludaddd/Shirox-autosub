@@ -1105,7 +1105,7 @@ struct PlaybackSettingsPage: View {
                 NavigationLink {
                     StreamingSettingsPage()
                 } label: {
-                    SettingsCategoryRow(icon: "dot.radiowaves.left.and.right", title: "Streaming", subtitle: "Auto-pick, progress")
+                    SettingsCategoryRow(icon: "dot.radiowaves.left.and.right", title: "Streaming", subtitle: "Progress threshold")
                 }
             }
         }
@@ -1565,17 +1565,11 @@ struct PiPSettingsPage: View {
 // MARK: - 9. Streaming Settings Page
 
 struct StreamingSettingsPage: View {
-    @AppStorage("autoPickLastStream") private var autoPickLastStream = false
-    @AppStorage("autoPickLastSearchResult") private var autoPickLastSearchResult = false
     @AppStorage("watchedPercentage") private var watchedPercentage: Double = 90.0
 
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                PlaybackSettingsCard(title: "Auto-Pick") {
-                    Toggle("Auto-pick Last Stream", isOn: $autoPickLastStream)
-                    Toggle("Auto-pick Last Search Result", isOn: $autoPickLastSearchResult)
-                }
                 PlaybackSettingsCard(title: "Progress Tracking") {
                     HStack {
                         Text("Progress Threshold")
@@ -2069,15 +2063,8 @@ struct NotificationsSettingsPage: View {
 // MARK: - Search Settings Page
 
 struct SearchSettingsPage: View {
-    @AppStorage("useDefaultExtension") private var useDefaultExtension = false
-    @EnvironmentObject private var moduleManager: ModuleManager
-
     var body: some View {
         Form {
-            Section("Search") {
-                Toggle("Use Default Extension Only", isOn: $useDefaultExtension)
-                    .disabled(moduleManager.activeModule == nil)
-            }
             Section {
                 Text("Live search is always enabled. Results appear as you type with a 500ms delay.")
                     .font(.caption)
