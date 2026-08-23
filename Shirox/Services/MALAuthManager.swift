@@ -239,7 +239,17 @@ final class MALAuthManager: NSObject, ObservableObject {
 
     /// Refresh the access token if it is expired/near-expiry, or unconditionally when `force`.
     /// Concurrent callers share a single in-flight refresh.
+    /// If the user is not logged in (no refresh token), throws immediately
+    /// without attempting a network call — prevents "token refresh failed:
+    /// unauthenticated" spam for users who never signed in with MAL.
     private func refreshIfNeeded(force: Bool) async throws {
+        // Short-circuit: if there's no refresh token at all, the user
+        // never signed in with MAL. Don't attempt a refresh — just throw
+        // unauthenticated immediately. This prevents the repeated
+        // "[MAL] token refresh failed: unauthenticated" log spam.
+        guard refreshToken != nil else {
+            throw ProviderError.unauthenticated
+        }
         if !force, let expiry = tokenExpiry, expiry.timeIntervalSinceNow > 60 { return }
         if let task = refreshTask {
             try await task.value

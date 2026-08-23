@@ -99,6 +99,23 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "1.98",
+        date: "2026-08-23",
+        added: [],
+        fixed: [
+            "Jikan 502/504 fallback failures — Jikan's fetchList and fetchSingle now retry once after 3 seconds on 5xx errors (was: immediately throw). Also increased 429 backoff from 1s to 2s to reduce repeated rate-limit rejections when multiple fallback calls fire in quick succession.",
+            "MAL token refresh spam for unauthenticated users — refreshIfNeeded now short-circuits immediately if there's no refresh token (user never signed in with MAL). Was previously attempting a network call that always failed with 'unauthenticated', logging the error every time.",
+            "Search manga fallback — manga search now falls back to Jikan when AniList is unavailable. Previously only the Home and Schedule had fallback; Search had none."
+        ],
+        changed: [],
+        improved: [
+            "Jikan fallback logging — all Jikan 5xx retries are now logged with the endpoint path and status code, making it easy to trace which requests are failing.",
+            "Backoff/retry limits — Jikan fetchList/fetchSingle retry at most once (was: unlimited for 429, none for 5xx). Prevents tight retry loops when Jikan is also down."
+        ],
+        removed: [],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "1.97",
         date: "2026-08-23",
         added: [],

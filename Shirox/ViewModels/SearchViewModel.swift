@@ -109,8 +109,17 @@ final class SearchViewModel: ObservableObject {
                     if isMangaMode {
                         // Manga mode: always use AniList MANGA endpoints so
                         // anime results never appear in Reading Mode.
-                        let mangaMedia = try await AniListService.shared.mangaSearch(keyword: q)
-                        res = mangaMedia.map { AniListProvider.shared.mapMangaMedia($0) }
+                        // If AniList is disabled/rate-limited, fall back to
+                        // Jikan's manga search.
+                        if AniListService.shared.isApiDisabled() || AniListService.shared.isRateLimited() {
+                            Logger.shared.log("[Search] AniList unavailable — falling back to Jikan manga search", type: "Info")
+                            let jikanResults = try await MALDiscoveryService.shared.fetchList("manga",
+                                queryItems: [URLQueryItem(name: "q", value: q), URLQueryItem(name: "limit", value: "25")])
+                            res = jikanResults.map { MALDiscoveryService.shared.mapToMedia($0) }
+                        } else {
+                            let mangaMedia = try await AniListService.shared.mangaSearch(keyword: q)
+                            res = mangaMedia.map { AniListProvider.shared.mapMangaMedia($0) }
+                        }
                     } else if activeProvider == .mal {
                         let raw = try await MALProvider.shared.search(q)
                         res = applyMALClientFilters(raw)

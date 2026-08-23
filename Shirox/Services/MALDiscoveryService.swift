@@ -72,10 +72,21 @@ final class MALDiscoveryService {
         if let http = response as? HTTPURLResponse {
             if http.statusCode == 429 {
                 if retrying { throw ProviderError.serverError(429) }
-                try await Task.sleep(nanoseconds: 1_000_000_000)
+                // Jikan rate limit: 3 req/sec, 60 req/min.
+                // Back off 2s before retrying (was 1s — too aggressive,
+                // caused repeated 429s when multiple fallback calls fire
+                // in quick succession).
+                try await Task.sleep(nanoseconds: 2_000_000_000)
                 return try await fetchList(path, queryItems: queryItems, retrying: true)
             }
-            if http.statusCode >= 500 { throw ProviderError.serverError(http.statusCode) }
+            if http.statusCode >= 500 {
+                if retrying { throw ProviderError.serverError(http.statusCode) }
+                // 502/503/504 — Jikan's backend is temporarily down.
+                // Retry once after 3s (was: immediately throw).
+                Logger.shared.log("[Jikan] \(path) returned \(http.statusCode) — retrying once after 3s", type: "Warning")
+                try await Task.sleep(nanoseconds: 3_000_000_000)
+                return try await fetchList(path, queryItems: queryItems, retrying: true)
+            }
         }
         var seen = Set<Int>()
         return try JSONDecoder().decode(JikanPage<JikanAnime>.self, from: data).data.filter {
@@ -91,10 +102,15 @@ final class MALDiscoveryService {
         if let http = response as? HTTPURLResponse {
             if http.statusCode == 429 {
                 if retrying { throw ProviderError.serverError(429) }
-                try await Task.sleep(nanoseconds: 1_000_000_000)
+                try await Task.sleep(nanoseconds: 2_000_000_000)
                 return try await fetchSingle(path, retrying: true)
             }
-            if http.statusCode >= 500 { throw ProviderError.serverError(http.statusCode) }
+            if http.statusCode >= 500 {
+                if retrying { throw ProviderError.serverError(http.statusCode) }
+                Logger.shared.log("[Jikan] \(path) returned \(http.statusCode) — retrying once after 3s", type: "Warning")
+                try await Task.sleep(nanoseconds: 3_000_000_000)
+                return try await fetchSingle(path, retrying: true)
+            }
         }
         return try JSONDecoder().decode(JikanSingle<JikanAnime>.self, from: data).data
     }
