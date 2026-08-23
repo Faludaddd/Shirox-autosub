@@ -32,7 +32,7 @@
           "date": "2026-08-23",
           "localizedDescription": "Fixed: Library alignment — Grid/List toggle moved back into filter row so it aligns with Sort capsule. Was in nav bar causing drift.\nFixed: Auto Pick Module now actually works — when ON, automatically selects module + stream using priority list and quality preferences. No Change Stream UI shown. Falls back through modules in order. Detailed logging added.\nWhen Auto Pick is OFF (default), manual workflow is unchanged.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 11040520,
+          "size": 11412308,
           "minOSVersion": "15.0"
         },
         {
