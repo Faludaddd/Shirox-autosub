@@ -305,13 +305,36 @@ struct LibraryView: View {
 
     @ViewBuilder
     private var filterCapsuleRow: some View {
-        // All filter controls uniformly left-aligned. No internal padding
-        // — callers provide padding via listRowInsets or external .padding.
+        // All filter controls in one HStack. Grid/List toggle is included
+        // here (after a Spacer) so it shares alignment context with the
+        // Sort capsule. This fixes the structural mismatch where the grid
+        // toggle was in the nav bar (ToolbarItem) and the Sort dropdown
+        // was in the content area — they could never visually align.
         HStack(spacing: LibraryDS.controlSpacing) {
             statusFilterCapsule
             sortCapsule
             Spacer()
+            gridToggleCapsule
         }
+    }
+
+    /// Grid/List toggle capsule — moved back into the filter row so it
+    /// aligns with the Sort capsule. Was previously in the nav bar
+    /// toolbar, which caused alignment drift between List/Grid modes.
+    @ViewBuilder
+    private var gridToggleCapsule: some View {
+        Button {
+            isGridLayout.toggle()
+            Haptics.light()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: isGridLayout ? "list.bullet" : "square.grid.2x2")
+                    .font(.system(size: LibraryDS.pillIconSize, weight: .semibold))
+            }
+            .libraryCapsuleStyle()
+        }
+        .buttonStyle(.plain)
+        .fixedSize(horizontal: true, vertical: false)
     }
 
     /// Status filter capsule — uses the shared `.libraryCapsuleStyle()`
@@ -530,21 +553,10 @@ struct LibraryView: View {
 
     @ToolbarContentBuilder
     private var libraryToolbar: some ToolbarContent {
-        #if os(iOS)
-        // Grid/list toggle — on the TRAILING (right) side, next to the
-        // profile button. Both are in separate ToolbarItems so SwiftUI
-        // renders them as two independent buttons with proper spacing.
-        ToolbarItem(placement: .topBarTrailing) {
-            Button {
-                isGridLayout.toggle()
-            } label: {
-                Image(systemName: isGridLayout ? "list.bullet" : "square.grid.2x2")
-                    .font(.system(size: 17, weight: .medium))
-            }
-        }
-        #endif
-        // Profile / Sign-In button — also on the trailing side, after the
-        // grid toggle. So the order is: [grid toggle] [profile] on the right.
+        // Grid/list toggle removed from toolbar — now in filterCapsuleRow
+        // so it aligns with the Sort capsule. This fixes the structural
+        // alignment mismatch between List and Grid modes.
+        // Profile / Sign-In button — on the trailing side.
         ToolbarItem(placement: .topBarTrailing) {
             if isActiveProviderAuthenticated {
                 HStack(spacing: 10) {

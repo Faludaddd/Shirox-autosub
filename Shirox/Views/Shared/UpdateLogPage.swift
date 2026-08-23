@@ -99,6 +99,22 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "1.95",
+        date: "2026-08-23",
+        added: [],
+        fixed: [
+            "Library alignment — moved the Grid/List toggle back into the filter row (filterCapsuleRow) so it shares alignment context with the Sort capsule. Was previously in the nav bar toolbar, which caused structural alignment drift between List/Grid modes. Now both controls are in the same HStack with consistent padding.",
+            "Auto Pick Module functionality — when Auto Pick is ON, tapping an episode now runs the full automatic selection process: reads the module priority list, tries each module in order, searches for the anime, fetches episodes, matches the target episode, fetches streams, selects the best stream based on quality preference, and starts playback directly. No Change Stream UI is shown. If all modules fail, shows a clear error toast. Detailed logging for every step."
+        ],
+        changed: [],
+        improved: [],
+        removed: [],
+        other: [
+            "When Auto Pick is OFF (default), the normal manual workflow is completely unchanged: Episode → Change Stream UI → Choose Module → Choose Stream → Watch.",
+            "Auto Pick respects: module priority list, preferred quality (Auto/1080p/720p/480p), skip unavailable modules, and reports module health status."
+        ]
+    ),
+    UpdateLogEntry(
         version: "1.94",
         date: "2026-08-23",
         added: [],

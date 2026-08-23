@@ -129,13 +129,226 @@ final class AniListDetailViewModel: ObservableObject {
         isLoading = false
     }
 
-    /// Opens the manual module-and-stream picker for the given episode.
-    /// No automatic module selection, no automatic stream selection —
-    /// the user picks the module, then picks the stream, then playback
-    /// starts. This is the original manual workflow restored.
+    /// When Auto Pick Module is ON, bypasses the Change Stream UI and
+    /// automatically selects a module + stream using the user's configured
+    /// priority list and preferences. When OFF (default), opens the manual
+    /// Change Stream UI as before.
     func watchEpisode(_ number: Int) {
         selectedEpisodeNumber = number
-        showStreamPicker = true
+
+        let autoPickEnabled = UserDefaults.standard.bool(forKey: "autoPickModuleTesting")
+        if autoPickEnabled {
+            // Auto Pick: run the automatic selection process.
+            // No Change Stream UI is shown.
+            Task { await autoPickAndPlay(episode: number) }
+        } else {
+            // Manual: open the Change Stream UI.
+            showStreamPicker = true
+        }
+    }
+
+    /// Auto Pick — automatically selects a module and stream using the
+    /// user's configured priority list and preferences. Tries modules
+    /// in priority order; for each module, searches, fetches episodes,
+    /// matches the target episode, fetches streams, selects the best
+    /// stream based on quality preferences, and starts playback.
+    /// If all modules fail, shows an error toast.
+    private func autoPickAndPlay(episode: Int) async {
+        guard let media else {
+            await MainActor.run {
+                ToastManager.shared.show(
+                    title: "Auto Pick",
+                    message: "Media not loaded yet — try again in a moment.",
+                    icon: "exclamationmark.triangle.fill",
+                    iconColor: .orange)
+            }
+            return
+        }
+
+        let preferredQuality = UserDefaults.standard.string(forKey: "autoPickPreferredQuality") ?? "Auto"
+        let preferredAudio = UserDefaults.standard.string(forKey: "autoPickPreferredAudio") ?? "Auto"
+        let modulePriority = UserDefaults.standard.stringArray(forKey: "autoPickModulePriority") ?? []
+        let skipUnavailable = UserDefaults.standard.bool(forKey: "autoPickSkipUnavailable")
+
+        Logger.shared.log("[AutoPick] Started — EP \(episode) — \(media.title.displayTitle)", type: "Info")
+        Logger.shared.log("[AutoPick] Quality: \(preferredQuality) | Audio: \(preferredAudio)", type: "Info")
+        Logger.shared.log("[AutoPick] Priority: \(modulePriority.joined(separator: " → "))", type: "Info")
+
+        // Build the module list — use priority list if set, otherwise all anime modules.
+        let manager = ModuleManager.shared
+        let allAnimeModules = manager.modules.filter { !$0.isManga && !$0.isNovel && !$0.isLocalPlayback && !$0.isJellyfin }
+        let orderedModules: [ModuleDefinition] = {
+            if modulePriority.isEmpty {
+                return allAnimeModules
+            }
+            // Map IDs to modules, keeping only existing ones.
+            return modulePriority.compactMap { id in
+                allAnimeModules.first { $0.id == id }
+            } + allAnimeModules.filter { !modulePriority.contains($0.id) } // append any not in priority list
+        }()
+
+        guard !orderedModules.isEmpty else {
+            await MainActor.run {
+                ToastManager.shared.show(
+                    title: "Auto Pick",
+                    message: "No anime modules installed. Install a module from Module Store.",
+                    icon: "exclamationmark.triangle.fill",
+                    iconColor: .red)
+            }
+            return
+        }
+
+        let searchTitle = ModuleSearchAliasManager.shared.getAlias(
+            mediaId: media.id, animeTitle: media.title.searchTitle, moduleId: orderedModules[0].id
+        ) ?? media.title.searchTitle
+
+        for module in orderedModules {
+            // Skip unhealthy modules if the option is enabled.
+            if skipUnavailable, let health = manager.health(for: module) {
+                if health.status == .error || health.status == .blocked {
+                    Logger.shared.log("[AutoPick] Skipping \(module.sourceName) — status: \(health.status.rawValue)", type: "Info")
+                    continue
+                }
+            }
+
+            Logger.shared.log("[AutoPick] Trying module: \(module.sourceName)", type: "Info")
+
+            // Ensure the module is active.
+            if manager.activeModule?.id != module.id {
+                _ = await manager.selectAndAwaitReady(module)
+            }
+
+            let runner = ModuleJSRunner()
+            do {
+                try await runner.load(module: module)
+
+                // Search for the anime.
+                var results = try await runner.search(keyword: searchTitle)
+                if results.isEmpty {
+                    try? await Task.sleep(nanoseconds: 800_000_000)
+                    if Task.isCancelled { return }
+                    results = try await runner.search(keyword: searchTitle)
+                }
+
+                guard !results.isEmpty else {
+                    Logger.shared.log("[AutoPick] \(module.sourceName) — no search results", type: "Info")
+                    manager.reportFailure(for: module.id, error: "No search results")
+                    continue
+                }
+
+                let ordered = SearchResultMatcher.ranked(
+                    query: media.title.searchTitle, items: results, title: { $0.title })
+                let match = ordered.first!
+                Logger.shared.log("[AutoPick] \(module.sourceName) — matched: \(match.title)", type: "Info")
+
+                // Fetch episodes.
+                let episodes = try await runner.fetchEpisodes(url: match.href)
+                guard !episodes.isEmpty else {
+                    Logger.shared.log("[AutoPick] \(module.sourceName) — no episodes", type: "Info")
+                    manager.reportFailure(for: module.id, error: "No episodes")
+                    continue
+                }
+
+                // Match the target episode.
+                let targetDouble = Double(episode)
+                let matched: EpisodeLink? = episodes.first(where: { $0.number == targetDouble })
+                    ?? episodes.first(where: { round($0.number) == targetDouble })
+                guard let epLink = matched else {
+                    Logger.shared.log("[AutoPick] \(module.sourceName) — episode \(episode) not found", type: "Info")
+                    manager.reportFailure(for: module.id, error: "Episode not found")
+                    continue
+                }
+
+                // Fetch streams.
+                let streams = try await runner.fetchStreams(episodeUrl: epLink.href)
+                guard !streams.isEmpty else {
+                    Logger.shared.log("[AutoPick] \(module.sourceName) — no streams for EP \(episode)", type: "Info")
+                    manager.reportFailure(for: module.id, error: "No streams")
+                    continue
+                }
+
+                Logger.shared.log("[AutoPick] \(module.sourceName) returned \(streams.count) streams", type: "Info")
+
+                // Select the best stream based on quality preference.
+                let selectedStream = selectBestStream(streams, preferredQuality: preferredQuality)
+                Logger.shared.log("[AutoPick] Selected: \(selectedStream.title)", type: "Info")
+
+                // Remember the alias + href.
+                ModuleSearchAliasManager.shared.setLastSearchResultHref(
+                    mediaId: media.id, animeTitle: media.title.searchTitle,
+                    moduleId: module.id, href: match.href)
+
+                manager.reportSuccess(for: module.id)
+                manager.selectModule(module)
+
+                // Start playback!
+                Logger.shared.log("[AutoPick] Starting playback — \(module.sourceName) / \(selectedStream.title)", type: "Info")
+
+                await MainActor.run {
+                    self.onStreamsLoaded(streams.sorted { $0.title < $1.title },
+                                        selectedStream: selectedStream,
+                                        episodeHref: match.href,
+                                        availableCount: episodes.count,
+                                        actualEpisodeHref: epLink.href)
+                }
+                return
+
+            } catch {
+                if (error as? CancellationError) != nil { return }
+                Logger.shared.log("[AutoPick] \(module.sourceName) failed — \(error.localizedDescription)", type: "Error")
+                manager.reportFailure(for: module.id, error: error.localizedDescription)
+                continue
+            }
+        }
+
+        // All modules failed.
+        Logger.shared.log("[AutoPick] All eligible modules failed — playback unavailable", type: "Error")
+        await MainActor.run {
+            ToastManager.shared.show(
+                title: "Auto Pick",
+                message: "Couldn't find a playable stream. All modules failed.",
+                icon: "exclamationmark.triangle.fill",
+                iconColor: .red)
+        }
+    }
+
+    /// Selects the best stream from a list based on the user's preferred quality.
+    private func selectBestStream(_ streams: [StreamResult], preferredQuality: String) -> StreamResult {
+        let sorted = streams.sorted { $0.title < $1.title }
+
+        if preferredQuality == "Auto" || preferredQuality.isEmpty {
+            // Auto: prefer HLS, then highest quality.
+            let hls = sorted.filter { $0.url.absoluteString.contains(".m3u8") }
+            let pool = hls.isEmpty ? sorted : hls
+            return pickByQualityScore(pool) ?? sorted[0]
+        }
+
+        // Try to find an exact match.
+        let lower = preferredQuality.lowercased()
+        if let match = sorted.first(where: { $0.title.lowercased().contains(lower) }) {
+            return match
+        }
+
+        // Fallback: prefer HLS, then highest quality.
+        let hls = sorted.filter { $0.url.absoluteString.contains(".m3u8") }
+        let pool = hls.isEmpty ? sorted : hls
+        return pickByQualityScore(pool) ?? sorted[0]
+    }
+
+    private func pickByQualityScore(_ streams: [StreamResult]) -> StreamResult? {
+        func qualityScore(_ title: String) -> Int {
+            let l = title.lowercased()
+            if l.contains("1080") { return 100 }
+            if l.contains("720") { return 80 }
+            if l.contains("480") { return 60 }
+            if l.contains("360") { return 40 }
+            return 50
+        }
+        return streams.sorted { a, b in
+            let qa = qualityScore(a.title)
+            let qb = qualityScore(b.title)
+            return qa != qb ? qa > qb : a.title < b.title
+        }.first
     }
 
     func dismissModulePicker() {
