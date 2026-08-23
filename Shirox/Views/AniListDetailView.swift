@@ -705,6 +705,7 @@ struct AniListDetailView: View {
                 // collapsible (the section renders its own header with a
                 // chevron — collapsed by default).
                 CharactersSection(mediaId: media.id, isManga: false,
+                                  malId: media.idMal,
                                   preloaded: vm.characters)
                     .frame(maxWidth: .infinity)
                     .padding(.top, 20)

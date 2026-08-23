@@ -15,6 +15,10 @@ import SwiftUI
 struct CharactersSection: View {
     let mediaId: Int
     let isManga: Bool
+    /// Optional MAL ID — when the parent already has it (from the AniList
+    /// detail fetch's `idMal` field), pass it in to avoid re-fetching the
+    /// full media detail just to read `idMal`. Used by `loadJikanCharacters()`.
+    var malId: Int? = nil
     /// Optional preloaded characters — when the parent already has them
     /// (e.g. anime detail fetches them as part of the main query), pass
     /// them in to avoid a second network call.
@@ -185,19 +189,21 @@ struct CharactersSection: View {
     /// character images (not manga images) and includes about text.
     private func loadJikanCharacters() async {
         do {
-            // We need the MAL ID. Try to get it from the AniList media's idMal,
-            // or from IDMappingService if not directly available.
-            let raw: AniListMedia
-            raw = try await AniListService.shared.detail(id: mediaId)
-
-            let malId = raw.idMal ?? 0
-            guard malId > 0 else {
+            // Use the MAL ID passed in from the parent (avoids re-fetching
+            // the full AniList detail just to read idMal). If not available,
+            // fall back to IDMappingService cache, then to a detail fetch
+            // only as a last resort.
+            var resolvedMalId = malId
+            if resolvedMalId == nil || resolvedMalId == 0 {
+                resolvedMalId = IDMappingService.shared.cachedMalId(forAnilistId: mediaId)
+            }
+            guard let finalMalId = resolvedMalId, finalMalId > 0 else {
                 // No MAL ID — fall back to AniList characters
                 await loadAniListCharacters()
                 return
             }
 
-            let edges = try await MALDiscoveryService.shared.characters(malId: malId)
+            let edges = try await MALDiscoveryService.shared.characters(malId: finalMalId)
             // Convert Jikan edges to AniListCharacterEdge for display
             fetchedCharacters = edges.compactMap { edge in
                 guard let char = edge.character else { return nil }

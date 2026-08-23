@@ -99,6 +99,24 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "1.88",
+        date: "2026-08-23",
+        added: [],
+        fixed: [
+            "Glow leaks — 4 episode/chapter row badge shadows (EpisodeRowView, ThumbnailEpisodeRow, MangaDetailView, AniListMangaDetailView) were not gated by the Glow setting. Now when Glow is OFF, no glow is visible on these badges. When ON, the glow appears only on the number circle (not on text).",
+            "Duplicate AniList API request — CharactersSection was re-fetching the full anime detail from AniList just to read the MAL ID (for Jikan character lookup). Now accepts the MAL ID from the parent view, eliminating the duplicate request. Falls back to IDMappingService cache, then to a detail fetch only as a last resort."
+        ],
+        changed: [],
+        improved: [],
+        removed: [
+            "CustomActionSheet.swift — 185 lines of dead code. Was created in v1.84 for the custom Long Action UI but became unused after the v1.85 revert. Zero references in the codebase.",
+            "DownloadModulePickerView.swift dead code — ~420 lines of unused DownloadVMStore, DownloadModuleRow, DownloadModuleRowViewModel, SearchResultCard, and SearchResultsPickerSheet. The file now delegates to ModuleStreamPickerView (since v1.87) and no longer needs these old implementations."
+        ],
+        other: [
+            "Download retry backoff — failed downloads now wait with exponential backoff (2s, 4s, 8s, 16s, 32s) before retrying instead of retrying immediately. Prevents hammering a flaky server during transient outages. Up to 5 retries still allowed."
+        ]
+    ),
+    UpdateLogEntry(
         version: "1.87",
         date: "2026-08-23",
         added: [

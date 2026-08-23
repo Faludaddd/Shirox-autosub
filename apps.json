@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "1.88",
+          "buildVersion": "1",
+          "date": "2026-08-23",
+          "localizedDescription": "Final polish pass.\n\nFixed: 4 glow leaks on episode/chapter row badges — now properly gated by the Glow setting.\nFixed: Duplicate AniList API request in CharactersSection — now uses the MAL ID from the parent instead of re-fetching.\nRemoved: 605 lines of dead code (CustomActionSheet.swift + DownloadModulePickerView old implementations).\nImproved: Download retry now uses exponential backoff (2s→4s→8s→16s→32s) instead of retrying immediately.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 11040520,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.87",
           "buildVersion": "1",
           "date": "2026-08-23",

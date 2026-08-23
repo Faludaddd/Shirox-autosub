@@ -869,12 +869,19 @@ final class DownloadManager: NSObject, ObservableObject {
     private func updateError(_ id: UUID, _ error: Error) {
         if let idx = items.firstIndex(where: { $0.id == id }) {
             let item = items[idx]
-            
+
             if shouldAutoRetry(error: error, item: item) {
                 items[idx].state = .pending
                 items[idx].retryCount += 1
                 persist()
-                processQueue()
+                // Exponential backoff — wait before retrying so we don't
+                // hammer a flaky server. Delay = 2^retryCount seconds (2s,
+                // 4s, 8s, 16s, 32s). Was previously immediate.
+                let delay = UInt64(min(32, Int(pow(2.0, Double(item.retryCount)))) * 1_000_000_000)
+                Task {
+                    try? await Task.sleep(nanoseconds: delay)
+                    await MainActor.run { self.processQueue() }
+                }
             } else {
                 items[idx].state = .failed
                 items[idx].error = error.localizedDescription

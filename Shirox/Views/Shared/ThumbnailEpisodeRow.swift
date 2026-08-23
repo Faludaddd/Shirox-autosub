@@ -86,8 +86,8 @@ struct ThumbnailEpisodeRow: View {
                                     .foregroundStyle(adaptiveBackground)
                             }
                         }
-                        .shadow(color: (isComplete ? Color.green : Color.primary).opacity(0.3),
-                                radius: 4, y: 2)
+                        .shadow(color: Color.glowEnabled ? (isComplete ? Color.green : Color.primary).opacity(0.3) : .clear,
+                                radius: Color.glowEnabled ? 4 : 0, y: 2)
                     }
                 }
 

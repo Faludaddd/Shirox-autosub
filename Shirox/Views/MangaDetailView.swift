@@ -982,8 +982,8 @@ private struct MangaChapterRowView: View {
                                 .frame(width: 34)
                         }
                     }
-                    .shadow(color: (isRead ? Color.green : Color.primary).opacity(0.3),
-                            radius: 4, y: 2)
+                    .shadow(color: Color.glowEnabled ? (isRead ? Color.green : Color.primary).opacity(0.3) : .clear,
+                            radius: Color.glowEnabled ? 4 : 0, y: 2)
 
                     Text(chapter.displayName)
                         .font(.callout.weight(.medium))
