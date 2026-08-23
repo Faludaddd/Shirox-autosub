@@ -1865,40 +1865,8 @@ struct NotificationsSettingsPage: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Divider().opacity(0.4)
-            Toggle(isOn: $episodeReminders) {
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "calendar.badge.clock")
-                            .font(.caption)
-                            .foregroundStyle(Color.appAccent)
-                        Text("Episode Reminders")
-                    }
-                    Text("Sends a phone notification when a new episode of an anime you're tracking is about to air.")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .tint(Color.appAccent)
-            .glowEffect(isOn: episodeReminders)
-            .disabled(!phoneNotificationsEnabled)
-            Toggle(isOn: $airingNotifications) {
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "tv.fill")
-                            .font(.caption)
-                            .foregroundStyle(Color.appAccent)
-                        Text("Airing Notifications")
-                    }
-                    Text("Shows in-app alerts for upcoming episodes in the Schedule tab, even for anime you haven't tracked yet.")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .tint(Color.appAccent)
-            .glowEffect(isOn: airingNotifications)
-            .disabled(!phoneNotificationsEnabled)
+            episodeRemindersToggle
+            airingNotificationsToggle
             Text("Reminders fire before an episode airs based on the timing setting below. Requires an AniList account and a connected schedule.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -1908,6 +1876,46 @@ struct NotificationsSettingsPage: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.secondary.opacity(0.08),
                     in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private var episodeRemindersToggle: some View {
+        Toggle(isOn: $episodeReminders) {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Image(systemName: "calendar.badge.clock")
+                        .font(.caption)
+                        .foregroundStyle(Color.appAccent)
+                    Text("Episode Reminders")
+                }
+                Text("Sends a phone notification when a new episode of an anime you're tracking is about to air.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .tint(Color.appAccent)
+        .glowEffect(isOn: episodeReminders)
+        .disabled(!phoneNotificationsEnabled)
+    }
+
+    private var airingNotificationsToggle: some View {
+        Toggle(isOn: $airingNotifications) {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Image(systemName: "tv.fill")
+                        .font(.caption)
+                        .foregroundStyle(Color.appAccent)
+                    Text("Airing Notifications")
+                }
+                Text("Shows in-app alerts for upcoming episodes in the Schedule tab, even for anime you haven't tracked yet.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .tint(Color.appAccent)
+        .glowEffect(isOn: airingNotifications)
+        .disabled(!phoneNotificationsEnabled)
     }
 
     // MARK: - Status
