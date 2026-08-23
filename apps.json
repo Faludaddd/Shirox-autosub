@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "1.92",
+          "buildVersion": "1",
+          "date": "2026-08-23",
+          "localizedDescription": "Added: Auto Pick Module Settings page with module priority tier list, preferred quality/audio/subtitles/stream type, fallback settings, and collapsible sections. Clearly marked as Experimental — disabled by default.\nChanged: Search History is now its own section — no longer shown under search results. Surprise Me becomes a small icon in the history header.\nThe normal manual workflow (Episode → Choose Module → Choose Stream → Watch) is unchanged.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 11040520,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.91",
           "buildVersion": "1",
           "date": "2026-08-23",

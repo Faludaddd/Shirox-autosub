@@ -609,6 +609,10 @@
                 F5A6B7C8D9E10000000000A4 /* AnimatedSplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5A6B7C8D9E10000000000A1 /* AnimatedSplashView.swift */; };
                 F5A6B7C8D9E10000000000A5 /* AnimatedSplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5A6B7C8D9E10000000000A1 /* AnimatedSplashView.swift */; };
                 5DBA399346D44632AFA516CA /* EpisodeNotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08ACB6FE07C044C1B7F17A79 /* EpisodeNotificationManager.swift */; };
+                2EE60A7AD751434CA25B596F /* AutoPickSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DB5DFADBFD9442B81C23272 /* AutoPickSettingsPage.swift */; };
+                3CB9242832FA47589FA59C8B /* AutoPickSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DB5DFADBFD9442B81C23272 /* AutoPickSettingsPage.swift */; };
+                792599532786413B9DA5A6E0 /* AutoPickSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DB5DFADBFD9442B81C23272 /* AutoPickSettingsPage.swift */; };
+                B0283CD248B6434486AFA593 /* AutoPickSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DB5DFADBFD9442B81C23272 /* AutoPickSettingsPage.swift */; };
                 FF862A30CCC14407A05749B2 /* PerShowPlaybackStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EC52AC9B6624738B27DD4A7 /* PerShowPlaybackStore.swift */; };
                 323F31A5964B4EB7B5CFEF4D /* PerShowPlaybackStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EC52AC9B6624738B27DD4A7 /* PerShowPlaybackStore.swift */; };
                 17A9B63C75AE45AD893D9D5E /* PerShowPlaybackStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EC52AC9B6624738B27DD4A7 /* PerShowPlaybackStore.swift */; };
@@ -949,6 +953,7 @@
                 FF4C00BAA407FF400B069044 /* JellyfinEntryView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JellyfinEntryView.swift; sourceTree = "<group>"; };
                 F5A6B7C8D9E10000000000A1 /* AnimatedSplashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimatedSplashView.swift; sourceTree = "<group>"; };
                 08ACB6FE07C044C1B7F17A79 /* EpisodeNotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpisodeNotificationManager.swift; sourceTree = "<group>"; };
+                5DB5DFADBFD9442B81C23272 /* AutoPickSettingsPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoPickSettingsPage.swift; sourceTree = "<group>"; };
                 3EC52AC9B6624738B27DD4A7 /* PerShowPlaybackStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerShowPlaybackStore.swift; sourceTree = "<group>"; };
                 2EBB2ADA20A14B00AF5D265F /* WesternScheduleService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WesternScheduleService.swift; sourceTree = "<group>"; };
                 EE6B60FF705A43CDBF491F0D /* UnifiedScheduleEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnifiedScheduleEntry.swift; sourceTree = "<group>"; };
@@ -1142,6 +1147,7 @@
                                 502A361F951FADB9DF23CCD0 /* MangaDownloadManager.swift */,
                                 4071A0ACA228C759CA67D5A0 /* QuickActions.swift */,
                                 08ACB6FE07C044C1B7F17A79 /* EpisodeNotificationManager.swift */,
+                                5DB5DFADBFD9442B81C23272 /* AutoPickSettingsPage.swift */,
                                 3EC52AC9B6624738B27DD4A7 /* PerShowPlaybackStore.swift */,
                                 2EBB2ADA20A14B00AF5D265F /* WesternScheduleService.swift */,
                                 180EA8BB63D54E6BBFCE8E9A /* AppModeManager.swift */,
@@ -1624,6 +1630,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 7E6DF30054A1D49BC766BE2C /* QuickActionTests.swift in Sources */,
                                 A2E73FF64F5BF85131459E21 /* AniListMangaMappingTests.swift in Sources */,
                                 E773D105F15D4C35841EAF17 /* EpisodeNotificationManager.swift in Sources */,
+                                2EE60A7AD751434CA25B596F /* AutoPickSettingsPage.swift in Sources */,
                                 FF862A30CCC14407A05749B2 /* PerShowPlaybackStore.swift in Sources */,
                                 56B1E902977343B29817FB44 /* WesternScheduleService.swift in Sources */,
                                 700DD5E4768C45EA97E32DF5 /* UnifiedScheduleEntry.swift in Sources */,
@@ -2053,7 +2060,8 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 29AEA9ECF2AA67DA60ACDF3D /* QuickActions.swift in Sources */,
        
                                 17A9B63C75AE45AD893D9D5E /* PerShowPlaybackStore.swift in Sources */,                         0A068DEF85EA1222AA997713 /* AniListMangaDetailView.swift in Sources */,
-                                9FA5C9CD2EC5426A8BB78E75 /* EpisodeNotificationManager.swift in Sources */,
+     
+                                3CB9242832FA47589FA59C8B /* AutoPickSettingsPage.swift in Sources */,                           9FA5C9CD2EC5426A8BB78E75 /* EpisodeNotificationManager.swift in Sources */,
                                 95C25DAC86AF4BA0B0FEAEB4 /* WesternScheduleService.swift in Sources */,
                                 120D5A334EC34F5A911BA904 /* UnifiedScheduleEntry.swift in Sources */,
                                 0D4809DF63374C11B0FBC113 /* TransparentNavBarModifier.swift in Sources */,
@@ -2267,7 +2275,8 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 A8965890C2900C21FC367D26 /* MangaDownloadManager.swift in Sources */,
                                 E72AA30BC01A4EFE9E6292F6 /* PerShowPlaybackStore.swift in Sources */,
                                 269BF42A2BD9270EB60582E7 /* QuickActions.swift in Sources */,
-                                11B06136CDF5130E68376E06 /* AniListMangaDetailView.swift in Sources */,
+       
+                                792599532786413B9DA5A6E0 /* AutoPickSettingsPage.swift in Sources */,                         11B06136CDF5130E68376E06 /* AniListMangaDetailView.swift in Sources */,
                                 5DBA399346D44632AFA516CA /* EpisodeNotificationManager.swift in Sources */,
                                 765B06A87D874A1092B2124E /* WesternScheduleService.swift in Sources */,
                                 F58FADB80A5F4E56A917A770 /* UnifiedScheduleEntry.swift in Sources */,
@@ -2331,7 +2340,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "@executable_path/Frameworks",
                                 );
                                 LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                                MARKETING_VERSION = 1.91;
+                                MARKETING_VERSION = 1.92;
                                 PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
                                 PRODUCT_NAME = "$(TARGET_NAME)";
                                 SDKROOT = appletvos;
@@ -2366,7 +2375,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "@executable_path/Frameworks",
                                 );
                                 LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                                MARKETING_VERSION = 1.91;
+                                MARKETING_VERSION = 1.92;
                                 PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
                                 PRODUCT_NAME = "$(TARGET_NAME)";
                                 SDKROOT = appletvos;
@@ -2483,7 +2492,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "$(inherited)",
                                         "@executable_path/Frameworks",
                                 );
-                                MARKETING_VERSION = 1.91;
+                                MARKETING_VERSION = 1.92;
                                 PRODUCT_NAME = shirox;
                                 PROVISIONING_PROFILE_SPECIFIER = "";
                                 SDKROOT = iphoneos;
@@ -2529,7 +2538,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "@executable_path/../Frameworks",
                                 );
                                 MACOSX_DEPLOYMENT_TARGET = 14.0;
-                                MARKETING_VERSION = 1.91;
+                                MARKETING_VERSION = 1.92;
                                 PRODUCT_NAME = shirox;
                                 SDKROOT = macosx;
                                 SUPPORTS_MACCATALYST = NO;
@@ -2555,7 +2564,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "$(inherited)",
                                         "@executable_path/Frameworks",
                                 );
-                                MARKETING_VERSION = 1.91;
+                                MARKETING_VERSION = 1.92;
                                 PRODUCT_NAME = shirox;
                                 PROVISIONING_PROFILE_SPECIFIER = "";
                                 SDKROOT = iphoneos;
@@ -2646,7 +2655,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "@executable_path/../Frameworks",
                                 );
                                 MACOSX_DEPLOYMENT_TARGET = 14.0;
-                                MARKETING_VERSION = 1.91;
+                                MARKETING_VERSION = 1.92;
                                 PRODUCT_NAME = shirox;
                                 SDKROOT = macosx;
                                 SUPPORTS_MACCATALYST = NO;

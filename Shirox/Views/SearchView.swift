@@ -187,25 +187,33 @@ struct SearchView: View {
             JellyfinEntryView()
         } else if isLocalModule {
             localEntryView
-        } else if !vm.hasResults && !vm.isLoading && !vm.hasSearched {
-            if vm.query.isEmpty && !history.queries.isEmpty {
-                historyView
+        } else if vm.hasResults || vm.isLoading || vm.hasSearched || !vm.query.isEmpty {
+            // Active search state — show results, loading, or error.
+            // History is NOT shown underneath results.
+            if vm.isLoading {
+                loadingView
+            } else if let err = vm.errorMessage {
+                emptyStateView(
+                    icon: "exclamationmark.triangle",
+                    title: "Something went wrong",
+                    subtitle: err
+                )
+            } else if !vm.hasResults && !vm.query.isEmpty {
+                ContentUnavailableView.search(text: vm.query)
+            } else if vm.hasResults {
+                resultsView
             } else {
-                // Items 17+18: Recommendations + Surprise Me in empty state
+                // hasSearched but no results and empty query — show empty state
                 searchEmptyState
             }
-        } else if vm.isLoading {
-            loadingView
-        } else if let err = vm.errorMessage {
-            emptyStateView(
-                icon: "exclamationmark.triangle",
-                title: "Something went wrong",
-                subtitle: err
-            )
-        } else if !vm.hasResults && !vm.query.isEmpty {
-            ContentUnavailableView.search(text: vm.query)
+        } else if vm.query.isEmpty && !history.queries.isEmpty {
+            // History section — its own state. Shows previous searches
+            // with a small Surprise Me icon instead of the big button.
+            historyView
         } else {
-            resultsView
+            // Fresh empty state — no history, no search yet.
+            // Shows recommendations + big Surprise Me button.
+            searchEmptyState
         }
     }
 
@@ -400,6 +408,9 @@ struct SearchView: View {
     }
 
     // MARK: - History View
+    /// Search History section — its own state, shown when the query is
+    /// empty and there are previous searches. Includes a small Surprise Me
+    /// icon in the header instead of the big button.
     private var historyView: some View {
         List {
             Section {
@@ -424,9 +435,22 @@ struct SearchView: View {
                     #endif
                 }
             } header: {
-                HStack {
+                HStack(spacing: 10) {
                     Text("Recent Searches")
                     Spacer()
+                    // Small Surprise Me icon — fits naturally in the
+                    // history header. Performs the same surpriseMe()
+                    // function as the big button.
+                    Button {
+                        surpriseMe()
+                    } label: {
+                        Image(systemName: "shuffle.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundStyle(Color.appAccent)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isSurpriseLoading)
+                    .help("Surprise Me")
                     Button("Clear All") { history.clear() }
                         .font(.caption)
                         .textCase(nil)

@@ -1643,6 +1643,22 @@ struct StreamingSettingsPage: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+
+                    NavigationLink {
+                        AutoPickSettingsPage()
+                            .environmentObject(moduleManager)
+                    } label: {
+                        HStack {
+                            Text("Auto Pick Settings")
+                                .font(.subheadline.weight(.semibold))
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                        .foregroundStyle(Color.appAccent)
+                    }
+                    .buttonStyle(.plain)
                 }
 
                 PlaybackSettingsCard(title: "Progress Tracking") {

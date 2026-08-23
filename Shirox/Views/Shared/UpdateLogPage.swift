@@ -99,6 +99,27 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "1.92",
+        date: "2026-08-23",
+        added: [
+            "Auto Pick Module Settings page (Settings → Streaming → Advanced → Auto Pick Settings) — experimental settings with collapsible sections for Module Priority, Quality Preferences, Audio & Subtitles, Fallback Settings, and Advanced. Clearly marked as Experimental with a purple banner. Disabled by default.",
+            "Module Priority tier list — add/remove/reorder anime modules to set the priority order (#1 → #2 → #3 → #4). The app tries modules in this order when Auto Pick or Auto-Fallback is enabled. Shows module health status (green/yellow/red/orange dot) next to each module in the list. Includes a Reset Priority button.",
+            "Preferred Quality setting (Auto, 1080p, 720p, 480p, Highest, Lowest) — Auto Pick considers this when choosing which stream to select.",
+            "Preferred Audio setting (Auto, Japanese, English) — falls back to the next available if the preferred option isn't available.",
+            "Preferred Subtitles setting (Auto, English, None) — same fallback behavior.",
+            "Preferred Stream Type setting (Auto, Direct/MP4, Embedded/HLS).",
+            "Additional Auto Pick preferences: Skip Unavailable Modules, Use Fallback Modules, Prefer Higher Quality, Remember Selection Per Anime. All organized in collapsible sections."
+        ],
+        fixed: [],
+        changed: [
+            "Search History reworked — history is now its own section/state. When the user is actively viewing search results, history is no longer shown underneath. History appears only when the query is empty and no search has been performed. Tapping a previous search performs it again.",
+            "Surprise Me in History — the large Surprise Me button is replaced with a small shuffle icon in the history section header. The icon disappears when leaving the history section (e.g., when viewing search results). No duplicate Surprise Me buttons."
+        ],
+        improved: [],
+        removed: [],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "1.91",
         date: "2026-08-23",
         added: [
