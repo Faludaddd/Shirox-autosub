@@ -93,6 +93,8 @@ struct UpdateLogEntry {
     let fixed: [String]
     let changed: [String]
     let improved: [String]
+    let removed: [String]
+    let other: [String]
 }
 
 private let logEntries: [UpdateLogEntry] = [
@@ -131,7 +133,9 @@ private let logEntries: [UpdateLogEntry] = [
         changed: [
             "Glow effects — removed from regular text-heavy buttons. The 'Surprise Me' button (SearchView), 'Remove All Pending' button (Notifications settings), 'Export Backup' button (Backup & Restore), and the module-store 'Install' button no longer cast a glow shadow — their labels read cleanly without the halo. Intentional glow on Modules (active module tile + active module list row), Sources (connected provider icons), the MangaHome layout/direction selector cards, the HomePressStyle card-press feedback, the Notification status circle, and all Toggle-on glow effects is preserved unchanged."
         ],
-        improved: []
+        improved: [],
+        removed: [],
+        other: []
     ),
     UpdateLogEntry(
         version: "1.51",
@@ -148,7 +152,9 @@ private let logEntries: [UpdateLogEntry] = [
         changed: [],
         improved: [
             "Provider fallback log deduplication — identical 'fallback not authenticated' messages are throttled to once per 30 seconds."
-        ]
+        ],
+        removed: [],
+        other: []
     ),
     UpdateLogEntry(
         version: "1.43",
@@ -164,7 +170,9 @@ private let logEntries: [UpdateLogEntry] = [
         changed: [],
         improved: [
             "AniList API requests now log the GraphQL operation name, variables, HTTP status, and response body on errors — so you can send the log back and I can identify the exact cause."
-        ]
+        ],
+        removed: [],
+        other: []
     ),
     UpdateLogEntry(
         version: "1.42",
@@ -176,7 +184,9 @@ private let logEntries: [UpdateLogEntry] = [
             "Chapter/episode invert and reset buttons are now 46×46 — same size as all other action buttons. Previously they were 36×32 (manga) and 36×32 (anime), smaller than the rest."
         ],
         changed: [],
-        improved: []
+        improved: [],
+        removed: [],
+        other: []
     ),
     UpdateLogEntry(
         version: "1.41",
@@ -193,7 +203,9 @@ private let logEntries: [UpdateLogEntry] = [
             "Removed dead 'openEntryDetail' function from LibraryView — was defined but never called.",
             "Manga chapters section header no longer has a download/selection-mode button — it's now in the action-button row above (matching anime)."
         ],
-        improved: []
+        improved: [],
+        removed: [],
+        other: []
     ),
     UpdateLogEntry(
         version: "1.40",
@@ -208,7 +220,9 @@ private let logEntries: [UpdateLogEntry] = [
         changed: [
             "Removed 'View on AniList' from the long-press context menu on Home and Library, for both anime and manga. The option remains in the Continue Watching / Continue Reading sections unchanged. Other context menu options (Add to Planning, Add to Watching/Reading, Mark as Completed) are unchanged."
         ],
-        improved: []
+        improved: [],
+        removed: [],
+        other: []
     ),
     UpdateLogEntry(
         version: "1.39",
@@ -220,7 +234,9 @@ private let logEntries: [UpdateLogEntry] = [
             "Notification custom UI 400 error — same root cause. AnimeNotificationDetailView calls AniListService.shared.detail(id:) which had the invalid field. Now that the query is fixed, the notification UI loads correctly."
         ],
         changed: [],
-        improved: []
+        improved: [],
+        removed: [],
+        other: []
     ),
     UpdateLogEntry(
         version: "1.38",
@@ -238,7 +254,9 @@ private let logEntries: [UpdateLogEntry] = [
         ],
         improved: [
             "Graceful empty state — if an anime genuinely has no character/recommendation data on AniList, the section renders nothing instead of a broken-looking empty section."
-        ]
+        ],
+        removed: [],
+        other: []
     ),
     UpdateLogEntry(
         version: "1.37",
@@ -260,7 +278,9 @@ private let logEntries: [UpdateLogEntry] = [
         improved: [
             "Surprise Me — no duplicate anime in the same session. Already-shown IDs are tracked and excluded. When the pool is exhausted, the exclusion list resets automatically.",
             "AniList detail request logging — 400 errors now log the response body for diagnosis instead of failing silently."
-        ]
+        ],
+        removed: [],
+        other: []
     ),
     UpdateLogEntry(
         version: "1.36",
@@ -274,7 +294,9 @@ private let logEntries: [UpdateLogEntry] = [
         changed: [
             "Grid/list toggle moved to top-right corner of Library."
         ],
-        improved: []
+        improved: [],
+        removed: [],
+        other: []
     ),
     UpdateLogEntry(
         version: "1.33",
@@ -284,7 +306,9 @@ private let logEntries: [UpdateLogEntry] = [
             "Anime detail pages now show Relations correctly even when the initial detail fetch fails. The Relations tab shows a 'Tap to retry' button instead of a dead-end 'No relations found' message."
         ],
         changed: [],
-        improved: []
+        improved: [],
+        removed: [],
+        other: []
     ),
     UpdateLogEntry(
         version: "1.32",
@@ -296,7 +320,9 @@ private let logEntries: [UpdateLogEntry] = [
         changed: [],
         improved: [
             "Added popularity field to the detail query so the Statistics section shows the Popularity row for all anime."
-        ]
+        ],
+        removed: [],
+        other: []
     ),
     UpdateLogEntry(
         version: "1.31",
@@ -315,7 +341,9 @@ private let logEntries: [UpdateLogEntry] = [
         ],
         improved: [
             "Added in-flight request de-duplication for anime/manga detail pages to prevent cascade into rate-limit."
-        ]
+        ],
+        removed: [],
+        other: []
     ),
     UpdateLogEntry(
         version: "1.30",
@@ -327,7 +355,9 @@ private let logEntries: [UpdateLogEntry] = [
             "Toast X button gesture conflict fixed (separated tap regions)."
         ],
         changed: [],
-        improved: []
+        improved: [],
+        removed: [],
+        other: []
     ),
     UpdateLogEntry(
         version: "1.29",
@@ -342,6 +372,8 @@ private let logEntries: [UpdateLogEntry] = [
         changed: [],
         improved: [
             "Grid toggle moved from navigation toolbar into the filter row."
-        ]
+        ],
+        removed: [],
+        other: []
     )
 ]
