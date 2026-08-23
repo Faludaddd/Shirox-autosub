@@ -117,8 +117,9 @@ extension UIColor {
 
 extension Color {
     /// Resolves the user's custom accent color from UserDefaults, falling back to
-    /// UIColor.systemRed — visible and saturated so toggle glow is perceptible.
-    /// Matches the app's accent color asset (red, ef4444).
+    /// a saturated blue (0A84FF — matches the iOS system blue used by the
+    /// default AccentColor asset). Blue is the new app default; previously
+    /// the fallback was systemRed, but the user explicitly asked for Blue.
     static var appAccent: Color {
         let hex = UserDefaults.standard.string(forKey: "accentColorHex") ?? ""
         let trimmed = hex.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -127,38 +128,28 @@ extension Color {
             return Color(uiColor)
             #endif
         }
+        // Default accent is now blue (0A84FF) — matches the iOS system
+        // blue swatch in Appearance settings. Was previously systemRed.
         #if canImport(UIKit)
-        return Color(UIColor.systemRed)
+        return Color(red: 0.039, green: 0.466, blue: 1.0)
         #else
-        return Color(NSColor.systemRed)
+        return Color(NSColor.systemBlue)
         #endif
     }
 
     /// The foreground color to use ON TOP of a `Color.appAccent` solid fill.
-    /// When a custom accent hex is set, the foreground is white (most custom
-    /// accents are saturated colors that need white text). When falling back
-    /// to `UIColor.label` (near-black in light mode, near-white in dark mode),
-    /// the foreground is the system background (white in light, black in dark)
-    /// so the text is always readable against the accent fill.
+    /// The default accent is now blue (0A84FF), which is saturated enough
+    /// that white text reads cleanly on top of it. Custom accent hexes also
+    /// get white text for the same reason.
     static var appAccentForeground: Color {
-        let hex = UserDefaults.standard.string(forKey: "accentColorHex") ?? ""
-        let trimmed = hex.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty {
-            // Custom accent color → white text on top (custom accents are
-            // typically saturated enough for white to be readable).
-            return .white
-        }
-        // Default: accent is UIColor.label (near-black in light, near-white in
-        // dark). Foreground must be the inverse → systemBackground.
-        #if canImport(UIKit)
-        return Color(UIColor.systemBackground)
-        #else
-        return Color.black
-        #endif
+        // Both the new default blue and any custom hex accent are saturated
+        // enough that white text is readable. Returns .white uniformly.
+        .white
     }
 
     static var scheduleSelectedPill: Color {
-        Color.red
+        // Matches the new default blue accent — was previously Color.red.
+        Color.appAccent
     }
 
     static var glowIntensity: Double {
@@ -238,7 +229,8 @@ struct ShiroxApp: App {
         }
     }
 
-    /// Resolves the user's custom accent color, falling back to the system default.
+    /// Resolves the user's custom accent color, falling back to the new
+    /// default blue (0A84FF). Was previously systemRed.
     private var accentColor: Color {
         let hex = accentColorHex.trimmingCharacters(in: .whitespacesAndNewlines)
         if !hex.isEmpty, let uiColor = UIColor(hex: hex) {
@@ -248,10 +240,11 @@ struct ShiroxApp: App {
             return Color(hex)
             #endif
         }
+        // Default: blue (matches the AccentColor asset).
         #if canImport(UIKit)
-        return Color(UIColor.systemRed)
+        return Color(red: 0.039, green: 0.466, blue: 1.0)
         #else
-        return Color(NSColor.systemRed)
+        return Color(NSColor.systemBlue)
         #endif
     }
 

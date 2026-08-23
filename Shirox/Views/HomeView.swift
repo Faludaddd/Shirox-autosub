@@ -969,6 +969,8 @@ private struct AnimeSectionCard: View {
     let media: Media
     let cardWidth: CGFloat
 
+    @State private var showActionSheet = false
+
     var body: some View {
         NavigationLink {
             AniListDetailView(mediaId: media.id, preloadedMedia: media)
@@ -976,34 +978,49 @@ private struct AnimeSectionCard: View {
             AniListCardView(media: media)
                 .frame(width: cardWidth)
                 .contentShape(Rectangle())
-                .contextMenu {
-                    Button {
-                        Task {
-                            try? await AniListLibraryService.shared.updateEntry(
-                                mediaId: media.id, status: .planning, progress: 0, score: nil)
-                        }
-                    } label: {
-                        Label("Add to Planning", systemImage: "bookmark")
-                    }
-                    Button {
-                        Task {
-                            try? await AniListLibraryService.shared.updateEntry(
-                                mediaId: media.id, status: .current, progress: 0, score: nil)
-                        }
-                    } label: {
-                        Label("Add to Watching", systemImage: "play.circle")
-                    }
-                    Button {
-                        Task {
-                            try? await AniListLibraryService.shared.updateEntry(
-                                mediaId: media.id, status: .completed, progress: 0, score: nil)
-                        }
-                    } label: {
-                        Label("Mark as Completed", systemImage: "checkmark.circle")
-                    }
-                }
         }
         .buttonStyle(HomePressStyle())
+        // Custom long-press gesture — replaces the default .contextMenu with
+        // a custom action sheet that matches the Change Stream UI's design.
+        // Each card has its own @State showActionSheet so gestures are
+        // completely independent (no shared state between cards).
+        .onLongPressGesture(minimumDuration: 0.4) {
+            Haptics.light()
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                showActionSheet = true
+            }
+        }
+        .fullScreenCover(isPresented: $showActionSheet) {
+            CustomActionSheet(
+                media: media,
+                onAddToPlanning: {
+                    Task {
+                        try? await AniListLibraryService.shared.updateEntry(
+                            mediaId: media.id, status: .planning, progress: 0, score: nil)
+                    }
+                },
+                onAddToWatching: {
+                    Task {
+                        try? await AniListLibraryService.shared.updateEntry(
+                            mediaId: media.id, status: .current, progress: 0, score: nil)
+                    }
+                },
+                onMarkCompleted: {
+                    Task {
+                        try? await AniListLibraryService.shared.updateEntry(
+                            mediaId: media.id, status: .completed, progress: 0, score: nil)
+                    }
+                },
+                onDismiss: {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                        showActionSheet = false
+                    }
+                }
+            )
+        }
+        .transaction { transaction in
+            transaction.disablesAnimations = false
+        }
     }
 }
 

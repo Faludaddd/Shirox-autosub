@@ -628,24 +628,22 @@ struct SearchView: View {
         }
     }
 
-    /// Picks a random anime. To avoid hammering AniList with 3 API calls on
-    /// every tap (which causes rate-limiting after ~4 uses), we cache the
-    /// combined trending + popular + top rated pool for 10 minutes. Within
-    /// that window, repeated taps just pick a random item from the cached
-    /// pool — no network request. After 10 minutes, or if the cache is
-    /// empty (first use / cache cleared), we do a single batch fetch and
-    /// cache the result.
+    /// Picks a random anime using a GENRE-BASED pool instead of category-based.
+    /// Was previously fetching trending + popular + top rated (3 fixed
+    /// categories, ~60 titles total — exhausted quickly). Now picks 3-4
+    /// random genres from a curated list and fetches up to 50 titles per
+    /// genre via `browseByGenre`, giving a pool of 150-200 titles.
     ///
-    /// The cache lives on the SearchView type itself (static) so it
-    /// survives view re-creation. It's keyed by media type (anime vs
-    /// manga) so switching modes doesn't mix pools.
+    /// The pool is cached for 10 minutes so repeated taps don't re-fetch.
+    /// If the pool is exhausted (user saw everything), we pick a new random
+    /// set of genres and refresh automatically.
     private func surpriseMe() {
         isSurpriseLoading = true
         Task {
             let now = Date()
             let cacheKey = isMangaMode ? "manga" : "anime"
 
-            // Use cache if it's fresh (< 10 min old) and matches the current mode.
+            // Use cache if it's fresh (< 10 min old) and has unused items.
             let useCache = SearchView.surpriseCache[cacheKey] != nil
                 && now.timeIntervalSince(SearchView.surpriseCacheTimestamp[cacheKey] ?? .distantPast) < 600
 
@@ -653,16 +651,25 @@ struct SearchView: View {
             if useCache, let cached = SearchView.surpriseCache[cacheKey] {
                 results = cached
             } else {
-                // Fresh fetch — combine trending + popular + top rated.
-                if !isMangaMode {
-                    if let t = try? await AniListService.shared.trending() { results.append(contentsOf: t) }
-                    if let p = try? await AniListService.shared.popular() { results.append(contentsOf: p) }
-                    if let r = try? await AniListService.shared.topRated() { results.append(contentsOf: r) }
-                } else {
-                    if let t = try? await AniListService.shared.mangaTrending() { results.append(contentsOf: t) }
-                    if let p = try? await AniListService.shared.mangaPopular() { results.append(contentsOf: p) }
+                // Fresh fetch — pick 3-4 random genres and fetch a large pool.
+                // This gives a MUCH larger result pool than the old category approach
+                // (~150-200 titles vs ~60), so the user won't exhaust it quickly.
+                let type = isMangaMode ? "MANGA" : "ANIME"
+                let genres = isMangaMode ? SearchView.mangaGenres : SearchView.animeGenres
+                let shuffledGenres = genres.shuffled()
+                let selectedGenres = Array(shuffledGenres.prefix(4))
+
+                // Fetch each genre's top 50 titles. We use multiple genres
+                // (OR semantics) so the pool is diverse. If a genre fails,
+                // we skip it and continue with the others.
+                for genre in selectedGenres {
+                    if let batch = try? await AniListService.shared.browseByGenre(
+                        page: 1, type: type, genres: [genre], perPage: 50) {
+                        results.append(contentsOf: batch)
+                    }
                 }
-                // Deduplicate by ID
+
+                // Deduplicate by ID (a title can match multiple genres).
                 var seen = Set<Int>()
                 results = results.filter { seen.insert($0.id).inserted }
 
@@ -689,9 +696,12 @@ struct SearchView: View {
                     pick = random
                     surpriseShownIds.insert(random.id)
                 } else {
-                    // Pool exhausted — reset and pick from the full set
+                    // Pool exhausted — reset exclusion and pick from full set.
+                    // Also clear the cache so the next tap fetches fresh genres.
                     surpriseShownIds = [results[0].id]
                     pick = results[0]
+                    SearchView.surpriseCache[cacheKey] = nil
+                    SearchView.surpriseCacheTimestamp[cacheKey] = .distantPast
                 }
             }
             await MainActor.run {
@@ -716,6 +726,20 @@ struct SearchView: View {
     /// rate-limiting after a few uses.
     private static var surpriseCache: [String: [AniListMedia]] = [:]
     private static var surpriseCacheTimestamp: [String: Date] = [:]
+
+    /// Curated genre lists for Surprise Me. Using a diverse set of genres
+    /// ensures the random pool is large and varied.
+    private static let animeGenres: [String] = [
+        "Action", "Adventure", "Comedy", "Drama", "Fantasy", "Sci-Fi",
+        "Mystery", "Romance", "Thriller", "Sports", "Supernatural",
+        "Slice of Life", "Psychological", "Horror", "Mecha", "Music"
+    ]
+
+    private static let mangaGenres: [String] = [
+        "Action", "Adventure", "Comedy", "Drama", "Fantasy", "Sci-Fi",
+        "Mystery", "Romance", "Thriller", "Supernatural",
+        "Slice of Life", "Psychological", "Horror", "Award Winning"
+    ]
 
     private func emptyStateView(icon: String, title: String, subtitle: String) -> some View {
         VStack(spacing: 16) {
@@ -952,9 +976,10 @@ struct SearchFilterSheet: View {
                     .disabled(localFilters.isEmpty)
                 }
             }
-            .safeAreaInset(edge: .bottom) {
-                bottomBar
-            }
+            // Bottom Apply Filters bar removed — duplicate of the toolbar
+            // Apply button (line ~931). Was creating two Apply buttons on
+            // the filter sheet (toolbar + bottom bar). The toolbar button
+            // remains as the single intended Apply button.
             #endif
         }
         .onAppear {

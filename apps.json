@@ -16,7 +16,7 @@
       "subtitle": "Personal anime & manga library manager for iOS",
       "localizedDescription": "Shirox+ is a free, source-available personal anime & manga library manager for iOS 15+.\n\n• Organize your anime and manga collection with community-built modules\n• AniList and MyAnimeList integration for library management and discovery\n• Full Reading Mode for manga with dedicated reader\n• Continue Watching / Continue Reading: pick up right where you left off\n• Picture-in-Picture and AirPlay support\n• Subtitle support\n• Manga schedule with chapter release tracking\n• Unified History system for anime and manga",
       "iconURL": "https://raw.githubusercontent.com/Faludaddd/Shirox-autosub/main/Shirox/shirox-icon.icon/Assets/白-shiro.png",
-      "tintColor": "ef4444",
+      "tintColor": "0a84ff",
       "category": "entertainment",
       "screenshots": [],
       "appPermissions": {
@@ -26,6 +26,15 @@
         "privacy": {}
       },
       "versions": [
+        {
+          "version": "1.84",
+          "buildVersion": "1",
+          "date": "2026-08-23",
+          "localizedDescription": "Added: Custom Long Action UI — long-press an anime poster to see a custom action sheet with poster, title, score, and action cards (Add to Planning, Add to Watching, Mark as Completed). Matches the Change Stream UI design. No more Apple default context menu.\nAdded: Collapsible Player Settings — Source, Quality, Audio, Subtitles, and Playback Speed are now hidden behind a single toggle button. Main controls (Fullscreen, Next Episode) stay visible.\nChanged: Blue is now the default theme (was red).\nChanged: Random Anime (Surprise Me) now uses genres — picks 4 random genres and fetches ~150-200 titles (was ~60 from 3 fixed categories). Much harder to exhaust.\nFixed: Player portrait title too small — increased from 14pt to 20pt.\nRemoved: Duplicate Apply Filter bar in Search — only one Apply button now.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 11040520,
+          "minOSVersion": "15.0"
+        },
         {
           "version": "1.83",
           "buildVersion": "1",
@@ -358,7 +367,7 @@
       "title": "New in 1.9 - Downloads tab tap-to-open fix",
       "identifier": "news-1.9-downloads-fix",
       "caption": "Tapping any in-progress or failed download in the Downloads tab now opens the anime's detail page. The offline episode list shows every download state with the right badge, so you always know what's still downloading, what failed, and what's ready to play.",
-      "tintColor": "ef4444",
+      "tintColor": "0a84ff",
       "date": "2026-08-14",
       "notify": true,
       "appID": "com.shirox.app"
@@ -367,7 +376,7 @@
       "title": "New in 1.5 - Native toggles, manga fixes, update system",
       "identifier": "news-1.5-toggles-manga-fixes",
       "caption": "Toggles are back to native SwiftUI switches. Manga module detection fixed so chapters load correctly when a module is installed. Update system now fetches from the correct fork repo. Manga settings tabs reworked with unique layouts.",
-      "tintColor": "ef4444",
+      "tintColor": "0a84ff",
       "date": "2026-08-13",
       "notify": true,
       "appID": "com.shirox.app"
@@ -376,7 +385,7 @@
       "title": "New in 1.4 - Reading Mode & MAL support",
       "identifier": "news-1.4-reading-mode",
       "caption": "Full Reading Mode for manga with dedicated home, search, schedule, and settings. MyAnimeList support as a search source. Mark as Private for library entries. Streamlined IPA-only build pipeline.",
-      "tintColor": "ef4444",
+      "tintColor": "0a84ff",
       "date": "2026-08-13",
       "notify": true,
       "appID": "com.shirox.app"

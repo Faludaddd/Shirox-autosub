@@ -42,6 +42,10 @@ struct PlayerBottomBar: View {
     var tvdbEpisodeTitle: String? = nil
     var mediaTitle: String? = nil
     @AppStorage("playerLiquidGlass") private var playerLiquidGlass = true
+    /// Collapsible Player Settings — when true, advanced controls (Source,
+    /// Quality, Audio, Subtitles, Playback Speed) are revealed inline below
+    /// the main controls. Defaults to false so the main player stays clean.
+    @State private var showPlayerSettings = false
 
     private var isPad: Bool {
         #if os(iOS)
@@ -88,9 +92,47 @@ struct PlayerBottomBar: View {
 
                 Spacer()
 
-                rightButtonGroup
+                // Main controls — always visible.
+                mainRightButtonGroup
+
+                // Player Settings toggle button — expands/collapses the
+                // advanced controls (Source, Quality, Audio, Subtitles,
+                // Playback Speed). Keeps the main player clean while making
+                // advanced controls easy to access.
+                Button {
+                    Haptics.light()
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                        showPlayerSettings.toggle()
+                    }
+                } label: {
+                    HStack(spacing: isPad ? 8 : 5) {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: isPad ? 18 : 15, weight: .medium))
+                        Image(systemName: showPlayerSettings ? "chevron.up" : "chevron.down")
+                            .font(.system(size: isPad ? 12 : 10, weight: .bold))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, isPad ? 14 : 10)
+                    .frame(height: isPad ? 46 : 34)
+                    .glassChrome(Capsule(), enabled: playerLiquidGlass, off: Color.white.opacity(0.2))
+                }
+                .buttonStyle(.plain)
             }
             .padding(.horizontal, isPad ? 30 : 20)
+
+            // Collapsible advanced controls — revealed when the Player
+            // Settings toggle is tapped. Uses the same glassChrome capsule
+            // styling as the main controls so it feels like one system.
+            if showPlayerSettings {
+                HStack(spacing: 0) {
+                    advancedButtonGroup
+                }
+                .padding(.horizontal, isPad ? 14 : 10)
+                .padding(.vertical, isPad ? 6 : 4)
+                .glassChrome(Capsule(), enabled: playerLiquidGlass, off: Color.white.opacity(0.15))
+                .padding(.horizontal, isPad ? 30 : 20)
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
 
             // Progress slider
             PlayerProgressSlider(
@@ -137,7 +179,37 @@ struct PlayerBottomBar: View {
         )
     }
 
-    @ViewBuilder private var rightButtonGroup: some View {
+    @ViewBuilder private var mainRightButtonGroup: some View {
+        let buttonWidth: CGFloat = isPad ? 50 : 36
+        let height: CGFloat = isPad ? 46 : 34
+        let iconSize: CGFloat = isPad ? 20 : 15
+
+        HStack(spacing: 0) {
+            Button(action: onFillTap) {
+                Image(systemName: isFilled ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                    .font(.system(size: iconSize - 1, weight: .medium))
+                    .foregroundStyle(.white)
+                    .frame(width: buttonWidth, height: height)
+            }
+            .buttonStyle(.plain)
+            if let onNextEpisodeTap {
+                Button(action: onNextEpisodeTap) {
+                    Image(systemName: "forward.end.fill")
+                        .font(.system(size: iconSize, weight: .medium))
+                        .foregroundStyle(.white)
+                        .frame(width: buttonWidth, height: height)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, isPad ? 6 : 4)
+        .padding(.vertical, 1)
+        .glassChrome(Capsule(), enabled: playerLiquidGlass, off: Color.white.opacity(0.2))
+    }
+
+    /// Advanced controls — Source, Quality, Audio, Subtitles, Playback Speed.
+    /// Shown inside the collapsible Player Settings capsule.
+    @ViewBuilder private var advancedButtonGroup: some View {
         let buttonWidth: CGFloat = isPad ? 50 : 36
         let height: CGFloat = isPad ? 46 : 34
         let iconSize: CGFloat = isPad ? 20 : 15
@@ -182,13 +254,6 @@ struct PlayerBottomBar: View {
                 }
                 .buttonStyle(.plain)
             }
-            Button(action: onFillTap) {
-                Image(systemName: isFilled ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
-                    .font(.system(size: iconSize - 1, weight: .medium))
-                    .foregroundStyle(.white)
-                    .frame(width: buttonWidth, height: height)
-            }
-            .buttonStyle(.plain)
             PlayerMenuButton(
                 menuTitle: "Playback Speed",
                 label: .text(speedLabel, size: isPad ? 17 : 15, weight: .semibold),
@@ -198,19 +263,7 @@ struct PlayerBottomBar: View {
             .frame(height: height)
             .padding(.horizontal, isPad ? 14 : 10)
             .contentShape(Rectangle())
-            if let onNextEpisodeTap {
-                Button(action: onNextEpisodeTap) {
-                    Image(systemName: "forward.end.fill")
-                        .font(.system(size: iconSize, weight: .medium))
-                        .foregroundStyle(.white)
-                        .frame(width: buttonWidth, height: height)
-                }
-                .buttonStyle(.plain)
-            }
         }
-        .padding(.horizontal, isPad ? 6 : 4)
-        .padding(.vertical, 1)
-        .glassChrome(Capsule(), enabled: playerLiquidGlass, off: Color.white.opacity(0.2))
     }
 
     // MARK: - Helpers

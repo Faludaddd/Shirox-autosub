@@ -99,6 +99,29 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "1.84",
+        date: "2026-08-23",
+        added: [
+            "Custom Long Action UI — long-pressing an anime poster now opens a custom action sheet instead of Apple's default context menu. Shows the anime's poster, title, score, and year at the top, then custom action cards for Add to Planning, Add to Watching, and Mark as Completed. Each card has an icon, title, and subtitle. Matches the Change Stream UI's design language. Smooth open/close animations with a dimmed backdrop.",
+            "Collapsible Player Settings — advanced playback controls (Source, Quality, Audio, Subtitles, Playback Speed) are now hidden behind a single 'Player Settings' toggle button. Tapping the slider icon expands/collapses them inline. The main player controls (Skip, Fullscreen, Next Episode) remain always visible. Keeps the player clean while making advanced controls easy to access."
+        ],
+        fixed: [
+            "Player portrait title too small — the anime title in the player's top bar was using a tiny 14pt font in portrait mode on iPhone. Increased to 20pt (.title3.weight) so it's clearly readable. Long titles still scale down via minimumScaleFactor(0.5) so they don't truncate."
+        ],
+        changed: [
+            "Blue is now the default theme — the app's default accent colour is now blue (0A84FF) instead of red. Applied consistently across Color.appAccent, the AccentColor asset, ShiroxApp's accentColor resolver, and the schedule selected pill. The AltStore tintColor in apps.json is also blue. Existing users with a custom accent selected keep their choice; only fresh installs / resets get blue.",
+            "Random Anime (Surprise Me) now uses genres — was previously fetching trending + popular + top rated (3 fixed categories, ~60 titles). Now picks 4 random genres from a curated list of 16 (Action, Comedy, Drama, Fantasy, etc.) and fetches up to 50 titles per genre, giving a pool of ~150-200 titles. Much harder to exhaust. Pool is cached for 10 minutes. When exhausted, automatically picks new genres on the next tap.",
+            "Player bottom bar restructured — main controls (Fullscreen, Next Episode) are in a primary capsule. Advanced controls (Source, Quality, Audio, Subtitles, Playback Speed) are in a secondary capsule that appears when the Player Settings toggle is expanded. Both capsules use the same glassChrome styling."
+        ],
+        improved: [],
+        removed: [
+            "Duplicate Apply Filter bar in Search — removed the bottom 'Apply Filters' bar from the Search filter sheet. Was creating two Apply buttons (toolbar + bottom bar). The toolbar Apply button remains as the single intended button."
+        ],
+        other: [
+            "AOT / duplicate seasons in Search — investigated and confirmed this is expected AniList behavior. When you search 'Attack on Titan', AniList returns each season (S1, S2, S3, Final Season) as a separate Media entry. These are not duplicates — they're individual entries with unique IDs. No code changes needed; the search deduplication by uniqueId already prevents true duplicates."
+        ]
+    ),
+    UpdateLogEntry(
         version: "1.83",
         date: "2026-08-23",
         added: [

@@ -700,6 +700,10 @@
 				C6CE1B5A31348C73AABA02CD /* StaffAndVideosSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC272D4B21A0374FC3081540 /* StaffAndVideosSections.swift */; };
 				756F68CD2C046ACE7EC4FB28 /* StaffAndVideosSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC272D4B21A0374FC3081540 /* StaffAndVideosSections.swift */; };
 				229BEF165B3FC43B3A3A3E37 /* StaffAndVideosSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC272D4B21A0374FC3081540 /* StaffAndVideosSections.swift */; };
+				C66D264B38034A5DB02B356B /* CustomActionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D35384F88564FDEA35A6EA6 /* CustomActionSheet.swift */; };
+				7DADFCE7787C4B30BCB23505 /* CustomActionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D35384F88564FDEA35A6EA6 /* CustomActionSheet.swift */; };
+				906E3A1C2D324941AB93E161 /* CustomActionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D35384F88564FDEA35A6EA6 /* CustomActionSheet.swift */; };
+				7BF232EADAF74D2284F9B2EE /* CustomActionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D35384F88564FDEA35A6EA6 /* CustomActionSheet.swift */; };
 		/* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -964,6 +968,7 @@
 		83539AD56A87E95D0B97CAFD /* AnimeNotificationDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimeNotificationDetailView.swift; sourceTree = "<group>"; };
 		2D3190485D774219690E87AD /* UpdateLogPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateLogPage.swift; sourceTree = "<group>"; };
 		DC272D4B21A0374FC3081540 /* StaffAndVideosSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffAndVideosSections.swift; sourceTree = "<group>"; };
+		4D35384F88564FDEA35A6EA6 /* CustomActionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomActionSheet.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1229,6 +1234,7 @@
                         isa = PBXGroup;
                         children = (
 				DC272D4B21A0374FC3081540 /* StaffAndVideosSections.swift */,
+				4D35384F88564FDEA35A6EA6 /* CustomActionSheet.swift */,
 				2D3190485D774219690E87AD /* UpdateLogPage.swift */,
                                 1251C4582FCAE1AA002AD0B2 /* LegalWebView.swift */,
                                 F5A6B7C8D9E10000000000A1 /* AnimatedSplashView.swift */,
@@ -1634,6 +1640,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                         				C94290844B96D63AB48F746E /* AnimeNotificationDetailView.swift in Sources */,
 				5703C0FFE4EE6FB06C424562 /* UpdateLogPage.swift in Sources */,
 				485457D1871AC64945A3A565 /* StaffAndVideosSections.swift in Sources */,
+				C66D264B38034A5DB02B356B /* CustomActionSheet.swift in Sources */,
 );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -1846,6 +1853,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                         				4F053E6E871DD8A501DCC50C /* AnimeNotificationDetailView.swift in Sources */,
 				A66C21D9758B528ED76D9835 /* UpdateLogPage.swift in Sources */,
 				C6CE1B5A31348C73AABA02CD /* StaffAndVideosSections.swift in Sources */,
+				7DADFCE7787C4B30BCB23505 /* CustomActionSheet.swift in Sources */,
 );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -2059,6 +2067,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                         				6BAA3DA7E2E722E5B6159A8F /* AnimeNotificationDetailView.swift in Sources */,
 				C843276266E1B02BC14E77A1 /* UpdateLogPage.swift in Sources */,
 				756F68CD2C046ACE7EC4FB28 /* StaffAndVideosSections.swift in Sources */,
+				906E3A1C2D324941AB93E161 /* CustomActionSheet.swift in Sources */,
 );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -2272,6 +2281,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                         				3C04C87F762887C0AF4A356D /* AnimeNotificationDetailView.swift in Sources */,
 				EB141EEBA4B687995F0CBDB7 /* UpdateLogPage.swift in Sources */,
 				229BEF165B3FC43B3A3A3E37 /* StaffAndVideosSections.swift in Sources */,
+				7BF232EADAF74D2284F9B2EE /* CustomActionSheet.swift in Sources */,
 );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -2312,7 +2322,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "@executable_path/Frameworks",
                                 );
                                 LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                                MARKETING_VERSION = 1.83;
+                                MARKETING_VERSION = 1.84;
                                 PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
                                 PRODUCT_NAME = "$(TARGET_NAME)";
                                 SDKROOT = appletvos;
@@ -2347,7 +2357,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "@executable_path/Frameworks",
                                 );
                                 LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                                MARKETING_VERSION = 1.83;
+                                MARKETING_VERSION = 1.84;
                                 PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
                                 PRODUCT_NAME = "$(TARGET_NAME)";
                                 SDKROOT = appletvos;
@@ -2464,7 +2474,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "$(inherited)",
                                         "@executable_path/Frameworks",
                                 );
-                                MARKETING_VERSION = 1.83;
+                                MARKETING_VERSION = 1.84;
                                 PRODUCT_NAME = shirox;
                                 PROVISIONING_PROFILE_SPECIFIER = "";
                                 SDKROOT = iphoneos;
@@ -2510,7 +2520,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "@executable_path/../Frameworks",
                                 );
                                 MACOSX_DEPLOYMENT_TARGET = 14.0;
-                                MARKETING_VERSION = 1.83;
+                                MARKETING_VERSION = 1.84;
                                 PRODUCT_NAME = shirox;
                                 SDKROOT = macosx;
                                 SUPPORTS_MACCATALYST = NO;
@@ -2536,7 +2546,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "$(inherited)",
                                         "@executable_path/Frameworks",
                                 );
-                                MARKETING_VERSION = 1.83;
+                                MARKETING_VERSION = 1.84;
                                 PRODUCT_NAME = shirox;
                                 PROVISIONING_PROFILE_SPECIFIER = "";
                                 SDKROOT = iphoneos;
@@ -2627,7 +2637,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "@executable_path/../Frameworks",
                                 );
                                 MACOSX_DEPLOYMENT_TARGET = 14.0;
-                                MARKETING_VERSION = 1.83;
+                                MARKETING_VERSION = 1.84;
                                 PRODUCT_NAME = shirox;
                                 SDKROOT = macosx;
                                 SUPPORTS_MACCATALYST = NO;
