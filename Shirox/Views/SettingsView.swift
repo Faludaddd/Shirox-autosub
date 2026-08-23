@@ -161,6 +161,11 @@ struct SettingsView: View {
             // Section 5: Data & Advanced
             Section {
                 NavigationLink {
+                    StorageManagementPage()
+                } label: {
+                    SettingsCategoryRow(icon: "internaldrive.fill", title: "Storage", subtitle: "Download sizes, bulk delete")
+                }
+                NavigationLink {
                     AdvancedSettingsPage()
                 } label: {
                     SettingsCategoryRow(icon: "gearshape.2.fill", title: "Advanced", subtitle: "Cache, reset, storage")
@@ -1573,10 +1578,46 @@ struct PiPSettingsPage: View {
 
 struct StreamingSettingsPage: View {
     @AppStorage("watchedPercentage") private var watchedPercentage: Double = 90.0
+    @State private var perShowCount = PerShowPlaybackStore.shared.savedCount
+    @State private var showClearPerShow = false
 
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
+                // Per-Show Playback Settings card — with clear instructions
+                // explaining what it does.
+                PlaybackSettingsCard(title: "Per-Show Playback") {
+                    // Instructions — the user said the title is confusing,
+                    // so we explain exactly what this feature does.
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("What this does")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .textCase(.uppercase)
+                        Text("The player remembers your playback speed for each anime individually. If you watch one anime at 1.5× and another at 1.0×, the app restores the correct speed automatically when you switch between them. No setup needed — just change the speed in the player and it saves automatically.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.bottom, 8)
+
+                    HStack {
+                        Text("Saved preferences")
+                        Spacer()
+                        Text("\(perShowCount) show\(perShowCount == 1 ? "" : "s")")
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
+                    if perShowCount > 0 {
+                        Button(role: .destructive) {
+                            showClearPerShow = true
+                        } label: {
+                            Label("Clear All Per-Show Speeds", systemImage: "trash")
+                                .font(.subheadline)
+                        }
+                    }
+                }
+
                 PlaybackSettingsCard(title: "Progress Tracking") {
                     HStack {
                         Text("Progress Threshold")
@@ -1595,6 +1636,15 @@ struct StreamingSettingsPage: View {
         }
         .navigationTitle("Streaming")
         .inlineNavBar()
+        .alert("Clear All Per-Show Speeds?", isPresented: $showClearPerShow) {
+            Button("Clear", role: .destructive) {
+                PerShowPlaybackStore.shared.clearAll()
+                perShowCount = 0
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will reset all saved playback speeds. Each anime will start at 1.0× speed again until you change it.")
+        }
     }
 }
 
@@ -1816,28 +1866,40 @@ struct NotificationsSettingsPage: View {
                 .fixedSize(horizontal: false, vertical: true)
             Divider().opacity(0.4)
             Toggle(isOn: $episodeReminders) {
-                HStack(spacing: 6) {
-                    Image(systemName: "calendar.badge.clock")
-                        .font(.caption)
-                        .foregroundStyle(Color.appAccent)
-                    Text("Episode Reminders")
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "calendar.badge.clock")
+                            .font(.caption)
+                            .foregroundStyle(Color.appAccent)
+                        Text("Episode Reminders")
+                    }
+                    Text("Sends a phone notification when a new episode of an anime you're tracking is about to air.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .tint(Color.appAccent)
             .glowEffect(isOn: episodeReminders)
             .disabled(!phoneNotificationsEnabled)
             Toggle(isOn: $airingNotifications) {
-                HStack(spacing: 6) {
-                    Image(systemName: "tv.fill")
-                        .font(.caption)
-                        .foregroundStyle(Color.appAccent)
-                    Text("Airing Notifications")
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "tv.fill")
+                            .font(.caption)
+                            .foregroundStyle(Color.appAccent)
+                        Text("Airing Notifications")
+                    }
+                    Text("Shows in-app alerts for upcoming episodes in the Schedule tab, even for anime you haven't tracked yet.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .tint(Color.appAccent)
             .glowEffect(isOn: airingNotifications)
             .disabled(!phoneNotificationsEnabled)
-            Text("Reminders fire before an episode airs. Requires an AniList account and a connected schedule.")
+            Text("Reminders fire before an episode airs based on the timing setting below. Requires an AniList account and a connected schedule.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -2285,6 +2347,16 @@ struct ModulesSettingsPage: View {
                                 }
                             }
                             Spacer()
+                            // Module health indicator — shows a colored dot
+                            // based on the module's last request status.
+                            // Green = working, Yellow = some failures,
+                            // Red = repeated failures, Orange = Cloudflare blocked.
+                            // Only shown if the module has been used at least once.
+                            if let health = moduleManager.health(for: module) {
+                                Image(systemName: health.status.icon)
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(health.status.color)
+                            }
                             if moduleManager.activeModule?.id == module.id {
                                 Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.appAccent)
                             }
@@ -3177,6 +3249,292 @@ private struct StoreModuleSkeletonTile: View {
                 .stroke(Color.secondary.opacity(0.08), lineWidth: 1)
         )
         .redacted(reason: .placeholder)
+    }
+}
+
+// MARK: - Storage Management Page
+
+/// Storage management page — shows the disk space used by Anime downloads,
+/// Manga downloads, and image cache, with bulk-delete options.
+struct StorageManagementPage: View {
+    @ObservedObject private var dm = DownloadManager.shared
+    @ObservedObject private var mdm = MangaDownloadManager.shared
+    @State private var animeDownloadSize: Int64 = 0
+    @State private var mangaDownloadSize: Int64 = 0
+    @State private var imageCacheSize: Int64 = 0
+    @State private var totalSize: Int64 = 0
+    @State private var isCalculating = false
+    @State private var showDeleteAnime = false
+    @State private var showDeleteManga = false
+    @State private var showDeleteAll = false
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                // Total storage card
+                totalCard
+                // Anime downloads card
+                animeDownloadsCard
+                // Manga downloads card
+                mangaDownloadsCard
+                // Image cache card
+                imageCacheCard
+            }
+            .padding(.vertical, 16)
+        }
+        .background(Color(.systemGroupedBackground).ignoresSafeArea())
+        .navigationTitle("Storage")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await refreshSizes() }
+        .refreshable { await refreshSizes() }
+        .alert("Delete All Anime Downloads?", isPresented: $showDeleteAnime) {
+            Button("Delete", role: .destructive) {
+                for item in dm.items { dm.remove(item) }
+                Task { await refreshSizes() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will permanently delete all \(dm.items.count) anime download\(dm.items.count == 1 ? "" : "s") and free up \(formatSize(animeDownloadSize)).")
+        }
+        .alert("Delete All Manga Downloads?", isPresented: $showDeleteManga) {
+            Button("Delete", role: .destructive) {
+                for item in mdm.items { mdm.remove(item) }
+                Task { await refreshSizes() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will permanently delete all \(mdm.items.count) manga download\(mdm.items.count == 1 ? "" : "s") and free up \(formatSize(mangaDownloadSize)).")
+        }
+        .alert("Delete Everything?", isPresented: $showDeleteAll) {
+            Button("Delete All", role: .destructive) {
+                for item in dm.items { dm.remove(item) }
+                for item in mdm.items { mdm.remove(item) }
+                Task { await refreshSizes() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will permanently delete all anime and manga downloads, freeing up \(formatSize(animeDownloadSize + mangaDownloadSize)). Image cache is not affected.")
+        }
+    }
+
+    // MARK: - Cards
+
+    private var totalCard: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(Color.appAccent.opacity(0.12))
+                        .frame(width: 50, height: 50)
+                    Image(systemName: "internaldrive.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(Color.appAccent)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Total Used")
+                        .font(.headline)
+                    Text(formatSize(totalSize))
+                        .font(.title2.weight(.bold).monospacedDigit())
+                        .foregroundStyle(.primary)
+                }
+                Spacer()
+            }
+            if isCalculating {
+                HStack(spacing: 6) {
+                    ProgressView().scaleEffect(0.7)
+                    Text("Calculating…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(.secondarySystemGroupedBackground))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        )
+        .padding(.horizontal, 16)
+    }
+
+    private var animeDownloadsCard: some View {
+        storageRow(
+            icon: "tv.fill",
+            iconColor: .blue,
+            title: "Anime Downloads",
+            count: dm.items.count,
+            size: animeDownloadSize,
+            onDelete: dm.items.isEmpty ? nil : { showDeleteAnime = true }
+        )
+    }
+
+    private var mangaDownloadsCard: some View {
+        storageRow(
+            icon: "book.fill",
+            iconColor: .teal,
+            title: "Manga Downloads",
+            count: mdm.items.count,
+            size: mangaDownloadSize,
+            onDelete: mdm.items.isEmpty ? nil : { showDeleteManga = true }
+        )
+    }
+
+    private var imageCacheCard: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(Color.orange.opacity(0.12))
+                        .frame(width: 50, height: 50)
+                    Image(systemName: "photo.stack.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(.orange)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Image Cache")
+                        .font(.headline)
+                    Text(formatSize(imageCacheSize))
+                        .font(.subheadline.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(.primary)
+                }
+                Spacer()
+            }
+            Text("Image cache is managed automatically and can be safely cleared. Poster images will re-download when needed.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button {
+                Haptics.light()
+                CacheManager.shared.clearImageCache()
+                Task { await refreshSizes() }
+            } label: {
+                Label("Clear Image Cache", systemImage: "trash")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.red)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color.red.opacity(0.1))
+                    )
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(.secondarySystemGroupedBackground))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        )
+        .padding(.horizontal, 16)
+    }
+
+    @ViewBuilder
+    private func storageRow(
+        icon: String,
+        iconColor: Color,
+        title: String,
+        count: Int,
+        size: Int64,
+        onDelete: (() -> Void)?
+    ) -> some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(iconColor.opacity(0.12))
+                        .frame(width: 50, height: 50)
+                    Image(systemName: icon)
+                        .font(.system(size: 22))
+                        .foregroundStyle(iconColor)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.headline)
+                    HStack(spacing: 6) {
+                        Text("\(count) item\(count == 1 ? "" : "s")")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text("·")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(formatSize(size))
+                            .font(.caption.weight(.semibold).monospacedDigit())
+                            .foregroundStyle(.primary)
+                    }
+                }
+                Spacer()
+            }
+            if let onDelete {
+                Button(action: onDelete) {
+                    Label("Delete All", systemImage: "trash")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.red)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(Color.red.opacity(0.1))
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(.secondarySystemGroupedBackground))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        )
+        .padding(.horizontal, 16)
+    }
+
+    // MARK: - Helpers
+
+    private func refreshSizes() async {
+        await MainActor.run { isCalculating = true }
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let animeDir = docs.appendingPathComponent("Downloads")
+        let mangaDir = docs.appendingPathComponent("MangaDownloads")
+        let anime = directorySize(at: animeDir)
+        let manga = directorySize(at: mangaDir)
+        let cache = CacheManager.shared.imageCacheSize()
+        await MainActor.run {
+            animeDownloadSize = anime
+            mangaDownloadSize = manga
+            imageCacheSize = cache
+            totalSize = anime + manga + cache
+            isCalculating = false
+        }
+    }
+
+    private func directorySize(at url: URL) -> Int64 {
+        let fm = FileManager.default
+        guard let enumerator = fm.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey], options: [.skipsHiddenFiles]) else { return 0 }
+        var total: Int64 = 0
+        for case let fileURL as URL in enumerator {
+            if let size = try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize {
+                total += Int64(size)
+            }
+        }
+        return total
+    }
+
+    private func formatSize(_ bytes: Int64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useKB, .useMB, .useGB]
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: bytes)
     }
 }
 

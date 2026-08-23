@@ -99,6 +99,21 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "1.89",
+        date: "2026-08-23",
+        added: [
+            "Storage Management page (Settings → Storage) — shows the total disk space used by Anime downloads, Manga downloads, and image cache, each with an item count and formatted size. Includes bulk-delete buttons for Anime downloads, Manga downloads, and image cache, plus pull-to-refresh to recalculate sizes.",
+            "Per-Show Playback Settings — the player now remembers your playback speed for each anime individually. If you watch one anime at 1.5× and another at 1.0×, the app restores the correct speed automatically when you switch. No setup needed — just change the speed in the player and it saves automatically. Settings → Streaming has a new 'Per-Show Playback' card with clear instructions explaining what it does, how many shows have saved preferences, and a Clear All button.",
+            "Module Health Indicators — each module in Settings → Modules now shows a colored status dot: green (working), yellow (some failures), red (repeated failures), or orange (Cloudflare blocked). The dot appears only after the module has been used at least once. Health is tracked automatically when the module loads or fails.",
+            "Episode Release Notifications UI polish — the Episode Reminders and Airing Notifications toggles now have descriptive subtitles explaining what each one does. 'Episode Reminders' sends a phone notification when a new episode of a tracked anime airs. 'Airing Notifications' shows in-app alerts for upcoming episodes in the Schedule tab."
+        ],
+        fixed: [],
+        changed: [],
+        improved: [],
+        removed: [],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "1.88",
         date: "2026-08-23",
         added: [],

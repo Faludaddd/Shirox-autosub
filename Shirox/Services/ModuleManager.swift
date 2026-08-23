@@ -28,6 +28,11 @@ final class ModuleManager: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
 
+    /// Per-module health tracking — keyed by module.scriptUrl.
+    /// Updated by JSEngine / ModuleJSRunner when a module's request
+    /// succeeds or fails. Read by the module list UI to show status dots.
+    @Published var moduleHealth: [String: ModuleHealth] = [:]
+
     private let storageKey = "savedModules"
     private let activeKey = "activeModuleId"
 
@@ -131,9 +136,11 @@ final class ModuleManager: ObservableObject {
         do {
             try await JSEngine.shared.loadModule(module)
             moduleReadyId = module.id
+            reportSuccess(for: module.id)
             return true
         } catch {
             Logger.shared.log("[ModuleManager] Failed to load JS for module \(module.sourceName): \(error.localizedDescription)", type: "Error")
+            reportFailure(for: module.id, error: error.localizedDescription)
             return false
         }
     }
@@ -212,4 +219,85 @@ final class ModuleManager: ObservableObject {
               let saved = try? JSONDecoder().decode([ModuleDefinition].self, from: data) else { return }
         modules = saved
     }
+
+    // MARK: - Module Health
+
+    /// Called when a module request succeeds.
+    func reportSuccess(for moduleId: String) {
+        var health = moduleHealth[moduleId] ?? ModuleHealth()
+        health.lastSuccessAt = Date()
+        health.consecutiveFailures = 0
+        health.lastError = nil
+        health.status = .healthy
+        moduleHealth[moduleId] = health
+    }
+
+    /// Called when a module request fails.
+    func reportFailure(for moduleId: String, error: String) {
+        var health = moduleHealth[moduleId] ?? ModuleHealth()
+        health.lastError = error
+        health.lastErrorAt = Date()
+        health.consecutiveFailures += 1
+        health.status = health.consecutiveFailures >= 3 ? .error : .warning
+        moduleHealth[moduleId] = health
+    }
+
+    /// Called when Cloudflare blocks a module's host.
+    func reportCloudflareBlocked(for moduleId: String, host: String) {
+        var health = moduleHealth[moduleId] ?? ModuleHealth()
+        health.cloudflareBlockedHost = host
+        health.status = .blocked
+        moduleHealth[moduleId] = health
+    }
+
+    /// Called when a Cloudflare challenge is solved.
+    func reportCloudflareSolved(for moduleId: String) {
+        if var health = moduleHealth[moduleId] {
+            health.cloudflareBlockedHost = nil
+            health.status = health.consecutiveFailures > 0 ? .warning : .healthy
+            moduleHealth[moduleId] = health
+        }
+    }
+
+    /// Gets the health status for a module. Returns nil (no dot shown)
+    /// if the module has never been used.
+    func health(for module: ModuleDefinition) -> ModuleHealth? {
+        moduleHealth[module.id]
+    }
+}
+
+/// Per-module health status — tracks the last error, success timestamp,
+/// and Cloudflare block state so the module list UI can show a status dot.
+struct ModuleHealth: Codable {
+    enum Status: String, Codable {
+        case healthy    // green dot
+        case warning    // yellow dot
+        case error      // red dot
+        case blocked    // orange dot (Cloudflare)
+
+        var color: Color {
+            switch self {
+            case .healthy: return .green
+            case .warning: return .yellow
+            case .error:   return .red
+            case .blocked: return .orange
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .healthy: return "checkmark.circle.fill"
+            case .warning: return "exclamationmark.triangle.fill"
+            case .error:   return "xmark.circle.fill"
+            case .blocked: return "shield.lefthalf.filled"
+            }
+        }
+    }
+
+    var status: Status = .healthy
+    var lastError: String?
+    var lastErrorAt: Date?
+    var lastSuccessAt: Date?
+    var consecutiveFailures: Int = 0
+    var cloudflareBlockedHost: String?
 }

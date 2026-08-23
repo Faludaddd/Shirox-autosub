@@ -310,6 +310,13 @@ struct PlayerView: View {
             if subtitleTracks == nil, let tracks = currentStream.allSubtitles, !tracks.isEmpty {
                 subtitleTracks = tracks
             }
+            // Load per-show playback speed — remembers the speed the user
+            // last used for this specific anime.
+            let saved = PerShowPlaybackStore.shared.settings(
+                for: currentContext?.aniListID, malID: currentContext?.malID)
+            if let speed = saved.playbackSpeed, speed > 0 {
+                playbackSpeed = speed
+            }
             setupPlayer()
             loadSubtitles()
             loadTVDBTitle()
@@ -388,6 +395,11 @@ struct PlayerView: View {
             #endif
         }
         .onChangeOf(playbackSpeed) { newSpeed in
+            // Save the speed per-show so it's remembered next time.
+            PerShowPlaybackStore.shared.saveSpeed(
+                newSpeed,
+                for: currentContext?.aniListID,
+                malID: currentContext?.malID)
             #if canImport(GoogleCast)
             if castManager.isConnected {
                 GCKCastContext.sharedInstance().sessionManager.currentCastSession?.remoteMediaClient?.setPlaybackRate(Float(newSpeed))
