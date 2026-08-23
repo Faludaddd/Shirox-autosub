@@ -32,7 +32,7 @@
           "date": "2026-08-23",
           "localizedDescription": "Added: Manual number input in Download Range — type episode/chapter numbers directly (e.g. 50 → 53).\nFixed: Download now opens the new custom Change Stream UI (same as Watch / Change Stream flow) instead of the old default iOS List picker.\nFixed: Collection (bookmark) icon color — was rendering white; now uses the accent color when saved.\nChanged: Episode labels now show 'EP N' instead of 'Episode N' everywhere. Manga unchanged.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 11040520,
+          "size": 11232576,
           "minOSVersion": "15.0"
         },
         {
