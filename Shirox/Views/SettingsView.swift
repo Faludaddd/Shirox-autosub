@@ -1577,6 +1577,7 @@ struct PiPSettingsPage: View {
 // MARK: - 9. Streaming Settings Page
 
 struct StreamingSettingsPage: View {
+    @EnvironmentObject private var moduleManager: ModuleManager
     @AppStorage("watchedPercentage") private var watchedPercentage: Double = 90.0
     @AppStorage("showNextEpisodeCountdown") private var showNextEpisodeCountdown = true
     @AppStorage("autoFallbackEnabled") private var autoFallbackEnabled = false
