@@ -99,6 +99,27 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "1.82",
+        date: "2026-08-23",
+        added: [],
+        fixed: [
+            "Long-press on Anime posters — when long-pressing a poster below the Continue Watching section, the action menu no longer randomly switches to a Continue Watching poster. Each poster now has its own isolated long-press gesture attached inside the card's view, with stable IDs and clipped hit-testing. The wrong-card menu bug is gone.",
+            "Surprise Me stops working after ~4 uses — root cause: every tap fired 3 fresh AniList API calls (trending + popular + top rated), which burned through the AniList rate limit. Now caches the combined pool for 10 minutes. Repeated taps within that window pick a random item from the cached pool with zero network requests. After 10 minutes the cache refreshes automatically. Surprise Me now works repeatedly without saying 'No anime found'.",
+            "Schedule details title — the title used to appear as a black bar overlay floating on top of the screen. Now displays the title inside the custom details UI itself as the first item below the hero poster, matching the rest of the app's layout.",
+            "Schedule tab — removed the navigation title bar (the bar at the top that said 'Schedule' or 'Releases'). The Schedule tab now has a clean look with just the date selector and anime cards — no extra bar at the top."
+        ],
+        changed: [
+            "Schedule poster titles are now ~20% larger — went from 14pt to 17pt. Longer titles still wrap correctly to 2 lines.",
+            "Schedule tab's navigation bar is now transparent/hidden instead of showing the dark release-title bar.",
+            "Surprise Me now uses a 10-minute static cache keyed by media type (anime vs manga) so switching modes doesn't mix pools. Even when the API fails, the cache prevents further API spam until the 10-minute window expires."
+        ],
+        improved: [],
+        removed: [
+            "Blue Appearance preset — completely removed from Settings → Appearance. The Default preset (system label colour, the existing app default) is now the only 'no colour' option. If you previously had Blue selected, your accent is automatically reset to Default on first launch."
+        ],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "1.81",
         date: "2026-08-23",
         added: [

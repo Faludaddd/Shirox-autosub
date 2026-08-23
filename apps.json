@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "1.82",
+          "buildVersion": "1",
+          "date": "2026-08-23",
+          "localizedDescription": "Fixed: Long-press on anime posters no longer triggers the wrong card's menu when the poster is below Continue Watching. Each poster now has its own isolated long-press gesture.\nFixed: Surprise Me stops working after ~4 uses — was hitting AniList rate limits because every tap fired 3 fresh API calls. Now caches the result pool for 10 minutes, so repeated taps make zero network requests.\nFixed: Schedule details title — was a black bar overlay floating on top of the screen. Now displays the title inside the custom details UI itself.\nFixed: Schedule tab — removed the dark navigation bar that said 'Schedule' or 'Releases' at the top. The Schedule tab is now clean.\nChanged: Schedule poster titles ~20% larger (14pt → 17pt).\nRemoved: Blue Appearance preset completely. If you had Blue selected, accent is automatically reset to Default.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 11040520,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.81",
           "buildVersion": "1",
           "date": "2026-08-23",

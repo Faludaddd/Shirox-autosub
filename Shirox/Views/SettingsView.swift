@@ -930,7 +930,6 @@ struct AppearanceSettingsPage: View {
         .init(id: "yellow",  hex: "#FFD60A", title: "Yellow"),
         .init(id: "green",   hex: "#30D158", title: "Green"),
         .init(id: "mint",    hex: "#63E6E2", title: "Mint"),
-        .init(id: "blue",    hex: "#0A84FF", title: "Blue"),
         .init(id: "indigo",  hex: "#5E5CE6", title: "Indigo"),
         .init(id: "purple",  hex: "#BF5AF2", title: "Purple"),
         .init(id: "pink",    hex: "#FF375F", title: "Pink")
@@ -947,6 +946,14 @@ struct AppearanceSettingsPage: View {
                     Text("Dark").tag("dark")
                 }
                 .tint(.appAccent)
+            }
+            .onAppear {
+                // Migrate away from the removed Blue preset — if the saved
+                // accent is the old Blue hex, reset to Default so the user
+                // doesn't get stuck with an unsupported colour.
+                if accentColorHex == "#0A84FF" {
+                    accentColorHex = ""
+                }
             }
             Section {
                 LazyVGrid(columns: swatchColumns, spacing: 14) {

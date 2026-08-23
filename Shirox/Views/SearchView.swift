@@ -628,34 +628,58 @@ struct SearchView: View {
         }
     }
 
-    /// Picks a random anime from AniList. No category filters required —
-    /// just fetches trending + popular anime, shuffles the pool, and picks
-    /// one that hasn't been shown yet this session. When the pool is
-    /// exhausted, resets the exclusion list.
-    /// FIX: When the API fails (results is empty), we ALSO reset
-    /// surpriseShownIds so stale exclusion state doesn't persist. This
-    /// prevents the "No anime found" error from repeating after 2 uses.
+    /// Picks a random anime. To avoid hammering AniList with 3 API calls on
+    /// every tap (which causes rate-limiting after ~4 uses), we cache the
+    /// combined trending + popular + top rated pool for 10 minutes. Within
+    /// that window, repeated taps just pick a random item from the cached
+    /// pool — no network request. After 10 minutes, or if the cache is
+    /// empty (first use / cache cleared), we do a single batch fetch and
+    /// cache the result.
+    ///
+    /// The cache lives on the SearchView type itself (static) so it
+    /// survives view re-creation. It's keyed by media type (anime vs
+    /// manga) so switching modes doesn't mix pools.
     private func surpriseMe() {
         isSurpriseLoading = true
         Task {
+            let now = Date()
+            let cacheKey = isMangaMode ? "manga" : "anime"
+
+            // Use cache if it's fresh (< 10 min old) and matches the current mode.
+            let useCache = SearchView.surpriseCache[cacheKey] != nil
+                && now.timeIntervalSince(SearchView.surpriseCacheTimestamp[cacheKey] ?? .distantPast) < 600
+
             var results: [AniListMedia] = []
-            if !isMangaMode {
-                if let t = try? await AniListService.shared.trending() { results.append(contentsOf: t) }
-                if let p = try? await AniListService.shared.popular() { results.append(contentsOf: p) }
-                if let r = try? await AniListService.shared.topRated() { results.append(contentsOf: r) }
+            if useCache, let cached = SearchView.surpriseCache[cacheKey] {
+                results = cached
             } else {
-                if let t = try? await AniListService.shared.mangaTrending() { results.append(contentsOf: t) }
-                if let p = try? await AniListService.shared.mangaPopular() { results.append(contentsOf: p) }
+                // Fresh fetch — combine trending + popular + top rated.
+                if !isMangaMode {
+                    if let t = try? await AniListService.shared.trending() { results.append(contentsOf: t) }
+                    if let p = try? await AniListService.shared.popular() { results.append(contentsOf: p) }
+                    if let r = try? await AniListService.shared.topRated() { results.append(contentsOf: r) }
+                } else {
+                    if let t = try? await AniListService.shared.mangaTrending() { results.append(contentsOf: t) }
+                    if let p = try? await AniListService.shared.mangaPopular() { results.append(contentsOf: p) }
+                }
+                // Deduplicate by ID
+                var seen = Set<Int>()
+                results = results.filter { seen.insert($0.id).inserted }
+
+                // Cache the result — even if it's empty (so we don't keep
+                // retrying a failing API on every tap; the cache will
+                // expire after 10 min and retry).
+                SearchView.surpriseCache[cacheKey] = results
+                SearchView.surpriseCacheTimestamp[cacheKey] = now
             }
-            // Deduplicate by ID
-            var seen = Set<Int>()
-            results = results.filter { seen.insert($0.id).inserted }
+
             // Shuffle for true randomness
             results.shuffle()
 
             let pick: AniListMedia?
             if results.isEmpty {
-                // API failure — reset exclusion list so next attempt starts fresh.
+                // API failure with no cache — reset exclusion list so next
+                // attempt starts fresh on the next call (after cache expires).
                 surpriseShownIds.removeAll()
                 pick = nil
             } else {
@@ -685,6 +709,13 @@ struct SearchView: View {
             }
         }
     }
+
+    /// Static cache for Surprise Me results, keyed by media type ("anime" or
+    /// "manga"). Survives view re-creation. Refreshed every 10 minutes (see
+    /// `surpriseMe()`). Prevents repeated AniList API calls from triggering
+    /// rate-limiting after a few uses.
+    private static var surpriseCache: [String: [AniListMedia]] = [:]
+    private static var surpriseCacheTimestamp: [String: Date] = [:]
 
     private func emptyStateView(icon: String, title: String, subtitle: String) -> some View {
         VStack(spacing: 16) {

@@ -930,40 +930,10 @@ private struct AnimeSection: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: 12) {
-                    ForEach(items) { media in
-                        NavigationLink {
-                            AniListDetailView(mediaId: media.id, preloadedMedia: media)
-                        } label: {
-                            AniListCardView(media: media)
-                        }
-                        .buttonStyle(HomePressStyle())
-                        .frame(width: cardWidth)
-                        .contextMenu {
-                            Button {
-                                Task {
-                                    try? await AniListLibraryService.shared.updateEntry(
-                                        mediaId: media.id, status: .planning, progress: 0, score: nil)
-                                }
-                            } label: {
-                                Label("Add to Planning", systemImage: "bookmark")
-                            }
-                            Button {
-                                Task {
-                                    try? await AniListLibraryService.shared.updateEntry(
-                                        mediaId: media.id, status: .current, progress: 0, score: nil)
-                                }
-                            } label: {
-                                Label("Add to Watching", systemImage: "play.circle")
-                            }
-                            Button {
-                                Task {
-                                    try? await AniListLibraryService.shared.updateEntry(
-                                        mediaId: media.id, status: .completed, progress: 0, score: nil)
-                                }
-                            } label: {
-                                Label("Mark as Completed", systemImage: "checkmark.circle")
-                            }
-                        }
+                    ForEach(items, id: \.id) { media in
+                        AnimeSectionCard(media: media, cardWidth: cardWidth)
+                            .frame(width: cardWidth)
+                            .id(media.id)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -977,6 +947,64 @@ private struct AnimeSection: View {
 private struct CarouselStretchKey: PreferenceKey {
     nonisolated(unsafe) static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+
+// MARK: - Anime Section Card (self-contained, per-card gesture isolation)
+//
+// Pulls each card into its own View struct so the context menu's long-press
+// gesture recognizer is bound to a single stable view identity. Fixes the bug
+// where long-pressing a poster below the Continue Watching section would
+// sometimes trigger the wrong card's menu (cause: shared gesture state +
+// LazyHStack cell reuse + coordinate conversion picking up the wrong card).
+//
+// Each AnimeSectionCard:
+//  - Has its own NavigationLink (tap navigation)
+//  - Has its own contextMenu attached INSIDE the NavigationLink label,
+//    not on the NavigationLink itself (so the gesture's hit area is the
+//    card content, not the whole NavigationLink wrapper).
+//  - Uses `.id(media.id)` from the caller for stable identity.
+//  - Uses `.contentShape(Rectangle())` to constrain hit-testing to the
+//    card's visible bounds.
+private struct AnimeSectionCard: View {
+    let media: Media
+    let cardWidth: CGFloat
+
+    var body: some View {
+        NavigationLink {
+            AniListDetailView(mediaId: media.id, preloadedMedia: media)
+        } label: {
+            AniListCardView(media: media)
+                .frame(width: cardWidth)
+                .contentShape(Rectangle())
+                .contextMenu {
+                    Button {
+                        Task {
+                            try? await AniListLibraryService.shared.updateEntry(
+                                mediaId: media.id, status: .planning, progress: 0, score: nil)
+                        }
+                    } label: {
+                        Label("Add to Planning", systemImage: "bookmark")
+                    }
+                    Button {
+                        Task {
+                            try? await AniListLibraryService.shared.updateEntry(
+                                mediaId: media.id, status: .current, progress: 0, score: nil)
+                        }
+                    } label: {
+                        Label("Add to Watching", systemImage: "play.circle")
+                    }
+                    Button {
+                        Task {
+                            try? await AniListLibraryService.shared.updateEntry(
+                                mediaId: media.id, status: .completed, progress: 0, score: nil)
+                        }
+                    } label: {
+                        Label("Mark as Completed", systemImage: "checkmark.circle")
+                    }
+                }
+        }
+        .buttonStyle(HomePressStyle())
+    }
 }
 
 // MARK: - Press Style
@@ -1202,9 +1230,10 @@ struct ScheduleView: View {
             #if os(iOS)
             .background(Color(.systemBackground))
             #endif
-            .navigationTitle(appMode.mode == .reading ? "Releases" : "Schedule")
+            .navigationTitle("")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 // Settings gear is shown in BOTH modes. Anime Mode opens
                 // ScheduleSettingsPage; Reading Mode opens a manga-specific
@@ -2156,7 +2185,7 @@ private struct MangaScheduleCard: View {
             // Title + badges + countdown + time capsule
             VStack(alignment: .leading, spacing: 6) {
                 Text(entry.title)
-                    .font(.subheadline.weight(.semibold))
+                    .font(.system(size: 17, weight: .semibold))
                     .lineLimit(2)
                     .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -2274,7 +2303,7 @@ private struct ScheduleCard: View {
             // Title + badges + countdown + time capsule
             VStack(alignment: .leading, spacing: 6) {
                 Text(entry.title)
-                    .font(.subheadline.weight(.semibold))
+                    .font(.system(size: 17, weight: .semibold))
                     .lineLimit(2)
                     .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -2555,6 +2584,16 @@ struct ScheduleDetailView: View {
 
     private var contentSection: some View {
         VStack(alignment: .leading, spacing: 18) {
+            // Title — displayed inside the custom UI (not as an external
+            // overlay). Removed the previous "black background with title
+            // sitting on top of the entire screen" behaviour by integrating
+            // the title as the first child of the content section.
+            Text(entry.title)
+                .font(.title2.weight(.bold))
+                .foregroundStyle(.primary)
+                .lineLimit(4)
+                .fixedSize(horizontal: false, vertical: true)
+
             // Episode number badge — slightly larger than the card's.
             Text(entry.episodeBadge)
                 .font(.subheadline.weight(.semibold))
