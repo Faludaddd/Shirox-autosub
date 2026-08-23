@@ -219,6 +219,13 @@ struct ShiroxApp: App {
     // Appearance settings — applied globally via .preferredColorScheme and .tint
     @AppStorage("appearanceMode") private var appearanceMode = "system"
     @AppStorage("accentColorHex") private var accentColorHex = ""
+    // Triggers immediate re-render when the Glow toggle changes. Without
+    // this, child views that read Color.glowEnabled (a static computed
+    // property) won't re-render because SwiftUI doesn't track the
+    // dependency. With @AppStorage here, the root body re-renders and
+    // cascades to all children.
+    @AppStorage("glowEnabled") private var glowEnabled = true
+    @AppStorage("glowIntensity") private var glowIntensity = 0.5
 
     /// Resolves the appearance mode to a ColorScheme (nil = follow system).
     private var colorScheme: ColorScheme? {

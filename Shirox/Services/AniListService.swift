@@ -944,6 +944,17 @@ final class AniListService {
                 }
               }
             }
+            staff(sort: ROLE, perPage: 20) {
+              edges {
+                role
+                node {
+                  id
+                  name { full native }
+                  image { large medium }
+                  language
+                }
+              }
+            }
             relations {
               edges {
                 relationType

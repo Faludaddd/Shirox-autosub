@@ -688,7 +688,8 @@ struct AniListDetailView: View {
                     .padding(.top, 20)
 
                 #if os(iOS)
-                StaffSection(mediaId: media.id, malId: media.idMal)
+                StaffSection(mediaId: media.id, malId: media.idMal,
+                            preloaded: vm.staff)
                     .frame(maxWidth: .infinity)
                     .padding(.top, 8)
                 #endif

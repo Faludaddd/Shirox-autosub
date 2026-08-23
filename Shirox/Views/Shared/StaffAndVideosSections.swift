@@ -6,8 +6,13 @@ import SwiftUI
 struct StaffSection: View {
     let mediaId: Int
     let malId: Int?
+    /// Optional preloaded staff from AniList — when the parent VM already
+    /// has staff data (fetched as part of the detail query), pass them in
+    /// to avoid a second network call. This is the primary data source;
+    /// Jikan is only used as a fallback when preloaded is nil/empty.
+    var preloaded: [AniListStaffEdge]? = nil
 
-    @State private var staff: [MALDiscoveryService.JikanStaffEdge] = []
+    @State private var fetchedStaff: [MALDiscoveryService.JikanStaffEdge] = []
     @State private var isLoading = false
     @State private var didFetch = false
     /// Collapsed by default — matches CharactersSection and
@@ -15,19 +20,39 @@ struct StaffSection: View {
     /// expanded strips stacked on top of each other.
     @State private var isExpanded = false
 
+    /// The staff to display — prefers preloaded AniList data (from the
+    /// detail query), falls back to any we fetched ourselves from Jikan.
+    private var displayStaff: [AniListStaffEdge] {
+        if let preloaded, !preloaded.isEmpty { return preloaded }
+        return []
+    }
+
+    private var hasJikanStaff: Bool {
+        !fetchedStaff.isEmpty
+    }
+
     var body: some View {
         // Always render the section header so the user can see Staff
         // exists (even when staff is empty after a failed fetch).
-        // Previously the entire section vanished when staff was empty,
-        // making it look like Staff had been removed from the page.
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader
             if isExpanded {
-                if !staff.isEmpty {
+                if !displayStaff.isEmpty {
+                    // AniList staff (primary source)
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 12) {
-                            ForEach(staff.indices, id: \.self) { idx in
-                                staffCard(staff[idx])
+                            ForEach(displayStaff) { edge in
+                                aniListStaffCard(edge)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                    }
+                } else if hasJikanStaff {
+                    // Jikan fallback
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(fetchedStaff.indices, id: \.self) { idx in
+                                jikanStaffCard(fetchedStaff[idx])
                             }
                         }
                         .padding(.horizontal, 16)
@@ -42,11 +67,21 @@ struct StaffSection: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 20)
                 } else if didFetch {
-                    // Loading completed but staff is empty — could be
-                    // (a) the anime has no staff data on MAL/Jikan, or
-                    // (b) the MAL id couldn't be resolved. Either way,
-                    // show a clean empty state so the section doesn't
-                    // look broken.
+                    // Jikan fetch completed but returned empty, and no
+                    // AniList preloaded data. Show a clean empty state.
+                    HStack(spacing: 8) {
+                        Image(systemName: "person.crop.rectangle.stack")
+                            .font(.system(size: 18))
+                            .foregroundStyle(.secondary)
+                        Text("No staff data available for this title.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 20)
+                } else if preloaded != nil {
+                    // AniList preloaded data exists but is empty — the anime
+                    // genuinely has no staff data on AniList.
                     HStack(spacing: 8) {
                         Image(systemName: "person.crop.rectangle.stack")
                             .font(.system(size: 18))
@@ -62,7 +97,11 @@ struct StaffSection: View {
         }
         .padding(.top, 8)
         .task {
-            if !didFetch { await loadStaff() }
+            // Only fetch from Jikan if we don't have AniList preloaded data.
+            // This avoids unnecessary API calls and Jikan rate-limiting.
+            if (preloaded?.isEmpty ?? true) && !didFetch {
+                await loadStaff()
+            }
         }
     }
 
@@ -89,7 +128,32 @@ struct StaffSection: View {
     }
 
     @ViewBuilder
-    private func staffCard(_ edge: MALDiscoveryService.JikanStaffEdge) -> some View {
+    private func aniListStaffCard(_ edge: AniListStaffEdge) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            CachedAsyncImage(urlString: edge.node.image?.large ?? edge.node.image?.medium ?? "")
+                .aspectRatio(1, contentMode: .fill)
+                .frame(width: 100, height: 100)
+                .clipShape(Circle())
+                .overlay(Circle().strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(edge.node.name?.full ?? "Unknown")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                    .frame(width: 100, alignment: .leading)
+                if let role = edge.role, !role.isEmpty {
+                    Text(role)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .frame(width: 100, alignment: .leading)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func jikanStaffCard(_ edge: MALDiscoveryService.JikanStaffEdge) -> some View {
         if let person = edge.person {
             VStack(alignment: .leading, spacing: 6) {
                 CachedAsyncImage(urlString: person.images?.jpg?.image_url ?? "")
@@ -119,10 +183,9 @@ struct StaffSection: View {
         didFetch = true
         isLoading = true
         // Resolve the MAL id: prefer the explicit idMal passed in; otherwise
-        // fall back to the IDMappingService cache (filled by Arm mappings
-        // prefetch). Without this fallback, anime whose preloaded media had
-        // no idMal (e.g. list-query media) would silently skip the staff
-        // fetch — leaving the Staff section blank.
+        // fall back to the IDMappingService cache. Without this fallback,
+        // anime whose preloaded media had no idMal would silently skip the
+        // staff fetch — leaving the Staff section blank.
         var resolvedMalId = malId
         if resolvedMalId == nil || resolvedMalId == 0 {
             resolvedMalId = IDMappingService.shared.cachedMalId(forAnilistId: mediaId)
@@ -132,9 +195,9 @@ struct StaffSection: View {
             return
         }
         do {
-            staff = try await MALDiscoveryService.shared.staff(malId: resolved)
+            fetchedStaff = try await MALDiscoveryService.shared.staff(malId: resolved)
         } catch {
-            staff = []
+            fetchedStaff = []
         }
         isLoading = false
     }

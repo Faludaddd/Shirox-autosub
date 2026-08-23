@@ -99,6 +99,26 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "1.85",
+        date: "2026-08-23",
+        added: [],
+        fixed: [
+            "Staff section — actual staff data now loads. Root cause: the section was fetching from Jikan's rate-limited API, which often returns 504 errors. Now fetches staff directly from AniList's GraphQL API as part of the main detail query — no separate network call, no Jikan rate-limiting. Each staff member shows their name, image, and role (Director, Animation, Original Creator, etc.). Jikan is kept as a fallback only if AniList returns no staff data.",
+            "Glow toggle — when Glow is OFF, absolutely no glow is visible anywhere. Was previously leaking through on the Continue Watching progress bar (had a hard-coded shadow not gated by the Glow setting). Now every glow effect checks Color.glowEnabled before rendering.",
+            "Glow updates immediately — changing the Glow toggle in Settings now updates the entire app instantly without requiring a restart. Added @AppStorage('glowEnabled') to the app root so the view tree re-renders when the toggle changes."
+        ],
+        changed: [
+            "Long Action UI reverted to the previous version's design — restored the standard context menu that was used before the custom action sheet was introduced. All functionality (Add to Planning, Add to Watching, Mark as Completed) remains intact.",
+            "Player UI reverted to the previous version's design — restored the original player bottom bar with all controls in a single row (Source, Quality, Audio, Subtitles, Fullscreen, Playback Speed, Next Episode). The collapsible Player Settings section has been removed. The title font size is also restored to the previous size."
+        ],
+        improved: [],
+        removed: [
+            "Custom Long Action UI (from v1.84) — reverted. The custom action sheet is no longer used; the standard context menu is restored.",
+            "Custom Player UI collapsible settings (from v1.84) — reverted. The slider toggle and advanced-controls capsule are removed; all controls are back in the single bottom bar."
+        ],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "1.84",
         date: "2026-08-23",
         added: [

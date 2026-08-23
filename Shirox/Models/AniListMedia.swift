@@ -25,6 +25,7 @@ struct AniListMedia: Identifiable, Codable {
     let studios: AniListStudios?
     let characters: AniListCharacterConnection?
     let recommendations: AniListRecommendationConnection?
+    let staff: AniListStaffConnection?
     let trailer: AniListTrailer?
     let source: String?           // "MANGA", "LIGHT_NOVEL", "ORIGINAL", etc.
     let duration: Int?            // episode length in minutes
@@ -261,6 +262,28 @@ struct AniListVoiceActor: Codable, Identifiable {
     let name: AniListCharacterName?
     let language: String?
     let image: AniListCharacterImage?
+}
+
+// MARK: - Staff
+
+struct AniListStaffConnection: Codable {
+    let edges: [AniListStaffEdge]
+}
+
+struct AniListStaffEdge: Codable, Identifiable {
+    var id: Int { node.id }
+    let role: String?
+    let node: AniListStaff
+}
+
+struct AniListStaff: Codable, Identifiable {
+    let id: Int
+    let name: AniListCharacterName?
+    let image: AniListCharacterImage?
+    let description: String?
+    let siteUrl: String?
+    let favourites: Int?
+    let language: String?   // e.g. "Japanese" for VAs that are also staff
 }
 
 // MARK: - Recommendations

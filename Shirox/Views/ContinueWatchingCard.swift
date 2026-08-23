@@ -449,7 +449,8 @@ struct ContinueWatchingCardDisplay: View {
                             Color.white.opacity(0.2)
                             Color.primary
                                 .frame(width: geo.size.width * progress)
-                                .shadow(color: Color.primary.opacity(0.5), radius: 3, x: 0, y: 0)
+                                .shadow(color: Color.glowEnabled ? Color.primary.opacity(0.5) : .clear,
+                                        radius: Color.glowEnabled ? 3 : 0, x: 0, y: 0)
                         }
                     }
                     .frame(height: 3)

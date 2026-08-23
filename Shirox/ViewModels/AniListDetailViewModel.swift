@@ -13,11 +13,12 @@ final class AniListDetailViewModel: ObservableObject {
     /// rather than hiding the whole page behind an error view.
     @Published var detailFetchFailed = false
 
-    /// Raw AniList characters + recommendations, fetched alongside `media`
-    /// so `CharactersSection` / `RecommendationsSection` can render without
-    /// a second network call. nil when not yet loaded or fetch failed.
+    /// Raw AniList characters + recommendations + staff, fetched alongside
+    /// `media` so `CharactersSection` / `RecommendationsSection` /
+    /// `StaffSection` can render without a second network call.
     @Published var characters: [AniListCharacterEdge] = []
     @Published var recommendations: [AniListRecommendation] = []
+    @Published var staff: [AniListStaffEdge] = []
 
     // Stream picker state
     @Published var showStreamPicker = false
@@ -69,9 +70,10 @@ final class AniListDetailViewModel: ObservableObject {
             // and is NOT removed here.)
             let raw = try await AniListService.shared.detail(id: id)
             media = AniListProvider.shared.mapMedia(raw)
-            // Pre-populate characters + recommendations from the same fetch.
+            // Pre-populate characters + recommendations + staff from the same fetch.
             characters = raw.characters?.edges ?? []
             recommendations = raw.recommendations?.nodes ?? []
+            staff = raw.staff?.edges ?? []
             // AniList may not have banner art for every title; reuse the
             // already-cached TVDB fanart as a fallback.
             if media?.bannerImage == nil {
@@ -111,6 +113,7 @@ final class AniListDetailViewModel: ObservableObject {
             media = AniListProvider.shared.mapMedia(raw)
             characters = raw.characters?.edges ?? []
             recommendations = raw.recommendations?.nodes ?? []
+            staff = raw.staff?.edges ?? []
             if media?.bannerImage == nil {
                 let artwork = await TVDBMappingService.shared.getArtwork(for: id, provider: .anilist)
                 if let fanart = artwork.fanart {
