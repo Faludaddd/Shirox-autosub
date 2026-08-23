@@ -10,6 +10,201 @@ final class MALDiscoveryService {
     }()
     private init() {}
 
+    // MARK: - Shared request layer (in-flight dedup + cache + rate limit)
+    //
+    // Prevents the "request storm" where multiple screens (HomeView,
+    // MangaHomeView, Schedule, Search) all call fetchList("top/manga")
+    // at nearly the same moment. Without dedup, each fires its own
+    // independent Jikan request — 3-4 concurrent calls to the same
+    // endpoint within the same second, which trips Jikan's 3 req/sec
+    // rate limit and causes 429/504 cascading failures.
+    //
+    // With this layer:
+    //   1. In-flight dedup: if a request for the same URL is already
+    //      running, the caller awaits the same Task instead of firing
+    //      a new one.
+    //   2. Short-lived cache: successful results are cached for 120s
+    //      so screens loading shortly after each other reuse the cache.
+    //   3. Rate limiting: a minimum 400ms gap between outbound Jikan
+    //      requests, enforced app-wide via a serial gate.
+
+    private var inFlightTasks: [String: Task<Data, Error>] = [:]
+    private var inFlightLock = NSLock()
+
+    private var listCache: [String: (data: [JikanAnime], timestamp: Date)] = [:]
+    private var singleCache: [String: (data: JikanAnime, timestamp: Date)] = [:]
+    private let cacheTTL: TimeInterval = 120  // 2 minutes
+
+    private var lastRequestTime: Date = .distantPast
+    private let minRequestSpacing: TimeInterval = 0.4  // 400ms between Jikan requests
+    private let rateLimitLock = NSLock()
+
+    /// Enforces minimum spacing between Jikan requests. Called before
+    /// every outbound request. If the last request was less than
+    /// `minRequestSpacing` ago, sleeps until the gap is met.
+    private func enforceRateLimit() async {
+        rateLimitLock.lock()
+        let elapsed = Date().timeIntervalSince(lastRequestTime)
+        let needed = minRequestSpacing - elapsed
+        rateLimitLock.unlock()
+        if needed > 0 {
+            try? await Task.sleep(nanoseconds: UInt64(needed * 1_000_000_000))
+        }
+        rateLimitLock.lock()
+        lastRequestTime = Date()
+        rateLimitLock.unlock()
+    }
+
+    /// Builds a cache key from path + sorted query items.
+    private func cacheKey(path: String, queryItems: [URLQueryItem]) -> String {
+        let sorted = queryItems.sorted { $0.name < $1.name }
+        let qs = sorted.map { "\($0.name)=\($0.value ?? "")" }.joined(separator: "&")
+        return "\(path)?\(qs)"
+    }
+
+    /// Shared fetch for list endpoints — deduplicates in-flight requests,
+    /// caches results for 120s, and rate-limits outbound calls.
+    private func sharedFetchList(_ path: String, queryItems: [URLQueryItem]) async throws -> [JikanAnime] {
+        let key = cacheKey(path: path, queryItems: queryItems)
+
+        // Check cache
+        if let cached = listCache[key], Date().timeIntervalSince(cached.timestamp) < cacheTTL {
+            Logger.shared.log("[Jikan] Cache hit: \(key)", type: "Debug")
+            return cached.data
+        }
+
+        // Check in-flight
+        inFlightLock.lock()
+        if let existing = inFlightTasks[key] {
+            inFlightLock.unlock()
+            Logger.shared.log("[Jikan] Dedup: awaiting in-flight request for \(key)", type: "Debug")
+            let data = try await existing.value
+            return try decodeList(data)
+        }
+
+        // Create new task
+        let task = Task<Data, Error> { [self] in
+            await enforceRateLimit()
+            var components = URLComponents(url: base.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
+            components.queryItems = [URLQueryItem(name: "sfw", value: "true")] + queryItems
+            Logger.shared.log("[Jikan] Fetching: \(key)", type: "Info")
+            let (data, response) = try await session.data(from: components.url!)
+            if let http = response as? HTTPURLResponse {
+                if http.statusCode == 429 {
+                    try await Task.sleep(nanoseconds: 2_000_000_000)
+                    // Single retry, no recursive call to avoid storms
+                    Logger.shared.log("[Jikan] 429 on \(key) — retrying after 2s", type: "Warning")
+                    let (retryData, retryResp) = try await session.data(from: components.url!)
+                    if let retryHttp = retryResp as? HTTPURLResponse, retryHttp.statusCode >= 400 {
+                        throw ProviderError.serverError(retryHttp.statusCode)
+                    }
+                    return retryData
+                }
+                if http.statusCode >= 500 {
+                    try await Task.sleep(nanoseconds: 3_000_000_000)
+                    Logger.shared.log("[Jikan] \(http.statusCode) on \(key) — retrying after 3s", type: "Warning")
+                    let (retryData, retryResp) = try await session.data(from: components.url!)
+                    if let retryHttp = retryResp as? HTTPURLResponse, retryHttp.statusCode >= 400 {
+                        throw ProviderError.serverError(retryHttp.statusCode)
+                    }
+                    return retryData
+                }
+            }
+            return data
+        }
+
+        inFlightTasks[key] = task
+        inFlightLock.unlock()
+
+        do {
+            let data = try await task.value
+            let decoded = try decodeList(data)
+            // Cache the result
+            listCache[key] = (data: decoded, timestamp: Date())
+            // Remove from in-flight
+            inFlightLock.lock()
+            inFlightTasks.removeValue(forKey: key)
+            inFlightLock.unlock()
+            return decoded
+        } catch {
+            inFlightLock.lock()
+            inFlightTasks.removeValue(forKey: key)
+            inFlightLock.unlock()
+            throw error
+        }
+    }
+
+    /// Shared fetch for single-item endpoints — same dedup + cache + rate limit.
+    private func sharedFetchSingle(_ path: String) async throws -> JikanAnime {
+        let key = path
+
+        // Check cache
+        if let cached = singleCache[key], Date().timeIntervalSince(cached.timestamp) < cacheTTL {
+            return cached.data
+        }
+
+        // Check in-flight
+        inFlightLock.lock()
+        if let existing = inFlightTasks[key] {
+            inFlightLock.unlock()
+            let data = try await existing.value
+            return try decodeSingle(data)
+        }
+
+        let task = Task<Data, Error> { [self] in
+            await enforceRateLimit()
+            let url = base.appendingPathComponent(path)
+            Logger.shared.log("[Jikan] Fetching single: \(key)", type: "Info")
+            let (data, response) = try await session.data(from: url)
+            if let http = response as? HTTPURLResponse {
+                if http.statusCode == 429 {
+                    try await Task.sleep(nanoseconds: 2_000_000_000)
+                    let (retryData, _) = try await session.data(from: url)
+                    return retryData
+                }
+                if http.statusCode >= 500 {
+                    try await Task.sleep(nanoseconds: 3_000_000_000)
+                    let (retryData, _) = try await session.data(from: url)
+                    return retryData
+                }
+            }
+            return data
+        }
+
+        inFlightTasks[key] = task
+        inFlightLock.unlock()
+
+        do {
+            let data = try await task.value
+            let decoded = try decodeSingle(data)
+            singleCache[key] = (data: decoded, timestamp: Date())
+            inFlightLock.lock()
+            inFlightTasks.removeValue(forKey: key)
+            inFlightLock.unlock()
+            return decoded
+        } catch {
+            inFlightLock.lock()
+            inFlightTasks.removeValue(forKey: key)
+            inFlightLock.unlock()
+            throw error
+        }
+    }
+
+    // MARK: - Decoders
+
+    private func decodeList(_ data: Data) throws -> [JikanAnime] {
+        var seen = Set<Int>()
+        return try JSONDecoder().decode(JikanPage<JikanAnime>.self, from: data).data.filter {
+            guard $0.mal_id > 0 else { return false }
+            guard let imgUrl = $0.images?.jpg?.image_url, !imgUrl.isEmpty, !imgUrl.contains("qm_50") else { return false }
+            return seen.insert($0.mal_id).inserted
+        }
+    }
+
+    private func decodeSingle(_ data: Data) throws -> JikanAnime {
+        try JSONDecoder().decode(JikanSingle<JikanAnime>.self, from: data).data
+    }
+
     // MARK: - Jikan models
 
     struct JikanAnime: Decodable {
@@ -63,56 +258,16 @@ final class MALDiscoveryService {
         let data: T
     }
 
-    // MARK: - Fetch helpers
+    // MARK: - Fetch helpers (now route through the shared dedup+cache+rate-limit layer)
 
     func fetchList(_ path: String, queryItems: [URLQueryItem] = [], retrying: Bool = false) async throws -> [JikanAnime] {
-        var components = URLComponents(url: base.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
-        components.queryItems = [URLQueryItem(name: "sfw", value: "true")] + queryItems
-        let (data, response) = try await session.data(from: components.url!)
-        if let http = response as? HTTPURLResponse {
-            if http.statusCode == 429 {
-                if retrying { throw ProviderError.serverError(429) }
-                // Jikan rate limit: 3 req/sec, 60 req/min.
-                // Back off 2s before retrying (was 1s — too aggressive,
-                // caused repeated 429s when multiple fallback calls fire
-                // in quick succession).
-                try await Task.sleep(nanoseconds: 2_000_000_000)
-                return try await fetchList(path, queryItems: queryItems, retrying: true)
-            }
-            if http.statusCode >= 500 {
-                if retrying { throw ProviderError.serverError(http.statusCode) }
-                // 502/503/504 — Jikan's backend is temporarily down.
-                // Retry once after 3s (was: immediately throw).
-                Logger.shared.log("[Jikan] \(path) returned \(http.statusCode) — retrying once after 3s", type: "Warning")
-                try await Task.sleep(nanoseconds: 3_000_000_000)
-                return try await fetchList(path, queryItems: queryItems, retrying: true)
-            }
-        }
-        var seen = Set<Int>()
-        return try JSONDecoder().decode(JikanPage<JikanAnime>.self, from: data).data.filter {
-            guard $0.mal_id > 0 else { return false }
-            guard let imgUrl = $0.images?.jpg?.image_url, !imgUrl.isEmpty, !imgUrl.contains("qm_50") else { return false }
-            return seen.insert($0.mal_id).inserted
-        }
+        // The `retrying` parameter is kept for backward compatibility but
+        // is no longer used — the shared layer handles retries internally.
+        try await sharedFetchList(path, queryItems: queryItems)
     }
 
     private func fetchSingle(_ path: String, retrying: Bool = false) async throws -> JikanAnime {
-        let url = base.appendingPathComponent(path)
-        let (data, response) = try await session.data(from: url)
-        if let http = response as? HTTPURLResponse {
-            if http.statusCode == 429 {
-                if retrying { throw ProviderError.serverError(429) }
-                try await Task.sleep(nanoseconds: 2_000_000_000)
-                return try await fetchSingle(path, retrying: true)
-            }
-            if http.statusCode >= 500 {
-                if retrying { throw ProviderError.serverError(http.statusCode) }
-                Logger.shared.log("[Jikan] \(path) returned \(http.statusCode) — retrying once after 3s", type: "Warning")
-                try await Task.sleep(nanoseconds: 3_000_000_000)
-                return try await fetchSingle(path, retrying: true)
-            }
-        }
-        return try JSONDecoder().decode(JikanSingle<JikanAnime>.self, from: data).data
+        try await sharedFetchSingle(path)
     }
 
     // MARK: - Public API

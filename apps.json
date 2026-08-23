@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "1.99",
+          "buildVersion": "1",
+          "date": "2026-08-23",
+          "localizedDescription": "Fixed: Jikan request storm — multiple screens were independently calling the same Jikan endpoints simultaneously, tripping the 3 req/sec rate limit and causing cascading 429/504 failures. Added a shared request layer with: (1) in-flight deduplication, (2) 120-second result cache, (3) app-wide 400ms rate limiting between requests. Retries are now handled centrally instead of per call site.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 11040520,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.98",
           "buildVersion": "1",
           "date": "2026-08-23",

@@ -99,6 +99,20 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "1.99",
+        date: "2026-08-23",
+        added: [],
+        fixed: [
+            "Jikan request storm — root cause found and fixed. Multiple screens (Home, Manga Home, Schedule, Search) were independently calling the same Jikan endpoints (e.g. top/manga) within the same second, causing 3-4 concurrent requests that tripped Jikan's 3 req/sec rate limit and led to cascading 429/504 failures. Added a shared request layer to MALDiscoveryService that: (1) de-duplicates in-flight requests — if a request for the same URL is already running, subsequent callers await the same Task instead of firing a new one; (2) caches successful results for 120 seconds so screens loading shortly after each other reuse the cache; (3) rate-limits all outbound Jikan requests with a minimum 400ms spacing enforced app-wide."
+        ],
+        changed: [],
+        improved: [
+            "Jikan fallback reliability — the shared layer also handles retries (single retry on 429 after 2s, on 5xx after 3s) instead of each call site implementing its own retry logic. This prevents overlapping retries from interfering with each other (which caused the CancellationError logs)."
+        ],
+        removed: [],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "1.98",
         date: "2026-08-23",
         added: [],
