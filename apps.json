@@ -32,7 +32,7 @@
           "date": "2026-08-23",
           "localizedDescription": "Fixed: Jikan 502/504 fallback failures — now retries once after 3s instead of immediately failing. Increased 429 backoff from 1s to 2s.\nFixed: MAL token refresh spam for unauthenticated users — short-circuits immediately if no refresh token exists.\nFixed: Search manga fallback — manga search now falls back to Jikan when AniList is unavailable.\nImproved: Jikan 5xx retries are logged with endpoint + status. Backoff/retry limited to once.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 11040520,
+          "size": 11416661,
           "minOSVersion": "15.0"
         },
         {
