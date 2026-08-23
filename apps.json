@@ -32,7 +32,7 @@
           "date": "2026-08-23",
           "localizedDescription": "Fixed: Staff section now loads actual staff data from AniList (was failing because Jikan API was rate-limited). Staff names, images, and roles appear correctly.\nFixed: Glow toggle — when OFF, no glow is visible anywhere. When ON, no glow on text. Updates immediately without restart.\nReverted: Custom Long Action UI (back to standard context menu).\nReverted: Custom Player UI collapsible settings (back to single bottom bar).",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 11040520,
+          "size": 11228216,
           "minOSVersion": "15.0"
         },
         {
