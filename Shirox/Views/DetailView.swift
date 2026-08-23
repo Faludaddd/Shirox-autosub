@@ -634,7 +634,7 @@ struct DetailView: View {
         }
 
         let stream = StreamResult(
-            title: item.streamTitle ?? item.episodeTitle ?? "EP \\(item.episodeNumber\)",
+            title: item.streamTitle ?? item.episodeTitle ?? "EP \(item.episodeNumber)",
             url: url,
             headers: item.headers ?? [:],
             subtitle: item.subtitle

@@ -93,7 +93,7 @@ struct ThumbnailEpisodeRow: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
-                        Text("EP \\(number\)")
+                        Text("EP \(number)")
                             .font(.callout.weight(.semibold))
                             .foregroundStyle(.primary)
                             .lineLimit(1)

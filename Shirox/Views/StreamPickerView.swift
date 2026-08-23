@@ -72,7 +72,7 @@ struct StreamPickerView: View {
     }
 
     private var episodeTitle: String {
-        vm.selectedEpisode.map { "EP \\($0.displayNumber\)" } ?? "Select Stream"
+        vm.selectedEpisode.map { "EP \($0.displayNumber)" } ?? "Select Stream"
     }
 }
 

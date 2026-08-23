@@ -365,7 +365,7 @@ struct ModuleStreamPickerView: View {
                 Image(systemName: "play.circle.fill")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Color.appAccent)
-                Text("EP \\(episodeNumber\)")
+                Text("EP \(episodeNumber)")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
                 Text("·")

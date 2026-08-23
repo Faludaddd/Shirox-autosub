@@ -64,7 +64,7 @@ struct EpisodeRowView: View {
                                 radius: 4, y: 2)
                     }
 
-                    Text("EP \\(episode.displayNumber\)")
+                    Text("EP \(episode.displayNumber)")
                         .font(.callout.weight(.medium))
                         .foregroundStyle(.primary)
                         .lineLimit(1)

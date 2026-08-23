@@ -21,7 +21,7 @@ struct DownloadRowView: View {
                     .font(.subheadline.weight(.bold))
                     .lineLimit(1)
 
-                Text(item.episodeTitle ?? "EP \\(item.episodeNumber\)")
+                Text(item.episodeTitle ?? "EP \(item.episodeNumber)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)

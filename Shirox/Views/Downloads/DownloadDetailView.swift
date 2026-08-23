@@ -47,7 +47,7 @@ struct DownloadDetailView: View {
                 Text(liveItem.mediaTitle)
                     .font(.headline)
                     .lineLimit(2)
-                Text(liveItem.episodeTitle ?? "EP \\(liveItem.episodeNumber\)")
+                Text(liveItem.episodeTitle ?? "EP \(liveItem.episodeNumber)")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
