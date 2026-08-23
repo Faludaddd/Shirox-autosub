@@ -1502,7 +1502,20 @@ struct ScheduleView: View {
             let raw = try await AniListService.shared.mangaReleaseSchedule()
             mangaReleases = raw.map { AniListProvider.shared.mapMangaMedia($0) }
         } catch {
-            mangaLoadError = error.localizedDescription
+            // AniList failed — try Jikan/MAL fallback for manga schedule.
+            if AniListService.shared.isApiDisabled() || AniListService.shared.isRateLimited() {
+                Logger.shared.log("[MangaSchedule] AniList failed, falling back to Jikan", type: "Info")
+                do {
+                    let mangaList = try await MALDiscoveryService.shared.fetchList("top/manga",
+                        queryItems: [URLQueryItem(name: "filter", value: "bypopularity"), URLQueryItem(name: "limit", value: "25")])
+                    mangaReleases = mangaList.map { MALDiscoveryService.shared.mapToMedia($0) }
+                } catch {
+                    mangaLoadError = "Couldn't load manga schedule. AniList and Jikan are both unavailable."
+                    Logger.shared.log("[MangaSchedule] Jikan fallback also failed: \(error.localizedDescription)", type: "Error")
+                }
+            } else {
+                mangaLoadError = error.localizedDescription
+            }
         }
         isLoadingManga = false
     }

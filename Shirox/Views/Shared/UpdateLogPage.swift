@@ -99,6 +99,20 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "1.97",
+        date: "2026-08-23",
+        added: [],
+        fixed: [
+            "Manga and Schedule not loading when AniList is down — AniList is returning 403 'API temporarily disabled'. The app already had Jikan fallback for manga trending/popular, but the manga schedule tab had NO fallback at all. Added Jikan fallback for the manga schedule: when AniList fails, fetches top manga from Jikan's /top/manga endpoint. Also added topRated to the manga home Jikan fallback (was only fetching trending + popular). Jikan fallback errors are now logged instead of silently swallowed."
+        ],
+        changed: [],
+        improved: [],
+        removed: [],
+        other: [
+            "The AniList 403 'API temporarily disabled due to severe stability issues' is a server-side issue on AniList's end — the API itself is down. The app handles it gracefully by falling back to Jikan/MAL. When AniList comes back online, pull-to-refresh will switch back automatically."
+        ]
+    ),
+    UpdateLogEntry(
         version: "1.96",
         date: "2026-08-23",
         added: [],

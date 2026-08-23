@@ -142,8 +142,12 @@ final class MangaHomeViewModel: ObservableObject {
                 let mangaPopular = try await MALDiscoveryService.shared.fetchList("top/manga",
                     queryItems: [URLQueryItem(name: "filter", value: "favorite"), URLQueryItem(name: "limit", value: "20")])
                 popular = mangaPopular.map { MALDiscoveryService.shared.mapToMedia($0) }
+                try await Task.sleep(nanoseconds: 400_000_000)
+                let mangaTopRated = try await MALDiscoveryService.shared.fetchList("top/manga",
+                    queryItems: [URLQueryItem(name: "filter", value: "bypopularity"), URLQueryItem(name: "limit", value: "20")])
+                topRated = mangaTopRated.map { MALDiscoveryService.shared.mapToMedia($0) }
             } catch {
-                // Jikan also failed
+                Logger.shared.log("[MangaHome] Jikan fallback also failed: \(error.localizedDescription)", type: "Error")
             }
         }
 
