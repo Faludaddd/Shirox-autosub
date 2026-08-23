@@ -99,6 +99,18 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "1.94",
+        date: "2026-08-23",
+        added: [],
+        fixed: [
+            "Manga section not loading — AniList HTTP 429 rate-limit errors were causing all manga queries to fail with no fallback. Added a 90-second rate-limit cooldown on AniListService.post() so the app stops sending requests that will also be rejected. When rate-limited, manga home now falls back to MAL/Jikan for trending and popular manga, same as the anime home already does. Anime home also updated to check rate-limit status before retrying."
+        ],
+        changed: [],
+        improved: [],
+        removed: [],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "1.93",
         date: "2026-08-23",
         added: [],

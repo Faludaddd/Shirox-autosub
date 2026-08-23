@@ -130,10 +130,10 @@ final class MangaHomeViewModel: ObservableObject {
         topRated = (r ?? []).map { AniListProvider.shared.mapMangaMedia($0) }
         latest = (l ?? []).map { AniListProvider.shared.mapMangaMedia($0) }
 
-        // If AniList is disabled/failed and we got no data, try Jikan/MAL
+        // If AniList is disabled/rate-limited/failed and we got no data, try Jikan/MAL
         if trending.isEmpty && popular.isEmpty && topRated.isEmpty && latest.isEmpty
-            && AniListService.shared.isApiDisabled() {
-            Logger.shared.logStructured(type: "Provider", feature: "MangaHome", operation: "Fallback to Jikan for manga", error: "AniList API disabled")
+            && (AniListService.shared.isApiDisabled() || AniListService.shared.isRateLimited()) {
+            Logger.shared.logStructured(type: "Provider", feature: "MangaHome", operation: "Fallback to Jikan for manga", error: "AniList API disabled or rate-limited")
             do {
                 let mangaTrending = try await MALDiscoveryService.shared.fetchList("top/manga",
                     queryItems: [URLQueryItem(name: "filter", value: "bypopularity"), URLQueryItem(name: "limit", value: "20")])

@@ -72,7 +72,7 @@ final class HomeViewModel: ObservableObject {
             trending = try await ProviderManager.shared.call { try await $0.trending() }
         } catch {
             // AniList failed — try Jikan/MAL as fallback for the data.
-            if AniListService.shared.isApiDisabled() {
+            if AniListService.shared.isApiDisabled() || AniListService.shared.isRateLimited() {
                 Logger.shared.logStructured(type: "Provider", feature: "Home", operation: "Trending fallback to Jikan", error: "AniList API disabled")
                 do {
                     let results = try await MALDiscoveryService.shared.trending()
@@ -90,7 +90,7 @@ final class HomeViewModel: ObservableObject {
         do {
             seasonal = try await ProviderManager.shared.call { try await $0.seasonal() }
         } catch {
-            if AniListService.shared.isApiDisabled() {
+            if AniListService.shared.isApiDisabled() || AniListService.shared.isRateLimited() {
                 do {
                     let results = try await MALDiscoveryService.shared.seasonal()
                     seasonal = results.map { MALDiscoveryService.shared.mapToMedia($0) }
@@ -103,7 +103,7 @@ final class HomeViewModel: ObservableObject {
         do {
             popular = try await ProviderManager.shared.call { try await $0.popular() }
         } catch {
-            if AniListService.shared.isApiDisabled() {
+            if AniListService.shared.isApiDisabled() || AniListService.shared.isRateLimited() {
                 do {
                     let results = try await MALDiscoveryService.shared.popular()
                     popular = results.map { MALDiscoveryService.shared.mapToMedia($0) }
@@ -116,7 +116,7 @@ final class HomeViewModel: ObservableObject {
         do {
             topRated = try await ProviderManager.shared.call { try await $0.topRated() }
         } catch {
-            if AniListService.shared.isApiDisabled() {
+            if AniListService.shared.isApiDisabled() || AniListService.shared.isRateLimited() {
                 do {
                     let results = try await MALDiscoveryService.shared.topRated()
                     topRated = results.map { MALDiscoveryService.shared.mapToMedia($0) }

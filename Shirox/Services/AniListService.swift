@@ -65,6 +65,12 @@ final class AniListService {
     /// When AniList returns "API temporarily disabled", we cache the
     /// disabled state for 60 seconds to avoid hammering a down API.
     private var aniListApiDisabledUntil: Date?
+    /// When AniList returns HTTP 429 (rate limited), we cache the
+    /// rate-limited state for 90 seconds to avoid hammering the API
+    /// with repeated requests that will also fail. This is separate
+    /// from `aniListApiDisabledUntil` (which handles the "API
+    /// temporarily disabled" 403 response).
+    private var aniListRateLimitedUntil: Date?
 
     /// True if AniList API is known to be temporarily disabled (from a
     /// previous "API temporarily disabled" response). Used by
@@ -73,6 +79,15 @@ final class AniListService {
         guard let until = aniListApiDisabledUntil else { return false }
         if Date() < until { return true }
         aniListApiDisabledUntil = nil
+        return false
+    }
+
+    /// True if AniList API is currently rate-limited (429). Used by
+    /// callers to fall back to MAL/Jikan instead of retrying.
+    func isRateLimited() -> Bool {
+        guard let until = aniListRateLimitedUntil else { return false }
+        if Date() < until { return true }
+        aniListRateLimitedUntil = nil
         return false
     }
 
@@ -1391,6 +1406,12 @@ final class AniListService {
             throw AniListError.httpError(403)
         }
 
+        // If AniList API is rate-limited (429), skip the request for 90s
+        // instead of sending more requests that will also be rejected.
+        if let rateLimitedUntil = aniListRateLimitedUntil, Date() < rateLimitedUntil {
+            throw AniListError.rateLimited
+        }
+
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -1441,10 +1462,11 @@ final class AniListService {
                 )
                 return data
             case 429:
+                aniListRateLimitedUntil = Date().addingTimeInterval(90)
                 Logger.shared.logStructured(
                     type: "Error",
                     feature: "AniList",
-                    operation: "GraphQL \(opName) rate limited",
+                    operation: "GraphQL \(opName) rate limited (90s cooldown)",
                     contentId: idStr,
                     httpStatus: 429
                 )
