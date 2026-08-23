@@ -15,70 +15,6 @@ private final class ModuleStreamVMStore: ObservableObject {
     }
 }
 
-// MARK: - Sheet
-
-struct ModuleStreamPickerView: View {
-    let mediaId: Int?
-    let animeTitle: String
-    let episodeNumber: Int
-    let onDismiss: () -> Void
-    let onStreamsLoaded: ([StreamResult], StreamResult?, String?, Int?, String?) -> Void  // allStreams, selectedStream, showHref, availableCount, episodeHref
-
-    @EnvironmentObject private var moduleManager: ModuleManager
-    @StateObject private var vmStore = ModuleStreamVMStore()
-
-    /// Always show every installed anime module — no hidden filtering,
-    /// no "use default extension only" toggle. The user manually picks
-    /// which module to search against.
-    private var visibleModules: [ModuleDefinition] {
-        moduleManager.modules
-    }
-
-    var body: some View {
-        NavigationStack {
-            List {
-                ForEach(visibleModules) { module in
-                    ModuleStreamRow(
-                        module: module,
-                        mediaId: mediaId,
-                        animeTitle: animeTitle,
-                        episodeNumber: episodeNumber,
-                        rowVm: vmStore.get(for: module, mediaId: mediaId, animeTitle: animeTitle, episodeNumber: episodeNumber)
-                    ) { streams, selectedStream, showHref, availableCount, episodeHref in
-                        moduleManager.selectModule(module)
-                        onDismiss()
-                        onStreamsLoaded(streams, selectedStream, showHref, availableCount, episodeHref)
-                    }
-                }
-            }
-            #if os(iOS)
-            .listStyle(.insetGrouped)
-            #elseif !os(tvOS)
-            .listStyle(.inset)
-            #endif
-
-            .navigationTitle("Watch Episode \(episodeNumber)")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { onDismiss() }
-                }
-            }
-            .tint(.primary)
-        }
-        #if os(iOS)
-        .adaptivePresentationDetents([.medium, .large])
-
-        #else
-
-        .frame(minWidth: 480, minHeight: 360)
-
-        #endif
-    }
-}
-
 // MARK: - Row ViewModel
 
 @MainActor
@@ -338,74 +274,277 @@ private final class ModuleStreamRowViewModel: ObservableObject {
     }
 }
 
-// MARK: - Row View
 
-private struct ModuleStreamRow: View {
-    let module: ModuleDefinition
+
+// MARK: - Sheet
+
+/// Fully custom Change Stream UI.
+///
+/// Replaces the previous iOS-default List with a custom design that
+/// matches the rest of the app: card-based module grid, custom stream
+/// rows with quality badges, in-card loading/error/empty states, and a
+/// persistent header showing what episode we're picking a stream for.
+///
+/// Module list is filtered at the data-source level — only anime modules
+/// (modules where `isManga == false`) are returned by `visibleModules`.
+/// Manga modules are never present in the array, so they cannot appear
+/// in the UI regardless of which code path renders them.
+struct ModuleStreamPickerView: View {
     let mediaId: Int?
     let animeTitle: String
     let episodeNumber: Int
+    let onDismiss: () -> Void
     let onStreamsLoaded: ([StreamResult], StreamResult?, String?, Int?, String?) -> Void
 
-    @ObservedObject var rowVm: ModuleStreamRowViewModel
-    @State private var showAllResults = false
-    @State private var showStreamPicker = false
+    @EnvironmentObject private var moduleManager: ModuleManager
+    @StateObject private var vmStore = ModuleStreamVMStore()
+    @State private var query: String = ""
+    @State private var selectedModuleId: String? = nil
 
-    init(
-        module: ModuleDefinition,
-        mediaId: Int?,
-        animeTitle: String,
-        episodeNumber: Int,
-        rowVm: ModuleStreamRowViewModel,
-        onStreamsLoaded: @escaping ([StreamResult], StreamResult?, String?, Int?, String?) -> Void
-    ) {
-        self.module = module
-        self.mediaId = mediaId
-        self.animeTitle = animeTitle
-        self.episodeNumber = episodeNumber
-        self.onStreamsLoaded = onStreamsLoaded
-        self._rowVm = ObservedObject(wrappedValue: rowVm)
+    /// Anime modules only — the underlying filter. Manga modules are
+    /// excluded here at the data-source layer so they can never reach
+    /// any rendering code path. We also filter out local-playback and
+    /// Jellyfin pseudo-modules (they have their own entry points).
+    private var animeModules: [ModuleDefinition] {
+        moduleManager.modules.filter { !$0.isManga && !$0.isNovel && !$0.isLocalPlayback && !$0.isJellyfin }
     }
 
-    private func fireStreamsLoaded(_ streams: [StreamResult], selected: StreamResult?, href: String?, count: Int?, episodeHref: String?) {
-        UserDefaults.standard.set(module.id, forKey: "lastUsedModuleId")
-        onStreamsLoaded(streams, selected, href, count, episodeHref)
+    private var visibleModules: [ModuleDefinition] {
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        if trimmed.isEmpty { return animeModules }
+        return animeModules.filter { $0.sourceName.localizedCaseInsensitiveContains(trimmed) }
     }
 
     var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    episodeHeader
+                    moduleSection
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 16)
+            }
+            .background(platformBackground.ignoresSafeArea())
+            .navigationTitle("Change Stream")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(action: onDismiss) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 22))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .tint(.primary)
+        }
+        #if os(iOS)
+        .adaptivePresentationDetents([.large])
+        #else
+        .frame(minWidth: 480, minHeight: 480)
+        #endif
+    }
+
+    private var platformBackground: Color {
+        #if os(iOS)
+        Color(.systemGroupedBackground)
+        #else
+        Color.black.opacity(0.05)
+        #endif
+    }
+
+    // MARK: Episode header
+
+    @ViewBuilder
+    private var episodeHeader: some View {
         VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "play.circle.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.appAccent)
+                Text("Episode \(episodeNumber)")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Text("·")
+                    .foregroundStyle(.secondary)
+                Text(animeTitle)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                Spacer()
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.secondary.opacity(0.08))
+            )
+        }
+    }
+
+    // MARK: Module section
+
+    @ViewBuilder
+    private var moduleSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "square.stack.3d.up.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Text("Modules")
+                    .font(.headline)
+                Spacer()
+                Text("\(visibleModules.count) available")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 4)
+
+            // Search field — only shown when there are 4+ modules so it
+            // doesn't clutter the UI for users with just 1–3 modules.
+            if animeModules.count >= 4 {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    TextField("Filter modules", text: $query)
+                        .font(.subheadline)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    if !query.isEmpty {
+                        Button {
+                            query = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 14))
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.secondary.opacity(0.08))
+                )
+            }
+
+            if animeModules.isEmpty {
+                EmptyStateView(
+                    icon: "puzzlepiece.extension",
+                    title: "No Anime Modules Installed",
+                    message: "Install an anime module from Settings → Modules → Module Store to start watching."
+                )
+            } else if visibleModules.isEmpty && !query.isEmpty {
+                EmptyStateView(
+                    icon: "magnifyingglass",
+                    title: "No Matches",
+                    message: "No modules match \"\(query)\". Try a different search."
+                )
+            } else {
+                LazyVStack(spacing: 10) {
+                    ForEach(visibleModules) { module in
+                        ModuleCard(
+                            module: module,
+                            isSelected: selectedModuleId == module.id,
+                            rowVm: vmStore.get(for: module, mediaId: mediaId, animeTitle: animeTitle, episodeNumber: episodeNumber),
+                            episodeNumber: episodeNumber,
+                            onSelect: {
+                                Haptics.light()
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                    selectedModuleId = module.id
+                                }
+                                // Kick off search on first selection.
+                                let vm = vmStore.get(for: module, mediaId: mediaId, animeTitle: animeTitle, episodeNumber: episodeNumber)
+                                if case .idle = vm.state {
+                                    vm.startFind()
+                                }
+                            },
+                            onStreamSelected: { stream, allStreams, href, count, episodeHref in
+                                moduleManager.selectModule(module)
+                                onDismiss()
+                                onStreamsLoaded(allStreams, stream, href, count, episodeHref)
+                            },
+                            onDismissPicker: onDismiss
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Module Card
+
+/// Custom module card with built-in search-result + episode + stream
+/// selection UI. Replaces the previous iOS-List row with a fully
+/// custom card that:
+///  - Shows the module icon + name + language + version
+///  - Highlights when selected
+///  - Shows loading skeleton / search results / episode picker /
+///    stream picker / error state INSIDE the card
+///  - Handles Cloudflare inline (no system alert)
+private struct ModuleCard: View {
+    let module: ModuleDefinition
+    let isSelected: Bool
+    @ObservedObject var rowVm: ModuleStreamRowViewModel
+    let episodeNumber: Int
+    let onSelect: () -> Void
+    let onStreamSelected: (StreamResult, [StreamResult], String?, Int?, String?) -> Void
+    let onDismissPicker: () -> Void
+
+    @State private var showAllResults = false
+    @State private var showStreamPicker = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
             headerRow
-            stateContent
+            if isSelected {
+                stateContent
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 14)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
-        .padding(.vertical, 6)
-        .onAppear {
-            rowVm.startFind()
-        }
-        .onDisappear {
-            rowVm.cancelIfSearching()
-        }
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(.secondarySystemGroupedBackground))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(
+                    isSelected ? Color.appAccent.opacity(0.6) : Color.primary.opacity(0.08),
+                    lineWidth: isSelected ? 1.5 : 1
+                )
+        )
+        .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .onTapGesture { onSelect() }
         .onChangeOf(rowVm.readyStreams) { streams in
             guard let streams else { return }
-
             // Single stream → it's the only choice, auto-select it.
             // Multiple streams → ALWAYS show the manual picker. No
             // "auto-pick last stream" shortcut — the user must
             // explicitly choose which stream to play.
             if streams.count == 1 {
-                fireStreamsLoaded(streams, selected: streams[0], href: rowVm.selectedEpisodeHref, count: rowVm.availableCount, episodeHref: rowVm.selectedEpisodeActualHref)
+                fireStreamSelected(streams[0], allStreams: streams)
             } else {
                 showStreamPicker = true
             }
         }
         .adaptiveSheet(isPresented: $showStreamPicker) {
             if let streams = rowVm.readyStreams {
-                ModuleStreamSelectionView(
+                CustomStreamSelectionView(
                     streams: streams,
                     onSelect: { stream in
                         ModuleSearchAliasManager.shared.setLastStreamTitle(moduleId: module.id, title: stream.title)
                         showStreamPicker = false
                         let allStreams = rowVm.readyStreams ?? [stream]
-                        fireStreamsLoaded(allStreams, selected: stream, href: rowVm.selectedEpisodeHref, count: rowVm.availableCount, episodeHref: rowVm.selectedEpisodeActualHref)
+                        fireStreamSelected(stream, allStreams: allStreams)
                     },
                     onDismiss: {
                         showStreamPicker = false
@@ -424,57 +563,68 @@ private struct ModuleStreamRow: View {
         }
     }
 
+    private func fireStreamSelected(_ stream: StreamResult, allStreams: [StreamResult]) {
+        UserDefaults.standard.set(module.id, forKey: "lastUsedModuleId")
+        onStreamSelected(stream, allStreams, rowVm.selectedEpisodeHref, rowVm.availableCount, rowVm.selectedEpisodeActualHref)
+    }
+
     // MARK: Header
 
     private var headerRow: some View {
         HStack(spacing: 12) {
-            AsyncImage(url: URL(string: module.iconUrl ?? "")) { phase in
-                if case .success(let img) = phase {
-                    img.resizable().scaledToFill()
-                } else {
-                    Image(systemName: "puzzlepiece.extension")
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .frame(width: 32, height: 32)
-            .clipShape(RoundedRectangle(cornerRadius: 7))
+            CachedAsyncImage(urlString: module.iconUrl ?? "", base64String: module.iconData)
+                .frame(width: 44, height: 44)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+                )
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(module.sourceName)
-                    .font(.subheadline).fontWeight(.semibold)
-                if let lang = module.language {
-                    Text(lang.uppercased())
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    if let lang = module.language, !lang.isEmpty {
+                        Text(lang)
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(Color.secondary.opacity(0.12)))
+                    }
+                    if let quality = module.quality, !quality.isEmpty {
+                        Text(quality)
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(Color.appAccent)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(Color.appAccent.opacity(0.12)))
+                    }
                 }
             }
-
             Spacer()
-            actionButton
-        }
-    }
-
-    @ViewBuilder
-    private var actionButton: some View {
-        switch rowVm.state {
-        case .idle:
-            Button("Find") { rowVm.startFind() }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .foregroundStyle(.primary)
-
-        case .loading, .loadingEpisodes, .loadingStreams:
-            Button { rowVm.cancel() } label: {
-                Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+            // Selection indicator
+            ZStack {
+                Circle()
+                    .strokeBorder(isSelected ? Color.appAccent : Color.secondary.opacity(0.3), lineWidth: 1.5)
+                    .frame(width: 22, height: 22)
+                if isSelected {
+                    Circle()
+                        .fill(Color.appAccent)
+                        .frame(width: 22, height: 22)
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.white)
+                }
             }
-            .buttonStyle(.plain)
-
-        case .searchResults, .selectingEpisode, .notFound, .error:
-            Button("Retry") { rowVm.reset(); rowVm.startFind() }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .foregroundStyle(.primary)
+            Image(systemName: isSelected ? "chevron.up" : "chevron.down")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.secondary)
         }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 14)
     }
 
     // MARK: State content
@@ -483,42 +633,65 @@ private struct ModuleStreamRow: View {
     private var stateContent: some View {
         switch rowVm.state {
         case .idle:
-            titleField
+            EmptyView()
 
         case .loading:
-            HStack(spacing: 6) {
-                ProgressView().scaleEffect(0.7)
-                Text("Searching \"\(rowVm.searchTitle)\"…")
-                    .font(.caption).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("Searching for \"\(rowVm.searchTitle)\"…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                // Loading skeleton — 3 shimmer rows
+                VStack(spacing: 6) {
+                    ForEach(0..<3, id: \.self) { _ in
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color.secondary.opacity(0.1))
+                            .frame(height: 36)
+                            .shimmer()
+                    }
+                }
             }
 
         case .loadingEpisodes(let item):
-            HStack(spacing: 6) {
-                ProgressView().scaleEffect(0.7)
+            HStack(spacing: 8) {
+                ProgressView().scaleEffect(0.8)
                 Text("Loading episodes for \"\(item.title)\"…")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
         case .loadingStreams:
-            HStack(spacing: 6) {
-                ProgressView().scaleEffect(0.7)
+            HStack(spacing: 8) {
+                ProgressView().scaleEffect(0.8)
                 Text("Fetching streams…")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
         case .searchResults(let items):
             VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
-                    titleField
-                    Button("Show All") { showAllResults = true }
+                HStack {
+                    Text("Search Results")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button {
+                        showAllResults = true
+                    } label: {
+                        Label("Show All", systemImage: "square.grid.2x2")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Color.appAccent)
+                    }
+                    .buttonStyle(.plain)
                 }
-                verifyBanner
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(alignment: .top, spacing: 10) {
                         ForEach(items) { item in
                             Button {
+                                Haptics.light()
                                 rowVm.startSelectResult(item, targetEpisodeNumber: episodeNumber)
                             } label: {
                                 SearchResultCard(item: item)
@@ -528,69 +701,133 @@ private struct ModuleStreamRow: View {
                     }
                     .padding(.bottom, 2)
                 }
+                if rowVm.cloudflareURL != nil {
+                    CloudflareVerifyInlineButton { rowVm.verifyAndRetry() }
+                }
             }
 
         case .selectingEpisode(let episodes):
-            VStack(alignment: .leading, spacing: 6) {
-                titleField
-                verifyBanner
+            VStack(alignment: .leading, spacing: 8) {
                 Text("Episode not auto-matched — pick manually:")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(episodes) { ep in
-                            Button("Ep \(ep.displayNumber)") {
+                            Button {
+                                Haptics.light()
                                 rowVm.startSelectEpisode(ep)
+                            } label: {
+                                Text("Ep \(ep.displayNumber)")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.primary)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(
+                                        Capsule().fill(Color.secondary.opacity(0.12))
+                                    )
                             }
-                            .buttonStyle(.bordered)
-                            .controlSize(.mini)
-                            .foregroundStyle(.primary)
+                            .buttonStyle(.plain)
                         }
                     }
                 }
             }
 
         case .notFound:
-            VStack(alignment: .leading, spacing: 6) {
-                titleField
+            VStack(alignment: .leading, spacing: 8) {
                 if rowVm.cloudflareURL != nil {
-                    Text("Blocked by Cloudflare").font(.caption).foregroundStyle(.secondary)
-                    verifyBanner
+                    Label("Blocked by Cloudflare", systemImage: "shield.lefthalf.filled")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                    CloudflareVerifyInlineButton { rowVm.verifyAndRetry() }
                 } else {
-                    Text("No results found")
-                        .font(.caption).foregroundStyle(.secondary)
+                    Label("No results found", systemImage: "magnifyingglass")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button {
+                        Haptics.light()
+                        rowVm.reset()
+                        rowVm.startFind()
+                    } label: {
+                        Label("Retry Search", systemImage: "arrow.clockwise")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Color.appAccent)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
 
         case .error(let msg):
-            VStack(alignment: .leading, spacing: 6) {
-                titleField
-                Text(msg).font(.caption).foregroundStyle(.primary)
-                verifyBanner
+            VStack(alignment: .leading, spacing: 8) {
+                Label(msg, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                Button {
+                    Haptics.light()
+                    rowVm.reset()
+                    rowVm.startFind()
+                } label: {
+                    Label("Retry", systemImage: "arrow.clockwise")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.appAccent)
+                }
+                .buttonStyle(.plain)
             }
         }
     }
+}
 
-    /// Inline "Verify Cloudflare" button shown whenever a Turnstile wall was hit while
-    /// loading this module (data fetch or a blocked poster image).
-    @ViewBuilder
-    private var verifyBanner: some View {
-        if rowVm.cloudflareURL != nil {
-            CloudflareVerifyInlineButton { rowVm.verifyAndRetry() }
-        }
-    }
+// MARK: - Empty State
 
-    private var titleField: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass")
-                .font(.caption).foregroundStyle(.secondary)
-            TextField("Search title…", text: $rowVm.searchTitle)
+private struct EmptyStateView: View {
+    let icon: String
+    let title: String
+    let message: String
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 36))
+                .foregroundStyle(.secondary.opacity(0.6))
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+            Text(message)
                 .font(.caption)
-                .onSubmit { rowVm.reset(); rowVm.startFind() }
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 28)
+        .padding(.horizontal, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.secondary.opacity(0.05))
+        )
+    }
+}
+
+// MARK: - Cloudflare verify inline button
+
+private struct CloudflareVerifyInlineButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button {
+            Haptics.light()
+            action()
+        } label: {
+            Label("Verify Cloudflare", systemImage: "checkmark.shield")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(
+                    Capsule().fill(Color.appAccent)
+                )
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -688,62 +925,78 @@ private struct SearchResultsPickerSheet: View {
         }
         #if os(iOS)
         .adaptivePresentationDetents([.medium, .large])
-
         #else
-
         .frame(minWidth: 480, minHeight: 360)
-
         #endif
     }
 }
 
-// MARK: - Stream Selection View
+// MARK: - Custom Stream Selection View
 
-private struct ModuleStreamSelectionView: View {
+/// Fully custom stream picker — replaces the iOS-default List with
+/// card-based rows that show quality badges, subtitle availability,
+/// server name, and a clear selected indicator.
+private struct CustomStreamSelectionView: View {
     let streams: [StreamResult]
     let onSelect: (StreamResult) -> Void
     let onDismiss: () -> Void
 
+    @State private var selectedStreamURL: URL?
+
+    private var sortedStreams: [StreamResult] {
+        // Sort: HLS streams first, then by quality score, then alphabetically.
+        streams.sorted { a, b in
+            let aHLS = a.url.absoluteString.contains(".m3u8")
+            let bHLS = b.url.absoluteString.contains(".m3u8")
+            if aHLS != bHLS { return aHLS && !bHLS }
+            let qa = qualityScore(a.title)
+            let qb = qualityScore(b.title)
+            return qa != qb ? qa > qb : a.title < b.title
+        }
+    }
+
+    private func qualityScore(_ title: String) -> Int {
+        let l = title.lowercased()
+        if l.contains("1080") { return 100 }
+        if l.contains("720")  { return 80 }
+        if l.contains("480")  { return 60 }
+        if l.contains("360")  { return 40 }
+        return 50
+    }
+
+    private func qualityBadge(_ title: String) -> String? {
+        let l = title.lowercased()
+        if l.contains("1080") { return "1080p" }
+        if l.contains("720")  { return "720p" }
+        if l.contains("480")  { return "480p" }
+        if l.contains("360")  { return "360p" }
+        return nil
+    }
+
     var body: some View {
         NavigationStack {
-            Group {
-                if streams.isEmpty {
-                    ContentUnavailableView(
-                        "No Streams Found",
-                        systemImage: "antenna.radiowaves.left.and.right.slash",
-                        description: Text("Could not find any playable streams for this episode.")
-                    )
-                } else {
-                    List(streams, id: \.url) { stream in
-                        Button {
-                            onSelect(stream)
-                        } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: "play.circle.fill")
-                                    .font(.system(size: 32))
-                                    .foregroundStyle(.primary)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(stream.title)
-                                        .font(.subheadline).fontWeight(.semibold)
-                                        .foregroundStyle(.primary)
-                                    Text(stream.subtitle != nil ? "Soft subtitles available" : "No soft subtitles")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                            }
-                            .contentShape(Rectangle())
-                            .padding(.vertical, 6)
-                        }
-                        .buttonStyle(.plain)
+            ScrollView {
+                VStack(spacing: 10) {
+                    // Stream count header
+                    HStack(spacing: 6) {
+                        Image(systemName: "antenna.radiowaves.left.and.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                        Text("\(streams.count) stream\(streams.count == 1 ? "" : "s") available")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                        Spacer()
                     }
-                    #if os(iOS)
-                    .listStyle(.insetGrouped)
-                    #elseif !os(tvOS)
-                    .listStyle(.inset)
-                    #endif
+                    .padding(.horizontal, 4)
+
+                    ForEach(sortedStreams, id: \.url) { stream in
+                        streamRow(stream)
+                    }
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 16)
             }
+            .background(Color(.systemGroupedBackground).ignoresSafeArea())
             .navigationTitle("Select Stream")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -753,14 +1006,90 @@ private struct ModuleStreamSelectionView: View {
                     Button("Cancel", action: onDismiss)
                 }
             }
+            .tint(.primary)
         }
         #if os(iOS)
-        .adaptivePresentationDetents([.medium, .large])
-
+        .adaptivePresentationDetents([.large])
         #else
-
         .frame(minWidth: 480, minHeight: 360)
-
         #endif
+    }
+
+    @ViewBuilder
+    private func streamRow(_ stream: StreamResult) -> some View {
+        let isSelected = selectedStreamURL == stream.url
+        Button {
+            Haptics.light()
+            selectedStreamURL = stream.url
+            // Slight delay so the user sees the selected state
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                onSelect(stream)
+            }
+        } label: {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(isSelected ? Color.appAccent : Color.secondary.opacity(0.1))
+                        .frame(width: 36, height: 36)
+                    Image(systemName: isSelected ? "checkmark" : "play.fill")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(isSelected ? .white : .primary)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(stream.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+
+                    HStack(spacing: 6) {
+                        if let badge = qualityBadge(stream.title) {
+                            Text(badge)
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(Color.appAccent)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(Color.appAccent.opacity(0.12)))
+                        }
+                        if stream.url.absoluteString.contains(".m3u8") {
+                            Text("HLS")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(.green)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(Color.green.opacity(0.12)))
+                        }
+                        if stream.subtitle != nil {
+                            Label("Soft subs", systemImage: "captions.bubble.fill")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Label("No subs", systemImage: "captions.bubble")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color(.secondarySystemGroupedBackground))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(
+                        isSelected ? Color.appAccent.opacity(0.6) : Color.primary.opacity(0.06),
+                        lineWidth: isSelected ? 1.5 : 1
+                    )
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 }

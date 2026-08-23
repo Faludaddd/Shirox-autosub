@@ -99,6 +99,29 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "1.81",
+        date: "2026-08-23",
+        added: [
+            "Custom Change Stream UI — completely redesigned the screen you see when you tap Change Stream on an episode. Instead of the default iOS list, it now shows a card for each anime module with the module's icon, name, language, and quality badge. Tapping a card opens the streams as a list of cards with quality badges (1080p, 720p, 480p, HLS), soft-subtitle indicators, and selected-state checkmarks.",
+            "Module filter bar — if you have 4+ anime modules installed, a filter field appears so you can quickly find the module you want.",
+            "Loading skeletons, error states, and Cloudflare verify prompts now all appear inside the module card itself instead of replacing the whole screen.",
+            "Episode header at the top of Change Stream shows the anime title and episode number so you always know what you're picking a stream for."
+        ],
+        fixed: [
+            "Manga modules appearing in Anime Change Stream — root cause: the module list returned ALL installed modules instead of filtering by content type. Now the data source itself filters to anime-only (no manga, no novels, no Jellyfin/local-playback pseudo-modules). Manga modules can never reach the anime stream picker regardless of which code path renders them.",
+            "Auto Pick Module regression — confirmed not brought back. The new custom UI still requires you to manually select a module, then manually select a stream. Single-stream modules still auto-select since there's only one choice, but multi-stream modules always open the manual picker."
+        ],
+        changed: [
+            "Anime module filtering now happens at the data-source layer (`animeModules` computed property), not at the UI rendering layer. The UI just iterates the already-filtered list — no possibility of manga modules slipping through."
+        ],
+        improved: [
+            "Streams now sorted by quality (HLS first, then 1080p → 720p → 480p → 360p, then alphabetically) so the best option is at the top.",
+            "Selected stream is highlighted with an accent border and checkmark icon before playback starts, so you get visual confirmation of your choice."
+        ],
+        removed: [],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "1.80",
         date: "2026-08-23",
         added: [],
