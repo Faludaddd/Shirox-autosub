@@ -32,7 +32,7 @@
           "date": "2026-08-23",
           "localizedDescription": "Completely reworked Change Stream UI — replaced the default iOS list with a fully custom card-based design that matches the rest of the app. Each anime module shows as a card with icon, name, language, and quality badge. Streams show as cards with quality badges (1080p/720p/480p/HLS), soft-subtitle indicators, and selected-state checkmarks.\n\nFixed: Manga modules appearing in Anime Change Stream — the module list now filters to anime-only at the data source. Manga modules can never reach the anime stream picker.\n\nImproved: Streams sorted by quality (HLS first, then 1080p → 720p → 480p → 360p). Module filter bar appears when you have 4+ anime modules installed.\n\nConfirmed: Auto Pick Module is still gone — manual selection preserved.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 11040520,
+          "size": 11196194,
           "minOSVersion": "15.0"
         },
         {
