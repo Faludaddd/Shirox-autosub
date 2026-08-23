@@ -111,8 +111,8 @@ private let logEntries: [UpdateLogEntry] = [
             "Auto-Fallback toggle (Settings → Streaming → Advanced) — when enabled, if your selected module fails to provide a stream, the app tries another eligible anime module. Only activates after a failure — does not auto-select a module. Disabled by default.",
             "Auto Pick Module toggle (Settings → Streaming → Advanced) — testing only, disabled by default. Automatically selects a module and stream without manual input. Does not affect the normal manual workflow unless explicitly enabled."
         ],
-        changed: [],
         fixed: [],
+        changed: [],
         improved: [],
         removed: [],
         other: [

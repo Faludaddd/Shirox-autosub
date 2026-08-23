@@ -982,7 +982,7 @@ struct PlayerView: View {
     @ViewBuilder
     private var upNextCard: some View {
         if showUpNext && !upNextDismissed,
-           let next = onNextEpisodeTap ?? (onWatchNext != nil ? { Task { @MainActor in await loadAndAdvance() } } : nil) {
+           (onWatchNext != nil || onSequelNeeded != nil) {
             HStack(spacing: 12) {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(Color.white.opacity(0.15))
@@ -1015,12 +1015,12 @@ struct PlayerView: View {
                 Spacer()
 
                 Text("\(upNextCountdown)s")
-                    .font(.system(size: 16, weight(.bold)))
+                    .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(.white)
                     .frame(width: 36)
 
                 Button {
-                    next()
+                    Task { @MainActor in await loadAndAdvance() }
                     showUpNext = false
                 } label: {
                     Image(systemName: "play.fill")
@@ -1687,7 +1687,7 @@ struct PlayerView: View {
                 // Up Next card — show when within 30 seconds of the end.
                 let remaining = duration - currentTime
                 if remaining <= 30 && remaining > 0 && !showUpNext && !upNextDismissed &&
-                   (onNextEpisodeTap != nil || onWatchNext != nil) {
+                   (onWatchNext != nil || onSequelNeeded != nil) {
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                         showUpNext = true
                     }
