@@ -32,7 +32,7 @@
           "date": "2026-08-23",
           "localizedDescription": "Restored the original manual episode selection workflow. Click an episode → choose a module → choose a stream → watch. Long-press an episode → Change Stream → choose a different module and stream → watch. No automatic module or stream selection anywhere.\n\nRemoved: Auto Pick Module feature completely (no more auto-resolve + auto-play). Removed 'Auto-pick Last Stream' and 'Auto-pick Last Search Result' toggles from Settings → Streaming. Removed 'Use Default Extension Only' toggle from Settings → Search — the module picker now always shows every installed anime module.\n\nFixed: Change Stream button (long-press an episode) now works and opens the manual picker. Previously it did nothing because the auto-pick flow had already committed to a stream.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 11040520,
+          "size": 11161312,
           "minOSVersion": "15.0"
         },
         {
