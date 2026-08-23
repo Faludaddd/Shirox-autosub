@@ -32,7 +32,7 @@
           "date": "2026-08-23",
           "localizedDescription": "Fixed: Schedule posters being cut off on the left — restored navigation title so safe area insets are correct.\nFixed: Duplicate Auto Pick settings — now only one entry point (NavigationLink to full settings page).\nInvestigated: 403/502 playback errors are provider-side failures, not app bugs. Normal manual playback is unaffected by Auto Pick when OFF (default).",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 11040520,
+          "size": 11383644,
           "minOSVersion": "15.0"
         },
         {
