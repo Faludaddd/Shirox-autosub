@@ -91,6 +91,10 @@
                 121D9B862FCA5623000FF9B4 /* BatchDownloadModulePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4A82FCA397700C9BA56 /* BatchDownloadModulePickerView.swift */; };
                 121D9B872FCA5623000FF9B4 /* DownloadRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4AB2FCA397700C9BA56 /* DownloadRowView.swift */; };
                 121D9B882FCA5623000FF9B4 /* BatchDownloadStreamPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4A92FCA397700C9BA56 /* BatchDownloadStreamPickerView.swift */; };
+                F80587FAE3DF48B3858BC616 /* DownloadRangePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 537BEA553BFE4B1F9A9B3FE3 /* DownloadRangePickerView.swift */; };
+                F492132335884569ADD325F8 /* DownloadRangePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 537BEA553BFE4B1F9A9B3FE3 /* DownloadRangePickerView.swift */; };
+                D9DDACBA408241269708095D /* DownloadRangePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 537BEA553BFE4B1F9A9B3FE3 /* DownloadRangePickerView.swift */; };
+                854ADC5B44884B2096D6BB28 /* DownloadRangePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 537BEA553BFE4B1F9A9B3FE3 /* DownloadRangePickerView.swift */; };
                 121D9B892FCA5623000FF9B4 /* DownloadStreamPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4AC2FCA397700C9BA56 /* DownloadStreamPickerView.swift */; };
                 121D9B8A2FCA5623000FF9B4 /* DownloadModulePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4AA2FCA397700C9BA56 /* DownloadModulePickerView.swift */; };
                 121D9B8B2FCA5628000FF9B4 /* LibraryEntryEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4AF2FCA397700C9BA56 /* LibraryEntryEditSheet.swift */; };
@@ -787,6 +791,7 @@
                 1279E4A62FCA397700C9BA56 /* SearchViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchViewModel.swift; sourceTree = "<group>"; };
                 1279E4A82FCA397700C9BA56 /* BatchDownloadModulePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchDownloadModulePickerView.swift; sourceTree = "<group>"; };
                 1279E4A92FCA397700C9BA56 /* BatchDownloadStreamPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchDownloadStreamPickerView.swift; sourceTree = "<group>"; };
+                537BEA553BFE4B1F9A9B3FE3 /* DownloadRangePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadRangePickerView.swift; sourceTree = "<group>"; };
                 1279E4AA2FCA397700C9BA56 /* DownloadModulePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadModulePickerView.swift; sourceTree = "<group>"; };
                 1279E4AB2FCA397700C9BA56 /* DownloadRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadRowView.swift; sourceTree = "<group>"; };
                 1279E4AC2FCA397700C9BA56 /* DownloadStreamPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadStreamPickerView.swift; sourceTree = "<group>"; };
@@ -1166,6 +1171,7 @@
                         children = (
                                 1279E4A82FCA397700C9BA56 /* BatchDownloadModulePickerView.swift */,
                                 1279E4A92FCA397700C9BA56 /* BatchDownloadStreamPickerView.swift */,
+                                537BEA553BFE4B1F9A9B3FE3 /* DownloadRangePickerView.swift */,
                                 1279E4AA2FCA397700C9BA56 /* DownloadModulePickerView.swift */,
                                 1279E4AB2FCA397700C9BA56 /* DownloadRowView.swift */,
                                 1279E4AC2FCA397700C9BA56 /* DownloadStreamPickerView.swift */,
@@ -1664,6 +1670,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 121D9B862FCA5623000FF9B4 /* BatchDownloadModulePickerView.swift in Sources */,
                                 121D9B872FCA5623000FF9B4 /* DownloadRowView.swift in Sources */,
                                 121D9B882FCA5623000FF9B4 /* BatchDownloadStreamPickerView.swift in Sources */,
+                                F80587FAE3DF48B3858BC616 /* DownloadRangePickerView.swift in Sources */,
                                 121D9B892FCA5623000FF9B4 /* DownloadStreamPickerView.swift in Sources */,
                                 121D9B8A2FCA5623000FF9B4 /* DownloadModulePickerView.swift in Sources */,
                                 121D9B622FCA5612000FF9B4 /* JSEngine+Search.swift in Sources */,
@@ -2000,7 +2007,8 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 1279E55C2FCA397700C9BA56 /* BrowseView.swift in Sources */,
                                 1279E55D2FCA397700C9BA56 /* MALDiscoveryService.swift in Sources */,
                                 1279E55E2FCA397700C9BA56 /* PresentationDetent.swift in Sources */,
-                                1279E55F2FCA397700C9BA56 /* BatchDownloadStreamPickerView.swift in Sources */,
+     
+                                F492132335884569ADD325F8 /* DownloadRangePickerView.swift in Sources */,                           1279E55F2FCA397700C9BA56 /* BatchDownloadStreamPickerView.swift in Sources */,
                                 1279E5602FCA397700C9BA56 /* ActivityDetailView.swift in Sources */,
                                 5F7E32EBD5AABB9509A45DBD /* KingfisherImageCache.swift in Sources */,
                                 6C59A671E530029B3E8D9BCA /* ManageCollectionsView.swift in Sources */,
@@ -2213,7 +2221,8 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 1279E5D42FCA397700C9BA56 /* AniListMedia.swift in Sources */,
                                 1279E5D52FCA397700C9BA56 /* BrowseView.swift in Sources */,
                                 1279E5D62FCA397700C9BA56 /* MALDiscoveryService.swift in Sources */,
-                                1279E5D72FCA397700C9BA56 /* PresentationDetent.swift in Sources */,
+
+                                D9DDACBA408241269708095D /* DownloadRangePickerView.swift in Sources */,                                1279E5D72FCA397700C9BA56 /* PresentationDetent.swift in Sources */,
                                 1279E5D82FCA397700C9BA56 /* BatchDownloadStreamPickerView.swift in Sources */,
                                 1279E5D92FCA397700C9BA56 /* ActivityDetailView.swift in Sources */,
                                 E78EF025EB954FED7A2E0EFC /* KingfisherImageCache.swift in Sources */,
@@ -2322,7 +2331,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "@executable_path/Frameworks",
                                 );
                                 LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                                MARKETING_VERSION = 1.85;
+                                MARKETING_VERSION = 1.86;
                                 PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
                                 PRODUCT_NAME = "$(TARGET_NAME)";
                                 SDKROOT = appletvos;
@@ -2357,7 +2366,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "@executable_path/Frameworks",
                                 );
                                 LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                                MARKETING_VERSION = 1.85;
+                                MARKETING_VERSION = 1.86;
                                 PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
                                 PRODUCT_NAME = "$(TARGET_NAME)";
                                 SDKROOT = appletvos;
@@ -2474,7 +2483,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "$(inherited)",
                                         "@executable_path/Frameworks",
                                 );
-                                MARKETING_VERSION = 1.85;
+                                MARKETING_VERSION = 1.86;
                                 PRODUCT_NAME = shirox;
                                 PROVISIONING_PROFILE_SPECIFIER = "";
                                 SDKROOT = iphoneos;
@@ -2520,7 +2529,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "@executable_path/../Frameworks",
                                 );
                                 MACOSX_DEPLOYMENT_TARGET = 14.0;
-                                MARKETING_VERSION = 1.85;
+                                MARKETING_VERSION = 1.86;
                                 PRODUCT_NAME = shirox;
                                 SDKROOT = macosx;
                                 SUPPORTS_MACCATALYST = NO;
@@ -2546,7 +2555,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "$(inherited)",
                                         "@executable_path/Frameworks",
                                 );
-                                MARKETING_VERSION = 1.85;
+                                MARKETING_VERSION = 1.86;
                                 PRODUCT_NAME = shirox;
                                 PROVISIONING_PROFILE_SPECIFIER = "";
                                 SDKROOT = iphoneos;
@@ -2637,7 +2646,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "@executable_path/../Frameworks",
                                 );
                                 MACOSX_DEPLOYMENT_TARGET = 14.0;
-                                MARKETING_VERSION = 1.85;
+                                MARKETING_VERSION = 1.86;
                                 PRODUCT_NAME = shirox;
                                 SDKROOT = macosx;
                                 SUPPORTS_MACCATALYST = NO;

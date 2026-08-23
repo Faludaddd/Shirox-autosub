@@ -99,6 +99,22 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "1.86",
+        date: "2026-08-23",
+        added: [
+            "Download Range feature for Anime — a new button in the Episodes header (next to Sort and Reset) opens a custom range picker. Pick a starting episode and ending episode (e.g. 50 → 53), and the app downloads episodes 50, 51, 52, 53. The range is inclusive and validated. Already-downloaded episodes are automatically skipped and counted in the summary. Quick presets include First 5, First 10, Last 5, Last 10, and Entire Series.",
+            "Download Range feature for Manga — the same custom range picker is now available on the Manga chapters page. Opens from a new button in the Chapters header. Pick a starting chapter and ending chapter (e.g. 50 → 53), and the app downloads chapters 50, 51, 52, 53. Already-downloaded chapters are skipped. Manga uses the same underlying range-download logic as Anime."
+        ],
+        changed: [],
+        fixed: [],
+        improved: [],
+        removed: [],
+        other: [
+            "The custom range UI uses the app's existing design language — card-based layout with rounded corners, accent-colored buttons, and custom number selectors with +/- buttons and sliders. No Apple default pickers or action sheets are used.",
+            "Anime and Manga range selection are completely separate — the UI automatically adapts its wording (Episode vs Chapter) and data source based on the content type. Anime episodes and Manga chapters never mix."
+        ]
+    ),
+    UpdateLogEntry(
         version: "1.85",
         date: "2026-08-23",
         added: [],

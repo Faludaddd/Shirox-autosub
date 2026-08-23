@@ -28,6 +28,7 @@ struct MangaDetailView: View {
     @ObservedObject private var mangaDownloads = MangaDownloadManager.shared
     @State private var isSelectionMode = false
     @State private var selectedChapterHrefs: Set<String> = []
+    @State private var showDownloadRangePicker = false
     @ObservedObject private var anilistAuth = AniListAuthManager.shared
     @ObservedObject private var malAuth = MALAuthManager.shared
     @State private var existingAniListEntry: LibraryEntry? = nil
@@ -194,6 +195,29 @@ struct MangaDetailView: View {
         .adaptiveSheet(isPresented: $showMALEdit) {
             if let mid = mangaMALID, let detail = vm.detail {
                 malEditSheet(mid: mid, detail: detail)
+            }
+        }
+        .adaptiveSheet(isPresented: $showDownloadRangePicker) {
+            if let detail = vm.detail {
+                let visible = liveChapters(for: detail)
+                let total = max(1, visible.count)
+                DownloadRangePickerView(
+                    contentType: .manga,
+                    title: detail.title,
+                    imageUrl: detail.image,
+                    total: total,
+                    chapters: visible,
+                    isChapterDownloaded: { href in
+                        mangaDownloads.items.contains {
+                            $0.mangaHref == item.href && $0.chapterHref == href
+                                && $0.state == .completed
+                        }
+                    },
+                    onMangaRangeSelected: { chapters in
+                        let ctx = downloadContext(detail)
+                        mangaDownloads.batchDownload(chapters: chapters, context: ctx)
+                    }
+                )
             }
         }
         #endif
@@ -636,6 +660,24 @@ struct MangaDetailView: View {
 
                 HStack(spacing: 8) {
                     #if os(iOS)
+                    // Download Range button — opens the custom range picker.
+                    // Only shown when not in selection mode and there are
+                    // chapters available.
+                    if !isSelectionMode && offlineChapters == nil {
+                        Button {
+                            Haptics.light()
+                            showDownloadRangePicker = true
+                        } label: {
+                            Image(systemName: "arrow.down.to.line.compact")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(.primary)
+                                .frame(width: 36, height: 36)
+                                .background(.ultraThinMaterial, in: Circle())
+                                .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                    }
+
                     Button {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                             isSelectionMode.toggle()

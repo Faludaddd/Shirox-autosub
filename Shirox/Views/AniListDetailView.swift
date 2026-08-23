@@ -37,6 +37,7 @@ struct AniListDetailView: View {
     @State private var isSelectionMode = false
     @State private var selectedEpisodeNumbers: Set<Int> = []
     @State private var showBatchDownloadPicker = false
+    @State private var showDownloadRangePicker = false
     #endif
     @State private var selectedRangeIndex = 0
     @State private var isReversed = false
@@ -405,6 +406,27 @@ struct AniListDetailView: View {
                     }
                 )
                 .environmentObject(moduleManager)
+            }
+        }
+        .adaptiveSheet(isPresented: $showDownloadRangePicker) {
+            if let media = vm.media {
+                let total = max(1, (media.nextAiringEpisode != nil ? media.nextAiringEpisode!.episode - 1 : nil) ?? media.episodes ?? 0)
+                DownloadRangePickerView(
+                    contentType: .anime,
+                    title: media.title.displayTitle,
+                    imageUrl: media.coverImage.best ?? "",
+                    total: total,
+                    isEpisodeDownloaded: { ep in
+                        DownloadManager.shared.items.contains {
+                            $0.aniListID == media.id && $0.episodeNumber == ep
+                                && $0.state == .completed
+                        }
+                    },
+                    onAnimeRangeSelected: { numbers in
+                        selectedEpisodeNumbers = numbers
+                        showBatchDownloadPicker = true
+                    }
+                )
             }
         }
         #endif
@@ -1330,7 +1352,26 @@ struct AniListDetailView: View {
                     }
                 }
                 Spacer()
-                
+
+                // Download Range button — opens the custom range picker.
+                // Only shown when not in selection mode and there are episodes.
+                #if os(iOS)
+                if !isSelectionMode && totalEpisodes > 0 {
+                    Button {
+                        Haptics.light()
+                        showDownloadRangePicker = true
+                    } label: {
+                        Image(systemName: "arrow.down.to.line.compact")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.primary)
+                            .frame(width: 46, height: 46)
+                            .background(.ultraThinMaterial, in: Circle())
+                            .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                }
+                #endif
+
                 // Sort Toggle
                 Button {
                     isReversed.toggle()

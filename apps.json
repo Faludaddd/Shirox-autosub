@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "1.86",
+          "buildVersion": "1",
+          "date": "2026-08-23",
+          "localizedDescription": "Added: Download Range feature for Anime — pick a start and end episode (e.g. 50→53) to download a range. Custom UI with +/- buttons, sliders, and quick presets (First 5, First 10, Last 5, Last 10, Entire Series). Already-downloaded episodes are skipped automatically.\nAdded: Download Range feature for Manga — same custom range picker for manga chapters. Pick a start and end chapter to download a range.\nThe range UI is fully custom (no Apple default pickers). Anime uses Episodes, Manga uses Chapters — completely separated.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 11040520,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.85",
           "buildVersion": "1",
           "date": "2026-08-23",
