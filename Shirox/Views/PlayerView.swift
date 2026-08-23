@@ -129,6 +129,12 @@ struct PlayerView: View {
     @State private var playbackSpeed: Double = 1.0
     @State private var volume: Float = 1.0
     @State private var showSubtitleSettings = false
+    /// Up Next card — shown when the current episode is within the last
+    /// 30 seconds. Displays the next episode info with a 10-second
+    /// countdown to auto-play. Dismissed by the user or when playback ends.
+    @State private var showUpNext = false
+    @State private var upNextCountdown = 10
+    @State private var upNextDismissed = false
     /// True while a bottom-bar pull-down menu is open, so the whole controls overlay is
     /// pinned visible (scheduleHide is gated on this). Set by onMenuOpen (the menu button's
     /// deferred element); cleared on didBecomeKey when the menu is dismissed (see body).
@@ -859,6 +865,8 @@ struct PlayerView: View {
                         .opacity(showControls ? 1 : 0)
                         .offset(y: showControls ? 0 : -14)
                     Spacer()
+                    upNextCard
+                        .opacity(showControls ? 1 : 0)
                     bottomBarView(bottomPad: layouts.bottom)
                         .opacity(showControls ? 1 : 0)
                         .offset(y: showControls ? 0 : 14)
@@ -966,6 +974,88 @@ struct PlayerView: View {
             mediaTitle: currentContext?.mediaTitle
         )
         .buttonStyle(CircularButtonStyle())
+    }
+
+    /// Up Next card — shows when the current episode is within the last
+    /// 30 seconds. Displays the next episode with a countdown and Play Now
+    /// button. Only appears when there is a next episode available.
+    @ViewBuilder
+    private var upNextCard: some View {
+        if showUpNext && !upNextDismissed,
+           let next = onNextEpisodeTap ?? (onWatchNext != nil ? { Task { @MainActor in await loadAndAdvance() } } : nil) {
+            HStack(spacing: 12) {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.white.opacity(0.15))
+                    .frame(width: 80, height: 45)
+                    .overlay(
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(.white.opacity(0.6))
+                    )
+
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 4) {
+                        Text("Up Next")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(Color.appAccent)
+                        if let ep = currentContext?.episodeNumber {
+                            Text("EP \(ep + 1)")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.white.opacity(0.7))
+                        }
+                    }
+                    if let title = currentContext?.mediaTitle {
+                        Text(title)
+                            .font(.caption2)
+                            .foregroundStyle(.white.opacity(0.5))
+                            .lineLimit(1)
+                    }
+                }
+
+                Spacer()
+
+                Text("\(upNextCountdown)s")
+                    .font(.system(size: 16, weight(.bold)))
+                    .foregroundStyle(.white)
+                    .frame(width: 36)
+
+                Button {
+                    next()
+                    showUpNext = false
+                } label: {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 36, height: 36)
+                        .background(Color.appAccent, in: Circle())
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    upNextDismissed = true
+                    showUpNext = false
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .frame(width: 28, height: 28)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(.ultraThinMaterial)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+            )
+            .padding(.horizontal, isPad ? 30 : 16)
+            .padding(.bottom, 8)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
     }
 
     @ViewBuilder
@@ -1425,6 +1515,10 @@ struct PlayerView: View {
         if let obs = timeObserver { player?.removeTimeObserver(obs); timeObserver = nil }
         rateObserver?.invalidate(); rateObserver = nil
         audioGroup = nil
+        // Reset Up Next state for the new episode.
+        showUpNext = false
+        upNextCountdown = 10
+        upNextDismissed = false
         #if os(iOS)
         videoReady = false
         // Take audio focus now that a player is actually opening. This is what
@@ -1589,6 +1683,30 @@ struct PlayerView: View {
                         alreadyStarted: didPrefetchNext) {
                     didPrefetchNext = true
                     startPrefetchNext()
+                }
+                // Up Next card — show when within 30 seconds of the end.
+                let remaining = duration - currentTime
+                if remaining <= 30 && remaining > 0 && !showUpNext && !upNextDismissed &&
+                   (onNextEpisodeTap != nil || onWatchNext != nil) {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                        showUpNext = true
+                    }
+                    upNextCountdown = 10
+                    // Start the countdown timer
+                    Task { @MainActor in
+                        for _ in 0..<10 {
+                            try? await Task.sleep(nanoseconds: 1_000_000_000)
+                            if !showUpNext { return }
+                            upNextCountdown -= 1
+                            if upNextCountdown <= 0 {
+                                if autoNextEpisode {
+                                    await loadAndAdvance()
+                                }
+                                showUpNext = false
+                                return
+                            }
+                        }
+                    }
                 }
             }
             if let resumeFrom = currentContext?.resumeFrom, !didSeekToResume, duration > 0 {

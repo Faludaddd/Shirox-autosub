@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "1.90",
+          "buildVersion": "1",
+          "date": "2026-08-23",
+          "localizedDescription": "Added: Up Next smart auto-play card in player (10-second countdown, Play Now, dismiss).\nAdded: Auto-Download New Episodes + Download Over WiFi Only (Settings → Downloads).\nAdded: Watch Time Statistics dashboard in Profile (episodes, time, streaks, top 5 anime).\nAdded: Continue Watching countdown badge (next episode airing timer).\nAdded: Show Next Episode Countdown, Auto-Fallback, Auto Pick Module (Testing) toggles in Settings → Streaming.\nThe normal manual workflow (Episode → Choose Module → Choose Stream → Watch) is unchanged. All new toggles are OFF by default except the countdown.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 11040520,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.89",
           "buildVersion": "1",
           "date": "2026-08-23",

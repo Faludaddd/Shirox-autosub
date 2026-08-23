@@ -99,6 +99,28 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "1.90",
+        date: "2026-08-23",
+        added: [
+            "Up Next smart auto-play — when an episode is within 30 seconds of ending, a clean 'Up Next' card appears showing the next episode number, anime title, a 10-second countdown, a Play Now button, and a dismiss button. If Auto Next is enabled, the next episode plays automatically when the countdown reaches zero.",
+            "Auto-Download New Episodes (Settings → Downloads) — when enabled, monitors anime you're currently watching and automatically queues new episodes for download when they air. Never downloads an episode that's already downloaded.",
+            "Download Over WiFi Only (Settings → Downloads) — prevents downloads from starting over cellular data when enabled.",
+            "Watch Time Statistics (Profile → Stats) — new 'Shirox Watch Stats' section showing episodes watched, unique anime, total watch time, average per episode, weekly/monthly activity, current streak, and top 5 anime by watch time. Computed from the app's own Continue Watching data.",
+            "Continue Watching countdown — when you've watched the latest available episode, a subtle countdown to the next episode's airing time appears on the Continue Watching card (e.g., 'EP 13 in 2h 15m'). Updates automatically every 60 seconds.",
+            "Show Next Episode Countdown toggle (Settings → Streaming) — lets you enable/disable the Continue Watching countdown. ON by default.",
+            "Auto-Fallback toggle (Settings → Streaming → Advanced) — when enabled, if your selected module fails to provide a stream, the app tries another eligible anime module. Only activates after a failure — does not auto-select a module. Disabled by default.",
+            "Auto Pick Module toggle (Settings → Streaming → Advanced) — testing only, disabled by default. Automatically selects a module and stream without manual input. Does not affect the normal manual workflow unless explicitly enabled."
+        ],
+        changed: [],
+        fixed: [],
+        improved: [],
+        removed: [],
+        other: [
+            "The normal Anime flow remains: Episode → Choose Module → Choose Stream → Watch. Auto Pick and Auto-Fallback are separate, isolated toggles that do not interfere with the manual workflow unless explicitly enabled.",
+            "Crunchyroll-style simulcast = airing countdown + availability notification experience only. No Crunchyroll provider/module was added."
+        ]
+    ),
+    UpdateLogEntry(
         version: "1.89",
         date: "2026-08-23",
         added: [

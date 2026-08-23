@@ -1578,17 +1578,17 @@ struct PiPSettingsPage: View {
 
 struct StreamingSettingsPage: View {
     @AppStorage("watchedPercentage") private var watchedPercentage: Double = 90.0
+    @AppStorage("showNextEpisodeCountdown") private var showNextEpisodeCountdown = true
+    @AppStorage("autoFallbackEnabled") private var autoFallbackEnabled = false
+    @AppStorage("autoPickModuleTesting") private var autoPickModuleTesting = false
     @State private var perShowCount = PerShowPlaybackStore.shared.savedCount
     @State private var showClearPerShow = false
 
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                // Per-Show Playback Settings card — with clear instructions
-                // explaining what it does.
+                // Per-Show Playback Settings card
                 PlaybackSettingsCard(title: "Per-Show Playback") {
-                    // Instructions — the user said the title is confusing,
-                    // so we explain exactly what this feature does.
                     VStack(alignment: .leading, spacing: 6) {
                         Text("What this does")
                             .font(.caption.weight(.semibold))
@@ -1616,6 +1616,33 @@ struct StreamingSettingsPage: View {
                                 .font(.subheadline)
                         }
                     }
+                }
+
+                PlaybackSettingsCard(title: "Continue Watching") {
+                    Toggle("Show Next Episode Countdown", isOn: $showNextEpisodeCountdown)
+                        .tint(Color.appAccent)
+                    Text("Shows a countdown to the next episode's airing time on Continue Watching cards, for anime where you've watched the latest available episode.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                PlaybackSettingsCard(title: "Advanced") {
+                    Toggle("Auto-Fallback", isOn: $autoFallbackEnabled)
+                        .tint(Color.appAccent)
+                    Text("When enabled, if your selected module fails to provide a stream, the app tries another eligible anime module. Does not auto-select a module — only falls back after a failure.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Divider().opacity(0.3)
+
+                    Toggle("Auto Pick Module (Testing)", isOn: $autoPickModuleTesting)
+                        .tint(Color.appAccent)
+                    Text("Testing only — automatically selects a module and stream without manual input. Disabled by default. Does not affect the normal manual workflow unless explicitly enabled.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 PlaybackSettingsCard(title: "Progress Tracking") {
@@ -1790,6 +1817,8 @@ struct LibrarySettingsPage: View {
 struct DownloadsSettingsPage: View {
     @AppStorage("maxConcurrentDownloads") private var maxConcurrentDownloads: Int = 3
     @AppStorage("backgroundDownloadsEnabled") private var backgroundDownloadsEnabled = true
+    @AppStorage("autoDownloadNewEpisodes") private var autoDownloadNewEpisodes = false
+    @AppStorage("downloadOverWiFiOnly") private var downloadOverWiFiOnly = false
 
     var body: some View {
         Form {
@@ -1797,6 +1826,15 @@ struct DownloadsSettingsPage: View {
                 Picker("Concurrent Downloads", selection: $maxConcurrentDownloads) {
                     Text("1").tag(1); Text("2").tag(2); Text("3").tag(3); Text("4").tag(4); Text("5").tag(5)
                 }
+                Toggle("Auto-Download New Episodes", isOn: $autoDownloadNewEpisodes)
+                    .tint(Color.appAccent)
+                Toggle("Download Over WiFi Only", isOn: $downloadOverWiFiOnly)
+                    .tint(Color.appAccent)
+            }
+            Section {
+                Text("Auto-Download monitors anime you're currently watching. When a new episode airs, it's automatically added to your download queue. Download Over WiFi Only prevents downloads from starting on cellular data.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .navigationTitle("Downloads")

@@ -313,6 +313,7 @@ struct ContinueWatchingSection: View {
 struct ContinueWatchingCardDisplay: View {
     let item: ContinueWatchingItem
     @State private var episodeThumbnail: String?
+    @AppStorage("showNextEpisodeCountdown") private var showNextEpisodeCountdown = true
 
     private var progress: Double {
         guard item.totalSeconds > 0 else { return 0 }
@@ -432,6 +433,15 @@ struct ContinueWatchingCardDisplay: View {
                         .lineLimit(1)
                         .fixedSize(horizontal: true, vertical: false)
 
+                        // Next episode countdown — shown only when the user
+                        // is caught up (watched the latest available episode)
+                        // and the setting is enabled. Uses the anime's
+                        // nextAiringEpisode data from AniList.
+                        if showNextEpisodeCountdown && (isWatched || isCaughtUp),
+                           let aid = item.aniListID {
+                            NextEpisodeCountdownView(aniListID: aid, nextEp: item.episodeNumber + 1)
+                        }
+
                         Text(item.mediaTitle)
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.white)
@@ -532,6 +542,65 @@ private struct CardThumbnail: View {
             Self.cache.setObject(loaded, forKey: urlString as NSString)
             platformImage = loaded
         }
+    }
+}
+
+// MARK: - Next Episode Countdown View
+
+/// Shows a live countdown to the next episode's airing time, for use on
+/// Continue Watching cards when the user has watched the latest available
+/// episode. Uses AniList's nextAiringEpisode data, fetched once and cached
+/// in memory for 5 minutes. Updates the countdown text every 60 seconds
+/// via TimelineView.
+struct NextEpisodeCountdownView: View {
+    let aniListID: Int
+    let nextEp: Int
+
+    @State private var airingAt: Date?
+    @State private var episode: Int?
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 60)) { _ in
+            if let airingAt, let ep = episode {
+                let remaining = airingAt.timeIntervalSinceNow
+                if remaining > 0 {
+                    HStack(spacing: 3) {
+                        Image(systemName: "clock.fill")
+                            .font(.system(size: 9, weight: .bold))
+                        Text("EP \(ep) in \(countdownText(remaining))")
+                            .font(.caption2.weight(.semibold))
+                    }
+                    .foregroundStyle(.yellow)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                }
+            }
+        }
+        .task(id: aniListID) {
+            await loadNextAiring()
+        }
+    }
+
+    private func loadNextAiring() async {
+        // Check if we already have the data from the AniList detail cache.
+        // The detail VM already fetches nextAiringEpisode as part of Media.
+        // We do a lightweight fetch here — it's cached by AniListService's
+        // deduplication so it won't cause duplicate API calls.
+        guard let raw = try? await AniListService.shared.detail(id: aniListID) else { return }
+        if let nae = raw.nextAiringEpisode {
+            episode = nae.episode
+            airingAt = Date(timeIntervalSince1970: TimeInterval(nae.airingAt ?? 0))
+        }
+    }
+
+    private func countdownText(_ seconds: TimeInterval) -> String {
+        let s = Int(seconds)
+        let days = s / 86400
+        let hours = (s % 86400) / 3600
+        let mins = (s % 3600) / 60
+        if days > 0 { return "\(days)d \(hours)h" }
+        if hours > 0 { return "\(hours)h \(mins)m" }
+        return "\(mins)m"
     }
 }
 
