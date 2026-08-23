@@ -99,6 +99,22 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "1.96",
+        date: "2026-08-23",
+        added: [],
+        fixed: [
+            "Library layout — restored Grid/List toggle to the top-right toolbar as its own separate icon (next to Profile). Removed it from the filter row where it was incorrectly placed in v1.95. Filter row is back to its original left-aligned layout with just Status + Sort capsules.",
+            "Schedule poster clipping — changed horizontal padding from hardcoded 16pt to .padding(.horizontal) which uses the system's safe area insets. Posters are no longer cut off on the left edge.",
+            "Auto Pick duplicate execution — added autoPickInProgress state guard that prevents multiple Auto Pick operations from running simultaneously. When an Auto Pick is in progress, duplicate triggers are ignored and logged as '[AutoPick] Duplicate trigger ignored'. Each operation gets a unique request ID for log tracing. The guard is cleared when the operation completes (success or failure)."
+        ],
+        changed: [],
+        improved: [
+            "Auto Pick logging — every log line now includes a request ID (e.g. [AutoPick:ABCD1234]) so all messages for a single episode selection can be traced together. Duplicate triggers are logged separately as warnings."
+        ],
+        removed: [],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "1.95",
         date: "2026-08-23",
         added: [],

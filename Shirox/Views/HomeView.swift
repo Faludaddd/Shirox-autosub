@@ -1418,7 +1418,7 @@ struct ScheduleView: View {
                             }
                         }
                     }
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal)
                     .padding(.top, 4)
                     .padding(.bottom, 24)
                 } else {
@@ -1567,7 +1567,7 @@ struct ScheduleView: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal)
                     .padding(.top, 4)
                     .padding(.bottom, 24)
                 } else {

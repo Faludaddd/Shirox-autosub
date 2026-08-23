@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "1.96",
+          "buildVersion": "1",
+          "date": "2026-08-23",
+          "localizedDescription": "Fixed: Library Grid icon restored to top-right toolbar (was incorrectly in filter row).\nFixed: Schedule poster left-edge clipping — now uses safe area horizontal padding.\nFixed: Auto Pick duplicate execution — added state guard preventing multiple simultaneous Auto Pick operations. Each gets a unique request ID. Duplicate triggers are logged and ignored.\nImproved: Auto Pick logging includes request ID for tracing.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 11040520,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.95",
           "buildVersion": "1",
           "date": "2026-08-23",

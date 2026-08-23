@@ -305,36 +305,13 @@ struct LibraryView: View {
 
     @ViewBuilder
     private var filterCapsuleRow: some View {
-        // All filter controls in one HStack. Grid/List toggle is included
-        // here (after a Spacer) so it shares alignment context with the
-        // Sort capsule. This fixes the structural mismatch where the grid
-        // toggle was in the nav bar (ToolbarItem) and the Sort dropdown
-        // was in the content area — they could never visually align.
+        // Filter controls — left-aligned, matching the original layout.
+        // Grid/List toggle is NOT here — it's in the top-right toolbar.
         HStack(spacing: LibraryDS.controlSpacing) {
             statusFilterCapsule
             sortCapsule
             Spacer()
-            gridToggleCapsule
         }
-    }
-
-    /// Grid/List toggle capsule — moved back into the filter row so it
-    /// aligns with the Sort capsule. Was previously in the nav bar
-    /// toolbar, which caused alignment drift between List/Grid modes.
-    @ViewBuilder
-    private var gridToggleCapsule: some View {
-        Button {
-            isGridLayout.toggle()
-            Haptics.light()
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: isGridLayout ? "list.bullet" : "square.grid.2x2")
-                    .font(.system(size: LibraryDS.pillIconSize, weight: .semibold))
-            }
-            .libraryCapsuleStyle()
-        }
-        .buttonStyle(.plain)
-        .fixedSize(horizontal: true, vertical: false)
     }
 
     /// Status filter capsule — uses the shared `.libraryCapsuleStyle()`
@@ -553,10 +530,20 @@ struct LibraryView: View {
 
     @ToolbarContentBuilder
     private var libraryToolbar: some ToolbarContent {
-        // Grid/list toggle removed from toolbar — now in filterCapsuleRow
-        // so it aligns with the Sort capsule. This fixes the structural
-        // alignment mismatch between List and Grid modes.
-        // Profile / Sign-In button — on the trailing side.
+        #if os(iOS)
+        // Grid/list toggle — top-right, as its own separate icon.
+        // Placed BEFORE the Profile button so the order is:
+        // [Grid/List Icon] [Profile Icon]
+        ToolbarItem(placement: .topBarTrailing) {
+            Button {
+                isGridLayout.toggle()
+            } label: {
+                Image(systemName: isGridLayout ? "list.bullet" : "square.grid.2x2")
+                    .font(.system(size: 17, weight: .medium))
+            }
+        }
+        #endif
+        // Profile / Sign-In button — on the trailing side, after the grid toggle.
         ToolbarItem(placement: .topBarTrailing) {
             if isActiveProviderAuthenticated {
                 HStack(spacing: 10) {

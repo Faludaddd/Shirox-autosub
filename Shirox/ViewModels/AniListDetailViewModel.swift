@@ -23,6 +23,12 @@ final class AniListDetailViewModel: ObservableObject {
     // Stream picker state
     @Published var showStreamPicker = false
     @Published var selectedEpisodeNumber: Int?
+    /// Auto Pick state — prevents duplicate execution. When non-nil,
+    /// an Auto Pick operation is in progress for the given episode number.
+    /// watchEpisode() checks this and refuses to start a new operation
+    /// for the same episode while one is already running. Cleared when
+    /// playback starts or the operation fails.
+    @Published var autoPickInProgress: Int? = nil
 
     // Stream results that bubble up from ModuleStreamPickerView
     @Published var pendingStreams: [StreamResult] = []
@@ -133,14 +139,26 @@ final class AniListDetailViewModel: ObservableObject {
     /// automatically selects a module + stream using the user's configured
     /// priority list and preferences. When OFF (default), opens the manual
     /// Change Stream UI as before.
+    ///
+    /// Includes a guard that prevents duplicate execution: if an Auto Pick
+    /// operation is already running for the same episode, the call is
+    /// ignored and logged. This prevents the repeated execution seen in
+    /// the logs (caused by SwiftUI re-rendering, .onChange observers, or
+    /// .task modifiers firing multiple times).
     func watchEpisode(_ number: Int) {
         selectedEpisodeNumber = number
 
         let autoPickEnabled = UserDefaults.standard.bool(forKey: "autoPickModuleTesting")
         if autoPickEnabled {
-            // Auto Pick: run the automatic selection process.
-            // No Change Stream UI is shown.
-            Task { await autoPickAndPlay(episode: number) }
+            // Guard: prevent duplicate Auto Pick execution.
+            if autoPickInProgress != nil {
+                Logger.shared.log("[AutoPick:\(requestId)] Duplicate trigger ignored — request already active for EP \(autoPickInProgress!)", type: "Warning")
+                return
+            }
+            autoPickInProgress = number
+            let requestId = UUID().uuidString.prefix(8)
+            Logger.shared.log("[AutoPick:\(requestId)] Request ID: \(requestId) — Started for EP \(number)", type: "Info")
+            Task { await autoPickAndPlay(episode: number, requestId: String(requestId)) }
         } else {
             // Manual: open the Change Stream UI.
             showStreamPicker = true
@@ -153,7 +171,16 @@ final class AniListDetailViewModel: ObservableObject {
     /// matches the target episode, fetches streams, selects the best
     /// stream based on quality preferences, and starts playback.
     /// If all modules fail, shows an error toast.
-    private func autoPickAndPlay(episode: Int) async {
+    ///
+    /// Each call gets a unique requestId for log tracing. The
+    /// autoPickInProgress guard is cleared on completion (success or
+    /// failure) to allow the next episode to be Auto Picked.
+    private func autoPickAndPlay(episode: Int, requestId: String) async {
+        defer {
+            Task { @MainActor in
+                autoPickInProgress = nil
+            }
+        }
         guard let media else {
             await MainActor.run {
                 ToastManager.shared.show(
@@ -170,9 +197,9 @@ final class AniListDetailViewModel: ObservableObject {
         let modulePriority = UserDefaults.standard.stringArray(forKey: "autoPickModulePriority") ?? []
         let skipUnavailable = UserDefaults.standard.bool(forKey: "autoPickSkipUnavailable")
 
-        Logger.shared.log("[AutoPick] Started — EP \(episode) — \(media.title.displayTitle)", type: "Info")
-        Logger.shared.log("[AutoPick] Quality: \(preferredQuality) | Audio: \(preferredAudio)", type: "Info")
-        Logger.shared.log("[AutoPick] Priority: \(modulePriority.joined(separator: " → "))", type: "Info")
+        Logger.shared.log("[AutoPick:\(requestId)] Started — EP \(episode) — \(media.title.displayTitle)", type: "Info")
+        Logger.shared.log("[AutoPick:\(requestId)] Quality: \(preferredQuality) | Audio: \(preferredAudio)", type: "Info")
+        Logger.shared.log("[AutoPick:\(requestId)] Priority: \(modulePriority.joined(separator: " → "))", type: "Info")
 
         // Build the module list — use priority list if set, otherwise all anime modules.
         let manager = ModuleManager.shared
@@ -206,12 +233,12 @@ final class AniListDetailViewModel: ObservableObject {
             // Skip unhealthy modules if the option is enabled.
             if skipUnavailable, let health = manager.health(for: module) {
                 if health.status == .error || health.status == .blocked {
-                    Logger.shared.log("[AutoPick] Skipping \(module.sourceName) — status: \(health.status.rawValue)", type: "Info")
+                    Logger.shared.log("[AutoPick:\(requestId)] Skipping \(module.sourceName) — status: \(health.status.rawValue)", type: "Info")
                     continue
                 }
             }
 
-            Logger.shared.log("[AutoPick] Trying module: \(module.sourceName)", type: "Info")
+            Logger.shared.log("[AutoPick:\(requestId)] Trying module: \(module.sourceName)", type: "Info")
 
             // Ensure the module is active.
             if manager.activeModule?.id != module.id {
@@ -231,7 +258,7 @@ final class AniListDetailViewModel: ObservableObject {
                 }
 
                 guard !results.isEmpty else {
-                    Logger.shared.log("[AutoPick] \(module.sourceName) — no search results", type: "Info")
+                    Logger.shared.log("[AutoPick:\(requestId)] \(module.sourceName) — no search results", type: "Info")
                     manager.reportFailure(for: module.id, error: "No search results")
                     continue
                 }
@@ -239,12 +266,12 @@ final class AniListDetailViewModel: ObservableObject {
                 let ordered = SearchResultMatcher.ranked(
                     query: media.title.searchTitle, items: results, title: { $0.title })
                 let match = ordered.first!
-                Logger.shared.log("[AutoPick] \(module.sourceName) — matched: \(match.title)", type: "Info")
+                Logger.shared.log("[AutoPick:\(requestId)] \(module.sourceName) — matched: \(match.title)", type: "Info")
 
                 // Fetch episodes.
                 let episodes = try await runner.fetchEpisodes(url: match.href)
                 guard !episodes.isEmpty else {
-                    Logger.shared.log("[AutoPick] \(module.sourceName) — no episodes", type: "Info")
+                    Logger.shared.log("[AutoPick:\(requestId)] \(module.sourceName) — no episodes", type: "Info")
                     manager.reportFailure(for: module.id, error: "No episodes")
                     continue
                 }
@@ -254,7 +281,7 @@ final class AniListDetailViewModel: ObservableObject {
                 let matched: EpisodeLink? = episodes.first(where: { $0.number == targetDouble })
                     ?? episodes.first(where: { round($0.number) == targetDouble })
                 guard let epLink = matched else {
-                    Logger.shared.log("[AutoPick] \(module.sourceName) — episode \(episode) not found", type: "Info")
+                    Logger.shared.log("[AutoPick:\(requestId)] \(module.sourceName) — episode \(episode) not found", type: "Info")
                     manager.reportFailure(for: module.id, error: "Episode not found")
                     continue
                 }
@@ -262,16 +289,16 @@ final class AniListDetailViewModel: ObservableObject {
                 // Fetch streams.
                 let streams = try await runner.fetchStreams(episodeUrl: epLink.href)
                 guard !streams.isEmpty else {
-                    Logger.shared.log("[AutoPick] \(module.sourceName) — no streams for EP \(episode)", type: "Info")
+                    Logger.shared.log("[AutoPick:\(requestId)] \(module.sourceName) — no streams for EP \(episode)", type: "Info")
                     manager.reportFailure(for: module.id, error: "No streams")
                     continue
                 }
 
-                Logger.shared.log("[AutoPick] \(module.sourceName) returned \(streams.count) streams", type: "Info")
+                Logger.shared.log("[AutoPick:\(requestId)] \(module.sourceName) returned \(streams.count) streams", type: "Info")
 
                 // Select the best stream based on quality preference.
                 let selectedStream = selectBestStream(streams, preferredQuality: preferredQuality)
-                Logger.shared.log("[AutoPick] Selected: \(selectedStream.title)", type: "Info")
+                Logger.shared.log("[AutoPick:\(requestId)] Selected: \(selectedStream.title)", type: "Info")
 
                 // Remember the alias + href.
                 ModuleSearchAliasManager.shared.setLastSearchResultHref(
@@ -282,7 +309,7 @@ final class AniListDetailViewModel: ObservableObject {
                 manager.selectModule(module)
 
                 // Start playback!
-                Logger.shared.log("[AutoPick] Starting playback — \(module.sourceName) / \(selectedStream.title)", type: "Info")
+                Logger.shared.log("[AutoPick:\(requestId)] Starting playback — \(module.sourceName) / \(selectedStream.title)", type: "Info")
 
                 await MainActor.run {
                     self.onStreamsLoaded(streams.sorted { $0.title < $1.title },
@@ -295,14 +322,14 @@ final class AniListDetailViewModel: ObservableObject {
 
             } catch {
                 if (error as? CancellationError) != nil { return }
-                Logger.shared.log("[AutoPick] \(module.sourceName) failed — \(error.localizedDescription)", type: "Error")
+                Logger.shared.log("[AutoPick:\(requestId)] \(module.sourceName) failed — \(error.localizedDescription)", type: "Error")
                 manager.reportFailure(for: module.id, error: error.localizedDescription)
                 continue
             }
         }
 
         // All modules failed.
-        Logger.shared.log("[AutoPick] All eligible modules failed — playback unavailable", type: "Error")
+        Logger.shared.log("[AutoPick:\(requestId)] All eligible modules failed — playback unavailable", type: "Error")
         await MainActor.run {
             ToastManager.shared.show(
                 title: "Auto Pick",
