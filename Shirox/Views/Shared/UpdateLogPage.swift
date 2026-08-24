@@ -99,6 +99,20 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.2",
+        date: "2026-08-24",
+        added: [],
+        fixed: [
+            "Auto Pick loading overlay removed — the progress overlay/spinner was unnecessary. Auto Pick now runs silently in the background and starts playback directly when a stream is found, with no visible loading animation."
+        ],
+        changed: [],
+        improved: [],
+        removed: [
+            "Auto Pick progress overlay and autoPickStatus property — removed entirely per user request. No loading animation, no overlay, no spinner."
+        ],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "2.1",
         date: "2026-08-24",
         added: [],
