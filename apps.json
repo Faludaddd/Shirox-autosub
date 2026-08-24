@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "2.1",
+          "buildVersion": "1",
+          "date": "2026-08-24",
+          "localizedDescription": "Fixed: Auto Pick playback not starting — the stream was selected in the logs but the player never received it because the Change Stream sheet's onDismiss callback was bypassed. Now calls selectStream() directly.\nFixed: Auto Pick 30-second freeze — added a progress overlay showing current step (Trying…, Searching…, Fetching streams…, Starting playback…).\nFixed: Schedule detail poster overflow — added .clipped() to prevent the hero image from extending past the left screen edge.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 11040520,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "2.0",
           "buildVersion": "1",
           "date": "2026-08-24",

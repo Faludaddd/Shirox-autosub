@@ -2547,6 +2547,7 @@ struct ScheduleDetailView: View {
                 contentSection
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .clipped() // prevent any child from overflowing the screen edges
         }
         .background(frostedBackground)
         .navigationTitle("")
@@ -2574,6 +2575,7 @@ struct ScheduleDetailView: View {
                         endPoint: .bottom
                     )
                 )
+                .clipped() // ensure image doesn't overflow the frame
 
             HStack(alignment: .top) {
                 Spacer()

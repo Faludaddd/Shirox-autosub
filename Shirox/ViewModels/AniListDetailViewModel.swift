@@ -29,6 +29,10 @@ final class AniListDetailViewModel: ObservableObject {
     /// for the same episode while one is already running. Cleared when
     /// playback starts or the operation fails.
     @Published var autoPickInProgress: Int? = nil
+    /// Progress text shown to the user during Auto Pick (e.g.
+    /// "Trying Miruro…", "Fetching streams…"). nil when Auto Pick
+    /// is not running.
+    @Published var autoPickStatus: String? = nil
 
     // Stream results that bubble up from ModuleStreamPickerView
     @Published var pendingStreams: [StreamResult] = []
@@ -142,9 +146,7 @@ final class AniListDetailViewModel: ObservableObject {
     ///
     /// Includes a guard that prevents duplicate execution: if an Auto Pick
     /// operation is already running for the same episode, the call is
-    /// ignored and logged. This prevents the repeated execution seen in
-    /// the logs (caused by SwiftUI re-rendering, .onChange observers, or
-    /// .task modifiers firing multiple times).
+    /// ignored and logged.
     func watchEpisode(_ number: Int) {
         selectedEpisodeNumber = number
 
@@ -156,6 +158,7 @@ final class AniListDetailViewModel: ObservableObject {
                 return
             }
             autoPickInProgress = number
+            autoPickStatus = "Starting…"
             let requestId = UUID().uuidString.prefix(8)
             Logger.shared.log("[AutoPick:\(requestId)] Request ID: \(requestId) — Started for EP \(number)", type: "Info")
             Task { await autoPickAndPlay(episode: number, requestId: String(requestId)) }
@@ -179,6 +182,7 @@ final class AniListDetailViewModel: ObservableObject {
         defer {
             Task { @MainActor in
                 autoPickInProgress = nil
+                autoPickStatus = nil
             }
         }
         guard let media else {
@@ -239,6 +243,7 @@ final class AniListDetailViewModel: ObservableObject {
             }
 
             Logger.shared.log("[AutoPick:\(requestId)] Trying module: \(module.sourceName)", type: "Info")
+            await MainActor.run { autoPickStatus = "Trying \(module.sourceName)…" }
 
             // Ensure the module is active.
             if manager.activeModule?.id != module.id {
@@ -248,6 +253,7 @@ final class AniListDetailViewModel: ObservableObject {
             let runner = ModuleJSRunner()
             do {
                 try await runner.load(module: module)
+                await MainActor.run { autoPickStatus = "Searching on \(module.sourceName)…" }
 
                 // Search for the anime.
                 var results = try await runner.search(keyword: searchTitle)
@@ -287,6 +293,7 @@ final class AniListDetailViewModel: ObservableObject {
                 }
 
                 // Fetch streams.
+                await MainActor.run { autoPickStatus = "Fetching streams…" }
                 let streams = try await runner.fetchStreams(episodeUrl: epLink.href)
                 guard !streams.isEmpty else {
                     Logger.shared.log("[AutoPick:\(requestId)] \(module.sourceName) — no streams for EP \(episode)", type: "Info")
@@ -308,15 +315,20 @@ final class AniListDetailViewModel: ObservableObject {
                 manager.reportSuccess(for: module.id)
                 manager.selectModule(module)
 
-                // Start playback!
+                // Start playback — call selectStream directly instead of
+                // onStreamsLoaded. onStreamsLoaded sets pendingModuleStream
+                // and relies on the showStreamPicker sheet's onDismiss
+                // callback to call selectStream. But Auto Pick never opens
+                // that sheet, so the onDismiss never fires and playback
+                // never starts. Calling selectStream directly fixes this.
                 Logger.shared.log("[AutoPick:\(requestId)] Starting playback — \(module.sourceName) / \(selectedStream.title)", type: "Info")
-
                 await MainActor.run {
-                    self.onStreamsLoaded(streams.sorted { $0.title < $1.title },
-                                        selectedStream: selectedStream,
-                                        episodeHref: match.href,
-                                        availableCount: episodes.count,
-                                        actualEpisodeHref: epLink.href)
+                    autoPickStatus = "Starting playback…"
+                    self.selectStream(selectedStream,
+                                       searchResultHref: match.href,
+                                       episodeActualHref: epLink.href,
+                                       availableEpisodes: episodes.count,
+                                       onSequelAdvanced: nil)
                 }
                 return
 

@@ -99,6 +99,22 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.1",
+        date: "2026-08-24",
+        added: [],
+        fixed: [
+            "Auto Pick playback not starting — root cause found: Auto Pick called onStreamsLoaded() which set pendingModuleStream, but since the Change Stream sheet was never opened (Auto Pick bypasses it), the sheet's onDismiss callback that actually calls selectStream() never fired. Playback was technically 'starting' in the logs but the player UI never received the stream. Fixed by calling selectStream() directly from autoPickAndPlay() instead of going through onStreamsLoaded().",
+            "Auto Pick 30-second freeze — during the ~30 seconds between a Cloudflare rejection and streams being returned, the screen showed nothing (looked frozen). Added a progress overlay that shows the current step: 'Trying Miruro…' → 'Searching on Miruro…' → 'Fetching streams…' → 'Starting playback…'. The overlay uses the app's custom design language (regularMaterial card with accent-colored spinner).",
+            "Schedule detail poster overflow — the hero poster image on the Schedule detail page was extending past the left edge of the screen. Added .clipped() to both the image's frame and the outer VStack to prevent any overflow."
+        ],
+        changed: [],
+        improved: [],
+        removed: [],
+        other: [
+            "The 'Duplicate trigger ignored' warning is expected behavior — the guard correctly prevents duplicate Auto Pick executions. The double-trigger comes from SwiftUI re-rendering, which is inherent to the framework. The guard at the source (watchEpisode) is the correct fix — suppressing after the fact rather than trying to prevent the re-render itself."
+        ]
+    ),
+    UpdateLogEntry(
         version: "2.0",
         date: "2026-08-23",
         added: [],

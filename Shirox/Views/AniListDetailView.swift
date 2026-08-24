@@ -349,6 +349,35 @@ struct AniListDetailView: View {
                 .environmentObject(moduleManager)
             }
         }
+        // Auto Pick progress overlay — shown when Auto Pick is running.
+        // Displays the current step (e.g. "Trying Miruro…") so the user
+        // knows the app is working, not frozen.
+        .overlay {
+            if vm.autoPickInProgress != nil, let status = vm.autoPickStatus {
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .scaleEffect(1.2)
+                        .tint(Color.appAccent)
+                    Text(status)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                    Text("Finding best stream…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(32)
+                .background(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(.regularMaterial)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.2), radius: 20, y: 8)
+                .transition(.opacity.combined(with: .scale))
+            }
+        }
         .adaptiveSheet(isPresented: $vm.showFinalStreamPicker, onDismiss: {
             if let stream = vm.pendingFinalStream {
                 vm.pendingFinalStream = nil
