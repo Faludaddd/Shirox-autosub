@@ -136,15 +136,15 @@ final class MangaHomeViewModel: ObservableObject {
             Logger.shared.logStructured(type: "Provider", feature: "MangaHome", operation: "Fallback to Jikan for manga", error: "AniList API disabled or rate-limited")
             do {
                 let mangaTrending = try await MALDiscoveryService.shared.fetchList("top/manga",
-                    queryItems: [URLQueryItem(name: "filter", value: "bypopularity"), URLQueryItem(name: "limit", value: "20")])
+                    queryItems: [URLQueryItem(name: "filter", value: "bypopularity"), URLQueryItem(name: "limit", value: "25")])
                 trending = mangaTrending.map { MALDiscoveryService.shared.mapToMedia($0) }
                 try await Task.sleep(nanoseconds: 400_000_000)
                 let mangaPopular = try await MALDiscoveryService.shared.fetchList("top/manga",
-                    queryItems: [URLQueryItem(name: "filter", value: "favorite"), URLQueryItem(name: "limit", value: "20")])
+                    queryItems: [URLQueryItem(name: "filter", value: "favorite"), URLQueryItem(name: "limit", value: "25")])
                 popular = mangaPopular.map { MALDiscoveryService.shared.mapToMedia($0) }
                 try await Task.sleep(nanoseconds: 400_000_000)
                 let mangaTopRated = try await MALDiscoveryService.shared.fetchList("top/manga",
-                    queryItems: [URLQueryItem(name: "filter", value: "bypopularity"), URLQueryItem(name: "limit", value: "20")])
+                    queryItems: [URLQueryItem(name: "filter", value: "bypopularity"), URLQueryItem(name: "limit", value: "25")])
                 topRated = mangaTopRated.map { MALDiscoveryService.shared.mapToMedia($0) }
             } catch {
                 Logger.shared.log("[MangaHome] Jikan fallback also failed: \(error.localizedDescription)", type: "Error")
@@ -153,7 +153,14 @@ final class MangaHomeViewModel: ObservableObject {
 
         isLoading = false
         if trending.isEmpty && popular.isEmpty && topRated.isEmpty && latest.isEmpty {
-            error = "Couldn't load manga. Check your connection and try again."
+            // Distinguish between "AniList down + Jikan also failed" vs
+            // just a network error — show a more specific message when
+            // both providers are unavailable.
+            if AniListService.shared.isApiDisabled() || AniListService.shared.isRateLimited() {
+                error = "Manga data is temporarily unavailable. AniList and Jikan are both down. Please try again shortly."
+            } else {
+                error = "Couldn't load manga. Check your connection and try again."
+            }
         }
     }
 }

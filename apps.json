@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "2.0",
+          "buildVersion": "1",
+          "date": "2026-08-23",
+          "localizedDescription": "Fixed: Manga cache key mismatch — standardized limit=25 across all manga top/manga call sites so they share cache/dedup benefit.\nImproved: Section-level 'temporarily unavailable' UI state — when both AniList and Jikan fail for manga, shows a clear message instead of blank/spinner. Applied to manga Browse, Schedule, and Search.\nManga 504 errors are confirmed as a Jikan-side issue (anime works, manga doesn't). App's request behavior and error handling are now fixed.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 11040520,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.99",
           "buildVersion": "1",
           "date": "2026-08-23",

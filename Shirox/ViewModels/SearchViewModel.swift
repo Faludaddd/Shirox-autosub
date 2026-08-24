@@ -143,7 +143,11 @@ final class SearchViewModel: ObservableObject {
                 }
             } catch {
                 if !Task.isCancelled {
-                    errorMessage = error.localizedDescription
+                    if isMangaMode && (AniListService.shared.isApiDisabled() || AniListService.shared.isRateLimited()) {
+                        errorMessage = "Manga search is temporarily unavailable. AniList and Jikan are both down. Please try again shortly."
+                    } else {
+                        errorMessage = error.localizedDescription
+                    }
                 }
             }
             if !Task.isCancelled {

@@ -1510,7 +1510,7 @@ struct ScheduleView: View {
                         queryItems: [URLQueryItem(name: "filter", value: "bypopularity"), URLQueryItem(name: "limit", value: "25")])
                     mangaReleases = mangaList.map { MALDiscoveryService.shared.mapToMedia($0) }
                 } catch {
-                    mangaLoadError = "Couldn't load manga schedule. AniList and Jikan are both unavailable."
+                    mangaLoadError = "Manga schedule is temporarily unavailable. AniList and Jikan are both down. Please try again shortly."
                     Logger.shared.log("[MangaSchedule] Jikan fallback also failed: \(error.localizedDescription)", type: "Error")
                 }
             } else {

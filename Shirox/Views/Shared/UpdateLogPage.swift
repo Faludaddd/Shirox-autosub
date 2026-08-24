@@ -99,6 +99,22 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.0",
+        date: "2026-08-23",
+        added: [],
+        fixed: [
+            "Manga cache key mismatch — MangaHomeView was requesting top/manga with limit=20 while the manga Schedule fallback requested the same endpoint with limit=25. Because the shared request layer's cache key is built from path + query items, these were treated as different requests and didn't share cache/dedup benefit. Standardized all manga top/manga call sites to limit=25 so they now hit the same cache key and deduplicate correctly."
+        ],
+        changed: [],
+        improved: [
+            "Section-level 'temporarily unavailable' UI state — when both AniList and Jikan fail for manga, the app now shows a clear, honest message: 'Manga data is temporarily unavailable. AniList and Jikan are both down. Please try again shortly.' instead of a generic error or blank section. Applied to manga Browse, manga Schedule, and manga Search. This only appears after the existing retry-once-with-backoff has been exhausted, not before."
+        ],
+        removed: [],
+        other: [
+            "Manga data loading is still dependent on Jikan's manga endpoints being healthy externally. The 504 errors on manga endpoints are confirmed as a Jikan-side issue (anime endpoints work fine through the same shared layer — only manga endpoints are 504-ing). What's fixed here is the app's own request behavior (cache key alignment) and its handling of the external failure (clear error state instead of blank/spinner)."
+        ]
+    ),
+    UpdateLogEntry(
         version: "1.99",
         date: "2026-08-23",
         added: [],
