@@ -32,7 +32,7 @@
           "date": "2026-08-24",
           "localizedDescription": "Removed: Auto Pick loading overlay/spinner — no loading animation. Auto Pick runs silently and starts playback directly when a stream is found.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 11040520,
+          "size": 11431183,
           "minOSVersion": "15.0"
         },
         {
