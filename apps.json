@@ -29,10 +29,10 @@
         {
           "version": "2.3",
           "buildVersion": "1",
-          "date": "2026-08-26",
+          "date": "2026-08-25",
           "localizedDescription": "Fixed: All ratings now display out of 10 (e.g. \"7.5\") instead of as a percentage (e.g. \"75%\"). Applied app-wide — Home (anime + manga), Library grid + list, anime detail, manga detail, search results, recommendations, notification detail, and the \"Rating\" info row on every detail page. No more percentage-format ratings remain anywhere.\nFixed: Schedule section posters were horizontally misaligned across cards (some slightly left, some slightly right). Applied the same alignment pattern already used by the notification section — the text column now absorbs all available width so the poster stays pinned to the leading edge and the bell stays pinned to the trailing edge on every card.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 11040520,
+          "size": 11436792,
           "minOSVersion": "15.0"
         },
         {
