@@ -268,7 +268,7 @@ struct MangaPosterCard: View, Equatable {
             )
             .overlay(alignment: .topTrailing) {
                 if let score = media.averageScore {
-                    Label("\(score)%", systemImage: "star.fill")
+                    Label(score.averageScoreOutOf10, systemImage: "star.fill")
                         .font(.caption2.weight(.bold))
                         .foregroundStyle(.yellow)
                         .lineLimit(1)

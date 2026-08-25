@@ -124,7 +124,7 @@ struct AnimeNotificationDetailView: View {
                         if let score = media.averageScore {
                             HStack(spacing: 4) {
                                 Image(systemName: "star.fill").font(.caption2.weight(.bold))
-                                Text("\(score)%").font(.caption2.weight(.bold))
+                                Text(score.averageScoreOutOf10).font(.caption2.weight(.bold))
                             }
                             .foregroundStyle(.primary)
                             .padding(.horizontal, 8).padding(.vertical, 3)
@@ -238,7 +238,7 @@ struct AnimeNotificationDetailView: View {
         }
         if let status = media.statusDisplay { items.append(("Status", status)) }
         if let episodes = media.episodes { items.append(("Episodes", "\(episodes)")) }
-        if let score = media.averageScore { items.append(("Rating", "\(score)%")) }
+        if let score = media.averageScore { items.append(("Rating", score.averageScoreOutOf10)) }
         if let pop = media.popularity, pop > 0 { items.append(("Popularity", "\(pop)")) }
         let seasonStr = [media.season?.capitalized, media.seasonYear.map { String($0) }]
             .compactMap { $0 }.joined(separator: " ")

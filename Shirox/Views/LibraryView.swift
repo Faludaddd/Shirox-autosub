@@ -832,7 +832,7 @@ struct LibraryView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .overlay(alignment: .topTrailing) {
                     if let score = entry.media.averageScore {
-                        Text("\(score)%")
+                        Text(score.averageScoreOutOf10)
                             .font(.system(size: 9, weight: .bold))
                             .foregroundStyle(.yellow)
                             .padding(.horizontal, 6).padding(.vertical, 3)
@@ -1149,7 +1149,7 @@ private struct LibraryRowView: View {
                         HStack(spacing: 3) {
                             Image(systemName: "chart.bar.fill")
                                 .font(.system(size: 9))
-                            Text("\(avg)%")
+                            Text(avg.averageScoreOutOf10)
                                 .font(.caption2.weight(.semibold))
                                 .lineLimit(1)
                                 .fixedSize(horizontal: true, vertical: false)

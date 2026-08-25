@@ -95,6 +95,27 @@ struct Media: Identifiable, Codable, Equatable, Hashable, Sendable {
     }
 }
 
+// MARK: - Average Score Formatting (out-of-10)
+//
+// AniList's `averageScore` is a 0–100 integer. Every place the public/community
+// rating is displayed anywhere in the app must render it out of 10 (e.g. 75 →
+// "7.5", 80 → "8", 82 → "8.2"). The user's *personal* score is rendered via
+// `ScoreFormat.displayString(for:)` and is already on the user's chosen scale
+// (defaults to /10) — this extension is ONLY for the public `averageScore`.
+extension Int {
+    /// Formats an AniList average score (0–100) as an out-of-10 string.
+    /// Whole numbers render without a decimal (e.g. 80 → "8", 90 → "9");
+    /// non-whole values render with one decimal place (e.g. 75 → "7.5",
+    /// 82 → "8.2"). 0 renders as "0".
+    var averageScoreOutOf10: String {
+        let value = Double(self) / 10.0
+        if value.truncatingRemainder(dividingBy: 1) == 0 {
+            return String(Int(value))
+        }
+        return String(format: "%.1f", value)
+    }
+}
+
 extension Media {
     /// Deterministic positive id for an on-device-only title, derived from a stable
     /// source key via FNV-1a (not Swift's per-launch-seeded hashValue), so the id and

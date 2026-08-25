@@ -99,6 +99,19 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.3",
+        date: "2026-08-26",
+        added: [],
+        fixed: [
+            "Ratings now display out of 10 (e.g. \"7.5\") instead of as a percentage (e.g. \"75%\") everywhere in the app. A previous fix was meant to apply this app-wide but only reached part of the Library section. This pass swept every screen that shows a rating — Home (anime + manga banners and posters), Library (grid card overlay + list view info), anime detail page (hero score badge + \"Rating\" info row + relations section), manga detail page (hero score badge + \"Rating\" info row), search result poster overlays, recommendation cards, and the anime notification detail page (hero score badge + \"Rating\" info row). No percentage-format ratings remain anywhere.",
+            "Schedule section posters were horizontally misaligned across cards — some sat slightly left, some slightly right, instead of forming a single straight column. Same alignment issue that was previously fixed in the notification section. Applied the notification section's pattern to both ScheduleCard and MangaScheduleCard: the text column now absorbs all available width via .frame(maxWidth: .infinity, alignment: .leading), and the explicit Spacer between text column and bell was removed. The poster stays pinned to the leading edge and the bell stays pinned to the trailing edge on every card, regardless of title length or badge count."
+        ],
+        changed: [],
+        improved: [],
+        removed: [],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "2.2",
         date: "2026-08-24",
         added: [],

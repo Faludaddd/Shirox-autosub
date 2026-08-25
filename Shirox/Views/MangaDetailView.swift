@@ -439,7 +439,7 @@ struct MangaDetailView: View {
                     if let enrich = vm.enrichment {
                         HStack(spacing: 6) {
                             if let score = enrich.averageScore {
-                                Label("\(score)%", systemImage: "star.fill")
+                                Label(score.averageScoreOutOf10, systemImage: "star.fill")
                                     .font(.caption2.weight(.semibold))
                                     .foregroundStyle(.primary)
                                     .padding(.horizontal, 8).padding(.vertical, 3)

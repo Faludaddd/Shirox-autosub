@@ -623,7 +623,7 @@ private struct MacFeaturedCarousel: View {
 
                                 HStack(spacing: 8) {
                                     if let score = media.averageScore {
-                                        Label("\(score)%", systemImage: "star.fill")
+                                        Label(score.averageScoreOutOf10, systemImage: "star.fill")
                                             .font(.caption.weight(.semibold))
                                             .foregroundStyle(.yellow)
                                             .lineLimit(1)
@@ -845,7 +845,7 @@ private struct FeaturedCard: View, Equatable {
 
             HStack(spacing: 8) {
                 if let score = media.averageScore {
-                    Label("\(score)%", systemImage: "star.fill")
+                    Label(score.averageScoreOutOf10, systemImage: "star.fill")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.yellow)
                         .lineLimit(1)
@@ -2252,8 +2252,12 @@ private struct MangaScheduleCard: View {
                     .fixedSize()
                 }
             }
-
-            Spacer(minLength: 4)
+            // Mirrors the notification section's `textColumn` pattern —
+            // the VStack absorbs all available width so the poster stays
+            // at the leading edge across every card (no per-card drift
+            // from the Spacer). MangaScheduleCard has no trailing bell,
+            // but the same leading-edge anchor applies.
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(12)
         .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
@@ -2386,8 +2390,11 @@ private struct ScheduleCard: View {
                     .fixedSize()
                 }
             }
-
-            Spacer(minLength: 4)
+            // Mirrors the notification section's `textColumn` pattern —
+            // the VStack absorbs all available width so the bell is pinned
+            // to the trailing edge and the poster stays at the leading
+            // edge across every card (no per-card drift from the Spacer).
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             // Notification bell
             Button(action: onToggleNotification) {

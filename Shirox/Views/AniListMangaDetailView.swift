@@ -866,7 +866,7 @@ struct AniListMangaDetailView: View {
                             HStack(spacing: 4) {
                                 Image(systemName: "star.fill")
                                     .font(.caption2.weight(.bold))
-                                Text("\(score)%")
+                                Text(score.averageScoreOutOf10)
                                     .font(.caption2.weight(.bold))
                             }
                             .foregroundStyle(.primary)
@@ -988,7 +988,7 @@ struct AniListMangaDetailView: View {
         if let status = media.statusDisplay { items.append(("Status", status)) }
         if let chapters = media.episodes { items.append(("Chapters", "\(chapters)")) }
         if let volumes = media.volumes { items.append(("Volumes", "\(volumes)")) }
-        if let score = media.averageScore { items.append(("Rating", "\(score)%")) }
+        if let score = media.averageScore { items.append(("Rating", score.averageScoreOutOf10)) }
         if let pop = media.popularity, pop > 0 { items.append(("Popularity", "\(pop)")) }
         let seasonStr = [media.season?.capitalized, media.seasonYear.map { String($0) }]
             .compactMap { $0 }.joined(separator: " ")

@@ -1102,7 +1102,7 @@ struct AniListDetailView: View {
                                 Image(systemName: "star.fill")
                                     .font(.caption2.weight(.bold))
                                     .foregroundStyle(.primary)
-                                Text("\(score)%")
+                                Text(score.averageScoreOutOf10)
                                     .font(.caption2.weight(.bold))
                                     .foregroundStyle(.primary)
                                     .lineLimit(1)
@@ -1276,7 +1276,7 @@ struct AniListDetailView: View {
         if let f = media.format, !f.isEmpty { items.append(("Format", f)) }
         if let s = media.statusDisplay { items.append(("Status", s)) }
         if let ep = media.episodes { items.append(("Episodes", "\(ep)")) }
-        if let score = media.averageScore { items.append(("Rating", "\(score)%")) }
+        if let score = media.averageScore { items.append(("Rating", score.averageScoreOutOf10)) }
         if let pop = media.popularity { items.append(("Popularity", "\(pop)")) }
         let seasonStr = [media.season?.capitalized, media.seasonYear.map { String($0) }].compactMap { $0 }.joined(separator: " ")
         if !seasonStr.isEmpty { items.append(("Season", seasonStr)) }
@@ -2145,7 +2145,7 @@ struct AniListMatchingSearchView: View {
                                         .lineLimit(2)
                                     
                                     if let score = media.averageScore {
-                                        Label("\(score)%", systemImage: "star.fill")
+                                        Label(score.averageScoreOutOf10, systemImage: "star.fill")
                                             .font(.caption)
                                             .foregroundStyle(.yellow)
                                             .lineLimit(1)

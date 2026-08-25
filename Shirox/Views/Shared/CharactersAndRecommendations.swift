@@ -909,7 +909,7 @@ struct RecommendationsSection: View {
                         HStack(spacing: 2) {
                             Image(systemName: "star.fill")
                                 .font(.system(size: 8, weight: .bold))
-                            Text("\(score)%")
+                            Text(score.averageScoreOutOf10)
                                 .font(.system(size: 10, weight: .bold))
                         }
                         .foregroundStyle(.yellow)
