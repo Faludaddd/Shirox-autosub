@@ -1924,14 +1924,33 @@ struct AniListCardView: View, Equatable {
                 }
             )
             .overlay(alignment: .bottomLeading) {
-                Text(media.title.displayTitle)
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.white)
-                    .lineLimit(2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 12)
+                // Matches MangaPosterCard's bottomLeading overlay — title
+                // on top, then a small status line below:
+                //   - if `media.episodes` is present: "\(episodes) ep"
+                //   - else if statusDisplay is present: status string
+                //     (e.g. "Airing", "Finished", "Upcoming")
+                // This is the same logic the manga poster card uses on
+                // Home — applied here to anime posters so both sections
+                // show the same style of status text in the same place.
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(media.title.displayTitle)
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if let episodes = media.episodes {
+                        Text("\(episodes) ep")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.8))
+                    } else if let status = media.statusDisplay {
+                        Text(status)
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.8))
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 12)
             }
             .overlay(alignment: .topTrailing) {
                 if let score = media.averageScore {

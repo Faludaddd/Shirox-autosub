@@ -288,6 +288,19 @@ struct AniListMangaDetailView: View {
                 .padding(.top, 16)
                 .padding(.bottom, 8)
                 #endif
+                // Characters + Recommendations — placed BEFORE the
+                // chapters/connections section, matching the anime AniList
+                // page's section order exactly:
+                //   Synopsis → Buttons → Characters → Recommendations → Chapters/Connections
+                // Some manga have 100+ chapters — having Characters/Recs
+                // before the chapter list keeps them reachable without an
+                // extremely long scroll.
+                CharactersSection(mediaId: media.id, isManga: true,
+                                  preloaded: preloadedCharacters)
+                    .padding(.top, 16)
+                RecommendationsSection(mediaId: media.id, isManga: true,
+                                       preloaded: preloadedRecommendations)
+                    .padding(.top, 8)
                 // Section order: when selectedTab == 0, show Relations +
                 // Chapters. When selectedTab == 1, show Connections view
                 // (relations + reading order). Matches anime page.
@@ -338,15 +351,6 @@ struct AniListMangaDetailView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.top, 16)
                 }
-                // Characters + Recommendations — placed AFTER the chapters/
-                // connections section, matching the anime AniList page:
-                // Synopsis → Buttons → Episodes/Chapters → Characters → Recommendations
-                CharactersSection(mediaId: media.id, isManga: true,
-                                  preloaded: preloadedCharacters)
-                    .padding(.top, 16)
-                RecommendationsSection(mediaId: media.id, isManga: true,
-                                       preloaded: preloadedRecommendations)
-                    .padding(.top, 8)
             }
             .padding(.bottom, 30)
         }

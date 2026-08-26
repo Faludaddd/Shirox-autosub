@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "2.4",
+          "buildVersion": "1",
+          "date": "2026-08-26",
+          "localizedDescription": "Fixed: Schedule section posters and notification bell icons are now perfectly aligned in a single straight line on every row — no per-card horizontal drift. Both ScheduleCard (anime) and MangaScheduleCard now have an explicit .frame(maxWidth: .infinity, alignment: .leading) on the outer body so the HStack fills the full row width, plus a double .frame(width: 84, height: 112) wrapper around the poster and an explicit .frame(width: 32, height: 32) on the bell Button so their layout contribution is identical on every row.\nFixed: Anime detail page poster now pulls from AniList's coverImage (extraLarge ?? large), matching the Home screen and long-press context menu preview. Previously the detail page used TVDBPosterImage which could show a different TVDB-sourced poster than the rest of the app.\nFixed: Manga detail page section order now matches the anime detail page — Characters and Recommendations sections appear BEFORE the chapter list (some manga have 100+ chapters, so this keeps these sections reachable without an extremely long scroll). Previously they appeared after the chapter list.\nAdded: Anime posters on Home now display the same small status text in the bottom-left corner that manga posters show — episode count (e.g. \"12 ep\") when episodes are populated, otherwise the status string (e.g. \"Airing\"). Matches the MangaPosterCard pattern exactly.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 11040520,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "2.3",
           "buildVersion": "1",
           "date": "2026-08-25",

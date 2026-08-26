@@ -2193,11 +2193,17 @@ private struct MangaScheduleCard: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            // Poster — matches notification section size (84×112)
+            // Poster — fixed 84×112. Wrapped in a fixed-size container so
+            // the poster is always anchored to the leading edge of the row,
+            // regardless of what the inner image does (placeholder, failed
+            // load, async swap-in). This eliminates the per-card horizontal
+            // drift that was causing posters to appear slightly offset to
+            // the left/right of each other.
             CachedAsyncImage(urlString: entry.coverImage ?? "")
                 .frame(width: 84, height: 112)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.1)))
+                .frame(width: 84, height: 112)
 
             // Title + badges + countdown + time capsule
             VStack(alignment: .leading, spacing: 6) {
@@ -2259,6 +2265,12 @@ private struct MangaScheduleCard: View {
             // but the same leading-edge anchor applies.
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        // Force the entire row to fill its parent's width and align its
+        // content to the leading edge. Without this, SwiftUI may center
+        // the HStack within the LazyVStack row when its natural content
+        // width is less than the row's width — producing visible per-card
+        // horizontal drift on the poster.
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
         .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
         .overlay(
@@ -2314,13 +2326,19 @@ private struct ScheduleCard: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            // Poster — matches notification section size (84×112)
+            // Poster — fixed 84×112. Wrapped in a fixed-size container so
+            // the poster is always anchored to the leading edge of the row,
+            // regardless of what the inner image does (placeholder, failed
+            // load, async swap-in). This eliminates the per-card horizontal
+            // drift that was causing posters to appear slightly offset to
+            // the left/right of each other.
             CachedAsyncImage(urlString: entry.coverImage ?? "")
                 .frame(width: 84, height: 112)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .background(
                     RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.1))
                 )
+                .frame(width: 84, height: 112)
 
             // Title + badges + countdown + time capsule
             VStack(alignment: .leading, spacing: 6) {
@@ -2396,7 +2414,9 @@ private struct ScheduleCard: View {
             // edge across every card (no per-card drift from the Spacer).
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            // Notification bell
+            // Notification bell — explicitly fixed at 32×32 so its
+            // contribution to the HStack's layout is identical on every
+            // row, regardless of the on/off state's SF Symbol width.
             Button(action: onToggleNotification) {
                 Image(systemName: isNotificationOn ? "bell.badge.fill" : "bell.fill")
                     .font(.system(size: 18, weight: .medium))
@@ -2409,8 +2429,16 @@ private struct ScheduleCard: View {
                     )
             }
             .buttonStyle(.plain)
+            .frame(width: 32, height: 32)
             .accessibilityLabel(isNotificationOn ? "Cancel notification" : "Schedule notification")
         }
+        // Force the entire row to fill its parent's width and align its
+        // content to the leading edge. Without this, SwiftUI may center
+        // the HStack within the LazyVStack row when its natural content
+        // width is less than the row's width — producing visible per-card
+        // horizontal drift on both the poster (leading) and the bell
+        // (trailing).
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
         .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
         .overlay(

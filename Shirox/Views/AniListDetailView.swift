@@ -1085,7 +1085,14 @@ struct AniListDetailView: View {
             .frame(height: 420)
 
             HStack(alignment: .bottom, spacing: 14) {
-                TVDBPosterImage(media: media)
+                // Use AniList's cover image directly (extraLarge ?? large)
+                // — NOT TVDBPosterImage — so the detail page shows the
+                // exact same poster the Home screen and long-press
+                // context menu preview show for the same title. The
+                // banner above can still use TVDB fanart; only the
+                // poster block needs to match Home's AniListCardView
+                // (which uses `media.coverImage.extraLarge ?? .large`).
+                CachedAsyncImage(urlString: media.coverImage.extraLarge ?? media.coverImage.large ?? "")
                     .frame(width: 110, height: 165)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .shadow(color: .black.opacity(0.5), radius: 14, y: 6)

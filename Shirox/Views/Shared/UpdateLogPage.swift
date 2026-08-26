@@ -99,6 +99,22 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.4",
+        date: "2026-08-26",
+        added: [
+            "Anime posters on Home now display the same small status text in the bottom-left corner that manga posters show — episode count (e.g. \"12 ep\") when episodes are populated, otherwise the status string (e.g. \"Airing\"). Matches the MangaPosterCard pattern exactly so anime and manga poster cards look consistent."
+        ],
+        fixed: [
+            "Schedule section posters and notification bell icons are now perfectly aligned in a single straight line on every row — no per-card horizontal drift. The previous pass added a .frame(maxWidth: .infinity, alignment: .leading) on the inner VStack, which reduced but did not eliminate drift. This pass adds the same modifier to the OUTER body of both ScheduleCard and MangaScheduleCard (forcing the entire HStack to fill the row's full width and align leading), wraps the poster in a double .frame(width: 84, height: 112) so the poster's contribution to the HStack layout is identical on every row regardless of image loading state, and adds an explicit .frame(width: 32, height: 32) on the bell Button itself (not just the inner Image) so the bell's contribution is also identical on every row regardless of on/off state.",
+            "Anime detail page poster now pulls from AniList's coverImage (extraLarge ?? large), matching the Home screen and long-press context menu preview. Previously the detail page used TVDBPosterImage which could resolve to a different TVDB-sourced poster than what Home and the context menu showed — making the same anime look like a different image when you navigated into it. The banner above the poster can still use TVDB fanart; only the small poster block needed to switch to AniList to match.",
+            "Manga detail page section order now matches the anime detail page — Characters and Recommendations sections appear BEFORE the chapter list. Previously they appeared after the chapter list, which made them nearly unreachable on long manga (some have 100+ chapters, requiring an extremely long scroll past the chapter list to reach Characters/Recommendations). Now the order is: Synopsis → Buttons → Characters → Recommendations → Relations/Chapters (tab 0) or Connections (tab 1)."
+        ],
+        changed: [],
+        improved: [],
+        removed: [],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "2.3",
         date: "2026-08-26",
         added: [],
