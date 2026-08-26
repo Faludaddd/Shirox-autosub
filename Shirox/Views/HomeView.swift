@@ -2267,12 +2267,6 @@ private struct MangaScheduleCard: View {
             // but the same leading-edge anchor applies.
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        // Force the entire row to fill its parent's width and align its
-        // content to the leading edge. Without this, SwiftUI may center
-        // the HStack within the LazyVStack row when its natural content
-        // width is less than the row's width — producing visible per-card
-        // horizontal drift on the poster.
-        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
         .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
         .overlay(
@@ -2431,16 +2425,8 @@ private struct ScheduleCard: View {
                     )
             }
             .buttonStyle(.plain)
-            .frame(width: 32, height: 32)
             .accessibilityLabel(isNotificationOn ? "Cancel notification" : "Schedule notification")
         }
-        // Force the entire row to fill its parent's width and align its
-        // content to the leading edge. Without this, SwiftUI may center
-        // the HStack within the LazyVStack row when its natural content
-        // width is less than the row's width — producing visible per-card
-        // horizontal drift on both the poster (leading) and the bell
-        // (trailing).
-        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
         .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
         .overlay(
