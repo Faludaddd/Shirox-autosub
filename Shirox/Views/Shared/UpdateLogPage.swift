@@ -99,6 +99,18 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.8",
+        date: "2026-08-27",
+        added: [],
+        fixed: [
+            "Schedule section cards rebuilt from scratch — the notification bell is now guaranteed to sit fully on-screen, and posters are guaranteed a perfectly straight leading edge. True root cause (finally identified): the badge row and the countdown row inside each schedule card used .fixedSize(), which made them refuse to compress; on content-heavy entries (Stream badge, longer date strings) and narrower devices the card's MINIMUM width exceeded the actual row width, so SwiftUI rendered the card wider than the screen and clipped the trailing bell off the right edge. This is also why every earlier fix (v2.4–v2.7) failed to fully correct it — those adjustments changed outer frames and symbol variants but never removed the incompressibility. New layout contract: only the poster (84×112) and the bell (32×32) have fixed widths; every badge, countdown, and date text is lineLimit(1) and fully compressible, truncating gracefully on tight rows instead of expanding the card — so the card can never exceed the row width on any device, the poster stays pinned to the leading edge on every row, and the bell stays pinned to the trailing edge, always fully visible. The manga release schedule cards received the same rework, and the calendar date selector at the top of the schedule is completely untouched."
+        ],
+        changed: [],
+        improved: [],
+        removed: [],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "2.7",
         date: "2026-08-27",
         added: [],

@@ -2194,18 +2194,22 @@ private struct MangaScheduleCard: View {
     }
 
     var body: some View {
+        // ── Layout contract (v2.8 rework, mirrors ScheduleCard) ─────────
+        // Only the poster has a FIXED width; every text is lineLimit(1)
+        // and compressible. No `.fixedSize()` anywhere: it made the badge
+        // and countdown rows refuse to compress, so on content-heavy rows
+        // the card's minimum width exceeded the row width and rendered
+        // wider than the screen. With compressible text the card can NEVER
+        // exceed the row: the poster is pinned to the leading edge on
+        // every row, on every device width.
         HStack(alignment: .top, spacing: 12) {
-            // Poster — fixed 84×112. Wrapped in a fixed-size container so
-            // the poster is always anchored to the leading edge of the row,
-            // regardless of what the inner image does (placeholder, failed
-            // load, async swap-in). This eliminates the per-card horizontal
-            // drift that was causing posters to appear slightly offset to
-            // the left/right of each other.
+            // Poster — single fixed 84×112 frame; the card's leading
+            // anchor. Identical size on every row so poster edges line
+            // up perfectly; clipShape bounds whatever the image does.
             CachedAsyncImage(urlString: entry.coverImage ?? "")
                 .frame(width: 84, height: 112)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.1)))
-                .frame(width: 84, height: 112)
 
             // Title + badges + countdown + time capsule
             VStack(alignment: .leading, spacing: 6) {
@@ -2219,45 +2223,48 @@ private struct MangaScheduleCard: View {
                 // Badges — chapter count + format only (one tag per metadata
                 // type; no duplicate badges). The "Manga" source badge is
                 // omitted since the entire schedule is manga-only.
+                // lineLimit(1) + compressible: truncate instead of
+                // expanding the card past the row width.
                 HStack(spacing: 6) {
                     if entry.episode > 0 {
                         Text("Ch \(entry.episode)")
                             .font(.caption2.weight(.semibold))
+                            .lineLimit(1)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(Color.secondary.opacity(0.18), in: Capsule())
-                            .fixedSize()
                     }
 
                     if let format = entry.format, !format.isEmpty {
                         Text(format.replacingOccurrences(of: "_", with: " "))
                             .font(.caption2.weight(.semibold))
+                            .lineLimit(1)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(formatBadgeColor.opacity(0.22), in: Capsule())
                             .foregroundStyle(formatBadgeColor)
-                            .fixedSize()
                     }
                 }
 
-                // Countdown + time capsule
+                // Countdown + time capsule — compressible, lineLimit(1),
+                // truncate instead of expanding the card.
                 HStack(spacing: 8) {
                     Text(entry.countdownDisplay)
                         .font(.caption.weight(.medium))
                         .foregroundStyle(.secondary)
-                        .fixedSize()
+                        .lineLimit(1)
 
                     HStack(spacing: 4) {
                         Image(systemName: "clock.fill")
                             .font(.system(size: 9, weight: .semibold))
                         Text(airTimeCapsule)
                             .font(.caption2.weight(.medium))
+                            .lineLimit(1)
                     }
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .background(.ultraThinMaterial, in: Capsule())
                     .foregroundStyle(.secondary)
-                    .fixedSize()
                 }
             }
             // Mirrors the notification section's `textColumn` pattern —
@@ -2321,22 +2328,41 @@ private struct ScheduleCard: View {
     }
 
     var body: some View {
+        // ── Layout contract (v2.8 from-scratch rework) ────────────────────
+        // Exactly two children of this HStack have a FIXED width: the poster
+        // (84) and the bell (32). Everything else is flexible — no badge,
+        // text, or capsule uses `.fixedSize()`, and every single-line string
+        // uses `.lineLimit(1)` so it TRUNCATES instead of growing the card's
+        // minimum width.
+        //
+        // Why: through v2.7 the badge row and the countdown row used
+        // `.fixedSize()`, which made them refuse to compress. On
+        // content-heavy entries (Stream badge, longer dates) and narrower
+        // devices, the card's MINIMUM width exceeded the row width, so
+        // SwiftUI rendered the card wider than the screen and the trailing
+        // bell hung off the right edge — which is why no outer-frame
+        // adjustment ever fixed it. With fully compressible text the card
+        // can NEVER exceed the row width: the poster is pinned to the
+        // leading edge, the bell to the trailing edge, both fully on-screen,
+        // on every row and every device width.
         HStack(alignment: .top, spacing: 12) {
-            // Poster — fixed 84×112. Wrapped in a fixed-size container so
-            // the poster is always anchored to the leading edge of the row,
-            // regardless of what the inner image does (placeholder, failed
-            // load, async swap-in). This eliminates the per-card horizontal
-            // drift that was causing posters to appear slightly offset to
-            // the left/right of each other.
+            // ── Poster ──────────────────────────────────────────────
+            // Single fixed 84×112 frame — the card's leading anchor.
+            // Identical size on every row, so poster edges line up
+            // perfectly. clipShape bounds the image (placeholder, failed
+            // load, async swap-in) so it can never influence layout.
             CachedAsyncImage(urlString: entry.coverImage ?? "")
                 .frame(width: 84, height: 112)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .background(
                     RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.1))
                 )
-                .frame(width: 84, height: 112)
 
-            // Title + badges + countdown + time capsule
+            // ── Text column ─────────────────────────────────────────
+            // Greedy (maxWidth: .infinity) so it absorbs ALL space the
+            // poster and bell leave behind — that is what pins the bell to
+            // the trailing edge — while every row inside truncates rather
+            // than pushing the card wider.
             VStack(alignment: .leading, spacing: 6) {
                 Text(entry.title)
                     .font(.system(size: 17, weight: .semibold))
@@ -2345,69 +2371,69 @@ private struct ScheduleCard: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .frame(height: 42, alignment: .top)
 
-                // Badges — all `.fixedSize()` so they sit on one row instead of stacking.
+                // Badges — EP, format, source, Stream. Every one is
+                // lineLimit(1) and compressible: when the row is tight the
+                // rightmost badges truncate with an ellipsis instead of
+                // shoving the bell off-screen.
                 HStack(spacing: 6) {
                     Text(entry.episodeBadge)
                         .font(.caption2.weight(.semibold))
+                        .lineLimit(1)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(Color.secondary.opacity(0.18), in: Capsule())
-                        .fixedSize()
 
                     if let format = entry.format, !format.isEmpty {
                         Text(format)
                             .font(.caption2.weight(.semibold))
+                            .lineLimit(1)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(formatBadgeColor.opacity(0.22), in: Capsule())
                             .foregroundStyle(formatBadgeColor)
-                            .fixedSize()
                     }
 
                     Text(entry.source == .anime ? "Anime" : entry.source == .manga ? "Manga" : "Western")
                         .font(.caption2.weight(.semibold))
+                        .lineLimit(1)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(sourceBadgeColor.opacity(0.18), in: Capsule())
                         .foregroundStyle(sourceBadgeColor)
-                        .fixedSize()
 
                     if entry.isStreamingRelease {
                         Label("Stream", systemImage: "play.tv.fill")
                             .labelStyle(.titleAndIcon)
                             .font(.caption2.weight(.semibold))
+                            .lineLimit(1)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(Color.orange.opacity(0.18), in: Capsule())
                             .foregroundStyle(.orange)
-                            .fixedSize()
                     }
                 }
 
-                // Countdown + time capsule
+                // Countdown + time capsule — same contract: compressible,
+                // lineLimit(1), truncate instead of expanding the card.
                 HStack(spacing: 8) {
                     Text(entry.countdownDisplay)
                         .font(.caption.weight(.medium))
                         .foregroundStyle(.secondary)
-                        .fixedSize()
+                        .lineLimit(1)
 
                     HStack(spacing: 4) {
                         Image(systemName: "clock.fill")
                             .font(.system(size: 9, weight: .semibold))
                         Text(airTimeCapsule)
                             .font(.caption2.weight(.medium))
+                            .lineLimit(1)
                     }
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .background(.ultraThinMaterial, in: Capsule())
                     .foregroundStyle(.secondary)
-                    .fixedSize()
                 }
             }
-            // Mirrors the notification section's `textColumn` pattern —
-            // the VStack absorbs all available width so the bell is pinned
-            // to the trailing edge and the poster stays at the leading
-            // edge across every card (no per-card drift from the Spacer).
             .frame(maxWidth: .infinity, alignment: .leading)
 
             // Notification bell — explicitly fixed at 32×32 so its
