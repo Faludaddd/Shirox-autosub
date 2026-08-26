@@ -99,6 +99,18 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.5",
+        date: "2026-08-26",
+        added: [],
+        fixed: [
+            "Schedule section posters were still appearing in different horizontal positions for certain entries (e.g. ONA-format shows). Root cause: the LazyVStack that renders the schedule cards defaulted to .center alignment, so any card whose NavigationLink wrapper didn't fully expand to fill the row width would get centered instead of leading-aligned — causing its poster to appear shifted right relative to cards that did fill the full width. Fixed by adding explicit alignment: .leading to both LazyVStacks (anime schedule + manga schedule) and .frame(maxWidth: .infinity, alignment: .leading) to each NavigationLink row so every card fills the full row width and anchors to the leading edge regardless of its content or format."
+        ],
+        changed: [],
+        improved: [],
+        removed: [],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "2.4",
         date: "2026-08-26",
         added: [

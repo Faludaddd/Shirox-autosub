@@ -1378,7 +1378,7 @@ struct ScheduleView: View {
                 }
 
                 if let bucket = selectedBucket, !bucket.entries.isEmpty {
-                    LazyVStack(spacing: 12) {
+                    LazyVStack(alignment: .leading, spacing: 12) {
                         HStack {
                             Text(bucket.shortTitle)
                                 .font(.subheadline.weight(.semibold))
@@ -1404,6 +1404,7 @@ struct ScheduleView: View {
                                 MangaScheduleCard(entry: entry, useUTC: useUTC)
                             }
                             .buttonStyle(.plain)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             .contextMenu {
                                 Button {
                                     addToLibrary(entry, status: .planning)
@@ -1545,7 +1546,7 @@ struct ScheduleView: View {
                 // the original ScheduleCard design with live countdown,
                 // notify-when-aired bell, and action buttons.
                 if let bucket = selectedBucket, !bucket.entries.isEmpty {
-                    LazyVStack(spacing: 12) {
+                    LazyVStack(alignment: .leading, spacing: 12) {
                         HStack {
                             Text(bucket.shortTitle)
                                 .font(.subheadline.weight(.semibold))
@@ -1578,6 +1579,7 @@ struct ScheduleView: View {
                                 )
                             }
                             .buttonStyle(.plain)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
                     .padding(.horizontal)
