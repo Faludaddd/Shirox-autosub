@@ -32,7 +32,7 @@
           "date": "2026-08-26",
           "localizedDescription": "Fixed: Schedule section notification bell icon was being pushed off the right edge of the screen. Root cause: the v2.4 fix added an OUTER .frame(maxWidth: .infinity, alignment: .leading) modifier on the ScheduleCard body (after .padding/.background) which expanded the view's frame but allowed the inner HStack's natural width to grow unbounded — combined with the inner VStack's own .frame(maxWidth: .infinity), this caused the HStack to claim more horizontal space than the row actually had, pushing the bell past the right edge. Removed the redundant OUTER .frame modifier (kept the inner VStack's .frame(maxWidth: .infinity) which is sufficient to anchor the poster to the leading edge and let the bell sit at the trailing edge naturally). Also removed the redundant .frame(width: 32, height: 32) on the bell Button itself (the inner Image already has the same frame). MangaScheduleCard got the same cleanup.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 11040520,
+          "size": 11440098,
           "minOSVersion": "15.0"
         },
         {
