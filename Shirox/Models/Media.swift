@@ -85,6 +85,47 @@ struct Media: Identifiable, Codable, Equatable, Hashable, Sendable {
         }
     }
 
+    /// Unified poster status line — "[Status], [count]" (e.g. "Airing, 8",
+    /// "Finished, 12"). Replaces the old either/or poster logic ("N ep" when a
+    /// count existed, otherwise the bare status word), which rendered
+    /// inconsistently: AniList sets the *announced total* on some airing shows,
+    /// so those posters showed a count while other airing shows showed
+    /// "Airing".
+    ///
+    /// Spec (Round 8): status and count are ALWAYS shown together, separated
+    /// by a comma, same size/font/position on every anime and manga poster.
+    ///
+    /// - Airing anime → "Airing, N" where N = episodes released so far
+    ///   (`nextAiringEpisode.episode - 1`), NOT the announced total. If the
+    ///   next airing episode is unknown there is no honest count, so the
+    ///   status word is shown alone rather than guessing with the total.
+    /// - Airing manga → "Airing, N" where N = chapters released so far
+    ///   (AniList keeps `chapters` — stored in `episodes` — current while a
+    ///   manga is RELEASING).
+    /// - Every other status → "Status, N" with the total count, or the status
+    ///   word alone when the count is unknown.
+    var posterStatusText: String? {
+        guard let statusWord = statusDisplay else { return nil }
+        if statusWord == "Airing" {
+            if isManga {
+                // `episodes` holds the live chapter count for releasing
+                // manga — exactly the "currently available" number.
+                guard let chapters = episodes, chapters > 0 else { return statusWord }
+                return "\(statusWord), \(chapters)"
+            }
+            // Anime: episodes available right now = next episode number - 1.
+            // Never fall back to `episodes` here — that is the announced
+            // total, which is precisely the wrong number the old either/or
+            // logic displayed on airing posters.
+            if let next = nextAiringEpisode, next.episode > 1 {
+                return "\(statusWord), \(next.episode - 1)"
+            }
+            return statusWord
+        }
+        guard let count = episodes, count > 0 else { return statusWord }
+        return "\(statusWord), \(count)"
+    }
+
     /// Primary animation studio name (first one), if any.
     var mainStudioName: String? { studioNames?.first }
 

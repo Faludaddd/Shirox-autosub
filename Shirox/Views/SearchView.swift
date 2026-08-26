@@ -1925,13 +1925,11 @@ struct AniListCardView: View, Equatable {
             )
             .overlay(alignment: .bottomLeading) {
                 // Matches MangaPosterCard's bottomLeading overlay — title
-                // on top, then a small status line below:
-                //   - if `media.episodes` is present: "\(episodes) ep"
-                //   - else if statusDisplay is present: status string
-                //     (e.g. "Airing", "Finished", "Upcoming")
-                // This is the same logic the manga poster card uses on
-                // Home — applied here to anime posters so both sections
-                // show the same style of status text in the same place.
+                // on top, then a small status line below: the unified
+                // "[Status], [count]" string from `Media.posterStatusText`
+                // (e.g. "Airing, 8" / "Finished, 12"). Same format, font,
+                // size and position as the manga poster card, so anime and
+                // manga posters render identical status text.
                 VStack(alignment: .leading, spacing: 2) {
                     Text(media.title.displayTitle)
                         .font(.caption)
@@ -1939,12 +1937,8 @@ struct AniListCardView: View, Equatable {
                         .foregroundStyle(.white)
                         .lineLimit(2)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    if let episodes = media.episodes {
-                        Text("\(episodes) ep")
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.8))
-                    } else if let status = media.statusDisplay {
-                        Text(status)
+                    if let statusLine = media.posterStatusText {
+                        Text(statusLine)
                             .font(.system(size: 9, weight: .medium))
                             .foregroundStyle(.white.opacity(0.8))
                     }

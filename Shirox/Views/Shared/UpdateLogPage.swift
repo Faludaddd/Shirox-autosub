@@ -99,6 +99,19 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.7",
+        date: "2026-08-27",
+        added: [],
+        fixed: [
+            "Anime and manga poster status text is inconsistent across posters — some airing titles showed a bare \"Airing\" while others showed an episode count. Replaced the old either/or logic (count if present, otherwise status word) with a single unified format: status and count ALWAYS shown together, separated by a comma — \"Airing, 8\", \"Finished, 12\" — same text size, font and bottom-left position on every anime and manga poster. For airing titles the count is the number of episodes/chapters released so far and currently available to watch/read (derived from AniList's nextAiringEpisode for anime — next episode number minus one — and from the live chapters count for manga), never the announced eventual total.",
+            "Schedule section notification bell icon was still a tiny bit offset to the right across rows (barely noticeable residual after the v2.6 fix). Root cause: the bell's on/off states swapped between two SF Symbols — \"bell.fill\" and \"bell.badge.fill\" — whose bounding boxes have different widths; centered inside the same fixed 32×32 frame, the wider badged variant shifted its visible bell a couple of points left on rows with notifications enabled, so on/off rows never lined up in a perfectly straight line. The bell glyph now renders the constant \"bell.fill\" symbol on every row (identical x/y position always) with the on-state badge drawn as a small yellow dot overlaid at the bell's top-right shoulder — preserving both states' existing look while giving zero offset. Poster alignment/positioning in the Schedule section is completely untouched."
+        ],
+        changed: [],
+        improved: [],
+        removed: [],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "2.6",
         date: "2026-08-26",
         added: [],

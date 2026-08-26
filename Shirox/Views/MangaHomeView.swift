@@ -295,12 +295,12 @@ struct MangaPosterCard: View, Equatable {
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.white)
                             .lineLimit(2)
-                        if let chapters = media.episodes {
-                            Text("\(chapters) ch")
-                                .font(.system(size: 9, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.8))
-                        } else if let status = media.statusDisplay {
-                            Text(status)
+                        // Unified "[Status], [count]" line from
+                        // `Media.posterStatusText` (e.g. "Airing, 8" /
+                        // "Finished, 12") — same format, font, size and
+                        // position as the anime poster card.
+                        if let statusLine = media.posterStatusText {
+                            Text(statusLine)
                                 .font(.system(size: 9, weight: .medium))
                                 .foregroundStyle(.white.opacity(0.8))
                         }

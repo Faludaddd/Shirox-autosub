@@ -2413,8 +2413,20 @@ private struct ScheduleCard: View {
             // Notification bell — explicitly fixed at 32×32 so its
             // contribution to the HStack's layout is identical on every
             // row, regardless of the on/off state's SF Symbol width.
+            //
+            // The glyph itself is ALWAYS "bell.fill" — never the wider
+            // "bell.badge.fill": those two symbols have different bounding
+            // boxes, so toggling between them inside the same centered
+            // fixed frame moved the visible bell a couple of points
+            // horizontally between rows (the badged variant's box is
+            // wider, pushing its bell left of the plain variant's). That
+            // was the residual "slightly offset to the right" wobble.
+            // Rendering one constant symbol pins the bell to the exact
+            // same x/y on every row; the on-state badge is drawn as a
+            // small dot overlaid at the bell's top-right shoulder so both
+            // states keep their existing look.
             Button(action: onToggleNotification) {
-                Image(systemName: isNotificationOn ? "bell.badge.fill" : "bell.fill")
+                Image(systemName: "bell.fill")
                     .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(isNotificationOn ? Color.yellow : .secondary)
                     .frame(width: 32, height: 32)
@@ -2423,6 +2435,20 @@ private struct ScheduleCard: View {
                             isNotificationOn ? Color.yellow.opacity(0.18) : Color.secondary.opacity(0.1)
                         )
                     )
+                    .overlay(alignment: .topTrailing) {
+                        // On-state badge (replaces the old
+                        // "bell.badge.fill" swap): a solid yellow dot on
+                        // the bell's top-right shoulder, sized and placed
+                        // like the SF badge so the visible change is
+                        // minimal. Constant bell + overlaid dot = the
+                        // bell column lines up perfectly across rows.
+                        if isNotificationOn {
+                            Circle()
+                                .fill(Color.yellow)
+                                .frame(width: 9, height: 9)
+                                .offset(x: -2, y: 3)
+                        }
+                    }
             }
             .buttonStyle(.plain)
             .accessibilityLabel(isNotificationOn ? "Cancel notification" : "Schedule notification")
