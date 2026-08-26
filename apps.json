@@ -32,7 +32,7 @@
           "date": "2026-08-26",
           "localizedDescription": "Fixed: Schedule section posters were still appearing in different horizontal positions for certain entries (e.g. ONA-format shows) — the LazyVStack defaulted to center alignment, so any card whose NavigationLink didn't fully expand would get centered instead of leading-aligned. Added explicit alignment: .leading to both LazyVStacks (anime schedule + manga schedule) and .frame(maxWidth: .infinity, alignment: .leading) to each NavigationLink row so every card fills the full row width and anchors to the leading edge regardless of its content.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 11040520,
+          "size": 11439995,
           "minOSVersion": "15.0"
         },
         {
