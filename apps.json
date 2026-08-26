@@ -29,10 +29,10 @@
         {
           "version": "2.7",
           "buildVersion": "1",
-          "date": "2026-08-27",
+          "date": "2026-08-26",
           "localizedDescription": "Fixed: Anime and manga poster status text now uses one unified format — status and count always shown together, comma-separated (\"Airing, 8\", \"Finished, 12\"), same size/font/position on every poster — replacing the old either/or logic that showed an episode count on some posters and a bare status word on others. For airing titles the count is the number of episodes/chapters released so far (derived from AniList's nextAiringEpisode for anime, from the live chapters count for manga), not the announced total. Fixed: Schedule section notification bell icon was still a tiny bit offset to the right across rows. Root cause: the on/off states swapped between two SF Symbols (\"bell.fill\" vs \"bell.badge.fill\") whose bounding boxes differ — centered in the same 32×32 frame, the wider badged variant shifted the visible bell a couple of points on rows with notifications enabled, so on/off rows never formed a perfectly straight line. The bell glyph is now always \"bell.fill\" (identical position on every row) with the on-state badge drawn as a small dot overlaid at the bell's top-right shoulder — zero offset, and poster alignment/positioning completely untouched.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 11040520,
+          "size": 11442410,
           "minOSVersion": "15.0"
         },
         {
