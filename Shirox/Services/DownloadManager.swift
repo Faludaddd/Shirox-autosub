@@ -141,11 +141,14 @@ final class DownloadManager: NSObject, ObservableObject {
         // completion (which touches manager state) hops back.
         urlSession.getAllTasks { [weak self] tasks in
             for task in tasks {
-                guard let idStr = task.taskDescription,
+                // Cast required: getAllTasks yields URLSessionTask, and only
+                // URLSessionDownloadTask has cancel(byProducingResumeData:).
+                guard let downloadTask = task as? URLSessionDownloadTask,
+                      let idStr = downloadTask.taskDescription,
                       let id = UUID(uuidString: idStr) else { continue }
                 // Explicit label required: bare trailing-closure syntax
                 // resolves to the no-argument cancel() overload.
-                task.cancel(byProducingResumeData: { [weak self] resumeData in
+                downloadTask.cancel(byProducingResumeData: { [weak self] resumeData in
                     Task { @MainActor in
                         guard let self else { return }
                         if let resumeData {
