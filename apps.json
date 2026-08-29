@@ -29,10 +29,10 @@
         {
           "version": "2.14",
           "buildVersion": "1",
-          "date": "2026-08-30",
+          "date": "2026-08-29",
           "localizedDescription": "The Downloads tab got the layout rework it needed. A live status header now sits at the top of the page — aggregate progress ring, total speed, transfer size, and a Wi-Fi/Cellular/Offline network pill — so you always know what the app is doing at a glance. All/Anime/Manga filter chips replace the old duplicated sections: anime and manga rows share ONE In Progress list and ONE Failed list (with a Retry All button right in the section header). The biggest change: completed downloads are grouped by series instead of by source module — each show is a single row (poster, episode or chapter count, source name) that opens a per-series page listing everything downloading, failed, and downloaded for that title, with a per-series Delete All that also cancels anything still in flight. Both download detail pages were rebuilt to match: one hero card with the poster and a live progress-ring badge, a clean stats strip, a single grouped info card (now including the source module), and state-aware actions — the old page showed the percentage three separate times; the new one shows it once, properly.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 11543961,
+          "size": 11624666,
           "minOSVersion": "15.0"
         },
         {
