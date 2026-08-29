@@ -18,6 +18,11 @@ struct ThumbnailEpisodeRow: View {
     var isSelectionMode: Bool = false
     var isSelected: Bool = false
     var downloadState: DownloadState? = nil
+    /// Inline Auto Pick status for this row (v2.10). When set, the trailing
+    /// play badge is replaced by a spinner and this status line renders
+    /// under the episode title — visible progress, no overlays. Nil for
+    /// every other row / whenever Auto Pick is off.
+    var autoPickStatus: String? = nil
 
     @State private var isDescriptionExpanded = false
 
@@ -123,6 +128,13 @@ struct ThumbnailEpisodeRow: View {
                             .lineLimit(1)
                             .fixedSize(horizontal: true, vertical: false)
                     }
+
+                    if let autoPickStatus {
+                        Text(autoPickStatus)
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(Color.appAccent)
+                            .lineLimit(1)
+                    }
                 }
 
                 Spacer()
@@ -164,11 +176,17 @@ struct ThumbnailEpisodeRow: View {
                     }
 
                     if !isSelectionMode {
-                        Image(systemName: "play.fill")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.primary)
-                            .padding(8)
-                            .background(Color.primary.opacity(0.1), in: Circle())
+                        if autoPickStatus != nil {
+                            ProgressView()
+                                .controlSize(.small)
+                                .padding(8)
+                        } else {
+                            Image(systemName: "play.fill")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.primary)
+                                .padding(8)
+                                .background(Color.primary.opacity(0.1), in: Circle())
+                        }
                     }
                 }
             }

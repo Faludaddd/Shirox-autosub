@@ -99,6 +99,33 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.10",
+        date: "2026-08-29",
+        added: [
+            "Auto Pick now shows live progress directly on the episode row you tapped: the play badge becomes a spinner and a status line (\"Trying HiAnime…\", \"Starting playback…\") appears under the episode title. No overlays, no popups — the row itself tells you what's happening.",
+            "Auto Pick failure is now honest and recoverable: a toast names which modules failed and why (timed out, no results, episode not found…), and the normal manual stream picker opens automatically so a tap is never left dead.",
+            "New Auto Pick Sub/Dub preference: streams are filtered by their SUB/DUB labels before quality scoring (with \"Any\" to disable the filter).",
+            "The About page now shows when the version was last successfully verified (\"checked 3 minutes ago\"), and a dismissed update stays visible with an install button."
+        ],
+        fixed: [
+            "The version check could show \"You're up to date\" with a green checkmark even when the check had never reached the server — every network failure was silently swallowed, making a dead check indistinguishable from a successful one. The checker now fetches the update manifest from three independent servers (raw.githubusercontent.com, the GitHub contents API, and the jsDelivr CDN mirror of the same file) and only fails when ALL three are unreachable; \"Couldn't verify version\" is now its own visible state with a Retry button instead of a fake all-clear.",
+            "Auto Pick could permanently brick itself: a duplicate-trigger guard refused every new tap while any previous pick was still running, so one hung module blocked all future episodes until the app was restarted. Starting a new Auto Pick now cancels the in-flight run first — the newest tap always wins.",
+            "Auto Pick had no timeout, so a single dead or hanging module stalled the entire module chain indefinitely. Every module now gets a hard 25-second budget (search + episodes + streams combined); when it expires the chain moves on to the next module and the failure is reported to module health.",
+            "Auto Pick thrashed the app-wide active module, switching it before every attempt — including attempts that failed — which could leave you on the last-tried (broken) module after an Auto Pick failure. The global module is now switched exactly once: for the winner, right before playback starts.",
+            "Auto Pick ranked stream quality by alphabetically sorting stream titles (a string comparison pretending to be quality analysis). Stream selection now parses the real resolution out of the title (2160/1440/1080/720/576/540/480/432/360/240), applies your Sub/Dub preference, breaks ties preferring HLS, and honours exact quality targets with nearest-above fallback (ask 1080p, get 1080p; if unavailable, the closest higher tier rather than an arbitrary entry).",
+            "Auto Pick consulted the per-anime search alias of only the FIRST module in the priority list for every module it tried; each module now uses its own alias.",
+            "Auto Pick started playback with an empty stream list, so in-player stream switching didn't work after an auto-picked episode. The player now receives the full stream list, matching the manual flow."
+        ],
+        changed: [
+            "Auto Pick Module reworked from scratch into a dedicated AutoPickEngine — one run at a time with cancel-on-new-tap, per-module time budgets, a single global module switch for the winner, and request-ID logging with per-module durations for debugging.",
+            "The Auto Pick settings page was rebuilt to contain only settings the engine actually reads: module priority order, preferred quality (Auto / 1080p / 720p / 480p / Highest / Lowest), the new Sub/Dub/Any audio preference, fallback on/off, and skip-unavailable-modules. Six placebo controls that were saved but never read by any code — audio language, subtitle language, preferred stream type, prefer-higher-quality, remember-per-anime, and a duplicate auto-fallback toggle — were removed.",
+            "The update-check state is now an explicit state machine (not-checked / checking / up to date / available / dismissed / failed) that the About page renders distinctly, instead of a single optional value that conflated \"failed\" with \"current\"."
+        ],
+        improved: [],
+        removed: [],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "2.9",
         date: "2026-08-29",
         added: [],

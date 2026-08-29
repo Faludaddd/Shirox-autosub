@@ -1581,7 +1581,6 @@ struct StreamingSettingsPage: View {
     @AppStorage("watchedPercentage") private var watchedPercentage: Double = 90.0
     @AppStorage("showNextEpisodeCountdown") private var showNextEpisodeCountdown = true
     @AppStorage("autoFallbackEnabled") private var autoFallbackEnabled = false
-    @AppStorage("autoPickModuleTesting") private var autoPickModuleTesting = false
     @State private var perShowCount = PerShowPlaybackStore.shared.savedCount
     @State private var showClearPerShow = false
 
@@ -1644,9 +1643,9 @@ struct StreamingSettingsPage: View {
                     } label: {
                         HStack {
                             VStack(alignment: .leading, spacing: 3) {
-                                Text("Auto Pick Module (Experimental)")
+                                Text("Auto Pick Module")
                                     .font(.subheadline.weight(.semibold))
-                                Text("Automatically selects module and stream. Disabled by default.")
+                                Text("Automatically picks module + stream when you tap an episode.")
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }
@@ -4613,13 +4612,18 @@ struct LandscapeSubtitlePreview: View {
 
 struct AboutSettingsPage: View {
     @ObservedObject private var updateManager = AppUpdateManager.shared
-    @State private var checkError: String?
 
     private var version: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "-"
     }
     private var build: String {
         Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "-"
+    }
+
+    /// "just now" / "3 minutes ago" … for the last successful check.
+    private var lastCheckedText: String? {
+        guard let date = updateManager.lastSuccessfulCheck else { return nil }
+        return RelativeDateTimeFormatter().localizedString(for: date, relativeTo: Date())
     }
 
     var body: some View {
@@ -4675,21 +4679,50 @@ struct AboutSettingsPage: View {
 
     // MARK: - Update Status Card
 
+    /// Renders every AppUpdateManager.CheckState distinctly — v2.10 honest
+    /// states. "Up to date" is only ever shown after a REAL successful
+    /// comparison; a failed check gets its own retry state instead of a
+    /// fake green checkmark.
     @ViewBuilder
     private var updateStatusCard: some View {
         VStack(spacing: 14) {
             HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(updateManager.availableUpdate != nil ? Color.orange.opacity(0.12) : Color.green.opacity(0.12))
-                        .frame(width: 44, height: 44)
-                    Image(systemName: updateManager.availableUpdate != nil ? "arrow.up.circle.fill" : "checkmark.circle.fill")
-                        .font(.system(size: 22))
-                        .foregroundStyle(updateManager.availableUpdate != nil ? .orange : .green)
-                }
+                statusIcon
 
                 VStack(alignment: .leading, spacing: 4) {
-                    if let update = updateManager.availableUpdate {
+                    switch updateManager.state {
+                    case .idle:
+                        Text("Version not checked yet")
+                            .font(.headline)
+                        Text("Checks run automatically on launch and hourly after that.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                    case .checking:
+                        Text("Checking for updates…")
+                            .font(.headline)
+                        Text("Asking three update servers for the latest version.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                    case .current:
+                        Text("You're up to date")
+                            .font(.headline)
+                            .foregroundStyle(.green)
+                        Text("Version \(version) (\(build))" + (lastCheckedText.map { " · checked \($0) ago" } ?? ""))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                    case .failed:
+                        Text("Couldn't verify version")
+                            .font(.headline)
+                            .foregroundStyle(.orange)
+                        Text("All update servers were unreachable. Your connection or the servers may be down — this is not the same as being up to date.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                    case .available(let update):
                         Text("Update Available")
                             .font(.headline)
                         Text("Version \(update.newVersion)")
@@ -4699,24 +4732,14 @@ struct AboutSettingsPage: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(3)
-                    } else if updateManager.isChecking {
-                        Text("Checking for updates…")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    } else if let _ = checkError {
-                        Text("Unable to check for updates")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.orange)
-                        Text("Check your internet connection and try again.")
+
+                    case .dismissed(let update):
+                        Text("Update available — dismissed")
+                            .font(.headline)
+                        Text("Version \(update.newVersion) · you dismissed the prompt, but you can still install it below.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                    } else {
-                        Text("You're up to date")
-                            .font(.headline)
-                            .foregroundStyle(.green)
-                        Text("Version \(version) (\(build))")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
 
@@ -4742,24 +4765,39 @@ struct AboutSettingsPage: View {
                 .buttonStyle(.plain)
             }
 
+            if case .dismissed(let update) = updateManager.state {
+                Button {
+                    if let url = URL(string: update.downloadURL.absoluteString) {
+                        #if os(iOS)
+                        UIApplication.shared.open(url)
+                        #endif
+                    }
+                    updateManager.markDownloadStarted()
+                } label: {
+                    Label("Install \(update.newVersion)", systemImage: "arrow.down.circle.fill")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color.appAccent, in: RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
+            }
+
             Button {
-                checkError = nil
                 Task {
                     await updateManager.checkForUpdates(force: true)
-                    if updateManager.availableUpdate == nil && !updateManager.isChecking {
-                        // If no update and not checking, it might have failed
-                        // silently. We don't set an error unless the network
-                        // actually failed — the AppUpdateManager handles
-                        // this internally by logging.
-                    }
                 }
             } label: {
-                Label("Check for Updates", systemImage: "arrow.clockwise")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.appAccent)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .background(Color.appAccent.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
+                Label(
+                    updateManager.state == .failed ? "Retry Check" : "Check for Updates",
+                    systemImage: "arrow.clockwise"
+                )
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.appAccent)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(Color.appAccent.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
             }
             .buttonStyle(.plain)
             .disabled(updateManager.isChecking)
@@ -4773,6 +4811,50 @@ struct AboutSettingsPage: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
         )
+    }
+
+    /// Leading icon for the update card, per state.
+    @ViewBuilder
+    private var statusIcon: some View {
+        ZStack {
+            Circle()
+                .fill(statusIconTint.opacity(0.12))
+                .frame(width: 44, height: 44)
+            switch updateManager.state {
+            case .checking:
+                ProgressView()
+                    .frame(width: 22, height: 22)
+            case .current:
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 22))
+                    .foregroundStyle(.green)
+            case .failed:
+                Image(systemName: "wifi.exclamationmark")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.orange)
+            case .available:
+                Image(systemName: "arrow.up.circle.fill")
+                    .font(.system(size: 22))
+                    .foregroundStyle(.orange)
+            case .dismissed:
+                Image(systemName: "bell.slash.fill")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.secondary)
+            case .idle:
+                Image(systemName: "questionmark.circle.fill")
+                    .font(.system(size: 22))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var statusIconTint: Color {
+        switch updateManager.state {
+        case .checking: return .secondary
+        case .current: return .green
+        case .failed, .available: return .orange
+        case .dismissed, .idle: return .secondary
+        }
     }
 
     // MARK: - Legal Card

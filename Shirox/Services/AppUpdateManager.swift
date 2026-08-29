@@ -2,40 +2,103 @@ import Foundation
 import Combine
 import SwiftUI
 
-/// Global update detection system. Checks the latest version released on the
-/// Faludaddd/Shirox-autosub fork against the currently installed version.
-/// On launch (and periodically in the background), it fetches the apps.json
-/// manifest from the repo, compares the latest `version` field against the
-/// bundle's `CFBundleShortVersionString`, and — if a newer version exists —
-/// publishes an `UpdateInfo` that the root view renders as a popup modal.
+/// Update checker — v2.10 from-scratch rework.
 ///
-/// Forced-update mode: if the installed version is older than the manifest's
-/// `minCompatibleVersion` (or by more than N minor versions), the popup
-/// becomes non-dismissible — only "Download Update" and "Exit" are offered.
+/// The old checker fetched the manifest from a single URL and swallowed
+/// every network failure, which made a dead check indistinguishable from
+/// "up to date" — the app showed a green checkmark even when it had never
+/// reached the server. This rework fixes both problems:
+///
+/// **Triple-source manifest fetch.** The same apps.json is fetched from
+/// three independent hosts, in order, and the first one that responds wins:
+///   1. raw.githubusercontent.com  (primary, as before)
+///   2. api.github.com contents API (different host, survives raw CDN blocks)
+///   3. cdn.jsdelivr.net mirror    (independent CDN, survives GitHub issues)
+/// A check only fails when ALL three sources are unreachable.
+///
+/// **Honest state machine.** `state` is exactly one of:
+///   idle → checking → current | available | dismissed | failed
+/// "current" is only ever set after a real, successful comparison, and
+/// "failed" is surfaced to the UI (with a retry) instead of being logged
+/// away. The About page renders every state distinctly.
 @MainActor
 final class AppUpdateManager: ObservableObject {
     static let shared = AppUpdateManager()
 
-    /// Latest version info fetched from the manifest. Nil until the first
-    /// successful check completes. The root view observes this and shows the
-    /// popup when it becomes non-nil AND the installed version is older.
-    @Published var availableUpdate: UpdateInfo?
-    @Published var isChecking = false
-    @Published var lastCheckAt: Date?
+    // MARK: - State
+
+    /// The single source of truth for the UI. See the class doc for the
+    /// exact transitions.
+    enum CheckState: Equatable {
+        /// No check has completed this session (fresh launch).
+        case idle
+        /// A check is in flight right now.
+        case checking
+        /// A check SUCCEEDED and the installed version is the latest.
+        case current
+        /// A check succeeded and a newer version exists (and wasn't dismissed).
+        case available(UpdateInfo)
+        /// A newer version exists but the user dismissed the prompt. Still
+        /// shown in About with an install button in case the sideload failed.
+        case dismissed(UpdateInfo)
+        /// Every manifest source failed — the installed version is UNKNOWN,
+        /// never "up to date".
+        case failed
+    }
+
+    @Published private(set) var state: CheckState = .idle
+    /// Timestamp of the last check that actually reached a manifest source.
+    @Published private(set) var lastSuccessfulCheck: Date?
 
     /// Persistent in-app notification integration. When an update is
     /// detected, a notification is posted so it shows in the app's
     /// Notification Center alongside airing/follow notifications.
     @Published var updateNotificationId: String?
 
-    private let manifestURL = URL(string: "https://raw.githubusercontent.com/Faludaddd/Shirox-autosub/main/apps.json")!
+    /// True while a network check is in flight (computed for convenience).
+    var isChecking: Bool { state == .checking }
 
-    /// AppStorage-backed user preferences for the update system. All keys
-    /// are prefixed `update.` so they live in their own namespace and never
-    /// collide with anime or manga settings.
-    @AppStorage("update.autoDownloadEnabled") var autoDownloadEnabled: Bool = false
+    /// The detected update, if any (computed for convenience — the About
+    /// page and notification flow read this).
+    var availableUpdate: UpdateInfo? {
+        if case .available(let info) = state { return info }
+        return nil
+    }
+
+    // MARK: - Preferences
+
     @AppStorage("update.lastDismissedVersion") var lastDismissedVersion: String = ""
     @AppStorage("update.checkIntervalSeconds") var checkIntervalSeconds: Int = 3600
+
+    // MARK: - Manifest sources
+
+    private struct ManifestSource {
+        enum Kind {
+            case raw        // plain JSON body
+            case githubAPI  // JSON envelope with base64 content field
+        }
+        let url: URL
+        let kind: Kind
+    }
+
+    /// Same manifest, three independent hosts. Order = try order.
+    private let manifestSources: [ManifestSource] = [
+        ManifestSource(url: URL(string: "https://raw.githubusercontent.com/Faludaddd/Shirox-autosub/main/apps.json")!, kind: .raw),
+        ManifestSource(url: URL(string: "https://api.github.com/repos/Faludaddd/Shirox-autosub/contents/apps.json")!, kind: .githubAPI),
+        ManifestSource(url: URL(string: "https://cdn.jsdelivr.net/gh/Faludaddd/Shirox-autosub@main/apps.json")!, kind: .raw),
+    ]
+
+    /// Dedicated session: short timeouts so a dead host doesn't stall the
+    /// check, and no URL cache so the manifest is always fresh.
+    private lazy var session: URLSession = {
+        let cfg = URLSessionConfiguration.default
+        cfg.timeoutIntervalForRequest = 10
+        cfg.timeoutIntervalForResource = 25
+        cfg.requestCachePolicy = .reloadIgnoringLocalCacheData
+        return URLSession(configuration: cfg)
+    }()
+
+    private var inFlight = false
 
     private init() {}
 
@@ -49,6 +112,10 @@ final class AppUpdateManager: ObservableObject {
         let downloadURL: URL
         let isCritical: Bool
         let releaseDate: Date?
+
+        static func == (lhs: UpdateInfo, rhs: UpdateInfo) -> Bool {
+            lhs.id == rhs.id && lhs.newVersion == rhs.newVersion
+        }
     }
 
     // MARK: - Current Version
@@ -65,7 +132,8 @@ final class AppUpdateManager: ObservableObject {
 
     /// Returns true if `newVersion` is strictly newer than `currentVersion`.
     /// Compares by splitting on `.` and comparing numeric components left to
-    /// right. Returns false if either string is empty or unparseable.
+    /// right ("2.10" IS newer than "2.9"). Returns false if either string is
+    /// empty or unparseable.
     static func isNewer(_ newVersion: String, than currentVersion: String) -> Bool {
         let newParts = newVersion.split(separator: ".").compactMap { Int($0) }
         let curParts = currentVersion.split(separator: ".").compactMap { Int($0) }
@@ -81,24 +149,21 @@ final class AppUpdateManager: ObservableObject {
     }
 
     /// Returns true if the installed version is so far behind the latest
-    /// that the user MUST update before continuing. We treat a gap of ≥ 3
-    /// minor versions as critical (e.g. installed 1.10, latest 1.13).
+    /// that the user MUST update before continuing. We treat a gap of >= 3
+    /// minor versions as critical (e.g. installed 2.6, latest 2.9). Major
+    /// version bumps are always critical.
     static func isCriticalGap(_ newVersion: String, vs currentVersion: String) -> Bool {
         let newParts = newVersion.split(separator: ".").compactMap { Int($0) }
         let curParts = currentVersion.split(separator: ".").compactMap { Int($0) }
         guard newParts.count >= 2, curParts.count >= 2 else { return false }
-        // Only consider the minor component for the gap calculation. Major
-        // version bumps (1.x → 2.x) are always critical.
         if newParts[0] != curParts[0] { return true }
-        let gap = newParts[1] - curParts[1]
-        return gap >= 3
+        return newParts[1] - curParts[1] >= 3
     }
 
     // MARK: - URL Validation
 
     /// Validates a download URL is well-formed and points to a trusted host.
-    /// Only HTTPS URLs on github.com (the release host) are accepted. This
-    /// prevents malformed or unsafe URLs from being opened or copied.
+    /// Only HTTPS URLs on github.com (the release host) are accepted.
     static func isValidDownloadURL(_ urlString: String) -> Bool {
         guard let url = URL(string: urlString),
               url.scheme == "https",
@@ -108,68 +173,131 @@ final class AppUpdateManager: ObservableObject {
 
     // MARK: - Check
 
-    /// Fetches the manifest and compares versions. Safe to call repeatedly —
-    /// no-ops if a check is already in flight or if the last check was less
-    /// than `checkIntervalSeconds` ago (unless `force` is true).
+    /// Fetches the manifest (trying each source in order until one
+    /// responds) and compares versions. No-ops if a check is already in
+    /// flight, or if the last SUCCESSFUL check was less than
+    /// `checkIntervalSeconds` ago (unless `force` is true).
     func checkForUpdates(force: Bool = false) async {
-        if isChecking { return }
-        if !force, let last = lastCheckAt,
+        guard !inFlight else { return }
+        if !force, let last = lastSuccessfulCheck,
            Date().timeIntervalSince(last) < TimeInterval(checkIntervalSeconds) {
             return
         }
-        isChecking = true
-        defer { isChecking = false; lastCheckAt = Date() }
+        inFlight = true
+        state = .checking
+        defer { inFlight = false }
 
-        do {
-            let (data, _) = try await URLSession.shared.data(from: manifestURL)
-            let manifest = try JSONDecoder().decode(Manifest.self, from: data)
-            guard let latest = manifest.apps.first?.versions.first else { return }
-            guard Self.isNewer(latest.version, than: currentVersion) else {
-                // Up to date — clear any previously-detected update.
-                if availableUpdate != nil { availableUpdate = nil }
-                return
+        // Try every source; first one that decodes wins.
+        var latest: VersionEntry?
+        for (index, source) in manifestSources.enumerated() {
+            do {
+                latest = try await fetchLatestVersion(from: source)
+                if index > 0 {
+                    Logger.shared.log("[Update] primary source unreachable — fell back to source #\(index + 1)", type: "Debug")
+                }
+                break
+            } catch {
+                Logger.shared.log("[Update] source #\(index + 1) failed: \(error.localizedDescription)", type: "Debug")
             }
-            // Don't re-prompt for a version the user already dismissed.
-            if !force && latest.version == lastDismissedVersion { return }
-
-            guard Self.isValidDownloadURL(latest.downloadURL) else { return }
-            let releaseDate = Self.parseDate(latest.date)
-
-            let info = UpdateInfo(
-                newVersion: latest.version,
-                currentVersion: currentVersion,
-                changelog: latest.localizedDescription,
-                downloadURL: URL(string: latest.downloadURL)!,
-                isCritical: Self.isCriticalGap(latest.version, vs: currentVersion),
-                releaseDate: releaseDate
-            )
-            availableUpdate = info
-
-            // Post an in-app notification so the update shows in the
-            // Notification Center alongside other notifications.
-            postUpdateNotification(info)
-        } catch {
-            // Network/parse failure — silent. Don't bother the user with
-            // update-check errors.
-            Logger.shared.log("[Update] check failed: \(error.localizedDescription)", type: "Debug")
         }
+
+        guard let latest else {
+            // All sources failed. If we already KNOW an update exists (from
+            // an earlier successful check), keep that knowledge — a flaky
+            // re-check must never hide a known update. Otherwise this is an
+            // honest "couldn't verify" failure.
+            switch state {
+            case .available, .dismissed:
+                break
+            default:
+                state = .failed
+            }
+            return
+        }
+
+        lastSuccessfulCheck = Date()
+
+        guard Self.isNewer(latest.version, than: currentVersion) else {
+            state = .current
+            return
+        }
+
+        // A newer version exists. Don't re-prompt for one the user already
+        // dismissed (non-forced checks only).
+        if !force, latest.version == lastDismissedVersion {
+            state = .dismissed(info(from: latest))
+            return
+        }
+
+        guard Self.isValidDownloadURL(latest.downloadURL) else {
+            Logger.shared.log("[Update] manifest downloadURL failed validation: \(latest.downloadURL)", type: "Error")
+            state = .failed
+            return
+        }
+
+        let info = info(from: latest)
+        state = .available(info)
+        postUpdateNotification(info)
     }
 
-    /// Marks the current available update as dismissed so we don't re-prompt
-    /// on the next launch. Forced updates can't be dismissed.
+    /// Marks the current available update as dismissed so non-forced checks
+    /// don't re-prompt. The info stays visible in About (dismissed state)
+    /// with an install button in case the sideload failed.
     func dismiss() {
-        guard let info = availableUpdate, !info.isCritical else { return }
+        guard case .available(let info) = state, !info.isCritical else { return }
         lastDismissedVersion = info.newVersion
-        availableUpdate = nil
-        // Keep the in-app notification so the user can still find the update
-        // later from the Notification Center.
+        state = .dismissed(info)
     }
 
-    /// Clears the available update after the user has started the download
-    /// flow (download / copy / share). The in-app notification stays so the
-    /// user can re-trigger if the sideload fails.
+    /// Called after the user starts the download flow. The update stays
+    /// visible (available/dismissed) so it can be re-triggered if the
+    /// sideload fails; the in-app notification also stays.
     func markDownloadStarted() {
-        availableUpdate = nil
+        // Intentionally keeps `state` as-is. See method doc.
+    }
+
+    // MARK: - Manifest fetching
+
+    private func info(from entry: VersionEntry) -> UpdateInfo {
+        UpdateInfo(
+            newVersion: entry.version,
+            currentVersion: currentVersion,
+            changelog: entry.localizedDescription,
+            downloadURL: URL(string: entry.downloadURL)!,
+            isCritical: Self.isCriticalGap(entry.version, vs: currentVersion),
+            releaseDate: Self.parseDate(entry.date)
+        )
+    }
+
+    private func fetchLatestVersion(from source: ManifestSource) async throws -> VersionEntry {
+        var request = URLRequest(url: source.url)
+        if source.kind == .githubAPI {
+            request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        }
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+
+        let manifest: Manifest
+        switch source.kind {
+        case .raw:
+            manifest = try JSONDecoder().decode(Manifest.self, from: data)
+        case .githubAPI:
+            // Contents API wraps the file in a JSON envelope with base64 content.
+            let envelope = try JSONDecoder().decode(GitHubContentEnvelope.self, from: data)
+            let cleaned = envelope.content.replacingOccurrences(of: "\n", with: "")
+            guard envelope.encoding == "base64",
+                  let decoded = Data(base64Encoded: cleaned) else {
+                throw URLError(.cannotParseResponse)
+            }
+            manifest = try JSONDecoder().decode(Manifest.self, from: decoded)
+        }
+
+        guard let latest = manifest.apps.first?.versions.first else {
+            throw URLError(.cannotParseResponse)
+        }
+        return latest
     }
 
     // MARK: - Notification Integration
@@ -215,6 +343,10 @@ final class AppUpdateManager: ObservableObject {
         let date: String
         let localizedDescription: String
         let downloadURL: String
+    }
+    private struct GitHubContentEnvelope: Decodable {
+        let content: String
+        let encoding: String
     }
 }
 

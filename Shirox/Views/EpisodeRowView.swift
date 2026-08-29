@@ -13,6 +13,9 @@ struct EpisodeRowView: View {
     var isSelectionMode: Bool = false
     var isSelected: Bool = false
     var downloadState: DownloadState? = nil
+    /// Inline Auto Pick status for this row (v2.10). Same contract as
+    /// ThumbnailEpisodeRow.autoPickStatus.
+    var autoPickStatus: String? = nil
 
     private var isComplete: Bool { (progress ?? 0) >= 0.9 }
 
@@ -69,6 +72,13 @@ struct EpisodeRowView: View {
                         .foregroundStyle(.primary)
                         .lineLimit(1)
 
+                    if let autoPickStatus {
+                        Text(autoPickStatus)
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(Color.appAccent)
+                            .lineLimit(1)
+                    }
+
                     Spacer()
 
                     if !isSelectionMode {
@@ -92,11 +102,17 @@ struct EpisodeRowView: View {
                                 .font(.system(size: 16))
                             }
 
-                            Image(systemName: "play.fill")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.primary)
-                                .padding(8)
-                                .background(Color.primary.opacity(0.1), in: Circle())
+                            if autoPickStatus != nil {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .padding(8)
+                            } else {
+                                Image(systemName: "play.fill")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.primary)
+                                    .padding(8)
+                                    .background(Color.primary.opacity(0.1), in: Circle())
+                            }
                         }
                     }
                 }

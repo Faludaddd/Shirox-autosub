@@ -1,29 +1,27 @@
 #if os(iOS)
 import SwiftUI
 
-/// Auto Pick Module Settings — experimental settings page for the
-/// Auto Pick Module feature. Contains:
-///   - Module Priority tier list (reorder with up/down buttons)
-///   - Quality Preferences (Auto, 1080p, 720p, 480p, etc.)
-///   - Audio & Subtitle Preferences
-///   - Fallback Settings
-///   - Advanced options
+/// Auto Pick Module Settings — v2.10 rebuild.
 ///
-/// All sections are collapsible. The page is clearly marked as
-/// "Experimental" — disabled by default, does not interfere with
-/// the normal manual workflow.
+/// Every control on this page maps 1:1 to a setting the AutoPickEngine
+/// actually reads at run time. The old page carried six placebos (audio
+/// language, subtitle language, stream type, "prefer higher", per-anime
+/// memory, auto-fallback duplicate) that were saved but never used —
+/// all removed.
+///
+/// What the engine does with these:
+///   - Module Priority — try order. Fallback walks down this list.
+///   - Preferred Quality — real resolution matching, not title sorting.
+///   - Preferred Language — Sub/Dub parsed from stream titles.
+///   - Use Fallback — off = only the first eligible module is tried.
+///   - Skip Unavailable — modules marked error/blocked are skipped.
 struct AutoPickSettingsPage: View {
     @EnvironmentObject private var moduleManager: ModuleManager
     @AppStorage("autoPickModuleTesting") private var autoPickEnabled = false
     @AppStorage("autoPickPreferredQuality") private var preferredQuality = "Auto"
-    @AppStorage("autoPickPreferredAudio") private var preferredAudio = "Auto"
-    @AppStorage("autoPickPreferredSubtitles") private var preferredSubtitles = "Auto"
-    @AppStorage("autoPickPreferredStreamType") private var preferredStreamType = "Auto"
+    @AppStorage("autoPickPreferredLanguage") private var preferredLanguage = "Sub"
     @AppStorage("autoPickSkipUnavailable") private var skipUnavailable = true
     @AppStorage("autoPickUseFallback") private var useFallback = true
-    @AppStorage("autoPickPreferHigher") private var preferHigher = true
-    @AppStorage("autoPickRememberPerAnime") private var rememberPerAnime = false
-    @AppStorage("autoFallbackEnabled") private var autoFallbackEnabled = false
 
     @State private var modulePriority: [String] = []
     @State private var expandedSections: Set<String> = ["priority"]
@@ -31,13 +29,12 @@ struct AutoPickSettingsPage: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                experimentalBanner
+                howItWorksCard
                 masterToggleCard
                 prioritySection
                 qualitySection
-                audioSubtitleSection
+                languageSection
                 fallbackSection
-                advancedSection
             }
             .padding(.vertical, 16)
         }
@@ -47,18 +44,17 @@ struct AutoPickSettingsPage: View {
         .onAppear { loadPriority() }
     }
 
-    // MARK: - Experimental Banner
+    // MARK: - How It Works
 
-    private var experimentalBanner: some View {
+    private var howItWorksCard: some View {
         HStack(spacing: 10) {
-            Image(systemName: "flask.fill")
+            Image(systemName: "wand.and.stars")
                 .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(.purple)
+                .foregroundStyle(Color.appAccent)
             VStack(alignment: .leading, spacing: 3) {
-                Text("Experimental Feature")
+                Text("How it works")
                     .font(.subheadline.weight(.bold))
-                    .foregroundStyle(.purple)
-                Text("Disabled by default. Does not interfere with the normal manual module selection workflow unless explicitly enabled here.")
+                Text("When enabled, tapping an episode tries your modules in priority order and plays the best stream automatically. Progress shows right on the episode row. If nothing works, the normal manual picker opens so you're never stuck.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -68,11 +64,11 @@ struct AutoPickSettingsPage: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.purple.opacity(0.08))
+                .fill(Color.appAccent.opacity(0.08))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color.purple.opacity(0.2), lineWidth: 1)
+                .strokeBorder(Color.appAccent.opacity(0.2), lineWidth: 1)
         )
         .padding(.horizontal, 16)
     }
@@ -85,7 +81,7 @@ struct AutoPickSettingsPage: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Auto Pick Module")
                         .font(.headline)
-                    Text("When enabled, the app automatically selects a module and stream using the priority list below. The normal manual workflow is bypassed.")
+                    Text("Off by default. When off, tapping an episode opens the manual module picker exactly as before.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -167,6 +163,11 @@ struct AutoPickSettingsPage: View {
     private var prioritySection: some View {
         collapsibleSection(title: "Module Priority", icon: "list.number", id: "priority") {
             VStack(spacing: 8) {
+                Text("Modules are tried top to bottom. The first one that returns a playable stream wins.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
                 if modulePriority.isEmpty {
                     Text("No modules in priority list. Add modules below.")
                         .font(.caption)
@@ -288,10 +289,10 @@ struct AutoPickSettingsPage: View {
     // MARK: - Quality Section
 
     private var qualitySection: some View {
-        collapsibleSection(title: "Quality Preferences", icon: "4k.tv", id: "quality") {
+        collapsibleSection(title: "Preferred Quality", icon: "4k.tv", id: "quality") {
             VStack(alignment: .leading, spacing: 10) {
                 Picker("Preferred Quality", selection: $preferredQuality) {
-                    Text("Auto").tag("Auto")
+                    Text("Auto (Best Available)").tag("Auto")
                     Text("1080p").tag("1080p")
                     Text("720p").tag("720p")
                     Text("480p").tag("480p")
@@ -301,46 +302,30 @@ struct AutoPickSettingsPage: View {
                 .pickerStyle(.menu)
                 .tint(Color.appAccent)
 
-                Toggle("Prefer Higher Quality", isOn: $preferHigher)
-                    .tint(Color.appAccent)
-                Text("When two streams have different quality, prefer the higher one.")
+                Text("Auto picks the highest resolution the winning module offers. A specific target (e.g. 1080p) uses an exact match when available, otherwise the closest resolution above it.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-
-                Picker("Preferred Stream Type", selection: $preferredStreamType) {
-                    Text("Auto").tag("Auto")
-                    Text("Direct (MP4)").tag("Direct")
-                    Text("Embedded (HLS)").tag("Embedded")
-                }
-                .pickerStyle(.menu)
-                .tint(Color.appAccent)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
 
-    // MARK: - Audio & Subtitles Section
+    // MARK: - Language Section
 
-    private var audioSubtitleSection: some View {
-        collapsibleSection(title: "Audio & Subtitles", icon: "waveform", id: "audio") {
+    private var languageSection: some View {
+        collapsibleSection(title: "Audio Language", icon: "waveform", id: "language") {
             VStack(alignment: .leading, spacing: 10) {
-                Picker("Preferred Audio", selection: $preferredAudio) {
-                    Text("Auto").tag("Auto")
-                    Text("Japanese").tag("Japanese")
-                    Text("English").tag("English")
+                Picker("Preferred Language", selection: $preferredLanguage) {
+                    Text("Sub").tag("Sub")
+                    Text("Dub").tag("Dub")
+                    Text("Any").tag("Any")
                 }
-                .pickerStyle(.menu)
-                .tint(Color.appAccent)
+                .pickerStyle(.segmented)
 
-                Picker("Preferred Subtitles", selection: $preferredSubtitles) {
-                    Text("Auto").tag("Auto")
-                    Text("English").tag("English")
-                    Text("None").tag("None")
-                }
-                .pickerStyle(.menu)
-                .tint(Color.appAccent)
-                Text("If the preferred option is unavailable, the system falls back to the next available.")
+                Text("Streams are filtered by their SUB/DUB label. If the winning module doesn't label its streams (or has no match), all of them stay in the pool.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -348,39 +333,26 @@ struct AutoPickSettingsPage: View {
     // MARK: - Fallback Section
 
     private var fallbackSection: some View {
-        collapsibleSection(title: "Fallback Settings", icon: "arrow.triangle.2.circlepath", id: "fallback") {
+        collapsibleSection(title: "Fallback", icon: "arrow.triangle.2.circlepath", id: "fallback") {
             VStack(alignment: .leading, spacing: 10) {
-                Toggle("Use Fallback Modules", isOn: $useFallback)
+                Toggle("Try Next Module on Failure", isOn: $useFallback)
                     .tint(Color.appAccent)
-                Text("If the primary module fails, try the next module in the priority list.")
+                Text("Off = only the first module in the priority list is tried. On = Auto Pick walks down the list until something plays.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-
-                Toggle("Auto-Fallback (after failure)", isOn: $autoFallbackEnabled)
-                    .tint(Color.appAccent)
-                Text("Same as the toggle in Streaming settings — activates only after the selected module fails.")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 Toggle("Skip Unavailable Modules", isOn: $skipUnavailable)
                     .tint(Color.appAccent)
-                Text("Skip modules marked as unhealthy when trying the fallback chain.")
+                Text("Modules currently marked as error or blocked in the module list are skipped entirely.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-            }
-        }
-    }
+                    .fixedSize(horizontal: false, vertical: true)
 
-    // MARK: - Advanced Section
-
-    private var advancedSection: some View {
-        collapsibleSection(title: "Advanced", icon: "gearshape.2", id: "advanced") {
-            VStack(alignment: .leading, spacing: 10) {
-                Toggle("Remember Selection Per Anime", isOn: $rememberPerAnime)
-                    .tint(Color.appAccent)
-                Text("Remember which module and stream worked for each anime so the app uses the same one next time.")
+                Text("Each module gets a 25-second budget. A module that hangs counts as a failure and the chain moves on — Auto Pick can no longer get stuck forever.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

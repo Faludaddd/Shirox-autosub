@@ -1826,6 +1826,9 @@ private struct AniListEpisodeRowContainer: View {
     var isSelectionMode: Bool = false
     var isSelected: Bool = false
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
+    /// v2.10 — observes the Auto Pick engine so the tapped episode row can
+    /// show inline progress (spinner + status line) while Auto Pick runs.
+    @ObservedObject private var autoPickEngine = AutoPickEngine.shared
 
     #if os(iOS)
     @ObservedObject private var downloadManager = DownloadManager.shared
@@ -1860,6 +1863,13 @@ private struct AniListEpisodeRowContainer: View {
         #else
             return nil
         #endif
+    }
+
+    /// Inline Auto Pick status for this row — only set while the engine is
+    /// actively picking THIS media + episode.
+    private var autoPickStatus: String? {
+        guard autoPickEngine.isRunning(mediaId: mediaId, episode: ep) else { return nil }
+        return autoPickEngine.statusText
     }
 
     private var progress: Double? {
@@ -1906,7 +1916,8 @@ private struct AniListEpisodeRowContainer: View {
             onTryOtherStream: onTryOtherStream,
             isSelectionMode: isSelectionMode,
             isSelected: isSelected,
-            downloadState: downloadState
+            downloadState: downloadState,
+            autoPickStatus: autoPickStatus
         )
         .alert(
             "Update tracking progress?",
