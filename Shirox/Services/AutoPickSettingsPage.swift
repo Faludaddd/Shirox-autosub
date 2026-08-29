@@ -1,5 +1,6 @@
 #if os(iOS)
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Auto Pick Module Settings — v2.10 rebuild.
 ///
@@ -187,6 +188,7 @@ struct AutoPickSettingsPage: View {
                                 return NSItemProvider(object: moduleId as NSString)
                             }
                             .onDrop(
+                                of: [UTType.text],
                                 delegate: PriorityDropDelegate(
                                     item: moduleId,
                                     list: $modulePriority,
