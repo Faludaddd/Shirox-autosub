@@ -291,8 +291,12 @@ struct DownloadsView: View {
                 // v2.12 — Clear Completed. The only bulk action the page was
                 // missing: swiping rows one by one after a 50-episode batch
                 // download was misery. Hidden while nothing is completed.
-                if completedCount > 0 {
-                    ToolbarItem(placement: .primaryAction) {
+                // NOTE: the `if` lives INSIDE the ToolbarItem's view content
+                // (ViewBuilder.buildIf, iOS 13+) — an `if` directly in the
+                // toolbar builder needs ToolbarContentBuilder.buildIf, which
+                // is iOS 16+ and this target ships iOS 15.
+                ToolbarItem(placement: .primaryAction) {
+                    if completedCount > 0 {
                         Button {
                             showingClearCompletedConfirm = true
                         } label: {
