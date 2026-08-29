@@ -1401,7 +1401,12 @@ struct ScheduleView: View {
                                     onToggleNotification: { toggleNotification(for: entry) }
                                 )
                             } label: {
-                                MangaScheduleCard(entry: entry, useUTC: useUTC)
+                                MangaScheduleCard(
+                                    entry: entry,
+                                    useUTC: useUTC,
+                                    isNotificationOn: scheduledIds.contains(entry.id),
+                                    onToggleNotification: { toggleNotification(for: entry) }
+                                )
                             }
                             .buttonStyle(.plain)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -1519,6 +1524,11 @@ struct ScheduleView: View {
             }
         }
         isLoadingManga = false
+
+        // Refresh the pending-notification set so the bells on the manga
+        // release rows reflect the persisted state (mirrors the anime
+        // schedule's `load()`).
+        scheduledIds = await EpisodeNotificationManager.shared.scheduledScheduleIds()
     }
 
     // MARK: - Content
@@ -2170,6 +2180,8 @@ struct ScheduleView: View {
 private struct MangaScheduleCard: View {
     let entry: UnifiedScheduleEntry
     let useUTC: Bool
+    let isNotificationOn: Bool
+    let onToggleNotification: () -> Void
 
     private var timeZone: TimeZone {
         useUTC ? (TimeZone(identifier: "UTC") ?? .current) : .current
@@ -2195,13 +2207,14 @@ private struct MangaScheduleCard: View {
 
     var body: some View {
         // ── Layout contract (v2.8 rework, mirrors ScheduleCard) ─────────
-        // Only the poster has a FIXED width; every text is lineLimit(1)
-        // and compressible. No `.fixedSize()` anywhere: it made the badge
-        // and countdown rows refuse to compress, so on content-heavy rows
-        // the card's minimum width exceeded the row width and rendered
-        // wider than the screen. With compressible text the card can NEVER
-        // exceed the row: the poster is pinned to the leading edge on
-        // every row, on every device width.
+        // Exactly two children of this HStack have a FIXED width: the poster
+        // (84) and the bell (32). Every text is lineLimit(1) and compressible,
+        // with no `.fixedSize()` anywhere — it made the badge and countdown
+        // rows refuse to compress, so on content-heavy rows the card's minimum
+        // width exceeded the row width and rendered wider than the screen.
+        // With compressible text the card can NEVER exceed the row: the poster
+        // is pinned to the leading edge, the bell to the trailing edge, both
+        // fully on-screen on every row and every device width.
         HStack(alignment: .top, spacing: 12) {
             // Poster — single fixed 84×112 frame; the card's leading
             // anchor. Identical size on every row so poster edges line
@@ -2269,10 +2282,39 @@ private struct MangaScheduleCard: View {
             }
             // Mirrors the notification section's `textColumn` pattern —
             // the VStack absorbs all available width so the poster stays
-            // at the leading edge across every card (no per-card drift
-            // from the Spacer). MangaScheduleCard has no trailing bell,
-            // but the same leading-edge anchor applies.
+            // at the leading edge and the bell sits flush against the
+            // trailing edge on every card.
             .frame(maxWidth: .infinity, alignment: .leading)
+
+            // Notification bell — EXACT replica of the ScheduleCard bell
+            // (Round 9): same position (trailing edge, top-aligned), same
+            // 32×32 fixed frame, same constant "bell.fill" glyph (never
+            // bell.badge.fill — the two symbols have different bounding
+            // boxes, which used to shift the bell between rows) and the
+            // same yellow dot overlay for the on-state. The fixed 32pt
+            // width keeps its layout contribution identical on every row
+            // so the bell column lines up perfectly across the section.
+            Button(action: onToggleNotification) {
+                Image(systemName: "bell.fill")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(isNotificationOn ? Color.yellow : .secondary)
+                    .frame(width: 32, height: 32)
+                    .background(
+                        Circle().fill(
+                            isNotificationOn ? Color.yellow.opacity(0.18) : Color.secondary.opacity(0.1)
+                        )
+                    )
+                    .overlay(alignment: .topTrailing) {
+                        if isNotificationOn {
+                            Circle()
+                                .fill(Color.yellow)
+                                .frame(width: 9, height: 9)
+                                .offset(x: -2, y: 3)
+                        }
+                    }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(isNotificationOn ? "Cancel notification" : "Schedule notification")
         }
         .padding(12)
         .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))

@@ -162,6 +162,58 @@ final class MangaHomeViewModel: ObservableObject {
                 error = "Couldn't load manga. Check your connection and try again."
             }
         }
+
+        // Round 9 — fill in live chapter counts for AIRING manga posters.
+        // AniList (and MAL/Jikan) leave `chapters` null while a manga is
+        // still releasing, so the shelves render first and the counts are
+        // patched in progressively (MangaUpdates cross-reference, disk
+        // cached — repeat loads are instant).
+        await enrichAiringChapterCounts()
+    }
+
+    /// Patches the poster status line of airing manga from "Airing" to
+    /// "Airing, N" by filling `episodes` with the live chapter count from
+    /// MangaUpdates. Only touches items that are airing AND missing a
+    /// count; finished manga keep the AniList total they already have.
+    private func enrichAiringChapterCounts() async {
+        var seen = Set<Int>()
+        var queue: [Media] = []
+        for m in trending + popular + topRated + latest {
+            guard m.isManga,
+                  m.statusDisplay == "Airing",
+                  (m.episodes ?? 0) == 0,
+                  seen.insert(m.id).inserted else { continue }
+            queue.append(m)
+        }
+        guard !queue.isEmpty else { return }
+
+        for m in queue {
+            if Task.isCancelled { break }
+            guard let count = await MangaUpdatesChapterService.shared.latestChapter(
+                anilistId: m.id,
+                title: m.title.displayTitle,
+                altTitle: m.title.searchTitle,
+                year: m.seasonYear
+            ) else { continue }
+            applyChapterCount(mediaId: m.id, count: count)
+        }
+    }
+
+    /// Writes a resolved chapter count back into every shelf that holds the
+    /// title, so every poster showing it updates on the next render pass.
+    private func applyChapterCount(mediaId: Int, count: Int) {
+        if let index = trending.firstIndex(where: { $0.id == mediaId }) {
+            trending[index].episodes = count
+        }
+        if let index = popular.firstIndex(where: { $0.id == mediaId }) {
+            popular[index].episodes = count
+        }
+        if let index = topRated.firstIndex(where: { $0.id == mediaId }) {
+            topRated[index].episodes = count
+        }
+        if let index = latest.firstIndex(where: { $0.id == mediaId }) {
+            latest[index].episodes = count
+        }
     }
 }
 
@@ -251,7 +303,12 @@ struct MangaPosterCard: View, Equatable {
     let media: Media
 
     static func == (lhs: MangaPosterCard, rhs: MangaPosterCard) -> Bool {
+        // `Media.==` is keyed on `uniqueId` only, so an extra comparison on
+        // `episodes` is required: the airing-manga chapter count is patched
+        // in AFTER the shelf renders (MangaUpdatesChapterService), and the
+        // poster's status line ("Airing, N") must re-render when it lands.
         lhs.media == rhs.media
+            && lhs.media.episodes == rhs.media.episodes
     }
 
     var body: some View {

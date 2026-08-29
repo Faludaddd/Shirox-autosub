@@ -1900,7 +1900,11 @@ struct AniListCardView: View, Equatable {
         // `.equatable()` in the search / browse grids to skip diffing the
         // poster + gradient + score badge tree on every grid re-evaluation
         // (e.g. while the live-search debounce or pagination spinner toggles).
+        // `episodes` is compared separately: airing-manga chapter counts are
+        // patched in AFTER the results render (MangaUpdatesChapterService)
+        // and the status line ("Airing, N") must refresh when they land.
         lhs.media == rhs.media
+            && lhs.media.episodes == rhs.media.episodes
     }
 
     var body: some View {

@@ -405,6 +405,9 @@
                 2226245532D5C4D6A3B109F1 /* HLSManifestParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 434062BAE638F3D33467EBCF /* HLSManifestParser.swift */; };
                 243906CC2AB59FF9AE447BDF /* LibraryWriteSink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CF6D00FF0F0489890FAF52D /* LibraryWriteSink.swift */; };
                 24B2669799E112151390A199 /* MangaMatchManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B461E257ABDE206C5F8A5EE5 /* MangaMatchManager.swift */; };
+                F6B69536045F10D084008DC0 /* MangaUpdatesChapterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30FD5E40BC8C0909C930773A /* MangaUpdatesChapterService.swift */; };
+                CC9DBEB73A982481F236AF1F /* MangaUpdatesChapterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30FD5E40BC8C0909C930773A /* MangaUpdatesChapterService.swift */; };
+                3C544158A94E850EE768AE00 /* MangaUpdatesChapterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30FD5E40BC8C0909C930773A /* MangaUpdatesChapterService.swift */; };
                 2590A021E9A9C37333EE5853 /* JellyfinModuleFlagTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1DFF59F54F073D10B1F45FF /* JellyfinModuleFlagTests.swift */; };
                 25DE15A403279BA1824BE2E7 /* MangaTrackingCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49B5885AD320A89432B9989B /* MangaTrackingCoordinator.swift */; };
                 269BF42A2BD9270EB60582E7 /* QuickActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4071A0ACA228C759CA67D5A0 /* QuickActions.swift */; };
@@ -924,6 +927,7 @@
                 AE72458EFA629F4C7C996AA9 /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
                 B1DFF59F54F073D10B1F45FF /* JellyfinModuleFlagTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JellyfinModuleFlagTests.swift; sourceTree = "<group>"; };
                 B461E257ABDE206C5F8A5EE5 /* MangaMatchManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MangaMatchManager.swift; sourceTree = "<group>"; };
+                30FD5E40BC8C0909C930773A /* MangaUpdatesChapterService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MangaUpdatesChapterService.swift; sourceTree = "<group>"; };
                 BAEE9A1A2FCB000000000001 /* BackgroundKeepAlive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundKeepAlive.swift; sourceTree = "<group>"; };
                 BC268A065BC5B9DB56250D4B /* WatchOrderSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WatchOrderSection.swift; sourceTree = "<group>"; };
                 BE39C4F1F663C90A50947045 /* PendingWriteQueue.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PendingWriteQueue.swift; sourceTree = "<group>"; };
@@ -1137,6 +1141,7 @@
                                 D15FDAB330588459FA8A0714 /* JSEngine+Manga.swift */,
                                 3CB5F43A448079ACC600D906 /* MangaProgressManager.swift */,
                                 B461E257ABDE206C5F8A5EE5 /* MangaMatchManager.swift */,
+                                30FD5E40BC8C0909C930773A /* MangaUpdatesChapterService.swift */,
                                 9BAE193514A5E83E81EF31B8 /* MALMangaLibraryService.swift */,
                                 49B5885AD320A89432B9989B /* MangaTrackingCoordinator.swift */,
                                 78D8556737F55F2772288018 /* MangaModuleResolver.swift */,
@@ -1830,6 +1835,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 43B2879B2F0E8F8951F228D6 /* ContinueReadingCard.swift in Sources */,
                                 9DE6574CFDE3001B655FD492 /* MangaMatch.swift in Sources */,
                                 C83E6FA614EECF23C1D7791E /* MangaMatchManager.swift in Sources */,
+                                F6B69536045F10D084008DC0 /* MangaUpdatesChapterService.swift in Sources */,
                                 0A3107E133486B031DAAB01F /* MALMangaLibraryService.swift in Sources */,
                                 25DE15A403279BA1824BE2E7 /* MangaTrackingCoordinator.swift in Sources */,
                                 33EA776012193DAB0570A9A6 /* MangaModuleResolver.swift in Sources */,
@@ -2045,6 +2051,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 E222081CF7D1FD62460F4D4A /* ContinueReadingCard.swift in Sources */,
                                 B03DE20B284328390A28EA99 /* MangaMatch.swift in Sources */,
                                 24B2669799E112151390A199 /* MangaMatchManager.swift in Sources */,
+                                CC9DBEB73A982481F236AF1F /* MangaUpdatesChapterService.swift in Sources */,
                                 973AD5CE33B4A1B0455FADE9 /* MALMangaLibraryService.swift in Sources */,
                                 455542CA728B8D33DC2DC17C /* MangaTrackingCoordinator.swift in Sources */,
                                 FA1B1A047DA983F954886DDB /* MangaModuleResolver.swift in Sources */,
@@ -2261,6 +2268,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 9E41F36197A967A21C4B3BA2 /* ContinueReadingCard.swift in Sources */,
                                 DC96B735178C288BFF58E50B /* MangaMatch.swift in Sources */,
                                 4CBFE6338E36B6529FDEE36B /* MangaMatchManager.swift in Sources */,
+                                3C544158A94E850EE768AE00 /* MangaUpdatesChapterService.swift in Sources */,
                                 A0722750ED30A028878FF395 /* MALMangaLibraryService.swift in Sources */,
                                 739EB48D2C876346667985D9 /* MangaTrackingCoordinator.swift in Sources */,
                                 B861A2F0399BEB5C4AD13096 /* MangaModuleResolver.swift in Sources */,
@@ -2340,7 +2348,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "@executable_path/Frameworks",
                                 );
                                 LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                                MARKETING_VERSION = 2.8;
+                                MARKETING_VERSION = 2.9;
                                 PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
                                 PRODUCT_NAME = "$(TARGET_NAME)";
                                 SDKROOT = appletvos;
@@ -2375,7 +2383,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "@executable_path/Frameworks",
                                 );
                                 LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                                MARKETING_VERSION = 2.8;
+                                MARKETING_VERSION = 2.9;
                                 PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
                                 PRODUCT_NAME = "$(TARGET_NAME)";
                                 SDKROOT = appletvos;
@@ -2492,7 +2500,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "$(inherited)",
                                         "@executable_path/Frameworks",
                                 );
-                                MARKETING_VERSION = 2.8;
+                                MARKETING_VERSION = 2.9;
                                 PRODUCT_NAME = shirox;
                                 PROVISIONING_PROFILE_SPECIFIER = "";
                                 SDKROOT = iphoneos;
@@ -2538,7 +2546,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "@executable_path/../Frameworks",
                                 );
                                 MACOSX_DEPLOYMENT_TARGET = 14.0;
-                                MARKETING_VERSION = 2.8;
+                                MARKETING_VERSION = 2.9;
                                 PRODUCT_NAME = shirox;
                                 SDKROOT = macosx;
                                 SUPPORTS_MACCATALYST = NO;
@@ -2564,7 +2572,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "$(inherited)",
                                         "@executable_path/Frameworks",
                                 );
-                                MARKETING_VERSION = 2.8;
+                                MARKETING_VERSION = 2.9;
                                 PRODUCT_NAME = shirox;
                                 PROVISIONING_PROFILE_SPECIFIER = "";
                                 SDKROOT = iphoneos;
@@ -2655,7 +2663,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "@executable_path/../Frameworks",
                                 );
                                 MACOSX_DEPLOYMENT_TARGET = 14.0;
-                                MARKETING_VERSION = 2.8;
+                                MARKETING_VERSION = 2.9;
                                 PRODUCT_NAME = shirox;
                                 SDKROOT = macosx;
                                 SUPPORTS_MACCATALYST = NO;

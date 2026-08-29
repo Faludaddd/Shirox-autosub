@@ -34,7 +34,11 @@ struct Media: Identifiable, Codable, Equatable, Hashable, Sendable {
     let coverImage: MediaCoverImage
     var bannerImage: String?
     let description: String?
-    let episodes: Int?
+    // `var` (not `let`): for AIRING manga this slot holds the LIVE chapter
+    // count, which AniList doesn't publish while a series is releasing —
+    // `MangaUpdatesChapterService` fills it in after the shelf loads so the
+    // poster status line can show "Airing, N".
+    var episodes: Int?
     let status: String?
     let averageScore: Int?   // 0–100
     let genres: [String]?

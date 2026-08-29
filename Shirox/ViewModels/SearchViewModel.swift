@@ -59,6 +59,12 @@ final class SearchViewModel: ObservableObject {
                 moduleResults = hit.moduleResults
                 aniListResults = hit.aniListResults
                 isLoading = false
+                // Cache entries store the pre-patch results; re-apply the
+                // airing-manga chapter counts (disk-cached, so normally this
+                // costs zero network calls). No-ops for anime results.
+                if !aniListResults.isEmpty {
+                    await enrichAiringChapterCounts()
+                }
                 return
             }
 
@@ -152,6 +158,39 @@ final class SearchViewModel: ObservableObject {
             }
             if !Task.isCancelled {
                 isLoading = false
+            }
+
+            // Round 9 — fill in live chapter counts for AIRING manga result
+            // posters (same progressive patch as the manga home shelves:
+            // AniList leaves `chapters` null while a manga is releasing, so
+            // MangaUpdatesChapterService supplies the live count). No-ops
+            // instantly for anime results / results that already have counts.
+            if !Task.isCancelled && !aniListResults.isEmpty {
+                await enrichAiringChapterCounts()
+            }
+        }
+    }
+
+    /// Patches airing manga search results from a bare "Airing" status line
+    /// to "Airing, N" by filling `episodes` with the live chapter count from
+    /// MangaUpdates. Runs inside the search task, so typing a new query
+    /// cancels it automatically.
+    private func enrichAiringChapterCounts() async {
+        let queue = aniListResults.filter {
+            $0.isManga && $0.statusDisplay == "Airing" && ($0.episodes ?? 0) == 0
+        }
+        guard !queue.isEmpty else { return }
+
+        for m in queue {
+            if Task.isCancelled { break }
+            guard let count = await MangaUpdatesChapterService.shared.latestChapter(
+                anilistId: m.id,
+                title: m.title.displayTitle,
+                altTitle: m.title.searchTitle,
+                year: m.seasonYear
+            ) else { continue }
+            if let index = aniListResults.firstIndex(where: { $0.id == m.id }) {
+                aniListResults[index].episodes = count
             }
         }
     }

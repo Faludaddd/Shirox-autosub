@@ -99,6 +99,19 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.9",
+        date: "2026-08-29",
+        added: [],
+        fixed: [
+            "Airing manga posters showed only \"Airing\" with no chapter count after it, while airing anime correctly showed \"Airing, N\". Root cause (verified live against the APIs): AniList, MyAnimeList/Jikan and Kitsu all leave the chapter field null while a manga is still releasing — they only fill in the total once a series finishes — so there was simply no in-house number to display for ongoing manga. The app now cross-references MangaUpdates (the one database that tracks the latest released chapter of ongoing series) by title with strict matching: an exact normalized-title hit with a compatible start year is accepted, anything less is treated as \"no data\" so a poster keeps an honest bare \"Airing\" instead of a wrong number. Counts are fetched in the background after the shelves render and patch in progressively (poster cards update in place as each count lands), cached on disk for 24 hours so repeat loads cost zero extra network calls. Airing manga posters now show \"Airing, N\" — N being the number of chapters currently available to read, not the eventual total — in the exact same format, size, font and position as the anime version, on the manga home shelves and in manga search results. Finished manga posters are unchanged.",
+            "The notification bell icon was missing entirely from every row of the manga Releases section (the Reading Mode equivalent of the Schedule tab), while the anime Schedule section had it correctly on every row. The manga release card never carried a bell at all — it now renders the exact same bell as the anime Schedule card: same position (trailing edge of every row), same 32×32 size, same alignment, same constant \"bell.fill\" glyph with the yellow dot badge when a notification is on. Tapping it schedules or cancels the release notification through the same notification manager the anime schedule uses, and the on/off state is restored from the pending-notification list whenever the Releases tab loads, so bells stay in sync across app restarts. No existing buttons were removed or repositioned, and the calendar date selector is untouched."
+        ],
+        changed: [],
+        improved: [],
+        removed: [],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "2.8",
         date: "2026-08-27",
         added: [],
