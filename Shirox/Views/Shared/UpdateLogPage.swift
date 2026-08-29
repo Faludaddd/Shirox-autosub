@@ -99,6 +99,25 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.12",
+        date: "2026-08-30",
+        added: [
+            "Clear Completed — the Downloads tab now has a toolbar action (top-right, only visible when something is completed) that removes every completed anime episode AND manga chapter in one pass, files included, with a confirmation dialog that tells you exactly how many entries will go. Downloads still in progress, waiting, or failed are untouched. Previously the only way to clean up after a 50-episode batch download was swiping rows one at a time."
+        ],
+        fixed: [
+            "Crash hardening in the update checker: when a version you had previously dismissed appeared again in the update manifest, the code constructed the update info WITHOUT validating the manifest's download URL first — a malformed URL in apps.json would have crashed the app right at the update check. URL validation now guards every path that builds update info, and the URL parse can never crash: a bad manifest is reported as \"Couldn't verify version\", never as a crash.",
+            "Crash hardening in the character sheet: the \"View on AniList\" link force-unwrapped the character's site URL from the API. A malformed or glitched URL from the AniList cache would have crashed the whole character page. The link now parses safely and simply hides if the URL is bad.",
+            "Episode notifications told a small lie: if you picked a lead time (say \"15 minutes before\") for an episode airing sooner than that, the notification correctly fell back to firing at airtime — but its text still claimed \"Airs in 15 minutes\" when it fired. The body now describes when the notification actually fires: \"Is airing now\" when it fires at airtime, the lead-time text only when the lead time was genuinely honoured.",
+            "Release page hygiene: the beta release carried a Mac (Catalyst) build from August 12 — missing every fix since v2.5, and never refreshed because the build workflow no longer produces it — and an IPA checksum file from August 4 that matched nothing (verifying a fresh download against it always failed). Both stale artifacts were removed, and the workflow now regenerates the checksum automatically on every build so it always matches the IPA it sits next to."
+        ],
+        changed: [
+            "Bulk deletion in Downloads uses dedicated clearCompleted methods on both download managers instead of looping the per-item remove (which fires a toast per episode — clearing 50 episodes would have stacked 50 toasts); one summary toast reports the count."
+        ],
+        improved: [],
+        removed: [],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "2.11",
         date: "2026-08-29",
         added: [

@@ -143,15 +143,20 @@ final class EpisodeNotificationManager: NSObject, ObservableObject {
         let content = UNMutableNotificationContent()
         content.title = title
         content.subtitle = "Episode \(episode)"
-        switch lead {
-        case .atAirtime:
+        // Body must describe when the notification ACTUALLY fires, not the
+        // requested lead time. When the lead time would land in the past we
+        // fall back to firing at airtime (see above), so saying "Airs in
+        // 15 minutes" on a notification that fires at airtime is a lie —
+        // show the honest text instead (v2.12).
+        if fireTimestamp < TimeInterval(airingAt) - 1 {
+            switch lead {
+            case .atAirtime:      content.body = "Is airing now"
+            case .fifteenMinutes: content.body = "Airs in 15 minutes"
+            case .oneHour:        content.body = "Airs in 1 hour"
+            case .oneDay:         content.body = "Airs in 1 day"
+            }
+        } else {
             content.body = "Is airing now"
-        case .fifteenMinutes:
-            content.body = "Airs in 15 minutes"
-        case .oneHour:
-            content.body = "Airs in 1 hour"
-        case .oneDay:
-            content.body = "Airs in 1 day"
         }
         content.sound = .default
         content.userInfo = [

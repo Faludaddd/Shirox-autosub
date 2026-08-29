@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "2.12",
+          "buildVersion": "1",
+          "date": "2026-08-30",
+          "localizedDescription": "Polish and hardening pass. New: Clear Completed — a toolbar action in the Downloads tab (visible whenever something has finished) that removes every completed anime episode and manga chapter in one pass, files included, behind a confirmation dialog that states exactly how many entries go; in-progress, waiting and failed downloads are untouched, and one summary toast replaces what would have been a toast per deleted row. Fixed: a crash path in the update checker — when a previously-dismissed version reappeared in the manifest, the update info was built without validating the manifest's download URL, so one malformed URL in apps.json would have crashed the app at the update check; validation now guards every path and a bad manifest reports honestly as \"Couldn't verify version\" instead of crashing. The character sheet's \"View on AniList\" link no longer force-unwraps the character URL from the API — a glitched value now hides the link instead of crashing the page. Episode notifications no longer lie about when they fire: when your chosen lead time would land in the past, the notification falls back to firing at airtime and its text now says \"Is airing now\" rather than claiming \"Airs in 15 minutes\". Release hygiene: the beta release page carried a Mac build from August 12 (missing every fix since v2.5, never refreshed) and an IPA checksum from August 4 that matched nothing — both removed, and the build workflow now regenerates the checksum on every build so it always matches the IPA next to it.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 11521062,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "2.11",
           "buildVersion": "1",
           "date": "2026-08-29",

@@ -183,6 +183,31 @@ final class MangaDownloadManager: ObservableObject {
         processQueue()
     }
 
+    /// Bulk-removes every COMPLETED manga chapter download in one pass —
+    /// the manga half of the "Clear Completed" toolbar action (v2.12).
+    /// Downloading / pending / failed chapters are untouched; one summary
+    /// toast replaces the per-item toasts `remove(_:)` would fire.
+    func clearCompleted() {
+        let completed = items.filter { $0.state == .completed }
+        guard !completed.isEmpty else { return }
+
+        for item in completed {
+            try? FileManager.default.removeItem(at: folderURL(for: item.id))
+        }
+
+        items.removeAll { $0.state == .completed }
+        persist()
+        reconcileDownloadsDirectory()
+
+        ToastManager.shared.show(
+            title: "Manga",
+            message: "Cleared \(completed.count) completed chapter\(completed.count == 1 ? "" : "s")",
+            icon: "trash.fill",
+            iconColor: .accentColor
+        )
+        processQueue()
+    }
+
     // MARK: - Directory reconcile (orphan sweep)
 
     private func reconcileDownloadsDirectory() {

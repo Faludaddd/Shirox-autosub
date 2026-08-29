@@ -8,6 +8,11 @@ struct DownloadsView: View {
     @ObservedObject private var mdm = MangaDownloadManager.shared
     @EnvironmentObject private var moduleManager: ModuleManager
 
+    /// Shows the "Clear Completed" confirmation dialog (v2.12). The action
+    /// removes every completed anime episode AND manga chapter (with their
+    /// files) in one pass; downloading/pending/failed entries stay.
+    @State private var showingClearCompletedConfirm = false
+
     // MARK: - Grouping
 
     private struct MediaGroup: Identifiable {
@@ -314,7 +319,43 @@ struct DownloadsView: View {
                 }
             }
             .navigationTitle("Downloads")
+            .toolbar {
+                // v2.12 — Clear Completed. The only bulk action the page was
+                // missing: swiping rows one by one after a 50-episode batch
+                // download was misery. Hidden while nothing is completed.
+                if completedCount > 0 {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button {
+                            showingClearCompletedConfirm = true
+                        } label: {
+                            Label("Clear Completed", systemImage: "trash")
+                        }
+                        .tint(.red)
+                    }
+                }
+            }
+            .confirmationDialog(
+                "Clear \(completedCount) Completed Download\(completedCount == 1 ? "" : "s")?",
+                isPresented: $showingClearCompletedConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("Clear Completed", role: .destructive) {
+                    Haptics.medium()
+                    dm.clearCompleted()
+                    mdm.clearCompleted()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Deletes the files for all completed episodes and chapters from this device. Downloads still in progress, waiting, or failed are kept.")
+            }
         }
+    }
+
+    /// Total completed entries (anime episodes + manga chapters) — drives
+    /// the toolbar visibility and the confirmation copy.
+    private var completedCount: Int {
+        dm.items.filter { $0.state == .completed }.count
+            + mdm.items.filter { $0.state == .completed }.count
     }
 }
 

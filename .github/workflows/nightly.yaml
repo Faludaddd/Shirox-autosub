@@ -68,6 +68,12 @@ jobs:
           fi
           gh release create beta --title "beta" --notes "Latest nightly build" 2>/dev/null || true
           gh release upload beta build/Shirox.ipa --clobber
+          # Keep the checksum artifact in sync with the freshly uploaded IPA
+          # (v2.12). It used to be stale since Aug 4 — anyone verifying a
+          # download against it got a false mismatch.
+          shasum -a 256 build/Shirox.ipa > build/Shirox.ipa.sha256
+          sed -i '' "s|build/Shirox.ipa|Shirox.ipa|" build/Shirox.ipa.sha256
+          gh release upload beta build/Shirox.ipa.sha256 --clobber
 
       # Artifact upload is a convenience for the Actions UI / debugging. It is
       # non-critical: if it fails the IPA is still available via the beta

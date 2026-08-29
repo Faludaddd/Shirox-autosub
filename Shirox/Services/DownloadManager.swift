@@ -562,6 +562,51 @@ final class DownloadManager: NSObject, ObservableObject {
         processQueue()
     }
 
+    /// Bulk-removes every COMPLETED anime download (files + manifest
+    /// entries) in one pass — the "Clear Completed" toolbar action in the
+    /// Downloads tab (v2.12). Downloading / pending / failed items are
+    /// untouched. Unlike `remove(_:)` there is no per-item toast — one
+    /// summary toast at the end, so clearing 50 episodes doesn't fire 50
+    /// toasts.
+    func clearCompleted() {
+        let completed = items.filter { $0.state == .completed }
+        guard !completed.isEmpty else { return }
+
+        for item in completed {
+            // Same file cleanup as remove(_:): HLS segment folder by id
+            // (completed HLS downloads live in Downloads/<id>/), the MP4
+            // file itself, and the sidecar subtitle.
+            try? FileManager.default.removeItem(at: downloadDir.appendingPathComponent(item.id.uuidString))
+            if let fileName = item.fileName, !item.isHLS {
+                try? FileManager.default.removeItem(at: downloadDir.appendingPathComponent(fileName))
+            }
+            if let subPath = item.relativeSubtitlePath {
+                try? FileManager.default.removeItem(at: downloadDir.appendingPathComponent(subPath))
+            }
+        }
+
+        items.removeAll { $0.state == .completed }
+        persist()
+        reconcileDownloadsDirectory()
+
+        // Snapshot entries survive only if another completed download for
+        // the same media still exists — removeIfOrphaned re-checks that
+        // against the (already pruned) manifest, so calling it per unique
+        // (mediaTitle, moduleId) pair is safe.
+        let pairs = Set(completed.map { ($0.mediaTitle, $0.moduleId) })
+        for (title, moduleId) in pairs {
+            DownloadedMediaSnapshotStore.shared.removeIfOrphaned(mediaTitle: title, moduleId: moduleId)
+        }
+
+        ToastManager.shared.show(
+            title: "Downloads",
+            message: "Cleared \(completed.count) completed download\(completed.count == 1 ? "" : "s")",
+            icon: "trash.fill",
+            iconColor: .accentColor
+        )
+        processQueue()
+    }
+
     /// Reconciles the on-disk `Downloads/` directory with the in-memory manifest, deleting any
     /// download artifact that no longer belongs to a tracked item. Without this, a file could
     /// stay on disk (visible in the Files app) while the app's Downloads list shows nothing —

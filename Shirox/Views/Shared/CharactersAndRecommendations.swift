@@ -310,8 +310,13 @@ struct CharacterDetailView: View {
                 }
                 infoSection
                     .padding(.top, 16)
-                if let siteUrl = displayCharacter.siteUrl, !siteUrl.isEmpty {
-                    Link(destination: URL(string: siteUrl)!) {
+                // siteUrl is remote API data — parse safely instead of
+                // force-unwrapping (a malformed URL from a cache/API glitch
+                // must never crash the character sheet, v2.12).
+                if let siteUrl = displayCharacter.siteUrl,
+                   !siteUrl.isEmpty,
+                   let url = URL(string: siteUrl) {
+                    Link(destination: url) {
                         HStack(spacing: 6) {
                             Image(systemName: "safari.fill")
                             Text("View on AniList")

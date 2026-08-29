@@ -222,16 +222,22 @@ final class AppUpdateManager: ObservableObject {
             return
         }
 
+        // URL validation guards EVERY path that constructs UpdateInfo
+        // below (available AND dismissed) — `info(from:)` force-unwraps
+        // nothing, but it does need a parseable URL, and the manifest is
+        // remote data we never fully trust. A bad URL is an honest
+        // "couldn't verify", never a crash (v2.12).
+        guard Self.isValidDownloadURL(latest.downloadURL),
+              URL(string: latest.downloadURL) != nil else {
+            Logger.shared.log("[Update] manifest downloadURL failed validation: \(latest.downloadURL)", type: "Error")
+            state = .failed
+            return
+        }
+
         // A newer version exists. Don't re-prompt for one the user already
         // dismissed (non-forced checks only).
         if !force, latest.version == lastDismissedVersion {
             state = .dismissed(info(from: latest))
-            return
-        }
-
-        guard Self.isValidDownloadURL(latest.downloadURL) else {
-            Logger.shared.log("[Update] manifest downloadURL failed validation: \(latest.downloadURL)", type: "Error")
-            state = .failed
             return
         }
 
@@ -259,11 +265,17 @@ final class AppUpdateManager: ObservableObject {
     // MARK: - Manifest fetching
 
     private func info(from entry: VersionEntry) -> UpdateInfo {
-        UpdateInfo(
+        // The caller (checkForUpdates) validates + parses the URL before
+        // reaching this point, so the parse below succeeds by construction.
+        // The defensive fallback (release page) keeps a broken invariant
+        // from ever becoming a crash (v2.12).
+        let url = URL(string: entry.downloadURL)
+            ?? URL(string: "https://github.com/Faludaddd/Shirox-autosub/releases/tag/beta")!
+        return UpdateInfo(
             newVersion: entry.version,
             currentVersion: currentVersion,
             changelog: entry.localizedDescription,
-            downloadURL: URL(string: entry.downloadURL)!,
+            downloadURL: url,
             isCritical: Self.isCriticalGap(entry.version, vs: currentVersion),
             releaseDate: Self.parseDate(entry.date)
         )
