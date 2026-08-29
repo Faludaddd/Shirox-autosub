@@ -21,7 +21,10 @@ import Combine
 @MainActor
 final class NetworkMonitor: ObservableObject {
 
-    nonisolated(unsafe) static let shared = NetworkMonitor()
+    /// Same singleton pattern as DownloadManager/MangaDownloadManager:
+    /// a @MainActor-isolated `static let` — every access site in this app is
+    /// main-actor bound (managers, SwiftUI views).
+    static let shared = NetworkMonitor()
 
     /// True when the current path is cellular, a personal hotspot, or
     /// otherwise metered ("expensive" in Network.framework terms). Downloads

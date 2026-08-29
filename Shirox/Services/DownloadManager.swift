@@ -143,7 +143,9 @@ final class DownloadManager: NSObject, ObservableObject {
             for task in tasks {
                 guard let idStr = task.taskDescription,
                       let id = UUID(uuidString: idStr) else { continue }
-                task.cancel { [weak self] resumeData in
+                // Explicit label required: bare trailing-closure syntax
+                // resolves to the no-argument cancel() overload.
+                task.cancel(byProducingResumeData: { [weak self] resumeData in
                     Task { @MainActor in
                         guard let self else { return }
                         if let resumeData {
