@@ -99,6 +99,26 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.11",
+        date: "2026-08-29",
+        added: [
+            "Manga downloads now have their own custom download page (MangaDownloadDetailView), mirroring the anime one: cover + chapter header with a status badge, a circular progress ring with page stats (pages on disk / total), an info list (chapter, page count, module, queued/completed dates, error details), and actions for every state — Read Chapter + Delete when completed (Read opens the reader directly on the downloaded pages, resuming your last-read position), Retry + Remove when failed, Cancel while downloading.",
+            "Module Priority list in Auto Pick settings supports drag-to-reorder: long-press any module row and drop it where you want it — rows shift aside with a spring animation, haptics tick on each swap, and the new order is saved the moment you let go. A grip handle marks the affordance; the up/down arrows remain for one-step nudges."
+        ],
+        fixed: [
+            "The app's home-screen icon label showed \"shirox\" instead of \"Shirox+\". Root cause: the v1.79 rename only set INFOPLIST_KEY_CFBundleDisplayName in the Xcode project file, but the iOS app target builds from a physical Info.plist (Shirox/Info.plist) — those INFOPLIST_KEY_ values are only applied when GENERATE_INFOPLIST_FILE is on, which this target doesn't use, so iOS fell back to CFBundleName (= PRODUCT_NAME = \"shirox\"). CFBundleDisplayName is now set directly in the Info.plist, so the springboard, App Switcher and Spotlight all show \"Shirox+\".",
+            "Tapping a manga download in the Downloads tab opened the offline reading page (the manga detail view listing downloaded chapters) instead of the custom download UI — anime rows had been fixed in v1.79 but every manga row (downloading, completed, failed) still pushed the offline page. All manga rows now open the new custom MangaDownloadDetailView, and the completed-manga section lists each downloaded chapter as its own row (same per-episode layout the anime section already uses) so every individual download is one tap from its detail page.",
+            "The Subtitles settings Live Preview card rendered a sample caption at 50% scale on the anime still — it could never show the true playback size (the card even carried a disclaimer admitting that) and it put text on the picture. The preview is now a clean anime still with zero text on it, and the \"Test in Landscape\" button sits on the picture itself instead of in its own section at the bottom of the page.",
+            "The fullscreen landscape caption test carried extra chrome on the picture — a \"Landscape Preview\" title label and a \"Caption shown at actual playback size\" helper line. Both removed; the only remaining chrome is the Done button (top-right, needed to exit), so what you see is exactly the backdrop with your caption on it, the way it looks during playback."
+        ],
+        changed: [
+            "Live Preview card layout: sample caption overlay, 40% black scrim and size disclaimer removed; the card is now the fetched anime backdrop at 200pt with a subtle bottom gradient for button legibility and the Test in Landscape capsule pinned to the bottom of the image."
+        ],
+        improved: [],
+        removed: [],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "2.10",
         date: "2026-08-29",
         added: [

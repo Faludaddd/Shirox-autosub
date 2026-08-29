@@ -25,6 +25,8 @@ struct AutoPickSettingsPage: View {
 
     @State private var modulePriority: [String] = []
     @State private var expandedSections: Set<String> = ["priority"]
+    /// Module id currently being dragged in the priority list (drag-to-reorder).
+    @State private var draggingModuleId: String?
 
     var body: some View {
         ScrollView {
@@ -163,7 +165,7 @@ struct AutoPickSettingsPage: View {
     private var prioritySection: some View {
         collapsibleSection(title: "Module Priority", icon: "list.number", id: "priority") {
             VStack(spacing: 8) {
-                Text("Modules are tried top to bottom. The first one that returns a playable stream wins.")
+                Text("Drag rows to reorder (arrows work too). Modules are tried top to bottom — the first one that returns a playable stream wins.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -175,8 +177,23 @@ struct AutoPickSettingsPage: View {
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.vertical, 12)
                 } else {
-                    ForEach(modulePriority.indices, id: \.self) { idx in
-                        priorityRow(at: idx)
+                    ForEach(modulePriority, id: \.self) { moduleId in
+                        priorityRow(for: moduleId)
+                            .opacity(draggingModuleId == moduleId ? 0.35 : 1)
+                            .scaleEffect(draggingModuleId == moduleId ? 0.97 : 1)
+                            .onDrag {
+                                draggingModuleId = moduleId
+                                Haptics.light()
+                                return NSItemProvider(object: moduleId as NSString)
+                            }
+                            .onDrop(
+                                delegate: PriorityDropDelegate(
+                                    item: moduleId,
+                                    list: $modulePriority,
+                                    dragging: $draggingModuleId,
+                                    onCommit: { savePriority() }
+                                )
+                            )
                     }
                 }
 
@@ -211,9 +228,9 @@ struct AutoPickSettingsPage: View {
     }
 
     @ViewBuilder
-    private func priorityRow(at index: Int) -> some View {
-        let moduleId = modulePriority[index]
-        if let module = moduleManager.modules.first(where: { $0.id == moduleId }) {
+    private func priorityRow(for moduleId: String) -> some View {
+        if let index = modulePriority.firstIndex(of: moduleId),
+           let module = moduleManager.modules.first(where: { $0.id == moduleId }) {
             let health = moduleManager.health(for: module)
             HStack(spacing: 12) {
                 Text("\(index + 1)")
@@ -243,6 +260,14 @@ struct AutoPickSettingsPage: View {
 
                 Spacer()
 
+                // Drag affordance — the whole row is draggable; the grip
+                // signals it. Long-press a row and drop it on another to
+                // reorder (v2.11).
+                Image(systemName: "line.3.horizontal")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.secondary.opacity(0.6))
+                    .frame(width: 20)
+
                 Button {
                     if index > 0 {
                         modulePriority.swapAt(index, index - 1)
@@ -252,7 +277,7 @@ struct AutoPickSettingsPage: View {
                     Image(systemName: "chevron.up")
                         .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(index > 0 ? Color.appAccent : .secondary.opacity(0.3))
-                        .frame(width: 30, height: 30)
+                        .frame(width: 26, height: 30)
                 }
                 .buttonStyle(.plain)
                 .disabled(index == 0)
@@ -266,23 +291,24 @@ struct AutoPickSettingsPage: View {
                     Image(systemName: "chevron.down")
                         .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(index < modulePriority.count - 1 ? Color.appAccent : .secondary.opacity(0.3))
-                        .frame(width: 30, height: 30)
+                        .frame(width: 26, height: 30)
                 }
                 .buttonStyle(.plain)
                 .disabled(index == modulePriority.count - 1)
 
                 Button {
-                    modulePriority.remove(at: index)
+                    modulePriority.removeAll { $0 == moduleId }
                     savePriority()
                 } label: {
                     Image(systemName: "minus.circle.fill")
                         .font(.system(size: 16))
                         .foregroundStyle(.red)
-                        .frame(width: 30, height: 30)
+                        .frame(width: 26, height: 30)
                 }
                 .buttonStyle(.plain)
             }
             .padding(.vertical, 4)
+            .contentShape(Rectangle())
         }
     }
 
@@ -370,6 +396,40 @@ struct AutoPickSettingsPage: View {
 
     private func savePriority() {
         UserDefaults.standard.set(modulePriority, forKey: "autoPickModulePriority")
+    }
+}
+
+// MARK: - Drag-to-Reorder Delegate
+
+/// Enables drag-to-reorder inside the plain (non-List) priority VStack.
+/// As the dragged row enters another row's frame, the two swap with a
+/// spring animation; the new order is persisted when the drop commits.
+private struct PriorityDropDelegate: DropDelegate {
+    let item: String
+    @Binding var list: [String]
+    @Binding var dragging: String?
+    let onCommit: () -> Void
+
+    func dropEntered(info: DropInfo) {
+        guard let dragged = dragging, dragged != item else { return }
+        guard let from = list.firstIndex(of: dragged),
+              let to = list.firstIndex(of: item) else { return }
+        guard from != to else { return }
+        withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
+            list.move(fromOffsets: IndexSet(integer: from), toOffset: to > from ? to + 1 : to)
+        }
+        Haptics.light()
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        dragging = nil
+        onCommit()
+        Haptics.medium()
+        return true
     }
 }
 #endif

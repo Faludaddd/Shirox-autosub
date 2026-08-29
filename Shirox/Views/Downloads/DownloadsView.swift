@@ -120,17 +120,20 @@ struct DownloadsView: View {
     /// through — so the downloaded episode's metadata, file name, and
     /// progress are preserved.
     ///
-    /// Previously this used a 4-tier fallback (snapshot → DetailView,
-    /// aniListID → AniListDetailView, href → DetailView, else →
-    /// DownloadDetailView). The fallback paths opened the "Offline
-    /// Reading" page (`DetailView` with `offlineSnapshot`) which only
-    /// shows downloaded episodes — that is NOT the custom download page
-    /// the user wants. All anime download rows now route to the custom
-    /// `DownloadDetailView`. Manga rows continue to route to
-    /// `MangaDetailView` with `offlineChapters` (see `body`).
+    /// v2.11 — manga downloads get the same treatment: every manga row
+    /// (downloading, completed, failed) now routes to the custom
+    /// `MangaDownloadDetailView` (ring, page stats, Read Chapter /
+    /// Retry / Cancel / Delete) instead of pushing the offline reading
+    /// page (`MangaDetailView` with offlineChapters) that only lists
+    /// downloaded chapters.
     @ViewBuilder
     private func detailDestination(for item: DownloadItem) -> some View {
         DownloadDetailView(item: item)
+    }
+
+    @ViewBuilder
+    private func mangaDetailDestination(for item: MangaDownloadItem) -> some View {
+        MangaDownloadDetailView(item: item)
     }
 
     var body: some View {
@@ -144,8 +147,8 @@ struct DownloadsView: View {
                     )
                 } else {
                     List {
-                        // Downloading / Pending — tappable to open the anime
-                        // DetailView with offlineSnapshot.
+                        // Downloading / Pending — tappable to open the custom
+                        // download detail page (ring, stats, cancel).
                         if !inProgress.isEmpty {
                             Section("Downloading") {
                                 ForEach(inProgress) { item in
@@ -171,10 +174,9 @@ struct DownloadsView: View {
                         }
 
                         // Completed — grouped by module → media → episodes.
-                        // Tapping an episode opens the anime DetailView (the
-                        // full anime detail page) with offlineSnapshot so it
-                        // shows the episode list in offline mode and can play
-                        // the downloaded file directly.
+                        // Tapping an episode opens the custom download detail
+                        // page (progress ring, file info, Find File / Share
+                        // File, Delete).
                         ForEach(moduleGroups) { moduleGroup in
                             Section {
                                 ForEach(moduleGroup.mediaGroups) { mediaGroup in
@@ -207,8 +209,8 @@ struct DownloadsView: View {
                             }
                         }
 
-                        // Failed — tappable to open DetailView for retry or
-                        // to inspect what failed.
+                        // Failed — tappable to open the custom download detail
+                        // page for retry or to inspect what failed.
                         if !failed.isEmpty {
                             Section("Failed") {
                                 ForEach(failed) { item in
@@ -236,14 +238,12 @@ struct DownloadsView: View {
                             }
                         }
 
-                        // Manga — in progress
+                        // Manga — in progress (custom download detail page)
                         if !mangaInProgress.isEmpty {
                             Section("Downloading Manga") {
                                 ForEach(mangaInProgress) { item in
                                     NavigationLink {
-                                        MangaDetailView(
-                                            item: SearchItem(title: item.mangaTitle, image: item.coverImage, href: item.mangaHref),
-                                            offlineChapters: mdm.downloadedChapters(forMangaHref: item.mangaHref))
+                                        mangaDetailDestination(for: item)
                                     } label: {
                                         MangaDownloadProgressRow(item: item)
                                     }
@@ -257,19 +257,32 @@ struct DownloadsView: View {
                             }
                         }
 
-                        // Manga — completed (module → manga → chapters)
-                        // Tapping opens MangaDetailView (the custom manga
-                        // detail page) in offline mode with downloaded
-                        // chapters from disk.
+                        // Manga — completed (module → manga → chapters).
+                        // v2.11 — every chapter is its own row (mirroring the
+                        // anime per-episode layout) and taps open the custom
+                        // MangaDownloadDetailView with its Read Chapter /
+                        // Delete actions — no more offline reading page.
                         ForEach(mangaModuleGroups) { moduleGroup in
                             Section {
-                                ForEach(moduleGroup.mangaGroups) { g in
-                                    NavigationLink {
-                                        MangaDetailView(
-                                            item: SearchItem(title: g.mangaTitle, image: g.coverImage, href: g.id),
-                                            offlineChapters: mdm.downloadedChapters(forMangaHref: g.id))
-                                    } label: {
-                                        MediaGroupRow(mediaTitle: g.mangaTitle, imageUrl: g.coverImage, count: g.items.count, unit: "chapter")
+                                ForEach(moduleGroup.mangaGroups) { mediaGroup in
+                                    ForEach(mediaGroup.items) { item in
+                                        NavigationLink {
+                                            mangaDetailDestination(for: item)
+                                        } label: {
+                                            MangaDownloadProgressRow(item: item)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .contextMenu {
+                                            Button(role: .destructive) { mdm.remove(item) } label: {
+                                                Label("Delete", systemImage: "trash")
+                                            }
+                                        }
+                                        .swipeActions(edge: .trailing) {
+                                            Button(role: .destructive) { mdm.remove(item) } label: {
+                                                Label("Delete", systemImage: "trash")
+                                            }
+                                            .tint(.red)
+                                        }
                                     }
                                 }
                             } header: {
@@ -277,14 +290,13 @@ struct DownloadsView: View {
                             }
                         }
 
-                        // Manga — failed
+                        // Manga — failed (custom download detail page with
+                        // Retry / Remove)
                         if !mangaFailed.isEmpty {
                             Section("Failed Manga") {
                                 ForEach(mangaFailed) { item in
                                     NavigationLink {
-                                        MangaDetailView(
-                                            item: SearchItem(title: item.mangaTitle, image: item.coverImage, href: item.mangaHref),
-                                            offlineChapters: mdm.downloadedChapters(forMangaHref: item.mangaHref))
+                                        mangaDetailDestination(for: item)
                                     } label: {
                                         MangaDownloadProgressRow(item: item)
                                     }
@@ -321,38 +333,6 @@ private struct ModuleSectionHeader: View {
             Text(name)
                 .lineLimit(1)
         }
-    }
-}
-
-// MARK: - Media Group Row
-
-private struct MediaGroupRow: View {
-    let mediaTitle: String
-    let imageUrl: String
-    let count: Int
-    var unit: String = "episode"
-
-    var body: some View {
-        HStack(spacing: 12) {
-            CachedAsyncImage(urlString: imageUrl)
-                .aspectRatio(2/3, contentMode: .fit)
-                .frame(width: 40)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                .shadow(radius: 2)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(mediaTitle)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                Text("\(count) \(unit)\(count == 1 ? "" : "s")")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
-            }
-        }
-        .padding(.vertical, 2)
     }
 }
 

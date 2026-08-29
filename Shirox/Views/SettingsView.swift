@@ -3840,8 +3840,9 @@ struct SubtitleSettingsPage: View {
 
     // #114 extension — Vertical position control. -100 = top of screen,
     // 100 = bottom of screen, 0 = default (near-bottom) subtitle position.
-    // The live preview and LandscapeSubtitlePreview both read this key so the
-    // user can drag the slider and see the caption move in real time.
+    // LandscapeSubtitlePreview reads this key so the user can drag the
+    // slider and see the caption move in real time during the landscape
+    // test.
     @AppStorage("subtitleVerticalOffset") private var subtitleVerticalOffset: Double = 0
 
     @State private var previewImageURL: String?
@@ -3866,7 +3867,6 @@ struct SubtitleSettingsPage: View {
                 typographyCard
                 timingCard
                 effectsCard
-                testInLandscapeButton
             }
             .padding()
         }
@@ -3946,6 +3946,13 @@ struct SubtitleSettingsPage: View {
 
     // MARK: - Live Preview Card
 
+    /// v2.11 rework — the card is now a clean anime still with the
+    /// "Test in Landscape" action overlaid ON the picture itself (it used
+    /// to live in its own button at the bottom of the page, and the
+    /// picture carried a half-scale sample caption that could never show
+    /// the true playback size anyway). No text is rendered on the picture:
+    /// the caption is only ever shown at its real size in the fullscreen
+    /// landscape preview, on the picture itself.
     private var livePreviewCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -3958,79 +3965,62 @@ struct SubtitleSettingsPage: View {
                 }
             }
 
-            ZStack(alignment: .bottom) {
+            ZStack {
                 Group {
                     if let url = previewImageURL {
                         CachedAsyncImage(urlString: url)
-                            .frame(height: 180)
+                            .frame(height: 200)
                             .clipped()
-                        Color.black.opacity(0.4)
-                            .frame(height: 180)
                     } else {
                         LinearGradient(colors: [Color.black, Color.gray.opacity(0.3)], startPoint: .top, endPoint: .bottom)
-                            .frame(height: 180)
+                            .frame(height: 200)
                     }
                 }
-                .frame(height: 180)
+                .frame(maxWidth: .infinity)
+                .frame(height: 200)
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
-                subtitlePreviewText
-                    .padding(.bottom, 16)
-                    // #114 extension — Apply the user's vertical offset so the
-                    // preview caption moves in real time as the slider drags.
-                    // The multiplier (0.5) scales the -100…100 range down to
-                    // ±50pt so the caption stays inside the 180pt preview frame.
-                    .offset(y: -subtitleVerticalOffset * 0.5)
-            }
-            .frame(maxWidth: .infinity)
+                // Subtle legibility scrim behind the overlaid button — no
+                // text sits on the picture besides the button itself.
+                LinearGradient(
+                    colors: [Color.black.opacity(0.0), Color.black.opacity(0.45)],
+                    startPoint: .center,
+                    endPoint: .bottom
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
-            // Caption text in this preview is scaled down by 50% so the preview
-            // fits inside the card without overflowing. The styling (color,
-            // stroke, background, weight) is preserved — only the rendered size
-            // is reduced. See the disclaimer below for why.
-            HStack(spacing: 6) {
-                Image(systemName: "info.circle")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text("True caption size is only visible in fullscreen landscape mode during playback.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                // The landscape test lives on the picture itself now — not
+                // a separate button at the bottom of the page.
+                Button {
+                    Haptics.light()
+                    showLandscapePreview = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "rectangle.landscape.rotate")
+                            .font(.system(size: 15, weight: .semibold))
+                        Text("Test in Landscape")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .background(Capsule().fill(Color.black.opacity(0.35)))
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                .padding(.bottom, 12)
             }
+            .frame(height: 200)
+
+            Text("Opens a fullscreen, landscape-only preview that renders your caption on the picture at its true playback size — no scaling.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
         .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    private var subtitlePreviewText: some View {
-        let resolvedStrokeWidth: Double = (subtitleStrokeColor == "none") ? 0 : subtitleStrokeWidth
-        // Preview is rendered at 50% of the user-selected font size so the
-        // caption fits inside the (180pt-tall) preview card. Stroke width is
-        // scaled by the same factor to keep the visual ratio between glyph
-        // and outline consistent with playback.
-        let previewFontScale: Double = 0.5
-        let previewFontSize = max(CGFloat(subtitleFontSize * previewFontScale), 8)
-        let previewStrokeWidth = resolvedStrokeWidth * previewFontScale
-        return Text("The journey of a thousand miles begins with a single step.")
-            .font(.system(size: previewFontSize,
-                          weight: subtitleBoldText ? .bold : .regular))
-            .foregroundStyle(color(fromName: subtitleTextColor))
-            .multilineTextAlignment(.center)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(
-                Group {
-                    if subtitleBackgroundEnabled {
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .fill(Color.black.opacity(0.6))
-                    } else {
-                        Color.clear
-                    }
-                }
-            )
-            .applySubtitleStroke(color: color(fromName: subtitleStrokeColor),
-                                 width: previewStrokeWidth)
     }
 
     // MARK: - Appearance Controls Card
@@ -4267,46 +4257,6 @@ struct SubtitleSettingsPage: View {
         .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    // MARK: - Test in Landscape Button
-
-    private var testInLandscapeButton: some View {
-        #if os(iOS)
-        VStack(alignment: .leading, spacing: 8) {
-            Button {
-                showLandscapePreview = true
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "rectangle.landscape.rotate")
-                        .font(.system(size: 17, weight: .semibold))
-                    Text("Test in Landscape")
-                        .font(.headline)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 13)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.secondary.opacity(0.15))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(0.18), lineWidth: 0.8)
-                )
-                .foregroundStyle(.primary)
-            }
-            .buttonStyle(.plain)
-
-            Text("Opens a fullscreen, landscape-only preview that renders the caption at its true playback size — no scaling.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        #else
-        EmptyView()
-        #endif
-    }
-
     // MARK: - Color Helpers
 
     private func color(fromName name: String) -> Color {
@@ -4410,13 +4360,11 @@ struct LandscapeSubtitlePreview: View {
                 // Backdrop fills the entire visible frame.
                 backdropView
 
-                // Top bar with Done button — pinned to the top, never traps
-                // the user.
+                // Top-trailing Done button — the ONLY chrome. No title label,
+                // no helper text: nothing competes with the caption on the
+                // picture (v2.11).
                 VStack {
                     HStack {
-                        Label("Landscape Preview", systemImage: "rectangle.landscape.rotate")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.white.opacity(0.85))
                         Spacer()
                         Button {
                             dismiss()
@@ -4436,23 +4384,14 @@ struct LandscapeSubtitlePreview: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
-                // Caption — bottom-anchored, centered, width-capped.
+                // Caption — bottom-anchored ON the picture (the backdrop
+                // fills the entire visible frame), centered, width-capped.
                 // On iOS 16+ ViewThatFits tries the user's chosen font size
                 // first; if the caption is too tall to fit, it steps down to
                 // smaller sizes so the text always remains fully visible.
                 // iOS 15 falls back to a single size (the user's chosen font
                 // size) since ViewThatFits isn't available.
                 captionContainer(captionMaxWidth: captionMaxWidth, bottomPadding: bottomPadding)
-
-                // Helper text above the caption.
-                VStack {
-                    Spacer()
-                    Text("Caption shown at actual playback size")
-                        .font(.caption2)
-                        .foregroundStyle(.white.opacity(0.4))
-                        .padding(.bottom, bottomPadding + 76)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .foregroundStyle(.white)
         }

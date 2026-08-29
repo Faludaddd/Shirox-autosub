@@ -6,6 +6,15 @@
     <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
     <key>CFBundleName</key>
     <string>$(PRODUCT_NAME)</string>
+    <!-- v2.11 — The iOS app target builds from this physical Info.plist, so
+         the INFOPLIST_KEY_CFBundleDisplayName in project.pbxproj is IGNORED
+         for it (those keys only apply when GENERATE_INFOPLIST_FILE = YES,
+         which this target does not set). The springboard icon label was
+         therefore falling back to CFBundleName = "shirox". Setting the
+         display name HERE makes the home screen show "Shirox+" on every
+         target that uses this plist. -->
+    <key>CFBundleDisplayName</key>
+    <string>Shirox+</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundlePackageType</key>
