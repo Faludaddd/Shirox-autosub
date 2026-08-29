@@ -99,6 +99,28 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.13",
+        date: "2026-08-30",
+        added: [
+            "Wi-Fi-only downloads are real. The \"Download Over WiFi Only\" toggle had been sitting in the Downloads settings page for ages doing absolutely nothing — no download code ever read it (same placebo disease as the old Auto Pick settings). It now works end to end: while you're on cellular, new downloads stay queued as \"Waiting\" instead of starting, and anything already downloading pauses the moment the device drops to cellular — HLS downloads keep every segment already fetched (restart continues where they left off), MP4 downloads are cancelled with resume data so the restart picks up at the exact same byte, and manga chapters go back to the queue. Everything resumes automatically the instant Wi-Fi returns. The Downloads settings page now shows a live status line under the toggle (\"Downloads paused — you're on cellular\" / \"On Wi-Fi — downloads run normally\"), and adding a download while on cellular says \"waiting for Wi-Fi\" right in the toast instead of pretending it started.",
+            "New NetworkMonitor service (NWPathMonitor) — one shared, always-current source of truth for whether the connection is metered (cellular, personal hotspot, expensive), feeding both download managers and the settings page. This closes a launch-time hole too: the first queue run after app start is delayed by a second so a cellular launch with Wi-Fi-only on can never slip past the gate before the monitor reports the network class.",
+            "Background Downloads toggle added to the Downloads settings page. The setting already existed and was honored by the keep-alive logic (it controls whether downloads keep running when you switch apps) but there was no switch for it anywhere in the UI — a real setting with no way to turn it off."
+        ],
+        fixed: [
+            "Backgrounding the app with HLS downloads in flight could mark them Failed. When iOS ends the ~30s background window (or background downloads are off), the app pauses HLS tasks and sets them back to Waiting — but the cancellation error then arrived asynchronously and overwrote the state to Failed with an error message, requiring a manual retry for something that was supposed to resume by itself. Cancellation errors are now recognized as deliberate in both download managers and no longer turn a pause into a failure.",
+            "A manga chapter with one malformed page URL silently \"completed\" with pages missing. The page downloader skipped any URL that failed to parse — the chapter finished, looked fine in the list, and only revealed the holes when you read it. Page URLs are now all validated before downloading starts: one bad URL fails the chapter honestly with a clear error instead of shipping a chapter with gaps.",
+            "The \"Auto-Download New Episodes\" toggle was removed — it was saved to storage and read by nothing (the second placebo found on that page). The Downloads settings now contain only settings that actually do something."
+        ],
+        changed: [
+            "No Mac/Catalyst builds, per user decision: the build pipeline produces the iOS IPA only (the stale Mac artifact was already removed in v2.12 and the workflow never rebuilds it), and nothing Mac-related is referenced in the app."
+        ],
+        improved: [],
+        removed: [
+            "Auto-Download New Episodes toggle (placebo — never read by any code)."
+        ],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "2.12",
         date: "2026-08-30",
         added: [

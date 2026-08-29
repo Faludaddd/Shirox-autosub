@@ -1,6 +1,7 @@
 #if os(iOS)
 import Foundation
 import Combine
+import SwiftUI
 import UIKit
 
 @MainActor
@@ -8,6 +9,19 @@ final class MangaDownloadManager: ObservableObject {
     static let shared = MangaDownloadManager()
 
     @Published private(set) var items: [MangaDownloadItem] = []
+
+    /// Wi-Fi-only downloads (v2.13) — same key as the anime manager so one
+    /// toggle governs both. New chapters don't start on cellular; in-flight
+    /// chapters are paused (re-downloading their already-fetched pages is
+    /// avoided where possible — pages on disk are rewritten atomically, so
+    /// a restart simply overwrites them) and resume when Wi-Fi returns.
+    @AppStorage("downloadOverWiFiOnly") private var downloadOverWiFiOnly = false {
+        didSet { wifiPolicyChanged() }
+    }
+
+    /// Fires when NetworkMonitor reports the network class changed
+    /// (Wi-Fi ↔ cellular). Re-evaluates the Wi-Fi-only policy.
+    private var cellularCancellable: AnyCancellable?
 
     let downloadDir: URL = {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -33,6 +47,47 @@ final class MangaDownloadManager: ObservableObject {
         load()
         reconcileDownloadsDirectory()
         observeAppLifecycle()
+        cellularCancellable = NetworkMonitor.shared.$isOnCellular
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                MainActor.assumeIsolated { self?.wifiPolicyChanged() }
+            }
+    }
+
+    /// Re-evaluates the Wi-Fi-only policy after either the toggle changed or
+    /// the network class changed (v2.13).
+    private func wifiPolicyChanged() {
+        if downloadOverWiFiOnly, NetworkMonitor.shared.isOnCellular {
+            pauseChaptersForCellular()
+        } else {
+            processQueue()
+        }
+    }
+
+    /// Pauses in-flight chapter downloads because the device is on cellular
+    /// and Wi-Fi-only is ON. Cancelled chapters go back to .pending ("Waiting")
+    /// and restart automatically when Wi-Fi returns; pages already on disk are
+    /// overwritten on the restart, so no stale partial files survive (writes
+    /// are atomic — a page file on disk is always complete).
+    private func pauseChaptersForCellular() {
+        let active = items.filter { $0.state == .downloading }
+        guard !active.isEmpty else { return }
+        for item in active {
+            chapterTasks[item.id]?.cancel()
+            chapterTasks.removeValue(forKey: item.id)
+            if let idx = items.firstIndex(where: { $0.id == item.id }) {
+                items[idx].state = .pending
+                items[idx].error = nil
+            }
+        }
+        persist()
+        ToastManager.shared.show(
+            title: "Manga",
+            message: "Paused — waiting for Wi-Fi",
+            icon: "wifi.slash",
+            iconColor: .orange
+        )
     }
 
     // MARK: - Paths
@@ -109,9 +164,14 @@ final class MangaDownloadManager: ObservableObject {
         }
         items.append(makeItem(chapter: chapter, context: context))
         persist()
+        // Tell the user when the chapter will sit waiting (Wi-Fi-only on
+        // cellular) instead of starting (v2.13).
+        let waitingForWifi = downloadOverWiFiOnly && NetworkMonitor.shared.isOnCellular
         ToastManager.shared.show(
             title: "Manga",
-            message: "Added: \(context.mangaTitle) - \(chapter.displayName)",
+            message: waitingForWifi
+                ? "Added: \(context.mangaTitle) - \(chapter.displayName) — waiting for Wi-Fi"
+                : "Added: \(context.mangaTitle) - \(chapter.displayName)",
             icon: "arrow.down.circle.fill",
             iconColor: .accentColor
         )
@@ -224,6 +284,8 @@ final class MangaDownloadManager: ObservableObject {
     // MARK: - Queue
 
     func processQueue() {
+        // Wi-Fi-only (v2.13): never START a chapter over cellular.
+        if downloadOverWiFiOnly, NetworkMonitor.shared.isOnCellular { return }
         let active = chapterTasks.count
         guard active < maxConcurrentChapters else { return }
         let pending = items.filter { $0.state == .pending }
@@ -264,20 +326,32 @@ final class MangaDownloadManager: ObservableObject {
     /// page to <folder>/<paddedIndex>.<ext> and reports progress on the main actor.
     /// Returns the ordered page filenames on success.
     private func downloadPages(id: UUID, urls: [String], referer: String, folder: URL) async throws -> [String] {
-        let total = urls.count
+        // Validate every page URL up front (v2.13). Previously a malformed
+        // URL was silently skipped by enqueue's guard — the chapter then
+        // "completed" with pages missing from the reader, only discoverable
+        // by flipping through it. Fail the chapter honestly instead, and
+        // drop the force-unwrap in the completion loop with it.
+        let parsed: [URL] = try urls.map { raw in
+            guard let url = URL(string: raw), !raw.isEmpty else {
+                throw NSError(domain: "MangaDownloadManager", code: -3,
+                              userInfo: [NSLocalizedDescriptionKey: "Chapter returned an invalid page URL"])
+            }
+            return url
+        }
+
+        let total = parsed.count
         var names = [String?](repeating: nil, count: total)
         var done = 0
 
         try await withThrowingTaskGroup(of: (Int, Data).self) { group in
             var next = 0
             func enqueue(_ i: Int) {
-                guard let url = URL(string: urls[i]) else { return }
-                group.addTask { (i, try await Self.fetchPage(url: url, referer: referer)) }
+                group.addTask { (i, try await Self.fetchPage(url: parsed[i], referer: referer)) }
             }
             while next < min(maxPagesInFlight, total) { enqueue(next); next += 1 }
 
             while let (i, data) = try await group.next() {
-                let name = MangaDownloadPlanning.pageFileName(index: i, total: total, url: URL(string: urls[i])!)
+                let name = MangaDownloadPlanning.pageFileName(index: i, total: total, url: parsed[i])
                 try data.write(to: folder.appendingPathComponent(name), options: .atomic)
                 names[i] = name
                 done += 1
@@ -329,7 +403,11 @@ final class MangaDownloadManager: ObservableObject {
 
     private func failChapter(id: UUID, error: Error) {
         guard let idx = items.firstIndex(where: { $0.id == id }) else { return }
-        if error is CancellationError { return }
+        // Cancellation is deliberate (Wi-Fi pause or removal) — the canceller
+        // already set the right state. Extended beyond CancellationError to
+        // URLError.cancelled, which is how URLSession surfaces cancellation
+        // of the page fetches (v2.13).
+        if Self.isCancellationError(error) { return }
         items[idx].state = .failed
         items[idx].error = error.localizedDescription
         persist()
@@ -339,6 +417,14 @@ final class MangaDownloadManager: ObservableObject {
             icon: "exclamationmark.circle.fill",
             iconColor: .red
         )
+    }
+
+    /// True when the error represents a deliberate task cancellation.
+    private static func isCancellationError(_ error: Error) -> Bool {
+        if error is CancellationError { return true }
+        if let urlError = error as? URLError, urlError.code == .cancelled { return true }
+        let ns = error as NSError
+        return ns.domain == NSURLErrorDomain && ns.code == NSURLErrorCancelled
     }
 
     // MARK: - Background keep-alive

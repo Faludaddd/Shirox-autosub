@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "2.13",
+          "buildVersion": "1",
+          "date": "2026-08-30",
+          "localizedDescription": "Wi-Fi-only downloads are now real — and a pile of honest fixes. The \"Download Over WiFi Only\" toggle had been in the Downloads settings forever but no download code ever read it: now, on cellular, new downloads wait as \"Waiting\" instead of starting and anything already downloading pauses on the spot — HLS keeps its fetched segments (resumes where it stopped), MP4 is cancelled with resume data (restarts at the exact same byte), manga chapters requeue — and everything resumes automatically when Wi-Fi returns. The settings page shows a live status line under the toggle, and adding a download on cellular says \"waiting for Wi-Fi\" in the toast. Fixed: backgrounding the app with HLS downloads in flight could mark them Failed (the cancellation error arrived after the pause and overwrote it — pauses now stay pauses); a manga chapter with one malformed page URL used to silently \"complete\" with pages missing, and now fails honestly before downloading starts; the Auto-Download New Episodes toggle was removed because it never did anything (the second placebo on that page). Also added the previously hidden Background Downloads switch to the UI, and per user decision the build pipeline produces the iOS IPA only — no Mac builds, ever.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 11529122,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "2.12",
           "buildVersion": "1",
           "date": "2026-08-29",

@@ -1831,8 +1831,10 @@ struct LibrarySettingsPage: View {
 struct DownloadsSettingsPage: View {
     @AppStorage("maxConcurrentDownloads") private var maxConcurrentDownloads: Int = 3
     @AppStorage("backgroundDownloadsEnabled") private var backgroundDownloadsEnabled = true
-    @AppStorage("autoDownloadNewEpisodes") private var autoDownloadNewEpisodes = false
     @AppStorage("downloadOverWiFiOnly") private var downloadOverWiFiOnly = false
+    /// Live network status under the Wi-Fi toggle (v2.13) — the toggle now
+    /// actually does something, so the page tells you which state you're in.
+    @ObservedObject private var networkMonitor = NetworkMonitor.shared
 
     var body: some View {
         Form {
@@ -1840,13 +1842,26 @@ struct DownloadsSettingsPage: View {
                 Picker("Concurrent Downloads", selection: $maxConcurrentDownloads) {
                     Text("1").tag(1); Text("2").tag(2); Text("3").tag(3); Text("4").tag(4); Text("5").tag(5)
                 }
-                Toggle("Auto-Download New Episodes", isOn: $autoDownloadNewEpisodes)
+                Toggle("Background Downloads", isOn: $backgroundDownloadsEnabled)
                     .tint(Color.appAccent)
                 Toggle("Download Over WiFi Only", isOn: $downloadOverWiFiOnly)
                     .tint(Color.appAccent)
+                // Live status while the Wi-Fi gate is armed — no guessing
+                // whether downloads are running or waiting.
+                if downloadOverWiFiOnly {
+                    if networkMonitor.isOnCellular {
+                        Label("Downloads paused — you're on cellular", systemImage: "wifi.slash")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    } else {
+                        Label("On Wi-Fi — downloads run normally", systemImage: "wifi")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                    }
+                }
             }
             Section {
-                Text("Auto-Download monitors anime you're currently watching. When a new episode airs, it's automatically added to your download queue. Download Over WiFi Only prevents downloads from starting on cellular data.")
+                Text("Download Over WiFi Only keeps new downloads waiting and pauses anything already downloading the moment the device drops to cellular; everything resumes automatically from where it stopped once Wi-Fi is back. Background Downloads lets downloads keep running while you use other apps. Concurrent Downloads caps how many episodes or chapters download at the same time.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

@@ -34,6 +34,19 @@ final class DownloadManager: NSObject, ObservableObject {
         didSet { refreshDownloadKeepAlive() }
     }
 
+    /// Wi-Fi-only downloads (v2.13). The toggle existed in settings for a
+    /// long time but nothing read it — a placebo. Now enforced:
+    ///   - processQueue won't START anything while on cellular, and
+    ///   - in-flight downloads are paused (HLS keeps its segments on disk,
+    ///     MP4 captures resume data) and resume when Wi-Fi returns.
+    @AppStorage("downloadOverWiFiOnly") var downloadOverWiFiOnly: Bool = false {
+        didSet { wifiPolicyChanged() }
+    }
+
+    /// Fires when NetworkMonitor reports the network class changed
+    /// (Wi-Fi ↔ cellular). Re-evaluates the Wi-Fi-only policy.
+    private var cellularCancellable: AnyCancellable?
+
     private let downloadDir: URL = {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let url = docs.appendingPathComponent("Downloads", isDirectory: true)
@@ -77,9 +90,82 @@ final class DownloadManager: NSObject, ObservableObject {
         load()
         reconcileDownloadsDirectory()
         reconnectBackgroundTasks()
-        processQueue()
+        // Delayed (not immediate) so NetworkMonitor's first path update —
+        // which lands a few milliseconds after start, asynchronously — has
+        // arrived. Without the delay, launching the app on cellular with
+        // Wi-Fi-only ON could slip past the gate before the monitor reports
+        // cellular and start downloading over mobile data.
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            self?.processQueue()
+        }
         requestNotificationPermission()
         observeAppLifecycle()
+        cellularCancellable = NetworkMonitor.shared.$isOnCellular
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                MainActor.assumeIsolated { self?.wifiPolicyChanged() }
+            }
+    }
+
+    /// Re-evaluates the Wi-Fi-only policy after either the toggle changed or
+    /// the network class changed: pause everything if the policy is active
+    /// and we're on cellular, otherwise let the queue run.
+    private func wifiPolicyChanged() {
+        if downloadOverWiFiOnly, NetworkMonitor.shared.isOnCellular {
+            pauseAllForCellular()
+        } else {
+            processQueue()
+        }
+    }
+
+    /// Pauses every in-flight download because the device is on cellular and
+    /// Wi-Fi-only is ON. Nothing is lost:
+    ///   - HLS: segments already on disk are skipped when the download
+    ///     restarts (HLSDownloader reuses them), so this is a true pause.
+    ///   - MP4: the URLSession task is cancelled WITH resume data, so the
+    ///     restart continues from the same byte offset.
+    /// Paused items sit in .pending ("Waiting") and resume automatically
+    /// when Wi-Fi returns (wifiPolicyChanged → processQueue).
+    private func pauseAllForCellular() {
+        let hadActive = !hlsTasks.isEmpty
+            || items.contains { $0.state == .downloading }
+        guard hadActive else { return }
+
+        pauseAllHLSTasks()
+
+        // MP4 tasks live in the background URLSession (taskDescription =
+        // item UUID). Cancel each with resume-data capture, then requeue.
+        // getAllTasks' completion runs off the main actor; only the cancel
+        // completion (which touches manager state) hops back.
+        urlSession.getAllTasks { [weak self] tasks in
+            for task in tasks {
+                guard let idStr = task.taskDescription,
+                      let id = UUID(uuidString: idStr) else { continue }
+                task.cancel { [weak self] resumeData in
+                    Task { @MainActor in
+                        guard let self else { return }
+                        if let resumeData {
+                            self.resumeData[id] = resumeData
+                        }
+                        if let idx = self.items.firstIndex(where: { $0.id == id }) {
+                            self.items[idx].state = .pending
+                            self.items[idx].error = nil
+                            self.items[idx].taskIdentifier = nil
+                        }
+                        self.persist()
+                    }
+                }
+            }
+        }
+
+        ToastManager.shared.show(
+            title: "Downloads",
+            message: "Paused — waiting for Wi-Fi",
+            icon: "wifi.slash",
+            iconColor: .orange
+        )
     }
 
     private func requestNotificationPermission() {
@@ -194,9 +280,14 @@ final class DownloadManager: NSObject, ObservableObject {
         items.append(item)
         persist()
 
+        // Tell the user when the item will just sit waiting (Wi-Fi-only on
+        // cellular) instead of starting — otherwise "Added" looks like a lie.
+        let waitingForWifi = downloadOverWiFiOnly && NetworkMonitor.shared.isOnCellular
         ToastManager.shared.show(
             title: "Downloads",
-            message: "Added: \(context.mediaTitle) - \(context.episodeNumber)",
+            message: waitingForWifi
+                ? "Added: \(context.mediaTitle) - \(context.episodeNumber) — waiting for Wi-Fi"
+                : "Added: \(context.mediaTitle) - \(context.episodeNumber)",
             icon: "arrow.down.circle.fill",
             iconColor: .accentColor
         )
@@ -760,6 +851,10 @@ final class DownloadManager: NSObject, ObservableObject {
     // MARK: - Queue Processing
     
     private func processQueue() {
+        // Wi-Fi-only (v2.13): never START a download over cellular. Paused
+        // items sit in .pending and processQueue re-fires when Wi-Fi returns.
+        if downloadOverWiFiOnly, NetworkMonitor.shared.isOnCellular { return }
+
         let activeCount = items.filter { $0.state == .downloading }.count
         let availableSlots = maxConcurrentDownloads - activeCount
 
@@ -786,6 +881,12 @@ final class DownloadManager: NSObject, ObservableObject {
             await MainActor.run {
                 guard let current = self.items.first(where: { $0.id == id }),
                       current.state == .downloading else { return }
+                // Re-check the Wi-Fi gate after the await: cellular may have
+                // arrived while the probe was in flight (v2.13).
+                if self.downloadOverWiFiOnly, NetworkMonitor.shared.isOnCellular {
+                    self.updateState(id, .pending)
+                    return
+                }
                 if isHLS { self.startHLS(current) } else { self.startMP4(current) }
             }
         }
@@ -919,6 +1020,13 @@ final class DownloadManager: NSObject, ObservableObject {
     
     private func updateError(_ id: UUID, _ error: Error) {
         if let idx = items.firstIndex(where: { $0.id == id }) {
+            // Cancellation is always deliberate (backgrounding pause, Wi-Fi
+            // pause, or removal) and the canceller has already set the right
+            // state — turning it into a .failed would undo the pause. This
+            // also fixes a pre-existing bug: backgrounding with HLS downloads
+            // in flight marked them Failed ("cancelled") instead of letting
+            // them resume on return (v2.13).
+            if Self.isCancellationError(error) { return }
             let item = items[idx]
 
             if shouldAutoRetry(error: error, item: item) {
@@ -949,6 +1057,16 @@ final class DownloadManager: NSObject, ObservableObject {
         }
     }
     
+    /// True when the error represents a deliberate task cancellation
+    /// (Swift's CancellationError, or URLError.cancelled which is how
+    /// URLSession surfaces cancellation of async data calls).
+    private static func isCancellationError(_ error: Error) -> Bool {
+        if error is CancellationError { return true }
+        if let urlError = error as? URLError, urlError.code == .cancelled { return true }
+        let ns = error as NSError
+        return ns.domain == NSURLErrorDomain && ns.code == NSURLErrorCancelled
+    }
+
     private func shouldAutoRetry(error: Error, item: DownloadItem) -> Bool {
         guard item.retryCount < 5 else { return false }
         let nsError = error as NSError
