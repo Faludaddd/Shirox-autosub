@@ -2,48 +2,107 @@
 import SwiftUI
 import UIKit
 
-/// Custom download detail view with circular progress ring, ETA, speed,
-/// Find File (share sheet), and rich metadata. Shown when tapping a download row.
+/// Custom download detail page — v2.14 rework.
+///
+/// One hero card (poster with a live progress-ring badge, title block and
+/// status), a stats strip while transferring, a single grouped info card,
+/// and state-aware actions. The anime and manga detail pages share the
+/// components at the bottom of this file, so both halves of the Downloads
+/// tab look and behave identically.
+///
+/// Shown when tapping any anime download row (in-progress, completed, or
+/// failed) — the ring badge, file metadata, ETA/speed, Find File / Share
+/// File actions, Retry (failed) / Cancel (downloading) / Delete
+/// (completed) buttons all live here.
 struct DownloadDetailView: View {
     let item: DownloadItem
 
     @ObservedObject private var dm = DownloadManager.shared
+    @ObservedObject private var moduleManager = ModuleManager.shared
     @Environment(\.dismiss) private var dismiss
 
+    /// Always render the freshest copy of the item from the manager so
+    /// progress, state and error update live while the page is open.
     private var liveItem: DownloadItem {
         dm.items.first(where: { $0.id == item.id }) ?? item
     }
 
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                headerCard
-                ringSection
-                infoSection
-                actionSection
-            }
-            .padding(20)
+    private var moduleName: String {
+        if let id = liveItem.moduleId, !id.isEmpty {
+            return moduleManager.modules.first { $0.id == id }?.sourceName ?? id
         }
-        .navigationTitle(liveItem.mediaTitle)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button("Done") { dismiss() }
-            }
+        return "Unknown Source"
+    }
+
+    private var status: (text: String, color: Color, icon: String) {
+        switch liveItem.state {
+        case .downloading: return ("Downloading", .blue, "arrow.down.circle.fill")
+        case .pending: return ("Waiting", .orange, "hourglass.fill")
+        case .completed: return ("Completed", .green, "checkmark.circle.fill")
+        case .failed: return ("Failed", .red, "exclamationmark.triangle.fill")
         }
     }
 
-    // MARK: - Header with poster
+    /// nil only while downloading — the ring then renders its live
+    /// percentage instead of a state glyph.
+    private var ringIcon: String? {
+        switch liveItem.state {
+        case .completed: return "checkmark"
+        case .failed: return "exclamationmark"
+        case .pending: return "hourglass"
+        case .downloading: return nil
+        }
+    }
 
-    private var headerCard: some View {
-        HStack(spacing: 16) {
-            CachedAsyncImage(urlString: liveItem.imageUrl)
-                .aspectRatio(2/3, contentMode: .fit)
-                .frame(width: 70, height: 105)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .shadow(radius: 3)
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                heroCard
+                if liveItem.state == .downloading || liveItem.state == .pending {
+                    statsCard
+                }
+                infoCard
+                actionSection
+            }
+            .padding(16)
+        }
+        .background(Color(.systemGroupedBackground).ignoresSafeArea())
+        .navigationTitle(liveItem.mediaTitle)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    // MARK: - Hero (poster + ring badge + title block)
+
+    private var heroCard: some View {
+        HStack(alignment: .top, spacing: 14) {
+            ZStack(alignment: .bottomTrailing) {
+                CachedAsyncImage(urlString: liveItem.imageUrl)
+                    .aspectRatio(2/3, contentMode: .fit)
+                    .frame(width: 96, height: 144)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .shadow(color: .black.opacity(0.2), radius: 5, y: 2)
+
+                DownloadRingView(
+                    progress: liveItem.state == .completed ? 1 : liveItem.progress,
+                    color: status.color,
+                    icon: ringIcon
+                )
+                .frame(width: 44, height: 44)
+                .background(Circle().fill(.thinMaterial))
+                .offset(x: 15, y: 15)
+            }
+            // Layout slack so the offset ring badge stays inside the card
+            // and never clips against the text column.
+            .padding(.trailing, 10)
+            .padding(.bottom, 12)
 
             VStack(alignment: .leading, spacing: 6) {
+                DownloadStatusBadge(
+                    text: status.text,
+                    color: status.color,
+                    systemImage: status.icon
+                )
+
                 Text(liveItem.mediaTitle)
                     .font(.headline)
                     .lineLimit(2)
@@ -51,103 +110,109 @@ struct DownloadDetailView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
-                if let stream = liveItem.streamTitle {
-                    Text(stream)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+
+                HStack(spacing: 5) {
+                    Image(systemName: "square.stack.3d.up.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                    Text(moduleName)
                         .lineLimit(1)
+                        .truncationMode(.middle)
                 }
-                statusBadge
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+                if let stream = liveItem.streamTitle {
+                    HStack(spacing: 5) {
+                        Image(systemName: "film.fill")
+                            .font(.system(size: 10, weight: .semibold))
+                        Text(stream)
+                            .lineLimit(1)
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
             }
-            Spacer()
+            Spacer(minLength: 0)
         }
         .padding(16)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(.secondarySystemGroupedBackground))
+        )
     }
 
-    private var statusBadge: some View {
-        let (text, color, icon): (String, Color, String) = {
-            switch liveItem.state {
-            case .downloading: return ("Downloading", .blue, "arrow.down.circle.fill")
-            case .pending: return ("Waiting", .orange, "hourglass.fill")
-            case .completed: return ("Completed", .green, "checkmark.circle.fill")
-            case .failed: return ("Failed", .red, "exclamationmark.triangle.fill")
+    // MARK: - Stats strip (transfers only)
+
+    private var statsCard: some View {
+        HStack(spacing: 0) {
+            DownloadStatBlock(value: liveItem.speedFormatted, label: "Speed")
+            statDivider
+            DownloadStatBlock(
+                value: liveItem.state == .downloading ? liveItem.etaFormatted : "--",
+                label: "Remaining"
+            )
+            if liveItem.totalBytes != nil {
+                statDivider
+                DownloadStatBlock(
+                    value: "\(liveItem.bytesReceivedFormatted) / \(liveItem.totalBytesFormatted)",
+                    label: "Downloaded"
+                )
             }
-        }()
-        return HStack(spacing: 4) {
-            Image(systemName: icon).font(.caption2)
-            Text(text).font(.caption.weight(.semibold))
         }
-        .foregroundStyle(color)
-        .padding(.horizontal, 8).padding(.vertical, 4)
-        .background(color.opacity(0.12), in: Capsule())
+        .padding(.vertical, 14)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(.secondarySystemGroupedBackground))
+        )
     }
 
-    // MARK: - Progress ring
-
-    private var ringSection: some View {
-        VStack(spacing: 12) {
-            CircularProgressView(progress: liveItem.progress, state: liveItem.state)
-                .frame(width: 140, height: 140)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Download progress")
-                .accessibilityValue("\(Int(liveItem.progress * 100)) percent, \(liveItem.state.rawValue)")
-
-            if liveItem.state == .downloading || liveItem.state == .pending {
-                HStack(spacing: 20) {
-                    statLabel(liveItem.speedFormatted, "Speed")
-                    statLabel(liveItem.etaFormatted, "Remaining")
-                    if liveItem.totalBytes != nil {
-                        statLabel("\(liveItem.bytesReceivedFormatted) / \(liveItem.totalBytesFormatted)", "Downloaded")
-                    }
-                }
-            }
-        }
-        .padding(20)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
+    private var statDivider: some View {
+        Rectangle()
+            .fill(Color.secondary.opacity(0.15))
+            .frame(width: 1, height: 30)
     }
 
-    private func statLabel(_ value: String, _ label: String) -> some View {
-        VStack(spacing: 2) {
-            Text(value).font(.subheadline.weight(.semibold).monospacedDigit())
-            Text(label).font(.caption2).foregroundStyle(.secondary)
+    // MARK: - Info card
+
+    private var infoRows: [DownloadInfoRow] {
+        var rows: [DownloadInfoRow] = []
+        if let fileName = liveItem.fileName {
+            rows.append(DownloadInfoRow(icon: "doc.fill", label: "File", value: fileName))
         }
+        if liveItem.isHLS {
+            rows.append(DownloadInfoRow(icon: "film.fill", label: "Type", value: "HLS Stream"))
+        } else if liveItem.fileName != nil {
+            rows.append(DownloadInfoRow(icon: "film.fill", label: "Type", value: "MP4 Video"))
+        }
+        rows.append(DownloadInfoRow(icon: "square.stack.3d.up.fill", label: "Module", value: moduleName))
+        rows.append(DownloadInfoRow(
+            icon: "calendar.fill",
+            label: "Queued",
+            value: liveItem.createdAt.formatted(date: .abbreviated, time: .shortened)
+        ))
+        if let completed = liveItem.completedAt {
+            rows.append(DownloadInfoRow(
+                icon: "checkmark.seal.fill",
+                label: "Completed",
+                value: completed.formatted(date: .abbreviated, time: .shortened)
+            ))
+        }
+        if let sub = liveItem.relativeSubtitlePath {
+            rows.append(DownloadInfoRow(icon: "captions.bubble.fill", label: "Subtitles", value: sub))
+        }
+        if let err = liveItem.error, liveItem.state == .failed {
+            rows.append(DownloadInfoRow(
+                icon: "exclamationmark.triangle.fill",
+                label: "Error",
+                value: err,
+                isAlert: true
+            ))
+        }
+        return rows
     }
 
-    // MARK: - Info
-
-    private var infoSection: some View {
-        VStack(spacing: 8) {
-            if let fileName = liveItem.fileName {
-                infoRow("doc.fill", "File", fileName)
-            }
-            if liveItem.isHLS {
-                infoRow("film.fill", "Type", "HLS Stream")
-            } else if liveItem.fileName != nil {
-                infoRow("film.fill", "Type", "MP4 Video")
-            }
-            infoRow("calendar.fill", "Queued", liveItem.createdAt.formatted(date: .abbreviated, time: .shortened))
-            if let completed = liveItem.completedAt {
-                infoRow("checkmark.seal.fill", "Completed", completed.formatted(date: .abbreviated, time: .shortened))
-            }
-            if let sub = liveItem.relativeSubtitlePath {
-                infoRow("captions.bubble.fill", "Subtitles", sub)
-            }
-            if let err = liveItem.error, liveItem.state == .failed {
-                infoRow("exclamationmark.triangle.fill", "Error", err).foregroundStyle(.red)
-            }
-        }
-    }
-
-    private func infoRow(_ icon: String, _ label: String, _ value: String) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon).foregroundStyle(.secondary).frame(width: 24)
-            Text(label).font(.subheadline).foregroundStyle(.secondary)
-            Spacer()
-            Text(value).font(.subheadline.weight(.medium)).lineLimit(2).multilineTextAlignment(.trailing)
-        }
-        .padding(.horizontal, 16).padding(.vertical, 10)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10))
+    private var infoCard: some View {
+        DownloadInfoCard(rows: infoRows)
     }
 
     // MARK: - Actions
@@ -155,43 +220,76 @@ struct DownloadDetailView: View {
     @ViewBuilder
     private var actionSection: some View {
         VStack(spacing: 12) {
-            if liveItem.state == .completed, let fileURL = downloadedFileURL {
-                Button { findFile(fileURL) } label: {
-                    Label("Find File", systemImage: "folder.badge.magnifyingglass")
-                        .frame(maxWidth: .infinity).padding(.vertical, 4)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(.appAccent)
-                .controlSize(.large)
+            switch liveItem.state {
+            case .completed:
+                if let fileURL = downloadedFileURL {
+                    HStack(spacing: 12) {
+                        Button {
+                            findFile(fileURL)
+                        } label: {
+                            Label("Find File", systemImage: "folder.badge.magnifyingglass")
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 6)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
 
-                Button { shareFile(fileURL) } label: {
-                    Label("Share File", systemImage: "square.and.arrow.up")
-                        .frame(maxWidth: .infinity).padding(.vertical, 4)
+                        Button {
+                            shareFile(fileURL)
+                        } label: {
+                            Label("Share File", systemImage: "square.and.arrow.up")
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 6)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.appAccent)
+                        .controlSize(.large)
+                    }
+                }
+                Button(role: .destructive) {
+                    dm.remove(liveItem)
+                    dismiss()
+                } label: {
+                    Label("Delete Download", systemImage: "trash")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
                 }
                 .buttonStyle(.bordered)
+                .tint(.red)
                 .controlSize(.large)
-            }
-            if liveItem.state == .failed {
-                Button { dm.retry(liveItem) } label: {
+
+            case .failed:
+                Button {
+                    dm.retry(liveItem)
+                } label: {
                     Label("Retry Download", systemImage: "arrow.clockwise")
-                        .frame(maxWidth: .infinity).padding(.vertical, 4)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.green)
                 .controlSize(.large)
-            }
-            if liveItem.state == .downloading || liveItem.state == .pending {
-                Button(role: .destructive) { dm.remove(liveItem); dismiss() } label: {
-                    Label("Cancel Download", systemImage: "xmark.circle.fill")
-                        .frame(maxWidth: .infinity).padding(.vertical, 4)
+
+                Button(role: .destructive) {
+                    dm.remove(liveItem)
+                    dismiss()
+                } label: {
+                    Label("Remove from List", systemImage: "trash")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
                 }
                 .buttonStyle(.bordered)
+                .tint(.red)
                 .controlSize(.large)
-            }
-            if liveItem.state == .completed {
-                Button(role: .destructive) { dm.remove(liveItem); dismiss() } label: {
-                    Label("Delete Download", systemImage: "trash.fill")
-                        .frame(maxWidth: .infinity).padding(.vertical, 4)
+
+            case .downloading, .pending:
+                Button(role: .destructive) {
+                    dm.remove(liveItem)
+                    dismiss()
+                } label: {
+                    Label("Cancel Download", systemImage: "xmark.circle")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
                 }
                 .buttonStyle(.bordered)
                 .tint(.red)
@@ -224,37 +322,126 @@ struct DownloadDetailView: View {
     }
 }
 
-private struct CircularProgressView: View {
-    let progress: Double
-    let state: DownloadState
+// MARK: - Shared download-detail components (anime + manga pages, v2.14)
 
-    private var displayProgress: Double { state == .completed ? 1.0 : progress }
-    private var ringColor: Color {
-        switch state {
-        case .completed: return .green
-        case .failed: return .red
-        case .pending: return .orange
-        case .downloading: return .appAccent
+/// Compact capsule status badge — one look across both detail pages.
+struct DownloadStatusBadge: View {
+    let text: String
+    let color: Color
+    let systemImage: String
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: systemImage)
+                .font(.system(size: 10, weight: .semibold))
+            Text(text)
+                .font(.caption.weight(.semibold))
         }
+        .foregroundStyle(color)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
+        .background(color.opacity(0.12), in: Capsule())
     }
+}
+
+/// Small progress ring used as a badge on the hero poster (and as the
+/// aggregate indicator in the Downloads tab status header). While
+/// `icon == nil` the ring renders its live percentage instead of a glyph.
+struct DownloadRingView: View {
+    let progress: Double
+    let color: Color
+    let icon: String?
+
+    private var clamped: Double { min(max(progress, 0), 1) }
 
     var body: some View {
         ZStack {
-            Circle().stroke(Color.secondary.opacity(0.15), lineWidth: 10)
-            Circle().trim(from: 0, to: displayProgress)
-                .stroke(ringColor, style: StrokeStyle(lineWidth: 10, lineCap: .round))
+            Circle()
+                .stroke(Color.secondary.opacity(0.18), lineWidth: 5)
+            Circle()
+                .trim(from: 0, to: clamped)
+                .stroke(color, style: StrokeStyle(lineWidth: 5, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-                .animation(.linear(duration: 0.3), value: displayProgress)
-            if state == .downloading {
-                Text("\(Int(displayProgress * 100))%")
-                    .font(.system(size: 26, weight: .heavy, design: .rounded).monospacedDigit())
-                    .foregroundStyle(ringColor)
+                .animation(.linear(duration: 0.3), value: clamped)
+            if let icon {
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(color)
             } else {
-                Image(systemName: state == .completed ? "checkmark.circle.fill" : state == .failed ? "exclamationmark.triangle.fill" : "hourglass")
-                    .font(.system(size: 30))
-                    .foregroundStyle(ringColor)
+                Text("\(Int(clamped * 100))")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(color)
             }
         }
+    }
+}
+
+/// One labelled value in the horizontal stats strip.
+struct DownloadStatBlock: View {
+    let value: String
+    let label: String
+
+    var body: some View {
+        VStack(spacing: 3) {
+            Text(value)
+                .font(.subheadline.weight(.semibold))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+/// A single key/value line inside the grouped info card.
+struct DownloadInfoRow: Identifiable {
+    let id = UUID()
+    let icon: String
+    let label: String
+    let value: String
+    var isAlert = false
+}
+
+/// One grouped card of key/value rows separated by hairline dividers —
+/// replaces the old stack of individually-boxed rows.
+struct DownloadInfoCard: View {
+    let rows: [DownloadInfoRow]
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(rows) { row in
+                HStack(spacing: 12) {
+                    Image(systemName: row.icon)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(row.isAlert ? .red : .secondary)
+                        .frame(width: 24)
+                    Text(row.label)
+                        .font(.subheadline)
+                        .foregroundStyle(row.isAlert ? .red : .secondary)
+                    Spacer(minLength: 12)
+                    Text(row.value)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(row.isAlert ? .red : .primary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.trailing)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 11)
+
+                if row.id != rows.last?.id {
+                    Divider()
+                        .padding(.leading, 52)
+                }
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(.secondarySystemGroupedBackground))
+        )
     }
 }
 #endif

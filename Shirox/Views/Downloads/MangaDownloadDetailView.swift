@@ -1,19 +1,17 @@
 #if os(iOS)
 import SwiftUI
 
-/// Custom manga download detail view — the manga counterpart of the anime
-/// `DownloadDetailView` (v2.11).
+/// Custom manga download detail page — v2.14 rework, sharing the anime
+/// page's design (see `DownloadDetailView`): one hero card with the cover
+/// and a live progress-ring badge, a stats strip (pages / progress), a
+/// single grouped info card, and state-aware actions:
+///   - completed — Read Chapter (opens the reader on the local pages) and
+///     Delete
+///   - failed — Retry and Remove from List
+///   - downloading / pending — Cancel
 ///
-/// Previously every manga row in the Downloads tab pushed
-/// `MangaDetailView(offlineChapters:)` — the offline reading page — which is
-/// NOT the custom download page. Now all manga download taps (downloading,
-/// completed, or failed) route here, mirroring the anime flow:
-///   - header card with the manga cover, title, chapter name and status badge
-///   - circular progress ring with page stats
-///   - info section (chapter, module, pages, queued/completed dates, error)
-///   - actions: Read Chapter (completed — opens the reader on the local
-///     pages), Delete (completed), Cancel (downloading/pending),
-///     Retry (failed)
+/// Since v2.11 every manga download tap (downloading, completed, or
+/// failed) routes here — never to the offline reading page.
 struct MangaDownloadDetailView: View {
     let item: MangaDownloadItem
 
@@ -30,47 +28,89 @@ struct MangaDownloadDetailView: View {
     }
 
     private var moduleName: String {
-        moduleManager.modules.first(where: { $0.id == liveItem.moduleId })?.sourceName
-            ?? (liveItem.moduleId.isEmpty ? "Unknown Source" : liveItem.moduleId)
+        if !liveItem.moduleId.isEmpty {
+            return moduleManager.modules.first(where: { $0.id == liveItem.moduleId })?.sourceName
+                ?? liveItem.moduleId
+        }
+        return "Unknown Source"
+    }
+
+    private var status: (text: String, color: Color, icon: String) {
+        switch liveItem.state {
+        case .downloading: return ("Downloading", .blue, "arrow.down.circle.fill")
+        case .pending: return ("Waiting", .orange, "hourglass.fill")
+        case .completed: return ("Completed", .green, "checkmark.circle.fill")
+        case .failed: return ("Failed", .red, "exclamationmark.triangle.fill")
+        }
+    }
+
+    private var ringIcon: String? {
+        switch liveItem.state {
+        case .completed: return "checkmark"
+        case .failed: return "exclamationmark"
+        case .pending: return "hourglass"
+        case .downloading: return nil
+        }
     }
 
     private var pagesOnDisk: Int {
-        liveItem.state == .completed ? liveItem.pageFiles.count : Int((liveItem.progress * Double(max(liveItem.totalPages, 1))).rounded())
+        liveItem.state == .completed
+            ? liveItem.pageFiles.count
+            : Int((liveItem.progress * Double(max(liveItem.totalPages, 1))).rounded())
+    }
+
+    private var totalPages: Int {
+        max(liveItem.totalPages, liveItem.pageFiles.count)
     }
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
-                headerCard
-                ringSection
-                infoSection
+            VStack(spacing: 16) {
+                heroCard
+                statsCard
+                infoCard
                 actionSection
             }
-            .padding(20)
+            .padding(16)
         }
+        .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .navigationTitle(liveItem.mangaTitle)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button("Done") { dismiss() }
-            }
-        }
         .fullScreenCover(item: $readerContext) { ctx in
             MangaReaderView(context: ctx)
         }
     }
 
-    // MARK: - Header with cover
+    // MARK: - Hero (cover + ring badge + title block)
 
-    private var headerCard: some View {
-        HStack(spacing: 16) {
-            CachedAsyncImage(urlString: liveItem.coverImage)
-                .aspectRatio(2/3, contentMode: .fit)
-                .frame(width: 70, height: 105)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .shadow(radius: 3)
+    private var heroCard: some View {
+        HStack(alignment: .top, spacing: 14) {
+            ZStack(alignment: .bottomTrailing) {
+                CachedAsyncImage(urlString: liveItem.coverImage)
+                    .aspectRatio(2/3, contentMode: .fit)
+                    .frame(width: 96, height: 144)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .shadow(color: .black.opacity(0.2), radius: 5, y: 2)
+
+                DownloadRingView(
+                    progress: liveItem.state == .completed ? 1 : liveItem.progress,
+                    color: status.color,
+                    icon: ringIcon
+                )
+                .frame(width: 44, height: 44)
+                .background(Circle().fill(.thinMaterial))
+                .offset(x: 15, y: 15)
+            }
+            .padding(.trailing, 10)
+            .padding(.bottom, 12)
 
             VStack(alignment: .leading, spacing: 6) {
+                DownloadStatusBadge(
+                    text: status.text,
+                    color: status.color,
+                    systemImage: status.icon
+                )
+
                 Text(liveItem.mangaTitle)
                     .font(.headline)
                     .lineLimit(2)
@@ -78,88 +118,83 @@ struct MangaDownloadDetailView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
-                Text(moduleName)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                statusBadge
+
+                HStack(spacing: 5) {
+                    Image(systemName: "square.stack.3d.up.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                    Text(moduleName)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
-            Spacer()
+            Spacer(minLength: 0)
         }
         .padding(16)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(.secondarySystemGroupedBackground))
+        )
     }
 
-    private var statusBadge: some View {
-        let (text, color, icon): (String, Color, String) = {
-            switch liveItem.state {
-            case .downloading: return ("Downloading", .blue, "arrow.down.circle.fill")
-            case .pending: return ("Waiting", .orange, "hourglass.fill")
-            case .completed: return ("Completed", .green, "checkmark.circle.fill")
-            case .failed: return ("Failed", .red, "exclamationmark.triangle.fill")
-            }
-        }()
-        return HStack(spacing: 4) {
-            Image(systemName: icon).font(.caption2)
-            Text(text).font(.caption.weight(.semibold))
+    // MARK: - Stats strip
+
+    private var statsCard: some View {
+        HStack(spacing: 0) {
+            DownloadStatBlock(value: "\(pagesOnDisk) / \(totalPages)", label: "Pages")
+            statDivider
+            DownloadStatBlock(value: "\(Int(liveItem.progress * 100))%", label: "Progress")
         }
-        .foregroundStyle(color)
-        .padding(.horizontal, 8).padding(.vertical, 4)
-        .background(color.opacity(0.12), in: Capsule())
+        .padding(.vertical, 14)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(.secondarySystemGroupedBackground))
+        )
     }
 
-    // MARK: - Progress ring
-
-    private var ringSection: some View {
-        VStack(spacing: 12) {
-            MangaDownloadRing(progress: liveItem.progress, state: liveItem.state)
-                .frame(width: 140, height: 140)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Download progress")
-                .accessibilityValue("\(Int(liveItem.progress * 100)) percent, \(liveItem.state.rawValue)")
-
-            HStack(spacing: 20) {
-                statLabel("\(pagesOnDisk) / \(max(liveItem.totalPages, liveItem.pageFiles.count))", "Pages")
-                statLabel("\(Int(liveItem.progress * 100))%", "Progress")
-            }
-        }
-        .padding(20)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
+    private var statDivider: some View {
+        Rectangle()
+            .fill(Color.secondary.opacity(0.15))
+            .frame(width: 1, height: 30)
     }
 
-    private func statLabel(_ value: String, _ label: String) -> some View {
-        VStack(spacing: 2) {
-            Text(value).font(.subheadline.weight(.semibold).monospacedDigit())
-            Text(label).font(.caption2).foregroundStyle(.secondary)
+    // MARK: - Info card
+
+    private var infoRows: [DownloadInfoRow] {
+        var rows: [DownloadInfoRow] = []
+        rows.append(DownloadInfoRow(icon: "book.fill", label: "Chapter", value: liveItem.chapterName))
+        rows.append(DownloadInfoRow(
+            icon: "square.grid.2x2.fill",
+            label: "Pages",
+            value: "\(totalPages) page\(totalPages == 1 ? "" : "s")"
+        ))
+        rows.append(DownloadInfoRow(icon: "square.stack.3d.up.fill", label: "Module", value: moduleName))
+        rows.append(DownloadInfoRow(
+            icon: "calendar.fill",
+            label: "Queued",
+            value: liveItem.createdAt.formatted(date: .abbreviated, time: .shortened)
+        ))
+        if let completed = liveItem.completedAt {
+            rows.append(DownloadInfoRow(
+                icon: "checkmark.seal.fill",
+                label: "Completed",
+                value: completed.formatted(date: .abbreviated, time: .shortened)
+            ))
         }
+        if let err = liveItem.error, liveItem.state == .failed {
+            rows.append(DownloadInfoRow(
+                icon: "exclamationmark.triangle.fill",
+                label: "Error",
+                value: err,
+                isAlert: true
+            ))
+        }
+        return rows
     }
 
-    // MARK: - Info
-
-    private var infoSection: some View {
-        VStack(spacing: 8) {
-            infoRow("book.fill", "Chapter", liveItem.chapterName)
-            infoRow("square.grid.2x2.fill", "Pages", "\(max(liveItem.pageFiles.count, liveItem.totalPages)) page\(max(liveItem.pageFiles.count, liveItem.totalPages) == 1 ? "" : "s")")
-            infoRow("square.stack.3d.up.fill", "Module", moduleName)
-            infoRow("calendar.fill", "Queued", liveItem.createdAt.formatted(date: .abbreviated, time: .shortened))
-            if let completed = liveItem.completedAt {
-                infoRow("checkmark.seal.fill", "Completed", completed.formatted(date: .abbreviated, time: .shortened))
-            }
-            if let err = liveItem.error, liveItem.state == .failed {
-                infoRow("exclamationmark.triangle.fill", "Error", err).foregroundStyle(.red)
-            }
-        }
-    }
-
-    private func infoRow(_ icon: String, _ label: String, _ value: String) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon).foregroundStyle(.secondary).frame(width: 24)
-            Text(label).font(.subheadline).foregroundStyle(.secondary)
-            Spacer()
-            Text(value).font(.subheadline.weight(.medium)).lineLimit(2).multilineTextAlignment(.trailing)
-        }
-        .padding(.horizontal, 16).padding(.vertical, 10)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10))
+    private var infoCard: some View {
+        DownloadInfoCard(rows: infoRows)
     }
 
     // MARK: - Actions
@@ -167,46 +202,66 @@ struct MangaDownloadDetailView: View {
     @ViewBuilder
     private var actionSection: some View {
         VStack(spacing: 12) {
-            if liveItem.state == .completed {
-                Button { readChapter() } label: {
+            switch liveItem.state {
+            case .completed:
+                Button {
+                    readChapter()
+                } label: {
                     Label("Read Chapter", systemImage: "book.fill")
-                        .frame(maxWidth: .infinity).padding(.vertical, 4)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.appAccent)
                 .controlSize(.large)
 
-                Button(role: .destructive) { mdm.remove(liveItem); dismiss() } label: {
-                    Label("Delete Download", systemImage: "trash.fill")
-                        .frame(maxWidth: .infinity).padding(.vertical, 4)
+                Button(role: .destructive) {
+                    mdm.remove(liveItem)
+                    dismiss()
+                } label: {
+                    Label("Delete Download", systemImage: "trash")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
                 }
                 .buttonStyle(.bordered)
-                .controlSize(.large)
                 .tint(.red)
-            }
-            if liveItem.state == .failed {
-                Button { mdm.retry(liveItem) } label: {
+                .controlSize(.large)
+
+            case .failed:
+                Button {
+                    mdm.retry(liveItem)
+                } label: {
                     Label("Retry Download", systemImage: "arrow.clockwise")
-                        .frame(maxWidth: .infinity).padding(.vertical, 4)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.green)
                 .controlSize(.large)
 
-                Button(role: .destructive) { mdm.remove(liveItem); dismiss() } label: {
-                    Label("Remove from List", systemImage: "trash.fill")
-                        .frame(maxWidth: .infinity).padding(.vertical, 4)
+                Button(role: .destructive) {
+                    mdm.remove(liveItem)
+                    dismiss()
+                } label: {
+                    Label("Remove from List", systemImage: "trash")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
                 }
                 .buttonStyle(.bordered)
-                .controlSize(.large)
                 .tint(.red)
-            }
-            if liveItem.state == .downloading || liveItem.state == .pending {
-                Button(role: .destructive) { mdm.remove(liveItem); dismiss() } label: {
-                    Label("Cancel Download", systemImage: "xmark.circle.fill")
-                        .frame(maxWidth: .infinity).padding(.vertical, 4)
+                .controlSize(.large)
+
+            case .downloading, .pending:
+                Button(role: .destructive) {
+                    mdm.remove(liveItem)
+                    dismiss()
+                } label: {
+                    Label("Cancel Download", systemImage: "xmark.circle")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
                 }
                 .buttonStyle(.bordered)
+                .tint(.red)
                 .controlSize(.large)
             }
         }
@@ -245,42 +300,6 @@ struct MangaDownloadDetailView: View {
             resumeFraction: isResume ? last?.pageFraction : nil,
             match: nil
         )
-    }
-}
-
-// MARK: - Ring
-
-private struct MangaDownloadRing: View {
-    let progress: Double
-    let state: MangaDownloadState
-
-    private var displayProgress: Double { state == .completed ? 1.0 : progress }
-    private var ringColor: Color {
-        switch state {
-        case .completed: return .green
-        case .failed: return .red
-        case .pending: return .orange
-        case .downloading: return .appAccent
-        }
-    }
-
-    var body: some View {
-        ZStack {
-            Circle().stroke(Color.secondary.opacity(0.15), lineWidth: 10)
-            Circle().trim(from: 0, to: displayProgress)
-                .stroke(ringColor, style: StrokeStyle(lineWidth: 10, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-                .animation(.linear(duration: 0.3), value: displayProgress)
-            if state == .downloading {
-                Text("\(Int(displayProgress * 100))%")
-                    .font(.system(size: 26, weight: .heavy, design: .rounded).monospacedDigit())
-                    .foregroundStyle(ringColor)
-            } else {
-                Image(systemName: state == .completed ? "checkmark.circle.fill" : state == .failed ? "exclamationmark.triangle.fill" : "hourglass")
-                    .font(.system(size: 30))
-                    .foregroundStyle(ringColor)
-            }
-        }
     }
 }
 #endif

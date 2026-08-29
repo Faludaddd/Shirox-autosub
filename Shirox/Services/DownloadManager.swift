@@ -709,6 +709,75 @@ final class DownloadManager: NSObject, ObservableObject {
         processQueue()
     }
 
+    /// Retries every failed anime download in one tap — the "Retry All"
+    /// action in the Failed section header of the Downloads tab (v2.14).
+    /// `retry(_:)` doesn't toast per item, so a single summary toast here is
+    /// all the feedback the user gets.
+    func retryAllFailed() {
+        let failedItems = items.filter { $0.state == .failed }
+        guard !failedItems.isEmpty else { return }
+        for item in failedItems { retry(item) }
+        ToastManager.shared.show(
+            title: "Downloads",
+            message: "Retrying \(failedItems.count) failed download\(failedItems.count == 1 ? "" : "s")",
+            icon: "arrow.clockwise",
+            iconColor: .accentColor
+        )
+    }
+
+    /// Bulk variant of `remove(_:)` — the series-level "Delete All" action
+    /// in the Downloads tab (v2.14). Removes the given items (files +
+    /// manifest entries) in one pass with a single summary toast. Targets
+    /// may be in ANY state, so deleting a series also cancels episodes that
+    /// are still downloading. Same file cleanup per item as `remove(_:)`;
+    /// snapshot orphan cleanup mirrors `clearCompleted()` (string-key dedup
+    /// — tuple-in-Set avoided, `(String, String?)` isn't Hashable here).
+    func removeItems(_ targets: [DownloadItem]) {
+        let ids = Set(targets.map { $0.id })
+        guard !ids.isEmpty else { return }
+
+        for item in targets {
+            hlsTasks[item.id]?.cancel()
+            hlsTasks.removeValue(forKey: item.id)
+            resumeData.removeValue(forKey: item.id)
+            if let taskID = item.taskIdentifier {
+                urlSession.getAllTasks { tasks in
+                    tasks.first { $0.taskIdentifier == taskID }?.cancel()
+                }
+            }
+            try? FileManager.default.removeItem(at: downloadDir.appendingPathComponent(item.id.uuidString))
+            if let fileName = item.fileName, !item.isHLS {
+                try? FileManager.default.removeItem(at: downloadDir.appendingPathComponent(fileName))
+            }
+            if let subPath = item.relativeSubtitlePath {
+                try? FileManager.default.removeItem(at: downloadDir.appendingPathComponent(subPath))
+            }
+        }
+
+        refreshDownloadKeepAlive()
+        items.removeAll { ids.contains($0.id) }
+        persist()
+        reconcileDownloadsDirectory()
+
+        var seenPairs = Set<String>()
+        for item in targets {
+            let key = "\(item.moduleId ?? "*")::\(item.mediaTitle)"
+            guard seenPairs.insert(key).inserted else { continue }
+            DownloadedMediaSnapshotStore.shared.removeIfOrphaned(
+                mediaTitle: item.mediaTitle,
+                moduleId: item.moduleId
+            )
+        }
+
+        ToastManager.shared.show(
+            title: "Downloads",
+            message: "Deleted \(targets.count) download\(targets.count == 1 ? "" : "s")",
+            icon: "trash.fill",
+            iconColor: .accentColor
+        )
+        processQueue()
+    }
+
     /// Reconciles the on-disk `Downloads/` directory with the in-memory manifest, deleting any
     /// download artifact that no longer belongs to a tracked item. Without this, a file could
     /// stay on disk (visible in the Files app) while the app's Downloads list shows nothing —

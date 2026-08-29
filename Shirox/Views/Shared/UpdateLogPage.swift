@@ -99,6 +99,27 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.14",
+        date: "2026-08-30",
+        added: [
+            "Live status header on the Downloads tab: an aggregate progress ring, total download speed, transfer size, and a Wi-Fi / Cellular / Offline network pill pinned above the list — one glance answers \"what is the app doing right now\". While the Wi-Fi-only gate is armed and you're on cellular it says so in orange instead of leaving a wall of \"Waiting…\" rows unexplained.",
+            "All / Anime / Manga filter chips with live counts, shown once you have downloads of both types. They replace the old design's six stacked duplicate sections (Downloading, Downloading Manga, Failed, Failed Manga…) with one merged In Progress list and one merged Failed list — every row self-describes with its poster, episode or chapter, and progress.",
+            "Completed downloads are grouped by series instead of by source module. Each show is a single row (poster, \"12 episodes · ModuleName\") that drills into a per-series page listing everything downloading, failed and downloaded for that title — with a header card (counts, source, size on disk) and a per-series Delete All that also cancels episodes still in flight. The old layout dumped every episode of every show into one alphabetized pile under a module header.",
+            "Retry All button in the Failed section header (plus Retry All on the manager itself) — one tap re-queues every failed episode and chapter instead of tapping retry on each row.",
+            "Per-series Delete All in the Downloads tab: swipe or context-menu a show row, confirm once, and every download for that title is removed in a single pass with one summary toast (new removeItems bulk API on both download managers)."
+        ],
+        fixed: [],
+        changed: [
+            "Both download detail pages (anime and manga) were rebuilt around one shared design: a hero card with the poster and a live progress-ring badge, a stats strip (speed / remaining / transferred — or pages for manga), a single grouped info card that now includes the source module, and state-aware actions. The old page showed the percentage three separate times (ring, stats, row) — the new one shows it once, properly.",
+            "The redundant \"Done\" toolbar button on the download detail pages is gone — they're pushed pages with a back button, so \"Done\" just duplicated it."
+        ],
+        improved: [],
+        removed: [
+            "Dead code: DownloadRowView — the pre-v1.79 row component nothing referenced anymore."
+        ],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "2.13",
         date: "2026-08-30",
         added: [

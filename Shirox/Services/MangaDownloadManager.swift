@@ -268,6 +268,47 @@ final class MangaDownloadManager: ObservableObject {
         processQueue()
     }
 
+    /// Retries every failed manga chapter in one tap — the "Retry All"
+    /// action in the Failed section header of the Downloads tab (v2.14).
+    func retryAllFailed() {
+        let failedItems = items.filter { $0.state == .failed }
+        guard !failedItems.isEmpty else { return }
+        for item in failedItems { retry(item) }
+        ToastManager.shared.show(
+            title: "Manga",
+            message: "Retrying \(failedItems.count) failed chapter\(failedItems.count == 1 ? "" : "s")",
+            icon: "arrow.clockwise",
+            iconColor: .accentColor
+        )
+    }
+
+    /// Bulk variant of `remove(_:)` — the manga side of the series-level
+    /// "Delete All" action (v2.14): one pass, one summary toast, and targets
+    /// may be in ANY state so deleting a series also cancels chapters that
+    /// are still downloading.
+    func removeItems(_ targets: [MangaDownloadItem]) {
+        let ids = Set(targets.map { $0.id })
+        guard !ids.isEmpty else { return }
+
+        for item in targets {
+            chapterTasks[item.id]?.cancel()
+            chapterTasks.removeValue(forKey: item.id)
+            try? FileManager.default.removeItem(at: folderURL(for: item.id))
+        }
+
+        items.removeAll { ids.contains($0.id) }
+        persist()
+        reconcileDownloadsDirectory()
+
+        ToastManager.shared.show(
+            title: "Manga",
+            message: "Deleted \(targets.count) chapter\(targets.count == 1 ? "" : "s")",
+            icon: "trash.fill",
+            iconColor: .accentColor
+        )
+        processQueue()
+    }
+
     // MARK: - Directory reconcile (orphan sweep)
 
     private func reconcileDownloadsDirectory() {
