@@ -158,7 +158,7 @@ final class DownloadManager: NSObject, ObservableObject {
                         }
                         self.persist()
                     }
-                }
+                })
             }
         }
 
