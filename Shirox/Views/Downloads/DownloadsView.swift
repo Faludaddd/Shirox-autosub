@@ -186,23 +186,7 @@ struct DownloadsView: View {
                             Section {
                                 ForEach(moduleGroup.mediaGroups) { mediaGroup in
                                     ForEach(mediaGroup.items) { item in
-                                        NavigationLink {
-                                            detailDestination(for: item)
-                                        } label: {
-                                            DownloadProgressRow(item: item)
-                                        }
-                                        .buttonStyle(.plain)
-                                        .contextMenu {
-                                            Button(role: .destructive) { dm.remove(item) } label: {
-                                                Label("Delete", systemImage: "trash")
-                                            }
-                                        }
-                                        .swipeActions(edge: .trailing) {
-                                            Button(role: .destructive) { dm.remove(item) } label: {
-                                                Label("Delete", systemImage: "trash")
-                                            }
-                                            .tint(.red)
-                                        }
+                                        completedEpisodeRow(item)
                                     }
                                 }
                             } header: {
@@ -271,23 +255,7 @@ struct DownloadsView: View {
                             Section {
                                 ForEach(moduleGroup.mangaGroups) { mediaGroup in
                                     ForEach(mediaGroup.items) { item in
-                                        NavigationLink {
-                                            mangaDetailDestination(for: item)
-                                        } label: {
-                                            MangaDownloadProgressRow(item: item)
-                                        }
-                                        .buttonStyle(.plain)
-                                        .contextMenu {
-                                            Button(role: .destructive) { mdm.remove(item) } label: {
-                                                Label("Delete", systemImage: "trash")
-                                            }
-                                        }
-                                        .swipeActions(edge: .trailing) {
-                                            Button(role: .destructive) { mdm.remove(item) } label: {
-                                                Label("Delete", systemImage: "trash")
-                                            }
-                                            .tint(.red)
-                                        }
+                                        completedMangaChapterRow(item)
                                     }
                                 }
                             } header: {
@@ -356,6 +324,55 @@ struct DownloadsView: View {
     private var completedCount: Int {
         dm.items.filter { $0.state == .completed }.count
             + mdm.items.filter { $0.state == .completed }.count
+    }
+
+    /// A completed manga chapter row — extracted for the same
+    /// type-checker-budget reason as `completedEpisodeRow` above.
+    @ViewBuilder
+    private func completedMangaChapterRow(_ item: MangaDownloadItem) -> some View {
+        NavigationLink {
+            mangaDetailDestination(for: item)
+        } label: {
+            MangaDownloadProgressRow(item: item)
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button(role: .destructive) { mdm.remove(item) } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+        .swipeActions(edge: .trailing) {
+            Button(role: .destructive) { mdm.remove(item) } label: {
+                Label("Delete", systemImage: "trash")
+            }
+            .tint(.red)
+        }
+    }
+
+    /// A completed anime episode row. Extracted from the three-level
+    /// ForEach nesting in `body` (module → media → episode) because the
+    /// whole List expression was tipping the Swift type-checker over its
+    /// time budget once the toolbar/confirmation dialog landed (v2.12 —
+    /// "unable to type-check this expression in reasonable time").
+    @ViewBuilder
+    private func completedEpisodeRow(_ item: DownloadItem) -> some View {
+        NavigationLink {
+            detailDestination(for: item)
+        } label: {
+            DownloadProgressRow(item: item)
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button(role: .destructive) { dm.remove(item) } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+        .swipeActions(edge: .trailing) {
+            Button(role: .destructive) { dm.remove(item) } label: {
+                Label("Delete", systemImage: "trash")
+            }
+            .tint(.red)
+        }
     }
 }
 

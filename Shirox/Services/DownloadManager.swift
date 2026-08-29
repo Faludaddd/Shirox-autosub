@@ -591,11 +591,17 @@ final class DownloadManager: NSObject, ObservableObject {
 
         // Snapshot entries survive only if another completed download for
         // the same media still exists — removeIfOrphaned re-checks that
-        // against the (already pruned) manifest, so calling it per unique
-        // (mediaTitle, moduleId) pair is safe.
-        let pairs = Set(completed.map { ($0.mediaTitle, $0.moduleId) })
-        for (title, moduleId) in pairs {
-            DownloadedMediaSnapshotStore.shared.removeIfOrphaned(mediaTitle: title, moduleId: moduleId)
+        // against the (already pruned) manifest, so calling it once per
+        // unique (mediaTitle, moduleId) pair is safe. (Tuple-in-Set avoided:
+        // (String, String?) doesn't synthesize Hashable on this Swift.)
+        var seenPairs = Set<String>()
+        for item in completed {
+            let key = "\(item.moduleId ?? "*")::\(item.mediaTitle)"
+            guard seenPairs.insert(key).inserted else { continue }
+            DownloadedMediaSnapshotStore.shared.removeIfOrphaned(
+                mediaTitle: item.mediaTitle,
+                moduleId: item.moduleId
+            )
         }
 
         ToastManager.shared.show(
