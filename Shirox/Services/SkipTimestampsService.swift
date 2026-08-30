@@ -37,11 +37,11 @@ final class SkipTimestampsService {
         if let skips = aniraEp?.skips, !skips.isEmpty {
             var result = SkipSegments()
             for skip in skips {
-                let seg = SkipSegments.Segment(startMs: skip.start * 1000, endMs: skip.end * 1000)
+                guard let seg = Self.sanitized(startSeconds: skip.start, endSeconds: skip.end) else { continue }
                 switch skip.type {
-                case "op", "mixed-op": result.intro = seg
-                case "ed", "mixed-ed": result.credits = seg
-                case "recap": result.recap = seg
+                case "op", "mixed-op": if result.intro == nil { result.intro = seg }
+                case "ed", "mixed-ed": if result.credits == nil { result.credits = seg }
+                case "recap": if result.recap == nil { result.recap = seg }
                 default: break
                 }
             }
@@ -97,29 +97,52 @@ final class SkipTimestampsService {
 
     // MARK: - Merge
 
+    /// Drops implausible segments so a Skip button never surfaces for an
+    /// episode that has no (usable) intro data — v2.15 accuracy fix.
+    /// Rules:
+    ///   • end must be positive and at least 1s past the start
+    ///   • a segment with no start ("from the beginning") may not claim to end
+    ///     after 5 minutes — that shape only comes from wrong-show/wrong-episode
+    ///     ID mappings, and was exactly what made the button appear on episodes
+    ///     with nothing to skip.
+    private static func sanitized(startMs: Double?, endMs: Double) -> SkipSegments.Segment? {
+        guard endMs > 0 else { return nil }
+        if let startMs {
+            guard endMs > startMs + 1000 else { return nil }
+        } else {
+            guard endMs <= 300_000 else { return nil }
+        }
+        return SkipSegments.Segment(startMs: startMs, endMs: endMs)
+    }
+
+    /// Seconds-based convenience for Anira (which reports skip windows in seconds).
+    private static func sanitized(startSeconds: Double, endSeconds: Double) -> SkipSegments.Segment? {
+        sanitized(startMs: startSeconds * 1000, endMs: endSeconds * 1000)
+    }
+
     private func merge(introdb: IntroDBResponse?, theintrodb: TheIntroDBResponse?) -> SkipSegments {
         var result = SkipSegments()
 
-        if let seg = introdb?.intro {
-            result.intro = SkipSegments.Segment(startMs: seg.start_ms, endMs: seg.end_ms)
-        } else if let seg = theintrodb?.intro?.first, let endMs = seg.end_ms {
-            result.intro = SkipSegments.Segment(startMs: seg.start_ms, endMs: endMs)
+        if let seg = introdb?.intro.flatMap({ Self.sanitized(startMs: $0.start_ms, endMs: $0.end_ms) }) {
+            result.intro = seg
+        } else if let seg = theintrodb?.intro?.first.flatMap({ Self.sanitized(startMs: $0.start_ms, endMs: $0.end_ms ?? 0) }) {
+            result.intro = seg
         }
 
-        if let seg = introdb?.recap {
-            result.recap = SkipSegments.Segment(startMs: seg.start_ms, endMs: seg.end_ms)
-        } else if let seg = theintrodb?.recap?.first, let endMs = seg.end_ms {
-            result.recap = SkipSegments.Segment(startMs: seg.start_ms, endMs: endMs)
+        if let seg = introdb?.recap.flatMap({ Self.sanitized(startMs: $0.start_ms, endMs: $0.end_ms) }) {
+            result.recap = seg
+        } else if let seg = theintrodb?.recap?.first.flatMap({ Self.sanitized(startMs: $0.start_ms, endMs: $0.end_ms ?? 0) }) {
+            result.recap = seg
         }
 
-        if let seg = introdb?.outro {
-            result.credits = SkipSegments.Segment(startMs: seg.start_ms, endMs: seg.end_ms)
-        } else if let seg = theintrodb?.credits?.first, let endMs = seg.end_ms {
-            result.credits = SkipSegments.Segment(startMs: seg.start_ms, endMs: endMs)
+        if let seg = introdb?.outro.flatMap({ Self.sanitized(startMs: $0.start_ms, endMs: $0.end_ms) }) {
+            result.credits = seg
+        } else if let seg = theintrodb?.credits?.first.flatMap({ Self.sanitized(startMs: $0.start_ms, endMs: $0.end_ms ?? 0) }) {
+            result.credits = seg
         }
 
-        if let seg = theintrodb?.preview?.first, let endMs = seg.end_ms {
-            result.preview = SkipSegments.Segment(startMs: seg.start_ms, endMs: endMs)
+        if let seg = theintrodb?.preview?.first.flatMap({ Self.sanitized(startMs: $0.start_ms, endMs: $0.end_ms ?? 0) }) {
+            result.preview = seg
         }
 
         return result

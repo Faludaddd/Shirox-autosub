@@ -1,13 +1,5 @@
 import SwiftUI
 
-struct Skip85ButtonFramePreferenceKey: PreferenceKey {
-    nonisolated(unsafe) static var defaultValue: CGRect = .zero
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
-        let next = nextValue()
-        if next != .zero { value = next }
-    }
-}
-
 struct PlayerBottomBar: View {
     @Binding var currentTime: Double
     let duration: Double
@@ -36,7 +28,6 @@ struct PlayerBottomBar: View {
     var onMenuOpen: () -> Void = {}
     var bottomPadding: CGFloat = 24
     var onNextEpisodeTap: (() -> Void)? = nil
-    var hasActiveSkipSegment: Bool = false
     var skipSegments: SkipSegments? = nil
     var episodeNumber: Int? = nil
     var tvdbEpisodeTitle: String? = nil
@@ -117,15 +108,9 @@ struct PlayerBottomBar: View {
             .glassChrome(Capsule(), enabled: playerLiquidGlass, off: Color.white.opacity(0.2))
         }
         .buttonStyle(.plain)
-        .opacity(hasActiveSkipSegment ? 0 : 1)
-        .background(
-            GeometryReader { proxy in
-                Color.clear.preference(
-                    key: Skip85ButtonFramePreferenceKey.self,
-                    value: proxy.frame(in: .global)
-                )
-            }
-        )
+        // v2.15 — no longer hidden while a Skip Intro segment is active: the skip
+        // button now lives in its own bottom-trailing space instead of borrowing
+        // this button's frame, so both can be on screen at once.
     }
 
     @ViewBuilder private var rightButtonGroup: some View {

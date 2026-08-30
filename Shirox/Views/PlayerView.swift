@@ -90,7 +90,13 @@ struct PlayerView: View {
     @State private var skipSegments: SkipSegments?
     @State private var activeSkipSegment: SkipSegmentType?
     @State private var skippedSegments: Set<SkipSegmentType> = []
-    @State private var skip85ButtonFrame: CGRect = .zero
+    /// When the active skip segment first became active (wall clock). Drives the
+    /// 5-second auto-dismiss countdown rendered on the Skip button.
+    @State private var skipSegmentActivatedAt: Date?
+    /// True once the Skip button's 5-second window has elapsed — the button hides
+    /// until the active segment changes (leaving + re-entering a segment re-arms it).
+    @State private var skipButtonAutoDismissed = false
+    @State private var skipDismissTask: Task<Void, Never>? = nil
     @AppStorage("autoSkipSegments") private var autoSkipSegments: Bool = true
 
     // AniList tracking
@@ -290,14 +296,34 @@ struct PlayerView: View {
                 lockOverlayView
             }
 
-            if let segment = activeSkipSegment, !castManager.isConnected, skip85ButtonFrame != .zero {
-                ZStack(alignment: .topLeading) {
-                    Color.clear
-                    PlayerSkipButton(segmentType: segment, onSkip: skipToSegmentEnd)
-                        .offset(x: skip85ButtonFrame.minX, y: skip85ButtonFrame.minY)
+            // Skip Intro / Recap / Credits button — anchored bottom-trailing in its
+            // own clear space, visible even while the controls are hidden (Netflix
+            // style). v2.15: this used to borrow the 85s skip button's frame via a
+            // preference-key offset hack, which collided with the other bottom-bar
+            // controls in portrait (the "Skip Intro overlaps everything" bug) —
+            // the wider label extended right into the source/quality button group.
+            if let segment = activeSkipSegment, !skipButtonAutoDismissed, !castManager.isConnected {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        PlayerSkipButton(
+                            segmentType: segment,
+                            activatedAt: skipSegmentActivatedAt,
+                            onSkip: skipToSegmentEnd
+                        )
+                    }
+                    .padding(.trailing, 20)
+                    // Clear of (a) the caption band near the bottom edge,
+                    // (b) the bottom bar — title row + progress slider — when
+                    // the controls are visible, in both orientations and on
+                    // iPad where the bar is taller.
+                    .padding(.bottom, 150)
                 }
                 .ignoresSafeArea()
                 .allowsHitTesting(true)
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                .animation(.easeOut(duration: 0.2), value: activeSkipSegment)
             }
 
             // Top-most modal: must sit above interactionLayer / controls so its
@@ -308,9 +334,6 @@ struct PlayerView: View {
             }
         }
         .ignoresSafeArea()
-        .onPreferenceChange(Skip85ButtonFramePreferenceKey.self) { frame in
-            if frame != .zero { skip85ButtonFrame = frame }
-        }
         .onAppear {
             // Sync subtitleTracks from currentStream — safer than relying on init-time @State override
             if subtitleTracks == nil, let tracks = currentStream.allSubtitles, !tracks.isEmpty {
@@ -967,7 +990,6 @@ struct PlayerView: View {
             onMenuOpen: { overlayActive = true; hideTask?.cancel() },
             bottomPadding: bottomPad,
             onNextEpisodeTap: (onWatchNext != nil || onSequelNeeded != nil) ? { Task { @MainActor in await loadAndAdvance() } } : nil,
-            hasActiveSkipSegment: activeSkipSegment != nil,
             skipSegments: skipSegments,
             episodeNumber: currentContext?.episodeNumber,
             tvdbEpisodeTitle: tvdbEpisodeTitle,
@@ -1400,8 +1422,39 @@ struct PlayerView: View {
               let seg = skipSegments?.segment(for: type) else { return }
         skippedSegments.insert(type)
         activeSkipSegment = nil
+        resetSkipCountdown()
         player?.seek(to: CMTime(seconds: seg.endMs / 1000, preferredTimescale: 600),
                      toleranceBefore: .zero, toleranceAfter: .zero)
+    }
+
+    /// Updates the active skip segment and manages the Skip button's 5-second
+    /// auto-dismiss window. Entering (or re-entering after leaving) a segment
+    /// re-arms the countdown; staying inside the same segment leaves it alone,
+    /// so the button vanishing after 5s doesn't reset while you watch the intro.
+    private func setActiveSkipSegment(_ newActive: SkipSegmentType?) {
+        if newActive != activeSkipSegment {
+            activeSkipSegment = newActive
+            if let newActive {
+                skipSegmentActivatedAt = Date()
+                skipButtonAutoDismissed = false
+                skipDismissTask?.cancel()
+                skipDismissTask = Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 5_000_000_000)
+                    guard !Task.isCancelled else { return }
+                    skipButtonAutoDismissed = true
+                }
+            } else {
+                resetSkipCountdown()
+            }
+        }
+    }
+
+    /// Clears all countdown state and cancels the pending auto-dismiss.
+    private func resetSkipCountdown() {
+        skipDismissTask?.cancel()
+        skipDismissTask = nil
+        skipSegmentActivatedAt = nil
+        skipButtonAutoDismissed = false
     }
 
     private func skip(by seconds: Double) {
@@ -1544,6 +1597,7 @@ struct PlayerView: View {
         let item = AVPlayerItem(asset: asset)
         item.preferredForwardBufferDuration = 0 // Automatic: let AVPlayer size the buffer adaptively (YouTube-style ABR). A fixed value fights stall-minimization and prolongs stalls on flaky CDNs.
         item.canUseNetworkResourcesForLiveStreamingWhilePaused = true // Continue buffering when paused
+        disableNativeSubtitles(asset: asset, item: item)
 
         // #126 — Data Saving Mode: cap the peak bitrate so AVPlayer never
         // buffers above ~480p. `preferredPeakBitRate` is in bits per second;
@@ -1732,7 +1786,19 @@ struct PlayerView: View {
                 for type in SkipSegmentType.allCases {
                     if let seg = segments.segment(for: type) {
                         let start = seg.startMs ?? 0
-                        if timeMs >= start && timeMs < seg.endMs {
+                        // v2.15 accuracy guards — only surface the button when the
+                        // segment data is actually plausible for THIS playback:
+                        //   • duration known and the segment ends before the video does
+                        //     (a segment that runs past the end = garbage data from a
+                        //     wrong episode/mapping — the "Skip Intro on episodes with
+                        //     no intro" bug)
+                        //   • at least 1.5s of the segment still ahead, so the button
+                        //     never flashes for a sliver at the boundary
+                        let durationMs = duration * 1000
+                        let endsBeforeVideo = duration <= 0 || Double(seg.endMs) < durationMs - 3000
+                        let enoughRemaining = Double(seg.endMs) - timeMs >= 1500
+                        if timeMs >= start && timeMs < seg.endMs,
+                           endsBeforeVideo, enoughRemaining {
                             newActive = type
                             break
                         }
@@ -1743,13 +1809,14 @@ struct PlayerView: View {
                        let seg = segments.segment(for: type) {
                         skippedSegments.insert(type)
                         activeSkipSegment = nil
+                        resetSkipCountdown()
                         p?.seek(to: CMTime(seconds: seg.endMs / 1000, preferredTimescale: 600),
                                 toleranceBefore: .zero, toleranceAfter: .zero)
                     } else {
-                        activeSkipSegment = newActive
+                        setActiveSkipSegment(newActive)
                     }
                 } else {
-                    activeSkipSegment = newActive
+                    setActiveSkipSegment(newActive)
                 }
             }
             if let p { updateNowPlaying(player: p) }
@@ -1760,6 +1827,7 @@ struct PlayerView: View {
         skipSegments = nil
         activeSkipSegment = nil
         skippedSegments = []
+        resetSkipCountdown()
         if let aid = currentContext?.aniListID, let ep = currentContext?.episodeNumber {
             Task {
                 let result = await SkipTimestampsService.shared.fetchSegments(aniListID: aid, episodeNumber: ep)
@@ -1938,6 +2006,33 @@ struct PlayerView: View {
         center.changePlaybackPositionCommand.removeTarget(nil)
         center.skipForwardCommand.removeTarget(nil)
         center.skipBackwardCommand.removeTarget(nil)
+    }
+
+    /// v2.15 — Embedded HLS subtitle tracks must never render natively.
+    /// AVPlayer's automatic media selection picks the first legible track on
+    /// streams that carry in-manifest subtitles and renders it through
+    /// AVPlayerLayer with system styling, silently bypassing every custom
+    /// subtitle setting — the root cause of "settings apply on one source but
+    /// not another" (sources with external VTT subtitles went through the
+    /// custom overlay, sources with embedded tracks didn't). Deselecting the
+    /// legible group makes the custom overlay the only subtitle renderer.
+    private func disableNativeSubtitles(asset: AVURLAsset, item: AVPlayerItem) {
+        Task {
+            guard let group = try? await asset.loadMediaSelectionGroup(for: .legible),
+                  !group.options.isEmpty else { return }
+            await MainActor.run { item.select(nil, in: group) }
+            Logger.shared.log("[Subtitles] Deselected \(group.options.count) embedded legible track(s) — custom overlay is the only renderer", type: "Debug")
+            // Re-assert once prepared: the automatic selection can (re)pick a
+            // legible track during item preparation, overriding an early
+            // deselect. The publisher emits the current status immediately, so
+            // this also covers items that were already ready.
+            for await status in item.publisher(for: \.status).values {
+                if status == .readyToPlay || status == .failed {
+                    await MainActor.run { item.select(nil, in: group) }
+                    break
+                }
+            }
+        }
     }
 
     private func setupPlaybackEndObserver(for item: AVPlayerItem) {
@@ -2458,8 +2553,30 @@ struct PlayerView: View {
     }
 
     private func switchQuality(_ next: StreamResult) {
-        guard next.url != currentStream.url else { return }
         let resumeAt = currentTime
+        let previousStream = currentStream
+        let previousItem = player?.currentItem
+
+        // v2.15 — alias handling: several providers point multiple “sources” at the
+        // same file. There is nothing to re-buffer, but the selection still has to
+        // update (menu checkmark, context stream title, subtitle tracks) — the old
+        // hard early-return here is what made tapping a different source look like
+        // a dead button when both resolved to one URL.
+        if next.url == currentStream.url {
+            if next.title == currentStream.title { return }
+            Logger.shared.log("[Player] Source alias switch: same file, selection now '\(next.title)'", type: "Debug")
+            subtitleTracks = next.allSubtitles ?? subtitleTracks
+            currentStream = next
+            if let ctx = currentContext {
+                currentContext = PlayerContext(mediaTitle: ctx.mediaTitle, episodeNumber: ctx.episodeNumber, episodeTitle: ctx.episodeTitle, imageUrl: ctx.imageUrl, aniListID: ctx.aniListID, malID: ctx.malID, moduleId: ctx.moduleId, totalEpisodes: ctx.totalEpisodes, availableEpisodes: ctx.availableEpisodes, isAiring: ctx.isAiring, resumeFrom: ctx.resumeFrom, detailHref: ctx.detailHref, episodeHref: ctx.episodeHref, streamTitle: next.title, workingDetailHref: ctx.workingDetailHref, thumbnailUrl: ctx.thumbnailUrl)
+            }
+            subtitleCues = []
+            selectedSubtitleTrack = nil
+            loadSubtitles()
+            scheduleHide()
+            return
+        }
+
         let asset: AVURLAsset
         if !next.headers.isEmpty { asset = AVURLAsset(url: next.url, options: ["AVURLAssetHTTPHeaderFieldsKey": next.headers]) }
         else { asset = AVURLAsset(url: next.url) }
@@ -2470,7 +2587,38 @@ struct PlayerView: View {
         if Color.dataSavingMode {
             newItem.preferredPeakBitRate = 1_000_000
         }
+        disableNativeSubtitles(asset: asset, item: newItem)
         setupPlaybackEndObserver(for: newItem)
+
+        // v2.15 — if the target source is dead (expired token, offline server),
+        // fall back to the stream we were watching instead of stranding the
+        // player on a failed item. The previous item keeps its position, so
+        // playback continues where it was.
+        Task { @MainActor in
+            for await status in newItem.publisher(for: \.status).values {
+                if status == .failed {
+                    guard player?.currentItem === newItem else { break }
+                    Logger.shared.log("[Player] Source switch to '\(next.title)' failed (\(newItem.error?.localizedDescription ?? "unknown")) — reverting to '\(previousStream.title)'", type: "Error")
+                    if let previousItem {
+                        player?.replaceCurrentItem(with: previousItem)
+                        currentStream = previousStream
+                        if let ctx = currentContext {
+                            currentContext = PlayerContext(mediaTitle: ctx.mediaTitle, episodeNumber: ctx.episodeNumber, episodeTitle: ctx.episodeTitle, imageUrl: ctx.imageUrl, aniListID: ctx.aniListID, malID: ctx.malID, moduleId: ctx.moduleId, totalEpisodes: ctx.totalEpisodes, availableEpisodes: ctx.availableEpisodes, isAiring: ctx.isAiring, resumeFrom: ctx.resumeFrom, detailHref: ctx.detailHref, episodeHref: ctx.episodeHref, streamTitle: previousStream.title, workingDetailHref: ctx.workingDetailHref, thumbnailUrl: ctx.thumbnailUrl)
+                        }
+                        subtitleTracks = previousStream.allSubtitles ?? subtitleTracks
+                        subtitleCues = []
+                        selectedSubtitleTrack = nil
+                        loadSubtitles()
+                        player?.rate = Float(playbackSpeed)
+                        isPlaying = true
+                    }
+                    break
+                } else if status == .readyToPlay {
+                    break
+                }
+            }
+        }
+
         player?.replaceCurrentItem(with: newItem)
         subtitleTracks = next.allSubtitles ?? subtitleTracks
         currentStream = next
@@ -2488,7 +2636,11 @@ struct PlayerView: View {
         Task { @MainActor in
             for _ in 0..<20 {
                 try? await Task.sleep(nanoseconds: 150_000_000)
-                if let item = player?.currentItem, item.status == .readyToPlay {
+                // Only seek while `newItem` is still the live item — if the
+                // switch failed and playback reverted to the previous source,
+                // seeking that item to `resumeAt` (where it already is) would
+                // just cause a pointless rebuffer.
+                if let item = player?.currentItem, item === newItem, item.status == .readyToPlay {
                     await player?.seek(to: CMTime(seconds: resumeAt, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
                     player?.rate = Float(playbackSpeed)
                     isPlaying = true
@@ -2524,6 +2676,7 @@ struct PlayerView: View {
         let newItem = AVPlayerItem(asset: asset)
         newItem.preferredForwardBufferDuration = 0
         newItem.canUseNetworkResourcesForLiveStreamingWhilePaused = true
+        disableNativeSubtitles(asset: asset, item: newItem)
         // #126 — Data Saving Mode applies on next-episode swap too.
         if Color.dataSavingMode {
             newItem.preferredPeakBitRate = 1_000_000
@@ -2582,6 +2735,7 @@ struct PlayerView: View {
         skipSegments = nil
         activeSkipSegment = nil
         skippedSegments = []
+        resetSkipCountdown()
         if let aid = currentContext?.aniListID {
             let ep = episodeNumber
             Task {
@@ -2617,7 +2771,11 @@ struct PlayerView: View {
 
     private func sourceMenuItems() -> [PlayerMenuItem] {
         availableStreams.map { stream in
-            PlayerMenuItem(title: stream.title, isOn: stream.url == currentStream.url) { switchQuality(stream) }
+            // Identity = url AND title: providers alias several source names onto
+            // one file, and the menu checkmark must land on the entry the user
+            // picked (v2.15 — matching on url alone left it frozen on the old row).
+            let isCurrent = stream.url == currentStream.url && stream.title == currentStream.title
+            return PlayerMenuItem(title: stream.title, isOn: isCurrent) { switchQuality(stream) }
         }
     }
 

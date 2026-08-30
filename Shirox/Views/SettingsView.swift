@@ -2448,7 +2448,18 @@ struct ModulesSettingsPage: View {
                         )
                     }
                     .onDelete { indices in
-                        for i in indices { moduleManager.removeModule(moduleManager.modules[i]) }
+                        // v2.15 — index the SAME array the ForEach renders.
+                        // This list shows `filteredModules` (manga filtered in or
+                        // out per page), but the old code indexed the UNfiltered
+                        // `moduleManager.modules` — with any manga module
+                        // installed alongside anime modules, every swipe-delete
+                        // removed a DIFFERENT source than the row tapped.
+                        // Snapshot first so a mid-flight module refresh can't
+                        // shift positions under the indices.
+                        let snapshot = filteredModules
+                        for i in indices where i < snapshot.count {
+                            moduleManager.removeModule(snapshot[i])
+                        }
                     }
                 }
             }
@@ -3834,36 +3845,24 @@ struct AdvancedSettingsPage: View {
 
 // MARK: - Subtitle Settings Page
 
+/// v2.15 — this page now edits the SAME `SubtitleSettingsManager` the player
+/// renders from. Previously it wrote a parallel set of UserDefaults keys that
+/// no player code ever read, while its preview rendered through its own
+/// stroke implementation — so the preview could (and did) drift from actual
+/// playback ("configure yellow bold subs, player shows white ones"). Both
+/// surfaces now share one state object and one caption renderer
+/// (`SubtitleCaptionText`), making this page fully WYSIWYG: what the landscape
+/// preview shows is byte-for-byte what the player renders.
 struct SubtitleSettingsPage: View {
-    @AppStorage("subtitleTextColor") private var subtitleTextColor: String = "white"
-    @AppStorage("subtitleStrokeColor") private var subtitleStrokeColor: String = "black"
-    @AppStorage("subtitleStrokeWidth") private var subtitleStrokeWidth: Double = 1.0
-    @AppStorage("subtitleBackgroundEnabled") private var subtitleBackgroundEnabled: Bool = false
-    @AppStorage("subtitleFontSize") private var subtitleFontSize: Double = 30
-    @AppStorage("subtitleBoldText") private var subtitleBoldText: Bool = false
-
-    // #114 — Expanded subtitle customization. These are persisted alongside
-    // the original keys so existing installs keep their settings; the new
-    // keys default to no-op values (1.0x spacing, full opacity, no delay…)
-    // so the visual result is unchanged until the user opts in.
-    @AppStorage("subtitleFontDesign") private var subtitleFontDesign: String = "default"
-    @AppStorage("subtitleTextOpacity") private var subtitleTextOpacity: Double = 1.0
-    @AppStorage("subtitleLineSpacing") private var subtitleLineSpacing: Double = 1.0
-    @AppStorage("subtitleMaxWidth") private var subtitleMaxWidth: Double = 90
-    @AppStorage("subtitleDelaySeconds") private var subtitleDelaySeconds: Double = 0
-    @AppStorage("subtitleShadowOffset") private var subtitleShadowOffset: Double = 2
-
-    // #114 extension — Vertical position control. -100 = top of screen,
-    // 100 = bottom of screen, 0 = default (near-bottom) subtitle position.
-    // LandscapeSubtitlePreview reads this key so the user can drag the
-    // slider and see the caption move in real time during the landscape
-    // test.
-    @AppStorage("subtitleVerticalOffset") private var subtitleVerticalOffset: Double = 0
+    @ObservedObject private var settings = SubtitleSettingsManager.shared
 
     @State private var previewImageURL: String?
     @State private var showLandscapePreview = false
 
-    private let textColorOptions = ["white", "yellow", "black", "cyan", "pink", "green"]
+    private let quickColors: [(name: String, color: Color)] = [
+        ("white", .white), ("yellow", .yellow), ("cyan", .cyan),
+        ("pink", .pink), ("green", .green), ("black", .black)
+    ]
     private let strokeColorOptions = ["none", "black", "white", "gray"]
     private let fontDesignOptions: [(label: String, value: String)] = [
         ("Default", "default"),
@@ -3875,13 +3874,21 @@ struct SubtitleSettingsPage: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
+                masterToggleCard
                 quickPresetsCard
                 livePreviewCard
                 appearanceControlsCard
-                positionCard
                 typographyCard
                 timingCard
+                positionCard
                 effectsCard
+
+                Text("All changes apply live during playback — adjust them from the captions button in the player for instant feedback.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 8)
             }
             .padding()
         }
@@ -3897,12 +3904,26 @@ struct SubtitleSettingsPage: View {
         }
         #if os(iOS)
         .fullScreenCover(isPresented: $showLandscapePreview) {
-            // #114 (bug) — Pass the fetched anime backdrop URL into the
-            // landscape preview so the caption renders over a real anime
-            // still (matching playback conditions), not just a flat gradient.
+            // Renders the caption through the REAL PlayerSubtitleOverlay — the
+            // exact component playback uses — over a real anime still.
             LandscapeSubtitlePreview(backdropImageURL: previewImageURL)
         }
         #endif
+    }
+
+    // MARK: - Master Toggle Card
+
+    private var masterToggleCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle(isOn: $settings.enabled) {
+                Label("Show Subtitles", systemImage: "captions.bubble.fill")
+                    .font(.headline)
+            }
+            .tint(.appAccent)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     // MARK: - Quick Presets Card
@@ -3912,34 +3933,49 @@ struct SubtitleSettingsPage: View {
             Label("Quick Presets", systemImage: "wand.and.stars")
                 .font(.headline)
 
-            Text("Tap a preset to apply a full subtitle style instantly.")
+            Text("Tap a preset to apply a full subtitle style instantly. These now actually change what the player shows.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
             HStack(spacing: 8) {
                 presetButton(title: "Minimal") {
-                    subtitleTextColor = "white"
-                    subtitleStrokeColor = "none"
-                    subtitleStrokeWidth = 0
-                    subtitleBackgroundEnabled = false
-                    subtitleFontSize = 24
-                    subtitleBoldText = false
+                    settings.foregroundColor = .white
+                    settings.strokeColorName = "none"
+                    settings.strokeWidth = 0
+                    settings.backgroundEnabled = false
+                    settings.fontSize = 24
+                    settings.boldText = false
+                    settings.shadowRadius = 0
+                    settings.shadowOffset = 0
+                    settings.textOpacity = 1
+                    settings.lineSpacingMultiplier = 1
+                    settings.fontDesignName = "default"
                 }
                 presetButton(title: "Bold") {
-                    subtitleTextColor = "yellow"
-                    subtitleStrokeColor = "black"
-                    subtitleStrokeWidth = 1.5
-                    subtitleBackgroundEnabled = true
-                    subtitleFontSize = 34
-                    subtitleBoldText = true
+                    settings.foregroundColor = .yellow
+                    settings.strokeColorName = "black"
+                    settings.strokeWidth = 1.5
+                    settings.backgroundEnabled = true
+                    settings.fontSize = 34
+                    settings.boldText = true
+                    settings.shadowRadius = 2
+                    settings.shadowOffset = 0
+                    settings.textOpacity = 1
+                    settings.lineSpacingMultiplier = 1
+                    settings.fontDesignName = "default"
                 }
                 presetButton(title: "Classic") {
-                    subtitleTextColor = "white"
-                    subtitleStrokeColor = "black"
-                    subtitleStrokeWidth = 1.0
-                    subtitleBackgroundEnabled = false
-                    subtitleFontSize = 30
-                    subtitleBoldText = false
+                    settings.foregroundColor = .white
+                    settings.strokeColorName = "black"
+                    settings.strokeWidth = 1.0
+                    settings.backgroundEnabled = false
+                    settings.fontSize = 30
+                    settings.boldText = false
+                    settings.shadowRadius = 2
+                    settings.shadowOffset = 0
+                    settings.textOpacity = 1
+                    settings.lineSpacingMultiplier = 1
+                    settings.fontDesignName = "default"
                 }
             }
         }
@@ -3961,13 +3997,10 @@ struct SubtitleSettingsPage: View {
 
     // MARK: - Live Preview Card
 
-    /// v2.11 rework — the card is now a clean anime still with the
-    /// "Test in Landscape" action overlaid ON the picture itself (it used
-    /// to live in its own button at the bottom of the page, and the
-    /// picture carried a half-scale sample caption that could never show
-    /// the true playback size anyway). No text is rendered on the picture:
-    /// the caption is only ever shown at its real size in the fullscreen
-    /// landscape preview, on the picture itself.
+    /// The card itself stays a clean anime still (a scaled-down caption always
+    /// lied about true playback size — v2.11 lesson). The fullscreen landscape
+    /// test is where the caption renders at 1:1 through the actual player
+    /// overlay, on the picture itself.
     private var livePreviewCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -3995,8 +4028,7 @@ struct SubtitleSettingsPage: View {
                 .frame(height: 200)
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
-                // Subtle legibility scrim behind the overlaid button — no
-                // text sits on the picture besides the button itself.
+                // Subtle legibility scrim behind the overlaid button.
                 LinearGradient(
                     colors: [Color.black.opacity(0.0), Color.black.opacity(0.45)],
                     startPoint: .center,
@@ -4004,8 +4036,6 @@ struct SubtitleSettingsPage: View {
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
-                // The landscape test lives on the picture itself now — not
-                // a separate button at the bottom of the page.
                 Button {
                     Haptics.light()
                     showLandscapePreview = true
@@ -4028,7 +4058,7 @@ struct SubtitleSettingsPage: View {
             }
             .frame(height: 200)
 
-            Text("Opens a fullscreen, landscape-only preview that renders your caption on the picture at its true playback size — no scaling.")
+            Text("Opens a fullscreen, landscape-only preview that renders your caption through the player's actual subtitle overlay — true size, true position, no scaling.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -4036,6 +4066,7 @@ struct SubtitleSettingsPage: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
         .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .id("landscapePreview")
     }
 
     // MARK: - Appearance Controls Card
@@ -4045,12 +4076,33 @@ struct SubtitleSettingsPage: View {
             Label("Appearance", systemImage: "textformat")
                 .font(.headline)
 
-            Picker("Text Color", selection: $subtitleTextColor) {
-                ForEach(textColorOptions, id: \.self) { Text($0.capitalized).tag($0) }
-            }
-            .tint(.appAccent)
+            #if !os(tvOS)
+            ColorPicker("Text Color", selection: $settings.foregroundColor)
+                .id("subtitleColor")
 
-            Picker("Stroke Color", selection: $subtitleStrokeColor) {
+            // Quick swatches — one tap beats hunting through the color wheel.
+            HStack(spacing: 10) {
+                ForEach(quickColors, id: \.name) { entry in
+                    Button {
+                        settings.foregroundColor = entry.color
+                    } label: {
+                        Circle()
+                            .fill(entry.color)
+                            .frame(width: 26, height: 26)
+                            .overlay(
+                                Circle().strokeBorder(
+                                    settings.foregroundColor == entry.color ? Color.appAccent : Color.white.opacity(0.25),
+                                    lineWidth: settings.foregroundColor == entry.color ? 2.5 : 1
+                                )
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+                Spacer()
+            }
+            #endif
+
+            Picker("Stroke Color", selection: $settings.strokeColorName) {
                 ForEach(strokeColorOptions, id: \.self) { Text($0.capitalized).tag($0) }
             }
             .tint(.appAccent)
@@ -4059,28 +4111,30 @@ struct SubtitleSettingsPage: View {
                 HStack {
                     Text("Stroke Width")
                     Spacer()
-                    Text(String(format: "%.1f", subtitleStrokeWidth))
+                    Text(String(format: "%.1f", settings.strokeWidth))
                         .foregroundStyle(.secondary)
                 }
-                Slider(value: $subtitleStrokeWidth, in: 0...4, step: 0.5)
+                Slider(value: $settings.strokeWidth, in: 0...4, step: 0.5)
                     .tint(.appAccent)
-                    .disabled(subtitleStrokeColor == "none")
+                    .disabled(settings.strokeColorName == "none")
+                Text("Outline around each letter. With no stroke, the player auto-outlines for legibility. Disabled subtitles get a soft glow instead.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     Text("Font Size")
                     Spacer()
-                    Text("\(Int(subtitleFontSize))pt")
+                    Text("\(Int(settings.fontSize))pt")
                         .foregroundStyle(.secondary)
                 }
-                Slider(value: $subtitleFontSize, in: 12...48, step: 1)
+                Slider(value: $settings.fontSize, in: 12...48, step: 1)
                     .tint(.appAccent)
             }
+            .id("subtitleFontSize")
 
-            // Background toggle removed here — it's duplicated in positionCard.
-            // The one in positionCard (labeled "Position & Background") is kept.
-            Toggle("Bold Text", isOn: $subtitleBoldText)
+            Toggle("Bold Text", isOn: $settings.boldText)
                 .tint(.appAccent)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -4088,14 +4142,14 @@ struct SubtitleSettingsPage: View {
         .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    // MARK: - Typography Card (#114)
+    // MARK: - Typography Card
 
     private var typographyCard: some View {
         VStack(alignment: .leading, spacing: 16) {
             Label("Typography", systemImage: "textformat.size")
                 .font(.headline)
 
-            Picker("Font Design", selection: $subtitleFontDesign) {
+            Picker("Font Design", selection: $settings.fontDesignName) {
                 ForEach(fontDesignOptions, id: \.value) { option in
                     Text(option.label).tag(option.value)
                 }
@@ -4106,11 +4160,11 @@ struct SubtitleSettingsPage: View {
                 HStack {
                     Text("Line Spacing")
                     Spacer()
-                    Text(String(format: "%.2fx", subtitleLineSpacing))
+                    Text(String(format: "%.2fx", settings.lineSpacingMultiplier))
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                 }
-                Slider(value: $subtitleLineSpacing, in: 0.8...2.0, step: 0.05)
+                Slider(value: $settings.lineSpacingMultiplier, in: 0.8...2.0, step: 0.05)
                     .tint(.appAccent)
                 Text("Multiplier applied between caption lines. 1.0 = default, 2.0 = double-spaced.")
                     .font(.caption)
@@ -4121,13 +4175,13 @@ struct SubtitleSettingsPage: View {
                 HStack {
                     Text("Max Width")
                     Spacer()
-                    Text("\(Int(subtitleMaxWidth))%")
+                    Text("\(Int(settings.maxWidthPercent))%")
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                 }
-                Slider(value: $subtitleMaxWidth, in: 50...100, step: 1)
+                Slider(value: $settings.maxWidthPercent, in: 50...100, step: 1)
                     .tint(.appAccent)
-                Text("Maximum width of the caption block, as a percentage of the screen width.")
+                Text("Maximum width of the caption block, as a percentage of the player width.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -4137,7 +4191,7 @@ struct SubtitleSettingsPage: View {
         .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    // MARK: - Timing Card (#114)
+    // MARK: - Timing Card
 
     private var timingCard: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -4148,11 +4202,11 @@ struct SubtitleSettingsPage: View {
                 HStack {
                     Text("Subtitle Delay")
                     Spacer()
-                    Text(String(format: "%+.1fs", subtitleDelaySeconds))
+                    Text(String(format: "%+.1fs", settings.delaySeconds))
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                 }
-                Slider(value: $subtitleDelaySeconds, in: -5...5, step: 0.1)
+                Slider(value: $settings.delaySeconds, in: -5...5, step: 0.1)
                     .tint(.appAccent)
                 Text("Negative values show subtitles earlier, positive values later.")
                     .font(.caption)
@@ -4160,7 +4214,7 @@ struct SubtitleSettingsPage: View {
 
                 Button {
                     withAnimation(.easeInOut(duration: 0.18)) {
-                        subtitleDelaySeconds = 0
+                        settings.delaySeconds = 0
                     }
                 } label: {
                     Label("Reset to 0s", systemImage: "arrow.counterclockwise")
@@ -4168,36 +4222,49 @@ struct SubtitleSettingsPage: View {
                 }
                 .buttonStyle(.bordered)
                 .tint(.appAccent)
-                .disabled(subtitleDelaySeconds == 0)
+                .disabled(settings.delaySeconds == 0)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
         .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .id("subtitleDelay")
     }
 
-    // MARK: - Position & Background Card (#114 extension)
+    // MARK: - Position & Background Card
 
-    /// #114 extension — Vertical position control. The slider runs -100…100
-    /// (top…bottom) with 0 as the default (near-bottom) subtitle position so
-    /// existing installs are unaffected until the user opts in.
     private var positionCard: some View {
         VStack(alignment: .leading, spacing: 16) {
             Label("Position & Background", systemImage: "arrow.up.and.down.text.horizontal")
                 .font(.headline)
 
-            Toggle("Background", isOn: $subtitleBackgroundEnabled)
+            Toggle("Background", isOn: $settings.backgroundEnabled)
                 .tint(.appAccent)
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Text("Vertical Position")
+                    Text("Bottom Padding")
                     Spacer()
-                    Text(String(format: "%+.0f", subtitleVerticalOffset))
+                    Text("\(Int(settings.bottomPadding))pt")
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                 }
-                Slider(value: $subtitleVerticalOffset, in: -100...100, step: 1)
+                Slider(value: $settings.bottomPadding, in: 20...200, step: 5)
+                    .tint(.appAccent)
+                Text("Distance between the caption and the bottom edge of the player.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("Vertical Nudge")
+                    Spacer()
+                    Text(String(format: "%+.0f", settings.verticalOffset))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+                Slider(value: $settings.verticalOffset, in: -100...100, step: 1)
                     .tint(.appAccent)
                 HStack {
                     Text("Top")
@@ -4208,13 +4275,13 @@ struct SubtitleSettingsPage: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
-                Text("Negative values lift the caption toward the top of the screen, positive values push it toward the bottom. 0 = default position near the bottom edge.")
+                Text("Fine-tune on top of the bottom padding: negative lifts the caption toward the top of the screen, positive pushes it down.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
                 Button {
                     withAnimation(.easeInOut(duration: 0.18)) {
-                        subtitleVerticalOffset = 0
+                        settings.verticalOffset = 0
                     }
                 } label: {
                     Label("Reset to 0", systemImage: "arrow.counterclockwise")
@@ -4222,15 +4289,16 @@ struct SubtitleSettingsPage: View {
                 }
                 .buttonStyle(.bordered)
                 .tint(.appAccent)
-                .disabled(subtitleVerticalOffset == 0)
+                .disabled(settings.verticalOffset == 0)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
         .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .id("subtitlePosition")
     }
 
-    // MARK: - Effects Card (#114)
+    // MARK: - Effects Card
 
     private var effectsCard: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -4241,11 +4309,11 @@ struct SubtitleSettingsPage: View {
                 HStack {
                     Text("Text Opacity")
                     Spacer()
-                    Text("\(Int((subtitleTextOpacity * 100).rounded()))%")
+                    Text("\(Int((settings.textOpacity * 100).rounded()))%")
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                 }
-                Slider(value: $subtitleTextOpacity, in: 0.5...1.0, step: 0.05)
+                Slider(value: $settings.textOpacity, in: 0.5...1.0, step: 0.05)
                     .tint(.appAccent)
                 Text("Dims the entire caption. Useful for non-intrusive subtitles over bright scenes.")
                     .font(.caption)
@@ -4254,15 +4322,30 @@ struct SubtitleSettingsPage: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Text("Shadow Offset")
+                    Text("Drop Shadow")
                     Spacer()
-                    Text(String(format: "%.1fpt", subtitleShadowOffset))
+                    Text(String(format: "%.1fpt", settings.shadowOffset))
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                 }
-                Slider(value: $subtitleShadowOffset, in: 0...10, step: 0.5)
+                Slider(value: $settings.shadowOffset, in: 0...10, step: 0.5)
                     .tint(.appAccent)
-                Text("Drop-shadow distance behind the caption. 0 disables the shadow.")
+                Text("Directional shadow behind the caption. 0 disables it.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("Glow")
+                    Spacer()
+                    Text(String(format: "%.1fpt", settings.shadowRadius))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+                Slider(value: $settings.shadowRadius, in: 0...8, step: 0.5)
+                    .tint(.appAccent)
+                Text("Soft blur halo around the caption. This is the classic subtitle soft shadow.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -4271,144 +4354,74 @@ struct SubtitleSettingsPage: View {
         .padding()
         .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
-
-    // MARK: - Color Helpers
-
-    private func color(fromName name: String) -> Color {
-        switch name.lowercased() {
-        case "white":  return .white
-        case "black":  return .black
-        case "yellow": return .yellow
-        case "cyan":   return .cyan
-        case "pink":   return .pink
-        case "green":  return .green
-        case "gray":   return .gray
-        case "none":   return .clear
-        default:       return .white
-        }
-    }
-}
-
-private extension View {
-    @ViewBuilder
-    func applySubtitleStroke(color: Color, width: Double) -> some View {
-        if width <= 0 || color == .clear {
-            self
-        } else {
-            let w = CGFloat(width)
-            self
-                .shadow(color: color, radius: 0, x: -w, y:  0)
-                .shadow(color: color, radius: 0, x:  w, y:  0)
-                .shadow(color: color, radius: 0, x:  0, y: -w)
-                .shadow(color: color, radius: 0, x:  0, y:  w)
-                .shadow(color: color, radius: 0, x: -w, y: -w)
-                .shadow(color: color, radius: 0, x:  w, y: -w)
-                .shadow(color: color, radius: 0, x: -w, y:  w)
-                .shadow(color: color, radius: 0, x:  w, y:  w)
-        }
-    }
 }
 
 // MARK: - Landscape Subtitle Preview
 
 #if os(iOS)
-/// Fullscreen, landscape-only preview that renders the configured subtitle
-/// style at its true playback size, with the caption guaranteed to remain
-/// fully inside the visible frame.
-///
-/// Design goals (reworked from the ground up):
-///   1. The caption is anchored to the bottom-center of the visible picture
-///      area, mirroring real playback where subtitles sit in the lower-middle
-///      band of the video frame.
-///   2. The caption's max width is computed from the VISIBLE frame (the
-///      GeometryReader proxy size, which already excludes safe areas when
-///      the view does NOT ignore them) minus a horizontal margin on each
-///      side. This guarantees long sentences wrap inside the frame instead
-///      of running off either edge.
-///   3. The caption is wrapped in a `ViewThatFits` so it can shrink its font
-///      size if needed to fit the available height, preventing vertical
-///      overflow on very tall captions.
-///   4. A dismiss button is pinned to the top-trailing corner so the user
-///      is never trapped.
+/// Fullscreen, landscape-only preview — v2.15 renders the caption through the
+/// REAL `PlayerSubtitleOverlay` (the same component, the same settings object,
+/// and the same positioning math playback uses), so this is a true
+/// what-you-see-is-what-you-get test. Previously it re-implemented caption
+/// rendering with its own stroke logic reading keys the player never touched.
 struct LandscapeSubtitlePreview: View {
     /// Optional anime artwork (banner or cover URL) shown behind the caption.
     var backdropImageURL: String? = nil
 
-    @AppStorage("subtitleTextColor") private var subtitleTextColor: String = "white"
-    @AppStorage("subtitleStrokeColor") private var subtitleStrokeColor: String = "black"
-    @AppStorage("subtitleStrokeWidth") private var subtitleStrokeWidth: Double = 1.0
-    @AppStorage("subtitleBackgroundEnabled") private var subtitleBackgroundEnabled: Bool = false
-    @AppStorage("subtitleFontSize") private var subtitleFontSize: Double = 30
-    @AppStorage("subtitleBoldText") private var subtitleBoldText: Bool = false
-    @AppStorage("subtitleFontDesign") private var subtitleFontDesign: String = "default"
-    @AppStorage("subtitleTextOpacity") private var subtitleTextOpacity: Double = 1.0
-    @AppStorage("subtitleLineSpacing") private var subtitleLineSpacing: Double = 1.0
-    @AppStorage("subtitleMaxWidth") private var subtitleMaxWidth: Double = 90
-    @AppStorage("subtitleShadowOffset") private var subtitleShadowOffset: Double = 2
-    @AppStorage("subtitleVerticalOffset") private var subtitleVerticalOffset: Double = 0
-
+    @ObservedObject private var settings = SubtitleSettingsManager.shared
     @Environment(\.dismiss) private var dismiss
     @State private var hasAppliedLandscapeLock = false
 
+    /// Sample cue spanning the whole preview so the caption is always "active".
+    private static let sampleCue = SubtitleCue(
+        start: -10, end: 3600,
+        text: "The journey of a thousand miles begins with a single step."
+    )
+
     var body: some View {
-        GeometryReader { proxy in
-            // The proxy.size is the VISIBLE frame (after safe-area insets are
-            // applied) because we do NOT call .ignoresSafeArea on this view.
-            // That means: caption width computed from proxy.size.width can
-            // never extend past the safe-area boundary.
-            let visibleWidth = proxy.size.width
-            let visibleHeight = proxy.size.height
-            // Horizontal margin on each side of the caption. 24pt keeps the
-            // caption clear of the notch / home indicator in landscape.
-            let sideMargin: CGFloat = 24
-            // Caption max width: the user's subtitleMaxWidth slider (a
-            // percentage of the visible width), clamped to a hard 92% so a
-            // 100% setting still leaves breathing room on both sides.
-            let userWidth = visibleWidth * min(max(subtitleMaxWidth, 50) / 100.0, 0.92)
-            let captionMaxWidth = min(userWidth, visibleWidth - sideMargin * 2)
-            // Bottom padding positions the caption in the lower-middle band.
-            // 14% of visible height keeps it above the home indicator on most
-            // devices while still feeling "bottom-anchored".
-            let bottomPadding = max(visibleHeight * 0.14, 56)
+        ZStack {
+            backdropView
 
-            ZStack(alignment: .bottom) {
-                // Backdrop fills the entire visible frame.
-                backdropView
+            // THE player overlay — identical rendering path to playback.
+            PlayerSubtitleOverlay(
+                cues: settings.enabled ? [Self.sampleCue] : [],
+                currentTime: 1,
+                showControls: false,
+                settings: settings
+            )
+            .allowsHitTesting(false)
 
-                // Top-trailing Done button — the ONLY chrome. No title label,
-                // no helper text: nothing competes with the caption on the
-                // picture (v2.11).
-                VStack {
-                    HStack {
-                        Spacer()
-                        Button {
-                            dismiss()
-                        } label: {
-                            Text("Done")
-                                .font(.headline)
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 18)
-                                .padding(.vertical, 8)
-                                .background(.ultraThinMaterial, in: Capsule())
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 10)
+            // Top-trailing Done button — the ONLY chrome.
+            VStack {
+                HStack {
                     Spacer()
+                    Button {
+                        dismiss()
+                    } label: {
+                        Text("Done")
+                            .font(.headline)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 8)
+                            .background(.ultraThinMaterial, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-
-                // Caption — bottom-anchored ON the picture (the backdrop
-                // fills the entire visible frame), centered, width-capped.
-                // On iOS 16+ ViewThatFits tries the user's chosen font size
-                // first; if the caption is too tall to fit, it steps down to
-                // smaller sizes so the text always remains fully visible.
-                // iOS 15 falls back to a single size (the user's chosen font
-                // size) since ViewThatFits isn't available.
-                captionContainer(captionMaxWidth: captionMaxWidth, bottomPadding: bottomPadding)
+                .padding(.horizontal, 20)
+                .padding(.top, 10)
+                Spacer()
             }
-            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+
+            if !settings.enabled {
+                Text("Subtitles are turned off — enable them above to preview.")
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .frame(maxHeight: .infinity, alignment: .center)
+            }
         }
         .statusBarHidden()
         .onAppear {
@@ -4423,36 +4436,6 @@ struct LandscapeSubtitlePreview: View {
                 PlayerPresenter.shared.updateOrientationLock(.portrait, shouldRotate: true)
             }
             #endif
-        }
-    }
-
-    // MARK: - Caption Container (iOS 15 / 16+ compatible)
-
-    /// Wraps the caption text with bottom-anchoring, centering, and the
-    /// vertical offset. On iOS 16+ uses `ViewThatFits` to step the font size
-    /// down if the caption is too tall; on iOS 15 falls back to the user's
-    /// chosen font size (with the width cap, long sentences wrap inside the
-    /// frame regardless).
-    @ViewBuilder
-    private func captionContainer(captionMaxWidth: CGFloat, bottomPadding: CGFloat) -> some View {
-        if #available(iOS 16, *) {
-            ViewThatFits(in: .vertical) {
-                captionText(fontSize: CGFloat(subtitleFontSize))
-                    .frame(maxWidth: captionMaxWidth, alignment: .center)
-                captionText(fontSize: CGFloat(subtitleFontSize) * 0.85)
-                    .frame(maxWidth: captionMaxWidth, alignment: .center)
-                captionText(fontSize: CGFloat(subtitleFontSize) * 0.7)
-                    .frame(maxWidth: captionMaxWidth, alignment: .center)
-            }
-            .frame(maxWidth: .infinity, alignment: .center)
-            .padding(.bottom, bottomPadding)
-            .offset(y: -subtitleVerticalOffset * 0.8)
-        } else {
-            captionText(fontSize: CGFloat(subtitleFontSize))
-                .frame(maxWidth: captionMaxWidth, alignment: .center)
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.bottom, bottomPadding)
-                .offset(y: -subtitleVerticalOffset * 0.8)
         }
     }
 
@@ -4494,73 +4477,11 @@ struct LandscapeSubtitlePreview: View {
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
-    }
-
-    // MARK: - Caption
-
-    /// Builds the caption Text with a specific font size. Called by
-    /// ViewThatFits with stepped-down sizes so the caption always fits.
-    private func captionText(fontSize: CGFloat) -> some View {
-        let resolvedStrokeWidth: Double = (subtitleStrokeColor == "none") ? 0 : subtitleStrokeWidth
-        let lineSpacingPoints = CGFloat((subtitleLineSpacing - 1.0) * subtitleFontSize * 0.5)
-        return Text("The journey of a thousand miles begins with a single step.")
-            .font(.system(size: fontSize,
-                          weight: subtitleBoldText ? .bold : .regular,
-                          design: resolvedFontDesign))
-            .foregroundStyle(resolvedTextColor.opacity(subtitleTextOpacity))
-            .multilineTextAlignment(.center)
-            .lineSpacing(lineSpacingPoints)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(
-                Group {
-                    if subtitleBackgroundEnabled {
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(Color.black.opacity(0.6))
-                    } else {
-                        Color.clear
-                    }
-                }
-            )
-            .applySubtitleStroke(color: color(fromName: subtitleStrokeColor),
-                                 width: resolvedStrokeWidth)
-            .shadow(color: .black.opacity(subtitleShadowOffset > 0 ? 0.85 : 0),
-                    radius: max(CGFloat(subtitleShadowOffset), 0),
-                    x: 0,
-                    y: max(CGFloat(subtitleShadowOffset) / 2.0, 0))
-            .fixedSize(horizontal: false, vertical: true)
-    }
-
-    // MARK: - Resolved values
-
-    private var resolvedFontDesign: Font.Design {
-        switch subtitleFontDesign.lowercased() {
-        case "rounded":    return .rounded
-        case "serif":      return .serif
-        case "monospaced": return .monospaced
-        default:           return .default
-        }
-    }
-
-    private var resolvedTextColor: Color {
-        color(fromName: subtitleTextColor)
-    }
-
-    private func color(fromName name: String) -> Color {
-        switch name.lowercased() {
-        case "white":  return .white
-        case "black":  return .black
-        case "yellow": return .yellow
-        case "cyan":   return .cyan
-        case "pink":   return .pink
-        case "green":  return .green
-        case "gray":   return .gray
-        case "none":   return .clear
-        default:       return .white
-        }
+        .ignoresSafeArea()
     }
 }
 #endif
+
 
 // MARK: - About Settings Page
 

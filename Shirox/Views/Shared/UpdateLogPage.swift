@@ -99,6 +99,29 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.15",
+        date: "2026-08-31",
+        added: [
+            "The Skip Intro button now auto-dismisses after 5 seconds, with a tiny live countdown (\"4s\", \"3s\"…) right on the button so you can see it's about to vanish. Re-entering a skip segment (or seeking back into one) brings it back with a fresh countdown.",
+            "Embedded HLS subtitles are now routed through the app's own subtitle renderer. Streams whose manifests carry built-in subtitle tracks used to be rendered by the system player with default styling — silently ignoring your configured size, color and position. All subtitles now render through the custom overlay, no matter the source.",
+            "Subtitles gained the full styling set in the player: bold text, outline color and width, font design (default / rounded / serif / monospaced), text opacity, line spacing, max caption width, drop-shadow distance, and a vertical nudge on top of the bottom padding.",
+            "Source switching now survives dead servers: if the source you switch to fails to load (expired link, offline server), the player automatically falls back to the source you were watching instead of sitting on a black screen."
+        ],
+        fixed: [
+            "Subtitle settings not applying in the player — root cause found and eliminated. The Settings → Subtitles page was writing to a completely separate set of stored keys that no player code ever read, while its preview rendered through its own drawing code. You could configure yellow bold subtitles and the player would keep showing its own defaults. The page now edits the exact same settings object the player renders from, and the landscape preview renders through the actual player overlay — what you preview is what plays. Any choices you'd already made on the old page are migrated over automatically.",
+            "Switching sources from the in-player Source menu could look like a dead button. Providers that alias several source names onto the same video file hit an early return that skipped updating anything — the stream kept playing (correctly, same file) but the selection never moved, so it read as \"switching doesn't work\". Same-file switches now update the selection, subtitle tracks and title properly; genuinely different files switch as before.",
+            "The Skip Intro button overlapped other player controls in portrait. It used to borrow the 85-second skip button's position via frame math that only worked in landscape — in portrait the wider label ran straight into the source / quality / audio buttons. It now sits in its own clear space at the bottom-right of the screen in both orientations (and the 85s button stays visible while a skip segment is active).",
+            "The Skip Intro button appearing on episodes with no intro. Skip-timestamp data is now validated before use: segments must actually end after they start, \"from the beginning\" segments can't claim to end after 5 minutes (the shape bad episode-mappings produce), the segment must end before the video does, and the button needs at least 1.5 seconds of segment left to be worth showing.",
+            "Deleting a source in Settings → Modules could delete a different source than the one you swiped. The installed list shows a filtered array (anime-only or manga-only per page), but the delete action was indexing the full unfiltered module list — with any manga module installed alongside anime modules, every delete removed the wrong row. Deletes now target the exact module from the row you tapped."
+        ],
+        changed: [
+            "Settings → Subtitles was rebuilt around one shared subtitle engine. Presets, the color swatches, and every slider now write the live settings the player reads mid-playback, and the landscape test renders through the real player overlay at true size and position — the preview can no longer drift from reality."
+        ],
+        improved: [],
+        removed: [],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "2.14",
         date: "2026-08-30",
         added: [
