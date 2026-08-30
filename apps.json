@@ -29,10 +29,10 @@
         {
           "version": "2.15",
           "buildVersion": "1",
-          "date": "2026-08-31",
+          "date": "2026-08-30",
           "localizedDescription": "Four bug reports, four root causes fixed. Subtitle settings now actually apply during playback: the Settings > Subtitles page turned out to be writing to a set of stored keys no player code ever read (while its preview drew through its own implementation), and streams with embedded HLS subtitles were being rendered by the system player with default styling that ignored your settings entirely. The page now edits the same live settings object the player renders from, every subtitle — external or embedded — flows through the one custom renderer, and the landscape preview renders through the actual player overlay: what you preview is what plays. Subtitles also gained the full styling set in the player (bold, outline, font design, opacity, line spacing, max width, drop shadow, vertical nudge). The in-player Source menu no longer looks like a dead button when a provider aliases several sources onto one file, and switching to a dead server now falls back to what you were watching instead of a black screen. The Skip Intro button moved to its own clear bottom-right space (no more overlapping the controls in portrait), auto-dismisses after 5 seconds with a tiny countdown on the button, and only appears when the episode's skip-timestamp data is actually valid — garbage data from wrong episode mappings no longer produces a Skip button on episodes with nothing to skip. And deleting a source in Settings > Modules now removes the exact source you swiped — the old code indexed the unfiltered module list behind a filtered display, so with mixed anime and manga modules installed it deleted the wrong row.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 11624666,
+          "size": 11649543,
           "minOSVersion": "15.0"
         },
         {
