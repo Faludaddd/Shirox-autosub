@@ -129,7 +129,7 @@ final class SubtitleSettingsManager: ObservableObject {
             Keys.verticalOffset:    0.0
         ])
 
-        migrateLegacy()
+        SubtitleSettingsManager.migrateLegacy()
 
         let d = UserDefaults.standard
         enabled           = d.bool(forKey: Keys.enabled)
@@ -154,7 +154,7 @@ final class SubtitleSettingsManager: ObservableObject {
     /// live keys. Runs only when the user actually changed a value on the old
     /// page (`object(forKey:) != nil` — @AppStorage only writes on change) and
     /// the corresponding live key has never been written.
-    private func migrateLegacy() {
+    private static func migrateLegacy() {
         let d = UserDefaults.standard
         let map: [(legacy: String, live: String, convert: (Any) -> Any)] = [
             ("subtitleFontSize",      Keys.fontSize,        { ($0 as? Double) ?? 24 }),
