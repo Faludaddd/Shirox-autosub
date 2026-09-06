@@ -4559,8 +4559,8 @@ struct AboutSettingsPage: View {
 
     /// v2.17 — Five quick taps on the version row toggles forced-update
     /// demo mode: the version comparison reports the installed build as
-    /// outdated so the real forced-update flow (gate, download, checksum
-    /// verification, AltStore handoff) can be exercised on a current build.
+    /// outdated so the real forced-update flow (gate + its Download from
+    /// GitHub CTA) can be exercised on a current build.
     /// The gate itself carries an "Exit demo mode" chip to turn it off.
     private func handleVersionRowTap() {
         versionTaps += 1

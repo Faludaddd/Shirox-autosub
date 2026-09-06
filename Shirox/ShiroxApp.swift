@@ -605,8 +605,9 @@ private struct RootTabView: View {
         // sheets, player) the moment AppUpdateManager confirms a newer
         // version exists. The cover offers no dismissal — it clears only
         // when a real check confirms the installed version is current
-        // again, i.e. after AltStore installs the update and iOS relaunches
-        // the app (or the user exits demo mode from the gate itself).
+        // again, i.e. after the user installs the update they downloaded
+        // from GitHub and iOS relaunches the app (or the user exits demo
+        // mode from the gate itself).
         #if os(iOS)
         .fullScreenCover(isPresented: Binding(
             get: { updateManager.gateVisible },

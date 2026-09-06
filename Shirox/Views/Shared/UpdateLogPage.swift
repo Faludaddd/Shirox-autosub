@@ -99,6 +99,20 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.18",
+        date: "2026-09-06",
+        added: [],
+        fixed: [],
+        changed: [
+            "The required-update screen now offers exactly one action: Download from GitHub. Tapping it opens the new release's IPA download in Safari — the same hop the About page's Update button has always made. Nothing is downloaded inside the app, and no installer is probed, launched, or handed off to; however you sideload, your tool fetches the file from GitHub itself, so the single button serves every setup. The gate is unchanged where it matters: still impossible to dismiss, still re-checking whenever you return to the app, and still clearing the moment your installed version is current again. The About-page demo trigger (five taps on the version row) still previews the whole flow."
+        ],
+        improved: [],
+        removed: [
+            "In-app update download with live progress and SHA-256 verification, the AltStore install handoff (altstore://install?url=… plus the altstore entry in LSApplicationQueriesSchemes), and the share-package fallback — all replaced by the single GitHub download button."
+        ],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "2.17",
         date: "2026-09-06",
         added: [

@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "2.18",
+          "buildVersion": "1",
+          "date": "2026-09-06",
+          "localizedDescription": "Update enforcement gets simpler and more universal: the required-update screen now offers exactly one thing — a Download from GitHub button that opens the new release's download in Safari. Nothing is downloaded inside the app anymore, and the app no longer probes for, talks to, or hands off to any installer — the AltStore integration and its URL-scheme declaration are gone entirely. Whatever tool you use to sideload fetches the file straight from GitHub itself, so that single button works for every setup. The gate itself is unchanged where it matters: it still can't be dismissed, still re-checks whenever you return to the app, and still clears the moment your installed version is current again. You can still preview the whole flow on demand: tap the version row on the About page five times, and exit demo mode from the screen itself.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 11834777,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "2.17",
           "buildVersion": "1",
           "date": "2026-09-06",

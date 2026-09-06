@@ -72,8 +72,8 @@ final class AppUpdateManager: ObservableObject {
 
     /// v2.17 — Forced-update demo mode. When true, the version comparison
     /// treats the installed build as outdated no matter what the manifest
-    /// says, so the entire forced-update flow (gate, download, verification,
-    /// installer handoff) can be exercised on a current build. Toggled by
+    /// says, so the entire forced-update flow (gate + its Download from
+    /// GitHub CTA) can be exercised on a current build. Toggled by
     /// tapping the version row on the About page five times; an "Exit demo
     /// mode" chip on the gate turns it off.
     @AppStorage("update.simulateOutdated") var simulateOutdated = false

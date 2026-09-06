@@ -38,14 +38,6 @@
     <key>UILaunchScreen</key>
     <dict/>
 
-    <!-- v2.17 — Forced update: the app needs to detect AltStore before
-         handing the update off to it (canOpenURL requires the scheme to be
-         declared here). -->
-    <key>LSApplicationQueriesSchemes</key>
-    <array>
-        <string>altstore</string>
-    </array>
-
     <!-- AniList OAuth URL scheme -->
     <key>CFBundleURLTypes</key>
     <array>
