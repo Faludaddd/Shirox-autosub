@@ -583,6 +583,8 @@ private struct NotificationRowContent: View {
         case .activityReply: return "Reply"
         case .activityMention: return "Mention"
         case .activityLike: return "Like"
+        case .threadComment: return "Thread"
+        case .threadLike: return "Thread"
         case .mediaChange: return "Update"
         case .unknown: return "Notice"
         }
@@ -903,6 +905,8 @@ private struct NotificationGridCard: View {
         case .activityReply: return "Reply"
         case .activityMention: return "Mention"
         case .activityLike: return "Like"
+        case .threadComment: return "Thread"
+        case .threadLike: return "Thread"
         case .mediaChange: return "Update"
         case .unknown: return "Notice"
         }

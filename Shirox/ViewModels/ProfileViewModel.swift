@@ -222,9 +222,15 @@ final class ProfileViewModel: ObservableObject {
             return "\(mediaTitle ?? "Anime") — Episode \(episode) aired"
         case .following(_, let userName, _):
             return "\(userName ?? "Someone") followed you"
-        case .activityMessage(_, let context, _), .activityReply(_, let context, _),
-             .activityMention(_, let context, _), .activityLike(_, let context, _):
+        case .activityMessage(_, _, let context, _), .activityReply(_, _, let context, _),
+             .activityMention(_, _, let context, _), .activityLike(_, _, let context, _):
             return "Activity: \(context ?? "")"
+        case .threadComment(let threadTitle, _, _, let context, _):
+            if let threadTitle, !threadTitle.isEmpty { return "\(threadTitle): \(context ?? "New comment")" }
+            return context ?? "Thread comment"
+        case .threadLike(let threadTitle, _, _, let context, _):
+            if let threadTitle, !threadTitle.isEmpty { return "\(threadTitle): \(context ?? "New like")" }
+            return context ?? "Thread like"
         case .mediaChange(let title, let context, _, _):
             if let title, !title.isEmpty { return "\(title): \(context ?? "Updated")" }
             return context ?? "Media updated"

@@ -61,6 +61,28 @@ final class ToastManager: ObservableObject {
         }
     }
 
+    // MARK: - Semantic-type convenience
+    //
+    // Upstream-ported call sites use `show(message:type:)` (upstream's API);
+    // our canonical card API is title/message/icon. This overload maps the
+    // semantic types onto our design so ported calls compile and render
+    // consistently with the rest of the app's toasts.
+    enum ToastType {
+        case success
+        case error
+    }
+
+    func show(message: String, type: ToastType, duration: TimeInterval = 4.0) {
+        switch type {
+        case .success:
+            show(title: "Success", message: message,
+                 icon: "checkmark.circle.fill", iconColor: .green, duration: duration)
+        case .error:
+            show(title: "Error", message: message,
+                 icon: "exclamationmark.triangle.fill", iconColor: .red, duration: duration)
+        }
+    }
+
     func dismiss(_ id: UUID) {
         DispatchQueue.main.async {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {

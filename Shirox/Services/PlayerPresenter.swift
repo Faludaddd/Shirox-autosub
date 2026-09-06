@@ -45,12 +45,13 @@ final class PlayerPresenter: ObservableObject {
 
     nonisolated private init() {}
 
-
-    #if !os(iOS)
-
     /// Shared flag set by PlayerView when 2× speed hold is active, so the
     /// drag-to-dismiss gesture coordinator can check it and block dismissal.
+    /// Unconditional: the iOS player is the one that sets and reads it; other
+    /// targets simply never touch it.
     @Published var isSpeedBoosted = false
+
+    #if !os(iOS)
 
     func presentPlayer(stream: StreamResult, streams: [StreamResult] = [], context: PlayerContext? = nil, onWatchNext: WatchNextLoader? = nil, onStreamExpired: StreamRefetchLoader? = nil, onSequelNeeded: SequelLoader? = nil, onSequelAdvanced: ((SequelNavigation) -> Void)? = nil, onFinished: ((PlayerContext) -> Void)? = nil, from sourceView: Any? = nil) {
         // TODO: implement this function for tv and macos
