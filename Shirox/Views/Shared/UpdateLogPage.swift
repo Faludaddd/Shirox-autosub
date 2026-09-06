@@ -99,6 +99,42 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.16",
+        date: "2026-09-06",
+        added: [
+            "Tap any detail-page poster to open it full-screen — pinch to zoom, double-tap to zoom, drag down to dismiss. The lightbox enlarges the exact same image the page was showing (same TVDB/AniList source), so it never swaps to a different picture under your finger. Works on anime, module and manga detail pages.",
+            "Long-press (or right-click on Mac) any detail-page title to copy it to the clipboard, with a confirmation toast so the copy isn't a silent no-feedback action.",
+            "AniList activity notifications now name the user — \"GamerX liked your activity\" instead of a bare \"Activity liked your activity\" fragment — and forum notifications (thread comments, likes, mentions, replies) render as real sentences with the thread title and open the thread on AniList instead of showing a blank row.",
+            "The in-player cast overlay now shows a reconnecting state, so a cast session recovering after a screen lock reads as \"reconnecting\" instead of dead controls."
+        ],
+        fixed: [
+            "Streams that silently failed to load — the root cause is fixed. The player was watching the video item's status through a channel that drops the fast failure signal an expired CDN link produces, so it never learned the stream had died: no refetch, no error, just the loading overlay until a black frame replaced it. Every item now carries a proper observer (including items swapped in by quality/source switches, episode advances and recoveries), failures trigger an automatic fresh-URL refetch, and when recovery runs out of road you get a Retry button instead of a spinning wheel.",
+            "Player launches could be silently dropped. UIKit refuses to present over a view controller that's still dismissing a sheet; the player now waits for the hierarchy to settle (up to ~2 seconds) instead of vanishing, and a double-tap on an episode row can no longer stack two players with competing audio.",
+            "Chromecast and AirPlay dropping out mid-playback. The cast session survives screen locks (the SDK's suspend-on-background was the teardown trigger), commands route to whichever engine actually owns playback, quality switches re-issue to the TV instead of starting the new rendition on the phone, and auto-advance during a cast no longer plays episode 2 out of the handset.",
+            "AirPlay to an Apple TV showing a black screen on header-protected streams: the receiver fetches the URL itself and auth headers don't travel with the handoff. Those streams now route through the phone's LAN proxy, which the TV's own fetch can authenticate against.",
+            "Modules whose scripts hang could freeze the app — the stream picker spun forever and every later recovery was blocked. Both JavaScript bridges are now bounded (120s) and can only resume once; modules returning a raw value instead of a promise no longer hang batch download and sequel resolution.",
+            "Pull-to-refresh on Browse appended the next page instead of reloading; refreshing a populated grid now starts over.",
+            "A stale episode-range index could render an empty episode list with no way to recover (the range menu only appears above 100 episodes). Both detail pages clamp the range to what the show actually has.",
+            "VTT subtitles that use a tab before the cue settings were silently dropped — the timestamp parser now splits on any whitespace.",
+            "The Home tab crashed when trending emptied out (failed refresh, offline): the carousel indexed an empty array in exactly the branch that guards it. Same class of fix in the manga reader for empty chapter lists, plus it saves your page position when the app is swiped away mid-read.",
+            "Failed social deletes and likes were silent or never rolled back — failures now show an error toast and restore the optimistic UI."
+        ],
+        changed: [
+            "The home carousel now loads TVDB's high-resolution posters (typically 680×1000+) instead of AniList's smaller cover art, with a 100-point parallax buffer so swipes reveal image instead of hard edges — visibly sharper on every device.",
+            "Exported logs no longer contain credentials. AniList access tokens, Jellyfin API keys, and Cloudflare session cookies are redacted before anything is written to logs.txt — safe to paste into bug reports.",
+            "Control Center / lock screen transport controls now drive the same code paths as the on-screen buttons (correct cast routing, audio-session reactivation, playback speed preserved), and their registration is idempotent instead of stacking a duplicate set per playback rebuild."
+        ],
+        improved: [
+            "Continue Watching's version wipe no longer leaves stale watched-markers behind, which silently marked episodes of a freshly cleared show as already seen.",
+            "The player presents on the app's own window instead of whichever window happens to be first — presenting from the Cloudflare bypass window no longer buries the player.",
+            "A player opened in portrait (Force Landscape off) now dismisses with the proper animation instead of skipping it and persisting a landscape orientation you never chose."
+        ],
+        removed: [],
+        other: [
+            "Synced with the upstream project's latest release (their 1.0.5 stream-fix batch, poster lightbox, cast/AirPlay rework, and notification improvements), merged on top of v2.15's subtitle/source/skip-intro work."
+        ]
+    ),
+    UpdateLogEntry(
         version: "2.15",
         date: "2026-08-31",
         added: [

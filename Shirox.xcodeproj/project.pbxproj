@@ -318,6 +318,24 @@
                 1279E58A2FCA397700C9BA56 /* ModuleListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4E02FCA397700C9BA56 /* ModuleListView.swift */; };
                 1279E58B2FCA397700C9BA56 /* ViewTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4E62FCA397700C9BA56 /* ViewTracker.swift */; };
                 1279E58C2FCA397700C9BA56 /* CastProxyServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4812FCA397700C9BA56 /* CastProxyServer.swift */; };
+                26CC929725048165DA71AB02 /* RemoteCommandCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADBC4EDBD4BDB681DA245E48 /* RemoteCommandCoordinator.swift */; };
+                503309DDA2B8C5AD46998B22 /* RemoteCommandCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADBC4EDBD4BDB681DA245E48 /* RemoteCommandCoordinator.swift */; };
+                B340A39D0D0B765607F5A833 /* RemoteCommandCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADBC4EDBD4BDB681DA245E48 /* RemoteCommandCoordinator.swift */; };
+                EEFB3C9405EC9F1A8798F9A6 /* PlaybackRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B70FA209F349380E173FA36 /* PlaybackRouting.swift */; };
+                285207A02C95CA2FC36149EC /* PlaybackRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B70FA209F349380E173FA36 /* PlaybackRouting.swift */; };
+                BB2F5126B39990B538691117 /* PlaybackRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B70FA209F349380E173FA36 /* PlaybackRouting.swift */; };
+                C12031E807866635668359AD /* HTTPRequestHead.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AB598C1FA51D6B9ECA33424 /* HTTPRequestHead.swift */; };
+                E57277E30B88A87FD979480E /* HTTPRequestHead.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AB598C1FA51D6B9ECA33424 /* HTTPRequestHead.swift */; };
+                371568CC892571F17054D3C6 /* HTTPRequestHead.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AB598C1FA51D6B9ECA33424 /* HTTPRequestHead.swift */; };
+                C6A8B3EBFF5FB8C478ED0FB6 /* CastSessionRecovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B1ACD7F2D51864002997F48 /* CastSessionRecovery.swift */; };
+                33E22A4FAB1B114E6A9B6FB5 /* CastSessionRecovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B1ACD7F2D51864002997F48 /* CastSessionRecovery.swift */; };
+                C2F28CF6ADBAF571A4F5C238 /* CastSessionRecovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B1ACD7F2D51864002997F48 /* CastSessionRecovery.swift */; };
+                E1BD6A6A43E3C48B978DFA8D /* CastManifestRewriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ADE5B6BC623A36C9424600D /* CastManifestRewriter.swift */; };
+                9315A3F73B6CBE0D87CF852F /* CastManifestRewriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ADE5B6BC623A36C9424600D /* CastManifestRewriter.swift */; };
+                1EED7B343C44D551BDD19AFF /* CastManifestRewriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ADE5B6BC623A36C9424600D /* CastManifestRewriter.swift */; };
+                908090B94C927D7FE25624F4 /* AirPlayRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100488BAA466DA3C976674C2 /* AirPlayRouting.swift */; };
+                660094E69AE2DCC5FDA426F1 /* AirPlayRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100488BAA466DA3C976674C2 /* AirPlayRouting.swift */; };
+                62A8CEB49CCAE8035AB1BA12 /* AirPlayRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100488BAA466DA3C976674C2 /* AirPlayRouting.swift */; };
                 1279E58D2FCA397700C9BA56 /* ThumbnailEpisodeRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4D52FCA397700C9BA56 /* ThumbnailEpisodeRow.swift */; };
                 1279E58E2FCA397700C9BA56 /* AniListProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E47D2FCA397700C9BA56 /* AniListProvider.swift */; };
                 1279E58F2FCA397700C9BA56 /* AniListActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4652FCA397700C9BA56 /* AniListActivity.swift */; };
@@ -335,6 +353,12 @@
                 1279E5992FCA397700C9BA56 /* AniListLibraryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E47C2FCA397700C9BA56 /* AniListLibraryService.swift */; };
                 1279E59A2FCA397700C9BA56 /* ContinueWatchingItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4692FCA397700C9BA56 /* ContinueWatchingItem.swift */; };
                 1279E59B2FCA397700C9BA56 /* CachedAsyncImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4CC2FCA397700C9BA56 /* CachedAsyncImage.swift */; };
+                F1AB924A028C0E25691FE092 /* CopyTitle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9B9C4B7F8CC17DCA4244990 /* CopyTitle.swift */; };
+                2EBFA0A47C32A4C438A0D324 /* CopyTitle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9B9C4B7F8CC17DCA4244990 /* CopyTitle.swift */; };
+                AE08652BAC34A34294246221 /* CopyTitle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9B9C4B7F8CC17DCA4244990 /* CopyTitle.swift */; };
+                99E5E18EA31431732038AD72 /* PosterViewer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F5E22F3922DEDB01A89A0B0 /* PosterViewer.swift */; };
+                34A9E8C8C65E6822AAD610A2 /* PosterViewer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F5E22F3922DEDB01A89A0B0 /* PosterViewer.swift */; };
+                B7E6AFBC96F12550F8015ED3 /* PosterViewer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F5E22F3922DEDB01A89A0B0 /* PosterViewer.swift */; };
                 1279E59D2FCA397700C9BA56 /* AniListNotification.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4672FCA397700C9BA56 /* AniListNotification.swift */; };
                 1279E59E2FCA397700C9BA56 /* DownloadModulePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4AA2FCA397700C9BA56 /* DownloadModulePickerView.swift */; };
                 1279E59F2FCA397700C9BA56 /* MarkContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E46D2FCA397700C9BA56 /* MarkContext.swift */; };
@@ -766,6 +790,12 @@
                 1279E47F2FCA397700C9BA56 /* AniListSocialService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListSocialService.swift; sourceTree = "<group>"; };
                 1279E4802FCA397700C9BA56 /* CacheManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CacheManager.swift; sourceTree = "<group>"; };
                 1279E4812FCA397700C9BA56 /* CastProxyServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CastProxyServer.swift; sourceTree = "<group>"; };
+                ADBC4EDBD4BDB681DA245E48 /* RemoteCommandCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteCommandCoordinator.swift; sourceTree = "<group>"; },
+                7B70FA209F349380E173FA36 /* PlaybackRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackRouting.swift; sourceTree = "<group>"; },
+                2AB598C1FA51D6B9ECA33424 /* HTTPRequestHead.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPRequestHead.swift; sourceTree = "<group>"; },
+                7B1ACD7F2D51864002997F48 /* CastSessionRecovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CastSessionRecovery.swift; sourceTree = "<group>"; },
+                8ADE5B6BC623A36C9424600D /* CastManifestRewriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CastManifestRewriter.swift; sourceTree = "<group>"; },
+                100488BAA466DA3C976674C2 /* AirPlayRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirPlayRouting.swift; sourceTree = "<group>"; },
                 1279E4822FCA397700C9BA56 /* CloudflareBypassManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudflareBypassManager.swift; sourceTree = "<group>"; };
                 1279E4832FCA397700C9BA56 /* ContinueWatchingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContinueWatchingManager.swift; sourceTree = "<group>"; };
                 1279E4842FCA397700C9BA56 /* DownloadManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadManager.swift; sourceTree = "<group>"; };
@@ -835,6 +865,8 @@
                 1279E4C92FCA397700C9BA56 /* ProfileStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileStatsView.swift; sourceTree = "<group>"; };
                 1279E4CA2FCA397700C9BA56 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
                 1279E4CC2FCA397700C9BA56 /* CachedAsyncImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachedAsyncImage.swift; sourceTree = "<group>"; };
+                B9B9C4B7F8CC17DCA4244990 /* CopyTitle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopyTitle.swift; sourceTree = "<group>"; },
+                3F5E22F3922DEDB01A89A0B0 /* PosterViewer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterViewer.swift; sourceTree = "<group>"; },
                 1279E4CD2FCA397700C9BA56 /* CloudflareBypassSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudflareBypassSheetView.swift; sourceTree = "<group>"; };
                 1279E4CE2FCA397700C9BA56 /* Color+SystemBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+SystemBackground.swift"; sourceTree = "<group>"; };
                 1279E4CF2FCA397700C9BA56 /* ContentUnavailableView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentUnavailableView.swift; sourceTree = "<group>"; };
@@ -1102,6 +1134,12 @@
                                 1279E47F2FCA397700C9BA56 /* AniListSocialService.swift */,
                                 1279E4802FCA397700C9BA56 /* CacheManager.swift */,
                                 1279E4812FCA397700C9BA56 /* CastProxyServer.swift */,
+                                ADBC4EDBD4BDB681DA245E48 /* RemoteCommandCoordinator.swift */,
+                                7B70FA209F349380E173FA36 /* PlaybackRouting.swift */,
+                                2AB598C1FA51D6B9ECA33424 /* HTTPRequestHead.swift */,
+                                7B1ACD7F2D51864002997F48 /* CastSessionRecovery.swift */,
+                                8ADE5B6BC623A36C9424600D /* CastManifestRewriter.swift */,
+                                100488BAA466DA3C976674C2 /* AirPlayRouting.swift */,
                                 BAEE9A1A2FCB000000000001 /* BackgroundKeepAlive.swift */,
                                 1279E4822FCA397700C9BA56 /* CloudflareBypassManager.swift */,
                                 1279E4832FCA397700C9BA56 /* ContinueWatchingManager.swift */,
@@ -1266,6 +1304,8 @@
                                 1251C4582FCAE1AA002AD0B2 /* LegalWebView.swift */,
                                 F5A6B7C8D9E10000000000A1 /* AnimatedSplashView.swift */,
                                 1279E4CC2FCA397700C9BA56 /* CachedAsyncImage.swift */,
+                                B9B9C4B7F8CC17DCA4244990 /* CopyTitle.swift */,
+                                3F5E22F3922DEDB01A89A0B0 /* PosterViewer.swift */,
                                 21201D48C8E94395977F4564 /* ScoreInputView.swift */,
                                 1279E4CD2FCA397700C9BA56 /* CloudflareBypassSheetView.swift */,
                                 1279E4CE2FCA397700C9BA56 /* Color+SystemBackground.swift */,
@@ -1679,6 +1719,12 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                                                 F5A6B7C8D9E10000000000A2 /* AnimatedSplashView.swift in Sources */,
 121D9B462FCA5603000FF9B4 /* EpisodeLink.swift in Sources */,
                                 121D9B5A2FCA5612000FF9B4 /* CastProxyServer.swift in Sources */,
+                                26CC929725048165DA71AB02 /* RemoteCommandCoordinator.swift in Sources */,
+                                EEFB3C9405EC9F1A8798F9A6 /* PlaybackRouting.swift in Sources */,
+                                C12031E807866635668359AD /* HTTPRequestHead.swift in Sources */,
+                                C6A8B3EBFF5FB8C478ED0FB6 /* CastSessionRecovery.swift in Sources */,
+                                E1BD6A6A43E3C48B978DFA8D /* CastManifestRewriter.swift in Sources */,
+                                908090B94C927D7FE25624F4 /* AirPlayRouting.swift in Sources */,
                                 BAEE9A1A2FCB000000000002 /* BackgroundKeepAlive.swift in Sources */,
                                 121D9B5B2FCA5612000FF9B4 /* CacheManager.swift in Sources */,
                                 121D9B5C2FCA5612000FF9B4 /* SubtitleSettingsManager.swift in Sources */,
@@ -1786,6 +1832,8 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 121D9BA92FCA563E000FF9B4 /* AniListDetailView.swift in Sources */,
                                 121D9BAA2FCA563E000FF9B4 /* HomeView.swift in Sources */,
                                 121D9BAB2FCA563E000FF9B4 /* CachedAsyncImage.swift in Sources */,
+                                F1AB924A028C0E25691FE092 /* CopyTitle.swift in Sources */,
+                                99E5E18EA31431732038AD72 /* PosterViewer.swift in Sources */,
                                 8BD8E901FE5D4CF199886175 /* ScoreInputView.swift in Sources */,
                                 121D9BAC2FCA563E000FF9B4 /* DetailView.swift in Sources */,
                                 121D9BAD2FCA563E000FF9B4 /* SettingsView.swift in Sources */,
@@ -1941,6 +1989,12 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 1279E5112FCA397700C9BA56 /* ModuleListView.swift in Sources */,
                                 1279E5122FCA397700C9BA56 /* ViewTracker.swift in Sources */,
                                 1279E5132FCA397700C9BA56 /* CastProxyServer.swift in Sources */,
+                                503309DDA2B8C5AD46998B22 /* RemoteCommandCoordinator.swift in Sources */,
+                                285207A02C95CA2FC36149EC /* PlaybackRouting.swift in Sources */,
+                                E57277E30B88A87FD979480E /* HTTPRequestHead.swift in Sources */,
+                                33E22A4FAB1B114E6A9B6FB5 /* CastSessionRecovery.swift in Sources */,
+                                9315A3F73B6CBE0D87CF852F /* CastManifestRewriter.swift in Sources */,
+                                660094E69AE2DCC5FDA426F1 /* AirPlayRouting.swift in Sources */,
                                 BAEE9A1A2FCB000000000003 /* BackgroundKeepAlive.swift in Sources */,
                                 1279E5142FCA397700C9BA56 /* ThumbnailEpisodeRow.swift in Sources */,
                                 1279E5152FCA397700C9BA56 /* AniListProvider.swift in Sources */,
@@ -1967,6 +2021,8 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 1E9C0F13D08F553EC0BF3F9E /* LocalCollection.swift in Sources */,
                                 AA105005000000000000F103 /* LocalSource.swift in Sources */,
                                 1279E5222FCA397700C9BA56 /* CachedAsyncImage.swift in Sources */,
+                                2EBFA0A47C32A4C438A0D324 /* CopyTitle.swift in Sources */,
+                                34A9E8C8C65E6822AAD610A2 /* PosterViewer.swift in Sources */,
                                 17265E759B724CB6BF9F6C7A /* ScoreInputView.swift in Sources */,
                                 1279E5242FCA397700C9BA56 /* AniListNotification.swift in Sources */,
                                 1279E5252FCA397700C9BA56 /* DownloadModulePickerView.swift in Sources */,
@@ -2160,6 +2216,12 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 1279E58A2FCA397700C9BA56 /* ModuleListView.swift in Sources */,
                                 1279E58B2FCA397700C9BA56 /* ViewTracker.swift in Sources */,
                                 1279E58C2FCA397700C9BA56 /* CastProxyServer.swift in Sources */,
+                                B340A39D0D0B765607F5A833 /* RemoteCommandCoordinator.swift in Sources */,
+                                BB2F5126B39990B538691117 /* PlaybackRouting.swift in Sources */,
+                                371568CC892571F17054D3C6 /* HTTPRequestHead.swift in Sources */,
+                                C2F28CF6ADBAF571A4F5C238 /* CastSessionRecovery.swift in Sources */,
+                                1EED7B343C44D551BDD19AFF /* CastManifestRewriter.swift in Sources */,
+                                62A8CEB49CCAE8035AB1BA12 /* AirPlayRouting.swift in Sources */,
                                 BAEE9A1A2FCB000000000004 /* BackgroundKeepAlive.swift in Sources */,
                                 1279E58D2FCA397700C9BA56 /* ThumbnailEpisodeRow.swift in Sources */,
                                 1279E58E2FCA397700C9BA56 /* AniListProvider.swift in Sources */,
@@ -2186,6 +2248,8 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 F8F895AB3AE54DBC2CA63B35 /* LocalCollection.swift in Sources */,
                                 AA105005000000000000F104 /* LocalSource.swift in Sources */,
                                 1279E59B2FCA397700C9BA56 /* CachedAsyncImage.swift in Sources */,
+                                AE08652BAC34A34294246221 /* CopyTitle.swift in Sources */,
+                                B7E6AFBC96F12550F8015ED3 /* PosterViewer.swift in Sources */,
                                 6AC7539852434F95B190C831 /* ScoreInputView.swift in Sources */,
                                 1279E59D2FCA397700C9BA56 /* AniListNotification.swift in Sources */,
                                 1279E59E2FCA397700C9BA56 /* DownloadModulePickerView.swift in Sources */,
@@ -2364,7 +2428,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "@executable_path/Frameworks",
                                 );
                                 LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                                MARKETING_VERSION = 2.15;
+                                MARKETING_VERSION = 2.16;
                                 PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
                                 PRODUCT_NAME = "$(TARGET_NAME)";
                                 SDKROOT = appletvos;
@@ -2399,7 +2463,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "@executable_path/Frameworks",
                                 );
                                 LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                                MARKETING_VERSION = 2.15;
+                                MARKETING_VERSION = 2.16;
                                 PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
                                 PRODUCT_NAME = "$(TARGET_NAME)";
                                 SDKROOT = appletvos;
@@ -2516,7 +2580,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "$(inherited)",
                                         "@executable_path/Frameworks",
                                 );
-                                MARKETING_VERSION = 2.15;
+                                MARKETING_VERSION = 2.16;
                                 PRODUCT_NAME = shirox;
                                 PROVISIONING_PROFILE_SPECIFIER = "";
                                 SDKROOT = iphoneos;
@@ -2562,7 +2626,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "@executable_path/../Frameworks",
                                 );
                                 MACOSX_DEPLOYMENT_TARGET = 14.0;
-                                MARKETING_VERSION = 2.15;
+                                MARKETING_VERSION = 2.16;
                                 PRODUCT_NAME = shirox;
                                 SDKROOT = macosx;
                                 SUPPORTS_MACCATALYST = NO;
@@ -2588,7 +2652,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "$(inherited)",
                                         "@executable_path/Frameworks",
                                 );
-                                MARKETING_VERSION = 2.15;
+                                MARKETING_VERSION = 2.16;
                                 PRODUCT_NAME = shirox;
                                 PROVISIONING_PROFILE_SPECIFIER = "";
                                 SDKROOT = iphoneos;
@@ -2679,7 +2743,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                         "@executable_path/../Frameworks",
                                 );
                                 MACOSX_DEPLOYMENT_TARGET = 14.0;
-                                MARKETING_VERSION = 2.15;
+                                MARKETING_VERSION = 2.16;
                                 PRODUCT_NAME = shirox;
                                 SDKROOT = macosx;
                                 SUPPORTS_MACCATALYST = NO;

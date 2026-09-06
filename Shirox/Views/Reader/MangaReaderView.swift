@@ -122,7 +122,7 @@ struct MangaReaderView: View {
 
     init(context: ReaderContext) {
         self.context = context
-        _displayedChapterIndex = State(initialValue: min(max(context.chapterIndex, 0), context.chapters.count - 1))
+        _displayedChapterIndex = State(initialValue: min(max(context.chapterIndex, 0), max(context.chapters.count - 1, 0)))
         _pendingResume = State(initialValue: context.resumePage)
         _pendingResumeFraction = State(initialValue: context.resumeFraction ?? 0)
     }
@@ -130,7 +130,7 @@ struct MangaReaderView: View {
     private var mode: MangaReadingMode { MangaReadingMode(rawValue: modeRaw) ?? .vertical }
     private var isRTL: Bool { mode == .pagedRTL }
 
-    private var displayedChapter: MangaChapter { context.chapters[displayedChapterIndex] }
+    private var displayedChapter: MangaChapter? { context.chapters[safe: displayedChapterIndex] }
     private var hasNextChapter: Bool { displayedChapterIndex + 1 < context.chapters.count }
     private var hasPrevChapter: Bool { displayedChapterIndex > 0 }
 
@@ -224,6 +224,13 @@ struct MangaReaderView: View {
         .onAppear {
             // Reading session: keep the screen awake until the reader closes.
             UIApplication.shared.isIdleTimerDisabled = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+            // Saves are debounced by 1.2s, and a swipe-away kill runs neither onDisappear nor
+            // applicationWillTerminate — so leaving the app right after a page turn dropped that
+            // page. This is the last reliable signal before that, same as the player's handler.
+            saveTask?.cancel()
+            performSave()
         }
         .onDisappear {
             UIApplication.shared.isIdleTimerDisabled = false
@@ -428,7 +435,7 @@ struct MangaReaderView: View {
                     .lineLimit(1)
                 // Always the chapter ON SCREEN — scrolling back into the
                 // previous chapter flips this back too.
-                Text(displayedChapter.displayName)
+                Text(displayedChapter?.displayName ?? "")
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.7))
                     .lineLimit(1)
@@ -588,6 +595,14 @@ struct MangaReaderView: View {
     /// for the seamless stitched transition, which appends instead.
     @MainActor
     private func loadChapter(_ idx: Int) async {
+        // A manga whose chapter list came back empty (module returned nothing, stale Continue
+        // Reading entry) used to reach `context.chapters[-1]` and crash the app.
+        guard !context.chapters.isEmpty else {
+            strip = []
+            loadError = "No chapters found"
+            isLoading = false
+            return
+        }
         let clamped = min(max(idx, 0), context.chapters.count - 1)
         isLoading = true
         loadError = nil
@@ -905,8 +920,8 @@ struct MangaReaderView: View {
             }
             return (currentPage, 0)
         }()
-        guard let item = strip[safe: min(max(globalIdx, 0), strip.count - 1)] else { return }
-        let chapterMeta = context.chapters[item.chapterIdx]
+        guard let item = strip[safe: min(max(globalIdx, 0), strip.count - 1)],
+              let chapterMeta = context.chapters[safe: item.chapterIdx] else { return }
         let total = chapterPageCounts[item.chapterIdx] ?? strip.count
         MangaProgressManager.shared.saveProgress(MangaReadingItem(
             mangaTitle: context.mangaTitle,

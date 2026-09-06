@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "2.16",
+          "buildVersion": "1",
+          "date": "2026-09-06",
+          "localizedDescription": "Synced with the upstream project's latest release and brought the best of it over. The home carousel now paints with TVDB's high-resolution posters instead of AniList's smaller covers — the same upgrade the upstream app made — with a 100-point parallax buffer so swipes reveal image instead of hard edges: visibly sharper on every phone. Streams that silently failed to load are fixed at the root: the player watched the video item through a channel that drops the fast failure signal an expired CDN link produces, so it never noticed the stream had died — now a proper observer catches every failure, on the launch stream AND on quality/source switches, auto-refetches a fresh URL, and when recovery runs out of road you get a Retry button instead of a black screen. Modules whose scripts hang (a promise that never settles) can no longer freeze the stream picker or block all later recovery — both JavaScript bridges are now bounded and resume exactly once. Chromecast and AirPlay no longer drop out mid-playback: the cast session survives screen locks, control-center commands route correctly during a cast, quality switches re-issue to the TV instead of playing on the phone, and header-authenticated streams now actually play on Apple TV via AirPlay (they used to 403 to a black screen). New: tap any detail-page poster to open it full-screen with pinch zoom and drag-to-dismiss, long-press a title to copy it, and AniList notifications now name the user and show forum activity instead of a blank row. Also fixed along the way: pull-to-refresh on Browse reloading instead of appending, the episode range menu never showing an empty list you couldn't recover from, VTT subtitles with tab-separated settings being dropped, the Home tab crashing when trending came back empty, the manga reader crashing on chapter lists that came back empty, failed social deletes/likes now reporting and rolling back, and credentials (AniList tokens, Jellyfin API keys, Cloudflare cookies) are now redacted from exported logs.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 11649543,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "2.15",
           "buildVersion": "1",
           "date": "2026-08-30",

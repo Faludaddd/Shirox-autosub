@@ -357,7 +357,12 @@ struct FeaturedCarousel: View {
             : UIScreen.main.bounds.height - 140
 
         let displayItems = realItems
-        let currentMedia = displayItems.isEmpty ? items[0] : displayItems[currentIndex]
+        // `displayItems` is `items.prefix(8)`, so it is empty exactly when `items` is — the old
+        // `displayItems.isEmpty ? items[0] : …` indexed the empty array in precisely the case it
+        // was guarding against. SwiftUI can still evaluate this body once with an emptied
+        // `items` while the parent's `if !vm.trending.isEmpty` is being torn down, which crashed
+        // the Home tab whenever trending went from populated to empty (failed refresh, offline).
+        let currentMedia = displayItems.indices.contains(currentIndex) ? displayItems[currentIndex] : nil
 
         VStack(spacing: 0) {
             ZStack {
@@ -442,73 +447,75 @@ struct FeaturedCarousel: View {
                     .frame(height: 360)
                     .allowsHitTesting(false)
 
-                    VStack(spacing: 10) {
-                        Text(currentMedia.title.displayTitle)
-                            .font(.title.weight(.bold))
-                            .foregroundStyle(.primary)
-                            .multilineTextAlignment(.center)
-                            .lineLimit(2)
+                    if let currentMedia {
+                        VStack(spacing: 10) {
+                            Text(currentMedia.title.displayTitle)
+                                .font(.title.weight(.bold))
+                                .foregroundStyle(.primary)
+                                .multilineTextAlignment(.center)
+                                .lineLimit(2)
 
-                        // Genre capsules — replace the previous multi-line description
-                        // (which was too dense for a carousel). Up to 3 tags, capped.
-                        if let genres = currentMedia.genres, !genres.isEmpty {
-                            HStack(spacing: 6) {
-                                ForEach(genres.prefix(3), id: \.self) { g in
-                                    Text(g)
-                                        .font(.caption2.weight(.semibold))
-                                        .foregroundStyle(.primary)
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 3)
-                                        .background(Color.primary.opacity(0.1), in: Capsule())
-                                        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
+                            // Genre capsules — replace the previous multi-line description
+                            // (which was too dense for a carousel). Up to 3 tags, capped.
+                            if let genres = currentMedia.genres, !genres.isEmpty {
+                                HStack(spacing: 6) {
+                                    ForEach(genres.prefix(3), id: \.self) { g in
+                                        Text(g)
+                                            .font(.caption2.weight(.semibold))
+                                            .foregroundStyle(.primary)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 3)
+                                            .background(Color.primary.opacity(0.1), in: Capsule())
+                                            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
+                                    }
                                 }
                             }
-                        }
 
-                        NavigationLink {
-                            if isManga {
-                                AniListMangaDetailView(mediaId: currentMedia.id, preloadedMedia: currentMedia)
-                            } else {
-                                AniListDetailView(mediaId: currentMedia.id, preloadedMedia: currentMedia)
+                            NavigationLink {
+                                if isManga {
+                                    AniListMangaDetailView(mediaId: currentMedia.id, preloadedMedia: currentMedia)
+                                } else {
+                                    AniListDetailView(mediaId: currentMedia.id, preloadedMedia: currentMedia)
+                                }
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: isManga ? "book.fill" : "play.fill").font(.caption.weight(.bold))
+                                    Text(isManga ? "Start Reading" : "Start Watching")
+                                        .font(.subheadline.weight(.semibold))
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.7)
+                                }
+                                .foregroundStyle(.primary)
+                                .frame(height: 38)
+                                .padding(.horizontal, 16)
+                                .background(.ultraThinMaterial, in: Capsule())
+                                .overlay(Capsule().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
                             }
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: isManga ? "book.fill" : "play.fill").font(.caption.weight(.bold))
-                                Text(isManga ? "Start Reading" : "Start Watching")
-                                    .font(.subheadline.weight(.semibold))
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.7)
-                            }
-                            .foregroundStyle(.primary)
-                            .frame(height: 38)
-                            .padding(.horizontal, 16)
-                            .background(.ultraThinMaterial, in: Capsule())
-                            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
-                        }
-                        .buttonStyle(.plain)
+                            .buttonStyle(.plain)
 
-                        // "Slide to browse" hint — fades out after the first swipe.
-                        if !hasInteracted {
-                            HStack(spacing: 6) {
-                                Image(systemName: "chevron.compact.left")
-                                    .font(.subheadline.weight(.bold))
-                                Text("Slide to browse")
-                                    .font(.caption.weight(.semibold))
-                                Image(systemName: "chevron.compact.right")
-                                    .font(.subheadline.weight(.bold))
+                            // "Slide to browse" hint — fades out after the first swipe.
+                            if !hasInteracted {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "chevron.compact.left")
+                                        .font(.subheadline.weight(.bold))
+                                    Text("Slide to browse")
+                                        .font(.caption.weight(.semibold))
+                                    Image(systemName: "chevron.compact.right")
+                                        .font(.subheadline.weight(.bold))
+                                }
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(.ultraThinMaterial, in: Capsule())
+                                .overlay(Capsule().strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
+                                .transition(.opacity.combined(with: .move(edge: .bottom)))
                             }
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(.ultraThinMaterial, in: Capsule())
-                            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
-                            .transition(.opacity.combined(with: .move(edge: .bottom)))
                         }
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 18)
+                        .animation(.easeOut(duration: 0.35), value: hasInteracted)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 18)
-                    .animation(.easeOut(duration: 0.35), value: hasInteracted)
                 }
             }
 
@@ -773,13 +780,17 @@ private struct FeaturedCard: View, Equatable {
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
+                // iPhone: portrait with horizontal parallax. TVDB posters (typically
+                // 680×1000 or larger) are higher-resolution than AniList's extraLarge
+                // cover (~460×645), so the carousel paints visibly sharper at full
+                // screen scale. A 100pt buffer rides along so the parallax swipe
+                // reveals image instead of hard edges; centered via -(buffer/2).
                 GeometryReader { geo in
                     let pageOffset = geo.frame(in: .global).minX
-                    let imageURL = media.coverImage.extraLarge ?? media.coverImage.large ?? ""
-                    CachedAsyncImage(urlString: imageURL)
-                        .frame(width: geo.size.width, height: geo.size.height)
-                        .clipped()
-                        .offset(x: -pageOffset * 0.25)
+                    let buffer: CGFloat = 100
+                    TVDBPosterImage(media: media)
+                        .frame(width: geo.size.width + buffer, height: geo.size.height)
+                        .offset(x: -(buffer / 2) - pageOffset * 0.25)
                 }
                 .clipped()
             }

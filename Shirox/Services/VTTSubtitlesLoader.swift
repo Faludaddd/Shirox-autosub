@@ -167,8 +167,8 @@ enum VTTSubtitlesLoader {
         // The end part may have cue settings appended; take only the first token
         let endStr = parts[1]
             .trimmingCharacters(in: .whitespaces)
-            .components(separatedBy: " ")[0]
-            .trimmingCharacters(in: .whitespaces)
+            .components(separatedBy: .whitespaces)
+            .first(where: { !$0.isEmpty }) ?? ""
 
         guard let start = parseTimestamp(startStr),
               let end   = parseTimestamp(endStr) else {

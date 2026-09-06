@@ -229,6 +229,11 @@ struct NotificationsView: View {
     private func handleTap(_ notif: ProviderNotification) {
         guard isTappable(notif) else { return }
         Haptics.light()
+        // Forum notifications have no in-app screen — open AniList's thread page directly.
+        if let url = notif.kind.externalURL, UIApplication.shared.canOpenURL(url) {
+            UIApplication.shared.open(url)
+            return
+        }
         pendingNavNotif = notif
     }
 
@@ -249,9 +254,11 @@ struct NotificationsView: View {
         switch notif.kind {
         case .airing(_, _, let mediaId, _):
             return mediaId != 0
-        case .activityMessage(let id, _, _), .activityReply(let id, _, _),
-             .activityMention(let id, _, _), .activityLike(let id, _, _):
+        case .activityMessage(let id, _, _, _), .activityReply(let id, _, _, _),
+             .activityMention(let id, _, _, _), .activityLike(let id, _, _, _):
             return id != nil
+        case .threadComment(_, let url, _, _, _), .threadLike(_, let url, _, _, _):
+            return url != nil
         case .mediaChange(_, _, _, let mediaId):
             return mediaId != nil
         default:
@@ -273,8 +280,8 @@ struct NotificationsView: View {
                 coverImageURL: coverURL,
                 notificationCreatedAt: notif.createdAt
             )
-        case .activityMessage(let activityId, _, _), .activityReply(let activityId, _, _),
-             .activityMention(let activityId, _, _), .activityLike(let activityId, _, _):
+        case .activityMessage(let activityId, _, _, _), .activityReply(let activityId, _, _, _),
+             .activityMention(let activityId, _, _, _), .activityLike(let activityId, _, _, _):
             if let id = activityId { ActivityFetchView(activityId: id) }
         case .mediaChange(_, _, _, let mediaId):
             if let id = mediaId { AniListDetailView(mediaId: id, preloadedMedia: nil) }
@@ -402,6 +409,8 @@ private struct NotificationSwipeRow: View {
         case .activityMessage: return ("envelope", .purple)
         case .activityReply, .activityMention: return ("bubble.left", .orange)
         case .activityLike: return ("heart.fill", .pink)
+        case .threadComment: return ("text.bubble", .indigo)
+        case .threadLike: return ("heart.fill", .pink)
         case .mediaChange: return ("arrow.triangle.2.circlepath", .gray)
         case .unknown: return ("bell", .gray)
         }
@@ -585,9 +594,16 @@ private struct NotificationRowContent: View {
             return Text("\(mediaTitle ?? "Anime") ").bold() + Text("episode \(episode) aired")
         case .following(_, let userName, _):
             return Text(userName ?? "Someone").bold() + Text(" followed you")
-        case .activityMessage(_, let context, _), .activityReply(_, let context, _),
-             .activityMention(_, let context, _), .activityLike(_, let context, _):
-            return Text("Activity ") + Text(context ?? "")
+        case .activityMessage(_, let userName, let context, _), .activityReply(_, let userName, let context, _),
+             .activityMention(_, let userName, let context, _), .activityLike(_, let userName, let context, _):
+            return sentenceText(NotificationSentence(userName: userName, context: context,
+                                                     fallbackAction: "interacted with your activity"))
+        case .threadComment(let threadTitle, _, let userName, let context, _):
+            return sentenceText(NotificationSentence(userName: userName, context: context,
+                                                     fallbackAction: "commented in", objectTitle: threadTitle))
+        case .threadLike(let threadTitle, _, let userName, let context, _):
+            return sentenceText(NotificationSentence(userName: userName, context: context,
+                                                     fallbackAction: "liked your post in", objectTitle: threadTitle))
         case .mediaChange(let title, let context, _, _):
             if let title, !title.isEmpty {
                 return Text(title).bold() + Text(context ?? " was recently added to the site.")
@@ -713,9 +729,13 @@ private func historyBodyText(for notif: ProviderNotification) -> String {
         return "\(mediaTitle ?? "Anime") — Episode \(episode) aired"
     case .following(_, let userName, _):
         return "\(userName ?? "Someone") followed you"
-    case .activityMessage(_, let context, _), .activityReply(_, let context, _),
-         .activityMention(_, let context, _), .activityLike(_, let context, _):
-        return "Activity: \(context ?? "")"
+    case .activityMessage(_, let userName, let context, _), .activityReply(_, let userName, let context, _),
+         .activityMention(_, let userName, let context, _), .activityLike(_, let userName, let context, _):
+        return "\(NotificationSentence(userName: userName, context: context, fallbackAction: "interacted with your activity"))"
+    case .threadComment(let threadTitle, _, let userName, let context, _):
+        return "\(NotificationSentence(userName: userName, context: context, fallbackAction: "commented in", objectTitle: threadTitle))"
+    case .threadLike(let threadTitle, _, let userName, let context, _):
+        return "\(NotificationSentence(userName: userName, context: context, fallbackAction: "liked your post in", objectTitle: threadTitle))"
     case .mediaChange(let title, let context, _, _):
         if let title, !title.isEmpty { return "\(title): \(context ?? "Updated")" }
         return context ?? "Media updated"
@@ -894,9 +914,16 @@ private struct NotificationGridCard: View {
             return Text("\(mediaTitle ?? "Anime") ").bold() + Text("ep \(episode) aired")
         case .following(_, let userName, _):
             return Text(userName ?? "Someone").bold() + Text(" followed you")
-        case .activityMessage(_, let context, _), .activityReply(_, let context, _),
-             .activityMention(_, let context, _), .activityLike(_, let context, _):
-            return Text(context ?? "Activity")
+        case .activityMessage(_, let userName, let context, _), .activityReply(_, let userName, let context, _),
+             .activityMention(_, let userName, let context, _), .activityLike(_, let userName, let context, _):
+            return sentenceText(NotificationSentence(userName: userName, context: context,
+                                                     fallbackAction: "interacted with your activity"))
+        case .threadComment(let threadTitle, _, let userName, let context, _):
+            return sentenceText(NotificationSentence(userName: userName, context: context,
+                                                     fallbackAction: "commented in", objectTitle: threadTitle))
+        case .threadLike(let threadTitle, _, let userName, let context, _):
+            return sentenceText(NotificationSentence(userName: userName, context: context,
+                                                     fallbackAction: "liked your post in", objectTitle: threadTitle))
         case .mediaChange(let title, let context, _, _):
             if let title, !title.isEmpty {
                 return Text(title).bold() + Text(" \(context ?? "updated")")
@@ -909,3 +936,12 @@ private struct NotificationGridCard: View {
     }
 }
 
+
+/// AniList sends contexts like " liked your activity", written to follow the
+/// username. Joining them keeps the sentence whole whether or not the API's
+/// leading space is there.
+private func sentenceText(_ sentence: NotificationSentence) -> Text {
+    let opening = Text(sentence.subject).bold() + Text(" \(sentence.action)")
+    guard let object = sentence.object else { return opening }
+    return opening + Text(" ") + Text(object).bold()
+}
