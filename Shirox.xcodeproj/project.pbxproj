@@ -790,12 +790,12 @@
                 1279E47F2FCA397700C9BA56 /* AniListSocialService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListSocialService.swift; sourceTree = "<group>"; };
                 1279E4802FCA397700C9BA56 /* CacheManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CacheManager.swift; sourceTree = "<group>"; };
                 1279E4812FCA397700C9BA56 /* CastProxyServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CastProxyServer.swift; sourceTree = "<group>"; };
-                ADBC4EDBD4BDB681DA245E48 /* RemoteCommandCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteCommandCoordinator.swift; sourceTree = "<group>"; },
-                7B70FA209F349380E173FA36 /* PlaybackRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackRouting.swift; sourceTree = "<group>"; },
-                2AB598C1FA51D6B9ECA33424 /* HTTPRequestHead.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPRequestHead.swift; sourceTree = "<group>"; },
-                7B1ACD7F2D51864002997F48 /* CastSessionRecovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CastSessionRecovery.swift; sourceTree = "<group>"; },
-                8ADE5B6BC623A36C9424600D /* CastManifestRewriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CastManifestRewriter.swift; sourceTree = "<group>"; },
-                100488BAA466DA3C976674C2 /* AirPlayRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirPlayRouting.swift; sourceTree = "<group>"; },
+                ADBC4EDBD4BDB681DA245E48 /* RemoteCommandCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteCommandCoordinator.swift; sourceTree = "<group>"; };
+                7B70FA209F349380E173FA36 /* PlaybackRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackRouting.swift; sourceTree = "<group>"; };
+                2AB598C1FA51D6B9ECA33424 /* HTTPRequestHead.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPRequestHead.swift; sourceTree = "<group>"; };
+                7B1ACD7F2D51864002997F48 /* CastSessionRecovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CastSessionRecovery.swift; sourceTree = "<group>"; };
+                8ADE5B6BC623A36C9424600D /* CastManifestRewriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CastManifestRewriter.swift; sourceTree = "<group>"; };
+                100488BAA466DA3C976674C2 /* AirPlayRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirPlayRouting.swift; sourceTree = "<group>"; };
                 1279E4822FCA397700C9BA56 /* CloudflareBypassManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudflareBypassManager.swift; sourceTree = "<group>"; };
                 1279E4832FCA397700C9BA56 /* ContinueWatchingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContinueWatchingManager.swift; sourceTree = "<group>"; };
                 1279E4842FCA397700C9BA56 /* DownloadManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadManager.swift; sourceTree = "<group>"; };
@@ -865,8 +865,8 @@
                 1279E4C92FCA397700C9BA56 /* ProfileStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileStatsView.swift; sourceTree = "<group>"; };
                 1279E4CA2FCA397700C9BA56 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
                 1279E4CC2FCA397700C9BA56 /* CachedAsyncImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachedAsyncImage.swift; sourceTree = "<group>"; };
-                B9B9C4B7F8CC17DCA4244990 /* CopyTitle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopyTitle.swift; sourceTree = "<group>"; },
-                3F5E22F3922DEDB01A89A0B0 /* PosterViewer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterViewer.swift; sourceTree = "<group>"; },
+                B9B9C4B7F8CC17DCA4244990 /* CopyTitle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopyTitle.swift; sourceTree = "<group>"; };
+                3F5E22F3922DEDB01A89A0B0 /* PosterViewer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterViewer.swift; sourceTree = "<group>"; };
                 1279E4CD2FCA397700C9BA56 /* CloudflareBypassSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudflareBypassSheetView.swift; sourceTree = "<group>"; };
                 1279E4CE2FCA397700C9BA56 /* Color+SystemBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+SystemBackground.swift"; sourceTree = "<group>"; };
                 1279E4CF2FCA397700C9BA56 /* ContentUnavailableView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentUnavailableView.swift; sourceTree = "<group>"; };
