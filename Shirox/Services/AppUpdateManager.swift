@@ -70,6 +70,22 @@ final class AppUpdateManager: ObservableObject {
     @AppStorage("update.lastDismissedVersion") var lastDismissedVersion: String = ""
     @AppStorage("update.checkIntervalSeconds") var checkIntervalSeconds: Int = 3600
 
+    /// v2.17 — Forced-update demo mode. When true, the version comparison
+    /// treats the installed build as outdated no matter what the manifest
+    /// says, so the entire forced-update flow (gate, download, verification,
+    /// installer handoff) can be exercised on a current build. Toggled by
+    /// tapping the version row on the About page five times; an "Exit demo
+    /// mode" chip on the gate turns it off.
+    @AppStorage("update.simulateOutdated") var simulateOutdated = false
+
+    /// v2.17 — True while the forced-update gate should cover the whole app.
+    /// Raised the moment a check CONFIRMS a newer version exists; lowered
+    /// only when a check confirms the installed version is current again
+    /// (i.e. after the update is installed and the app relaunches) or the
+    /// demo mode is exited. A FAILED re-check never lowers it — a flaky
+    /// network must not un-gate a known-outdated app.
+    @Published private(set) var gateVisible = false
+
     // MARK: - Manifest sources
 
     private struct ManifestSource {
@@ -217,8 +233,14 @@ final class AppUpdateManager: ObservableObject {
 
         lastSuccessfulCheck = Date()
 
-        guard Self.isNewer(latest.version, than: currentVersion) else {
+        // v2.17 — In demo mode the comparison always reports "outdated" so
+        // the forced-update flow can be demoed on the latest build; the UI
+        // still shows the real installed version.
+        let installedForComparison = simulateOutdated ? "0.0.0" : currentVersion
+
+        guard Self.isNewer(latest.version, than: installedForComparison) else {
             state = .current
+            gateVisible = false
             return
         }
 
@@ -238,12 +260,22 @@ final class AppUpdateManager: ObservableObject {
         // dismissed (non-forced checks only).
         if !force, latest.version == lastDismissedVersion {
             state = .dismissed(info(from: latest))
+            gateVisible = true
             return
         }
 
         let info = info(from: latest)
         state = .available(info)
         postUpdateNotification(info)
+        gateVisible = true
+    }
+
+    /// v2.17 — Turns off forced-update demo mode and immediately re-checks,
+    /// so the gate clears as soon as the honest comparison says "current".
+    func exitDemo() {
+        simulateOutdated = false
+        gateVisible = false
+        Task { await checkForUpdates(force: true) }
     }
 
     /// Marks the current available update as dismissed so non-forced checks

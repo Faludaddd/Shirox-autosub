@@ -440,6 +440,9 @@ private struct RootTabView: View {
     #if os(iOS)
     @ObservedObject private var playerPresenter = PlayerPresenter.shared
     @ObservedObject private var quickActions = QuickActionManager.shared
+    // v2.17 — Forced-update gate: observed here so the cover is presented /
+    // dismissed the moment the manager's verdict changes.
+    @ObservedObject private var updateManager = AppUpdateManager.shared
     #endif
     @State private var selectedTab = 0
     #if targetEnvironment(macCatalyst) || os(macOS)
@@ -597,6 +600,21 @@ private struct RootTabView: View {
                 .adaptivePresentationDetents([.medium, .large])
             }
         }
+
+        // v2.17 — Forced update gate. Presented over EVERYTHING (tabs,
+        // sheets, player) the moment AppUpdateManager confirms a newer
+        // version exists. The cover offers no dismissal — it clears only
+        // when a real check confirms the installed version is current
+        // again, i.e. after AltStore installs the update and iOS relaunches
+        // the app (or the user exits demo mode from the gate itself).
+        #if os(iOS)
+        .fullScreenCover(isPresented: Binding(
+            get: { updateManager.gateVisible },
+            set: { _ in }
+        )) {
+            ForcedUpdateView()
+        }
+        #endif
 
         .onChange(of: cfManager.activeBypassWebView != nil) { presented in
             if presented {

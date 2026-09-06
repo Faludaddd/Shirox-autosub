@@ -99,6 +99,20 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.17",
+        date: "2026-09-06",
+        added: [
+            "Forced updates, end to end. If the version you're running is behind the latest release, the app now locks itself behind a dedicated update screen the moment it launches — and re-checks whenever you open the login/sources page or return to the app. There's no dismissing it and no way past it until you're current: the update is downloaded inside the app (live percentage, megabytes, and speed), verified against the checksum published with the release, then handed to AltStore to install — and the app relaunches straight into the new version. The screen itself is a custom, animated experience that matches the app: an emblem with an orbiting sparkle ring that becomes your download progress, your version transitioning into the new one, the changelog of what's coming, springy state transitions, haptics on every state change, one-tap retry on failure, and a share-the-package fallback if AltStore isn't installed. You can preview the entire flow on demand: tap the version row on the About page five times to enter demo mode, and exit it from the screen itself."
+        ],
+        fixed: [],
+        changed: [
+            "The update check now drives a real gate instead of just a notification: a confirmed newer version raises it, only a confirmed-current version (or exiting demo mode) lowers it, and a failed network check never unlocks a known-outdated app."
+        ],
+        improved: [],
+        removed: [],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "2.16",
         date: "2026-09-06",
         added: [

@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "2.17",
+          "buildVersion": "1",
+          "date": "2026-09-06",
+          "localizedDescription": "Updates are now enforced, end to end, inside the app. If the version you're running is behind the latest release, Shirox+ locks itself behind a dedicated update screen the moment it launches (and re-checks whenever you open the login/sources page or return to the app) — there's no way past it until you're current, and no browser page or system popup involved. The screen is built like the rest of the app: an animated update emblem with orbiting sparkles, your version transitioning to the new one, the full changelog of what's coming, and a prominent Update Now button. Tapping it (or just waiting a second) downloads the new IPA right there with live percentage, megabytes and speed; the app then streams a SHA-256 over the file and matches it against the checksum published with the release before handing off to AltStore to finish the install — Shirox+ restarts into the new version and the gate never shows again. Failed downloads explain themselves and offer one-tap retry; if AltStore isn't installed you can share the verified package instead. You can preview the whole flow any time: tap the version row on the About page five times, and exit demo mode from the screen itself.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 11739540,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "2.16",
           "buildVersion": "1",
           "date": "2026-09-06",

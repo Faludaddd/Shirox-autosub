@@ -2324,6 +2324,13 @@ struct SourcesSettingsPage: View {
             }
         }
         .navigationTitle("Sources")
+        // v2.17 — Forced update: re-check whenever the user reaches the
+        // login/sources screen (the app's login surface), per spec. Forced:
+        // arriving here should always produce a FRESH verdict, not an
+        // hour-old one.
+        .onAppear {
+            Task { await AppUpdateManager.shared.checkForUpdates(force: true) }
+        }
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
@@ -4517,6 +4524,11 @@ struct LandscapeSubtitlePreview: View {
 struct AboutSettingsPage: View {
     @ObservedObject private var updateManager = AppUpdateManager.shared
 
+    /// v2.17 — Tap counter for the forced-update demo trigger (5 taps on
+    /// the version row, each within ~1.8s of the last).
+    @State private var versionTaps = 0
+    @State private var versionTapResetTask: Task<Void, Never>?
+
     private var version: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "-"
     }
@@ -4545,6 +4557,40 @@ struct AboutSettingsPage: View {
 
     // MARK: - Hero Card
 
+    /// v2.17 — Five quick taps on the version row toggles forced-update
+    /// demo mode: the version comparison reports the installed build as
+    /// outdated so the real forced-update flow (gate, download, checksum
+    /// verification, AltStore handoff) can be exercised on a current build.
+    /// The gate itself carries an "Exit demo mode" chip to turn it off.
+    private func handleVersionRowTap() {
+        versionTaps += 1
+        versionTapResetTask?.cancel()
+        versionTapResetTask = Task {
+            try? await Task.sleep(nanoseconds: 1_800_000_000)
+            if !Task.isCancelled { versionTaps = 0 }
+        }
+        guard versionTaps >= 5 else { return }
+        versionTaps = 0
+        versionTapResetTask?.cancel()
+        Haptics.medium()
+        if updateManager.simulateOutdated {
+            updateManager.exitDemo()
+            ToastManager.shared.show(
+                title: "Forced Update",
+                message: "Demo mode off — re-checking your real version.",
+                icon: "checkmark.circle.fill",
+                iconColor: .green)
+        } else {
+            updateManager.simulateOutdated = true
+            ToastManager.shared.show(
+                title: "Forced Update",
+                message: "Demo mode on — the update gate will appear.",
+                icon: "arrow.down.circle.fill",
+                iconColor: .accentColor)
+            Task { await updateManager.checkForUpdates(force: true) }
+        }
+    }
+
     private var heroCard: some View {
         VStack(spacing: 14) {
             // #94 — Single clean app icon: just the bundled `app-logo` asset
@@ -4562,6 +4608,7 @@ struct AboutSettingsPage: View {
                 Text("Version \(version) (\(build))")
                     .font(.subheadline.monospacedDigit())
                     .foregroundStyle(.secondary)
+                    .onTapGesture { handleVersionRowTap() }
             }
 
             HStack(spacing: 8) {
