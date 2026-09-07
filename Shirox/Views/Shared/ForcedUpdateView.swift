@@ -1,6 +1,7 @@
 #if canImport(UIKit)
 import SwiftUI
 import CryptoKit
+import UniformTypeIdentifiers
 
 // MARK: - Update destination (v2.23)
 //
@@ -1374,6 +1375,106 @@ struct UpdateCoverView: View {
             .adaptivePresentationDetents([.medium, .large])
     }
 
+    // MARK: - Downloaded-file management (v2.24: DELETE FILE / FIND FILE)
+
+    /// Real file management for a package that actually exists on disk:
+    /// DELETE FILE removes it (after a confirmation) and returns the flow
+    /// to idle so the download can restart; FIND FILE opens the Files
+    /// interface rooted at the app's Documents folder — iOS offers no
+    /// deep-link into an exact container path, so the exact location is
+    /// spelled out alongside. `compact` renders the slim idle-state row;
+    /// the full card is shown on the success screen.
+    @ViewBuilder
+    private func downloadedFileManagement(compact: Bool) -> some View {
+        // Only ever rendered when the package REALLY exists (checked on
+        // disk, not remembered) — both call sites already gate on
+        // hasDownloadedPackage.
+        let path = downloadService.packageFilesPath ?? "On My iPhone/Shirox+/Updates"
+        let size: Int64 = {
+            guard let url = downloadService.packageURL else { return 0 }
+            return (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64) ?? 0
+        }()
+
+        if compact {
+            VStack(spacing: 8) {
+                HStack(spacing: 10) {
+                    Button {
+                        showDeleteFileConfirmation = true
+                    } label: {
+                        Label("Delete File", systemImage: "trash")
+                            .font(.caption.weight(.semibold))
+                            .lineLimit(1)
+                    }
+                    .buttonStyle(UpdateSecondaryButtonStyle(height: 40, tint: .red))
+
+                    Button {
+                        findFileNotice = path
+                        showFileBrowser = true
+                        Haptics.selection()
+                    } label: {
+                        Label("Find File", systemImage: "folder")
+                            .font(.caption.weight(.semibold))
+                            .lineLimit(1)
+                    }
+                    .buttonStyle(UpdateSecondaryButtonStyle(height: 40))
+                }
+                if let notice = findFileNotice {
+                    Text("File location: \(notice)")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        } else {
+            statusCard {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "doc.zip")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Color.appAccent)
+                        Text("Downloaded File")
+                            .font(.subheadline.weight(.semibold))
+                        Spacer()
+                        if size > 0 {
+                            Text(ByteCountFormatter.string(fromByteCount: size, countStyle: .file))
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    HStack(spacing: 5) {
+                        Image(systemName: "folder")
+                            .font(.system(size: 10, weight: .semibold))
+                        Text(path)
+                            .lineLimit(2)
+                    }
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    HStack(spacing: 10) {
+                        Button {
+                            showDeleteFileConfirmation = true
+                        } label: {
+                            Label("Delete File", systemImage: "trash")
+                                .font(.caption.weight(.semibold))
+                                .lineLimit(1)
+                        }
+                        .buttonStyle(UpdateSecondaryButtonStyle(height: 40, tint: .red))
+
+                        Button {
+                            findFileNotice = path
+                            showFileBrowser = true
+                            Haptics.selection()
+                        } label: {
+                            Label("Find File", systemImage: "folder")
+                                .font(.caption.weight(.semibold))
+                                .lineLimit(1)
+                        }
+                        .buttonStyle(UpdateSecondaryButtonStyle(height: 40))
+                    }
+                }
+            }
+        }
+    }
+
     // MARK: - Shared status card
 
     private func statusCard(tint: Color = .clear,
@@ -1505,6 +1606,77 @@ struct ActivityShareSheet: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+// MARK: - Document browser sheet (v2.24 FIND FILE)
+
+/// FIND FILE: the Files interface. iOS provides no API to open the Files
+/// app rooted at an exact container path, so this presents the system
+/// document picker in browsing mode over a header that spells out the
+/// package's real location (On My iPhone → Shirox+ → Updates). Picking
+/// anything simply dismisses — the goal was navigation, not selection;
+/// nothing is copied or imported.
+struct DocumentBrowserSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Image(systemName: "folder")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Color.appAccent)
+                    Text("Find the downloaded update")
+                        .font(.subheadline.weight(.semibold))
+                }
+                Text("In the Files app, navigate to On My iPhone → Shirox+ → Updates. The update package (Shirox-<version>.ipa) is in that folder.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            DocumentPickerBridge(onDismiss: { dismiss() })
+                .ignoresSafeArea(edges: .bottom)
+        }
+        .background(Color(uiColor: .systemBackground))
+    }
+}
+
+/// The system document picker (browse mode). Selecting a file only
+/// dismisses the sheet — nothing is imported.
+private struct DocumentPickerBridge: UIViewControllerRepresentable {
+    var onDismiss: () -> Void
+
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        // Browse mode over every file type; asCopy avoids needing
+        // opening-in-place security-scoped bookkeeping for a
+        // navigation-only interaction.
+        let picker = UIDocumentPickerViewController(
+            forOpeningContentTypes: [.data, .zip],
+            asCopy: true)
+        picker.delegate = context.coordinator
+        picker.allowsMultipleSelection = false
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator(onDismiss: onDismiss) }
+
+    final class Coordinator: NSObject, UIDocumentPickerDelegate {
+        let onDismiss: () -> Void
+        init(onDismiss: @escaping () -> Void) { self.onDismiss = onDismiss }
+
+        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+            onDismiss()
+        }
+
+        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+            onDismiss()
+        }
+    }
 }
 #endif
 #endif

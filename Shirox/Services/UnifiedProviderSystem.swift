@@ -170,7 +170,15 @@ enum ProviderCacheStore {
         return dir
     }
 
-    struct Entry<T: Decodable>: Decodable {
+    /// Encode-side entry (write accepts any Encodable payload).
+    private struct WriteEntry<T: Encodable>: Encodable {
+        let savedAt: Date
+        let payload: T
+    }
+
+    /// Decode-side entry (read accepts any Decodable payload). Same JSON
+    /// shape as WriteEntry.
+    private struct ReadEntry<T: Decodable>: Decodable {
         let savedAt: Date
         let payload: T
     }
@@ -187,13 +195,13 @@ enum ProviderCacheStore {
     static func read<T: Decodable>(_ type: T.Type, key: String, domain: ProviderDomain, ttl: TimeInterval) -> T? {
         let fileURL = url(for: key, domain: domain)
         guard let data = try? Data(contentsOf: fileURL),
-              let entry = try? JSONDecoder().decode(Entry<T>.self, from: data),
+              let entry = try? JSONDecoder().decode(ReadEntry<T>.self, from: data),
               Date().timeIntervalSince(entry.savedAt) < ttl else { return nil }
         return entry.payload
     }
 
     static func write<T: Encodable>(_ payload: T, key: String, domain: ProviderDomain) {
-        let entry = Entry(savedAt: Date(), payload: payload)
+        let entry = WriteEntry(savedAt: Date(), payload: payload)
         guard let data = try? JSONEncoder().encode(entry) else { return }
         let fileURL = url(for: key, domain: domain)
         try? FileManager.default.createDirectory(
@@ -518,6 +526,7 @@ final class UnifiedProviderSystem: ObservableObject {
         }
 
         // 3. Execute the chain inside a task so concurrent callers share it.
+        var storedOurs = false
         let task = Task<AnyMediaBox, Never> { [weak self] in
             guard let self else {
                 return AnyMediaBox(wrapped: nil, servedBy: nil, error: CancellationError())
@@ -525,7 +534,7 @@ final class UnifiedProviderSystem: ObservableObject {
             do {
                 let (value, servedBy) = try await self.runChainOnce(
                     domain: domain, operation: operation, fullKey: fullKey,
-                    cacheTTL: cacheTTL, fetch: fetch)
+                    cacheTTL: cacheTTL, fetch)
                 return AnyMediaBox(wrapped: value, servedBy: servedBy, error: nil)
             } catch {
                 return AnyMediaBox(wrapped: nil, servedBy: nil, error: error)
@@ -542,10 +551,13 @@ final class UnifiedProviderSystem: ObservableObject {
                 }
             } else {
                 inFlight[fullKey] = task
+                storedOurs = true
             }
         }
         let box = await task.value
-        if let fullKey, inFlight[fullKey] === task { inFlight[fullKey] = nil }
+        // Task is a struct (no identity comparison) — only the caller that
+        // STORED the entry may remove it.
+        if let fullKey, storedOurs { inFlight[fullKey] = nil }
         if let error = box.error { throw error }
         guard let value = box.wrapped as? T, let servedBy = box.servedBy else {
             throw ProviderChainError.allProvidersFailed(lastReason: nil)
@@ -879,7 +891,9 @@ enum ProviderErrorMapper {
             if case .rateLimited = aniError { return true }
             if case .httpError(429) = aniError { return true }
         }
-        if let urlError = error as? URLError, urlError.code == .httpTooManyRequests { return true }
+        // (URLError.Code has no HTTP-status members — transport-level
+        // errors carry no 429; service-level 429s arrive via the mapped
+        // error types above.)
         return false
     }
 }

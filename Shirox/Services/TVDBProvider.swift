@@ -33,7 +33,7 @@ struct TVDBDetailFields: Codable, Equatable {
 }
 
 struct TVDBEpisodeInfo: Codable, Equatable, Identifiable {
-    var id: Int { episodeId ?? airedEpisodeNumber ?? 0 }
+    var id: Int { episodeId ?? number ?? 0 }
     var episodeId: Int?
     var season: Int?
     var number: Int?

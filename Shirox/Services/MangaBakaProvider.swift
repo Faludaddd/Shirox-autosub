@@ -131,8 +131,6 @@ final class MangaBakaProvider {
         }
     }
 
-    private init() {}
-
     // MARK: - Health check
 
     func healthCheck() async throws -> Bool {
