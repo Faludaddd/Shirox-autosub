@@ -238,8 +238,8 @@ final class MusicPlayerManager: NSObject, ObservableObject {
             Task { @MainActor [weak self] in
                 guard let self, let track = self.currentTrack else { return }
                 let pos = self.player.position // 0…1 while playing
-                let timeMs = self.player.time?.value ?? 0
-                let lengthMs = self.player.media?.length?.value ?? 0
+                let timeMs = self.player.time.value
+                let lengthMs = self.player.media?.length.value ?? 0
                 self.positionSeconds = Double(timeMs) / 1000.0
                 self.durationSeconds = lengthMs > 0 ? Double(lengthMs) / 1000.0 : self.durationSeconds
                 if lengthMs <= 0 && pos > 0 && self.durationSeconds == 0 {

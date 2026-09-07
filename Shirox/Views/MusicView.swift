@@ -113,7 +113,7 @@ struct MusicView: View {
                 .font(.body)
                 .autocorrectionDisabled()
                 .submitLabel(.search)
-                .onSubmit { await vm.runSearchNow() }
+                .onSubmit { Task { await vm.runSearchNow() } }
             if !vm.searchText.isEmpty {
                 Button {
                     vm.clearSearch()

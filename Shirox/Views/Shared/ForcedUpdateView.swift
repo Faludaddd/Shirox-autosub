@@ -755,7 +755,7 @@ struct UpdateCoverView: View {
                         Text(destination.displayName)
                             .font(.caption2)
                             .foregroundStyle(installed ? .secondary : .tertiary)
-                            .strikethrough(!installed, color: .tertiary)
+                            .strikethrough(!installed, color: Color.secondary)
                     }
                     .padding(.trailing, 10)
                 }
@@ -1248,10 +1248,10 @@ struct UpdateCoverView: View {
     private var dismissDrag: some Gesture {
         DragGesture(minimumDistance: 12)
             .onChanged { value in
-                if value.translation.y > 0 { dragOffset = value.translation.y }
+                if value.translation.height > 0 { dragOffset = value.translation.height }
             }
             .onEnded { value in
-                if value.translation.y > 110 {
+                if value.translation.height > 110 {
                     laterTap()
                 } else {
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {

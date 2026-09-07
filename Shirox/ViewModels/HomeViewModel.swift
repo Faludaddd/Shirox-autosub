@@ -144,19 +144,19 @@ final class HomeViewModel: ObservableObject {
     /// carousel — alive with real data instead of an error wall. Only
     /// surfaces an error when there is NO snapshot to serve.
     private func serveSnapshotIfAvailable(error: Error, quiet: Bool = false) {
-        let sourceNotice = SnapshotStore.loadHomeShelves()
-        let snapshot = sourceNotice?.shelves
-        if trending.isEmpty, let snapshot, let snapTrending = snapshot.trending, !snapTrending.isEmpty {
-            trending = snapTrending
-        }
-        if seasonal.isEmpty, let snapshot, let snapSeasonal = snapshot.seasonal, !snapSeasonal.isEmpty {
-            seasonal = snapSeasonal
-        }
-        if popular.isEmpty, let snapshot, let snapPopular = snapshot.popular, !snapPopular.isEmpty {
-            popular = snapPopular
-        }
-        if topRated.isEmpty, let snapshot, let snapTop = snapshot.topRated, !snapTop.isEmpty {
-            topRated = snapTop
+        if let snapshot = SnapshotStore.loadHomeShelves() {
+            if trending.isEmpty, let snapTrending = snapshot.trending, !snapTrending.isEmpty {
+                trending = snapTrending
+            }
+            if seasonal.isEmpty, let snapSeasonal = snapshot.seasonal, !snapSeasonal.isEmpty {
+                seasonal = snapSeasonal
+            }
+            if popular.isEmpty, let snapPopular = snapshot.popular, !snapPopular.isEmpty {
+                popular = snapPopular
+            }
+            if topRated.isEmpty, let snapTop = snapshot.topRated, !snapTop.isEmpty {
+                topRated = snapTop
+            }
         }
         if trending.isEmpty, !quiet {
             self.error = "Trending sources are all unreachable right now. Pull to retry — or check your connection."
@@ -204,8 +204,9 @@ enum SnapshotStore {
         try? data.write(to: fileURL, options: .atomic)
     }
 
-    /// Returns the snapshot (and when it was saved) when it's fresh enough.
-    static func loadHomeShelves() -> (shelves: ShelfSnapshot)? {
+    /// Returns the snapshot when it's fresh enough (6h TTL — a bridge
+    /// over outages, not a permanent freeze).
+    static func loadHomeShelves() -> ShelfSnapshot? {
         guard let data = try? Data(contentsOf: fileURL),
               let snapshot = try? JSONDecoder().decode(ShelfSnapshot.self, from: data),
               Date().timeIntervalSince(snapshot.savedAt) < ttl else { return nil }
