@@ -1737,7 +1737,13 @@ enum BrowseCategory: String, CaseIterable, Hashable {
         if provider == .mal { malCache[id] = data } else { cache[id] = data }
     }
 
-    func getTVDBId(for id: Int, provider: ProviderType = .anilist) async -> (id: Int, season: Int?)? {
+    /// - Parameter malId: v2.21 — the title's MAL id when known. anira indexes
+    ///   the same entry table by BOTH keys, and a title can be missing under
+    ///   its AniList id while present under its MAL id (new airing shows get
+    ///   MAL ids first), so the MAL key is tried before giving up. Lookups are
+    ///   still ID-keyed — never by similar title — so artwork can only ever
+    ///   come from the exact series.
+    func getTVDBId(for id: Int, provider: ProviderType = .anilist, malId: Int? = nil) async -> (id: Int, season: Int?)? {
         let cached = tvdbCache(for: provider)[id]
         // Only return from cache if we have a definitive result:
         // - tid < 0 means we already know there's no mapping
@@ -1763,24 +1769,55 @@ enum BrowseCategory: String, CaseIterable, Hashable {
             return nil
         }
 
-        // Fallback: id absent from the snapshot (e.g. added after the last refresh) — one per-id lookup.
-        do {
-            let key = mappingKey(for: provider)
-            guard let url = URL(string: "\(mappingEndpoint)\(id)?mapping_key=\(key)") else { return nil }
-            let (data, _) = try await Self.session.data(for: URLRequest(url: url))
-            struct Mapping: Decodable { let tvdb_id: Int?; let tvdb_season: Int?; let tvdb_epoffset: Int? }
-            let results = try JSONDecoder().decode([Mapping].self, from: data)
-            if let first = results.first, let tid = first.tvdb_id {
-                setTVDBCache(CachedData(tid: tid, season: first.tvdb_season, epOffset: first.tvdb_epoffset, epOffsetFetched: true), id: id, provider: provider)
-                provider == .mal ? saveMALCache() : saveCache()
-                return (tid, first.tvdb_season)
-            } else {
-                setTVDBCache(CachedData(tid: -1, season: nil, epOffsetFetched: true), id: id, provider: provider)
-                provider == .mal ? saveMALCache() : saveCache()
+        // Fallback: id absent from the snapshot (e.g. added after the last refresh) — one per-id
+        // lookup. `answered` distinguishes “anira replied and has nothing” (a definitive miss we
+        // can negative-cache) from a transport failure (must stay retryable).
+        struct Mapping: Decodable { let tvdb_id: Int?; let tvdb_season: Int?; let tvdb_epoffset: Int? }
+        func aniraPerId(_ rawId: Int, key: String) async -> (first: Mapping?, answered: Bool) {
+            guard let url = URL(string: "\(mappingEndpoint)\(rawId)?mapping_key=\(key)") else { return (nil, false) }
+            guard let (data, _) = try? await Self.session.data(for: URLRequest(url: url)),
+                  let results = try? JSONDecoder().decode([Mapping].self, from: data) else { return (nil, false) }
+            return (results.first, true)
+        }
+
+        let perId = await aniraPerId(id, key: mappingKey(for: provider))
+        if let first = perId.first, let tid = first.tvdb_id {
+            setTVDBCache(CachedData(tid: tid, season: first.tvdb_season, epOffset: first.tvdb_epoffset, epOffsetFetched: true), id: id, provider: provider)
+            provider == .mal ? saveMALCache() : saveCache()
+            return (tid, first.tvdb_season)
+        }
+
+        // v2.21 — MAL cross-lookup (AniList-keyed lookups only): the AniList id
+        // isn't in anira at all, but the title's MAL id may be — check the
+        // in-memory snapshot first (free), then the per-id endpoint. A hit is
+        // cached under the AniList id so future lookups skip this path.
+        if provider == .anilist, let malId, malId > 0 {
+            if let m = malMappingIndex[malId], let tid = m.tvdb_id {
+                setTVDBCache(CachedData(tid: tid, season: m.tvdb_season, epOffset: m.tvdb_epoffset,
+                                        epOffsetFetched: true,
+                                        posterPath: cached?.posterPath, fanartPath: cached?.fanartPath),
+                             id: id, provider: provider)
+                saveCache()
+                return (tid, m.tvdb_season)
             }
-        } catch where (error as? URLError)?.code == .cancelled || error is CancellationError {
-        } catch {
-            Logger.shared.log("TVDB mapping error (\(provider.rawValue)): \(error)", type: "Error")
+            let malPerId = await aniraPerId(malId, key: "myanimelist")
+            if let first = malPerId.first, let tid = first.tvdb_id {
+                setTVDBCache(CachedData(tid: tid, season: first.tvdb_season, epOffset: first.tvdb_epoffset,
+                                        epOffsetFetched: true,
+                                        posterPath: cached?.posterPath, fanartPath: cached?.fanartPath),
+                             id: id, provider: provider)
+                saveCache()
+                return (tid, first.tvdb_season)
+            }
+            // Both keys answered with nothing (or the MAL leg answered) → definitive miss.
+            if perId.answered || malPerId.answered {
+                setTVDBCache(CachedData(tid: -1, season: nil, epOffsetFetched: true), id: id, provider: provider)
+                saveCache()
+            }
+        } else if perId.answered {
+            // Provider-keyed miss that anira answered → definitively no TVDB mapping.
+            setTVDBCache(CachedData(tid: -1, season: nil, epOffsetFetched: true), id: id, provider: provider)
+            provider == .mal ? saveMALCache() : saveCache()
         }
         return nil
     }
@@ -1912,11 +1949,12 @@ enum BrowseCategory: String, CaseIterable, Hashable {
         return (nil, nil)
     }
 
-    func getArtwork(for id: Int, provider: ProviderType = .anilist) async -> (poster: String?, fanart: String?) {
+    /// - Parameter malId: v2.21 — the title's MAL id when known (see `getTVDBId`).
+    func getArtwork(for id: Int, provider: ProviderType = .anilist, malId: Int? = nil) async -> (poster: String?, fanart: String?) {
         if let c = tvdbCache(for: provider)[id], c.posterPath != nil || c.fanartPath != nil {
             return (formatURL(c.posterPath), formatURL(c.fanartPath))
         }
-        guard let mapping = await getTVDBId(for: id, provider: provider), mapping.id > 0 else {
+        guard let mapping = await getTVDBId(for: id, provider: provider, malId: malId), mapping.id > 0 else {
             return (nil, nil)
         }
         let artwork = await fetchTVDBIdArtwork(tid: mapping.id, targetSeason: mapping.season)
@@ -1941,11 +1979,11 @@ enum BrowseCategory: String, CaseIterable, Hashable {
     /// resolution — and plain title text only when the list comes back empty
     /// (no TVDB mapping, or TVDB has no logo artwork at all). Candidates are
     /// also cached in `CachedData.logoPaths` so repeat renders never refetch.
-    func getLogoCandidates(for id: Int, provider: ProviderType = .anilist) async -> [String] {
+    func getLogoCandidates(for id: Int, provider: ProviderType = .anilist, malId: Int? = nil) async -> [String] {
         if let c = tvdbCache(for: provider)[id], let paths = c.logoPaths {
             return paths.compactMap { formatURL($0) }
         }
-        guard let mapping = await getTVDBId(for: id, provider: provider), mapping.id > 0 else {
+        guard let mapping = await getTVDBId(for: id, provider: provider, malId: malId), mapping.id > 0 else {
             return []
         }
         let artwork = await fetchTVDBIdArtwork(tid: mapping.id, targetSeason: mapping.season)

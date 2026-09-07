@@ -335,6 +335,11 @@ extension CachedAsyncImage {
 /// 1. **TheTVDB** (primary) — season-matched poster or background/fan-art for
 ///    the exact series resolved from the AniList/MAL id via the anira mapping
 ///    (ID-keyed, so artwork can never come from a merely similar-named title).
+///    v2.21 also tries the title's MAL id when its AniList id is absent from
+///    anira's table, and — with `tvdbFirstPaint` (the carousel) — the surface
+///    waits for that answer instead of painting provider art first, so TVDB
+///    posters and backgrounds are what you actually see whenever TVDB has
+///    them, with provider art appearing only as the backup it is.
 /// 2. **Provider's own art** (first fallback) — AniList banner/cover or MAL
 ///    cover, applied synchronously from `providerFallback` so a TVDB miss
 ///    never paints a blank frame.
@@ -350,10 +355,23 @@ struct TVDBPosterImage: View {
     var type: TVDBArtworkType = .poster
     /// `.fill` for cropped thumbnails (default), `.fit` for the full-poster viewer.
     var contentMode: SwiftUI.ContentMode = .fill
-    // Only used for AniList async TVDB lookup
+    /// v2.21 — carousel mode: while the TVDB lookup is still pending on a cold
+    /// mapping cache, paint the standard loading tint instead of the provider's
+    /// art (see the header note). Warm caches still paint TVDB art synchronously.
+    /// Non-carousel call sites keep the v2.20 behavior (provider art paints
+    /// immediately and TVDB art swaps in when it resolves) with `false`.
+    var tvdbFirstPaint: Bool = false
+    /// Resolved this session for the CURRENT media. Reset at the top of every
+    /// media change (v2.21): the iPad ambient background swaps `media` on every
+    /// swipe, and a lingering resolved URL used to keep the previous title's
+    /// artwork on screen until a re-fetch finished.
     @State private var tvdbURL: String?
     /// v2.20 — Jikan last-resort URL (step 3 of the chain above).
     @State private var jikanURL: String?
+    /// v2.21 — true once the TVDB lookup has ANSWERED for this media (nil art
+    /// included). Distinguishes “still resolving” (placeholder under
+    /// `tvdbFirstPaint`) from “TVDB has nothing” (paint the provider backup).
+    @State private var lookupDone = false
 
     enum TVDBArtworkType {
         case poster, fanart
@@ -365,37 +383,74 @@ struct TVDBPosterImage: View {
             : (media.coverImage.extraLarge ?? media.coverImage.large ?? "")
     }
 
-    /// Immediate URL — TVDB cache if available, otherwise provider's native image.
-    private var immediateURL: String {
+    /// TVDB URL for this artwork type straight from the mapping store — the
+    /// synchronous paint when warm (persisted, so steady state is instant).
+    private var cachedTVDBURL: String? {
         let cached = TVDBMappingService.shared.getCachedArtwork(for: media.id, provider: media.provider)
-        let cachedURL = (type == .poster) ? cached.poster : cached.fanart
-        return cachedURL ?? providerFallback
+        let url = (type == .poster) ? cached.poster : cached.fanart
+        return (url?.isEmpty == false) ? url : nil
     }
 
-    init(media: Media, type: TVDBArtworkType = .poster, contentMode: SwiftUI.ContentMode = .fill) {
+    /// Immediate URL — resolved TVDB art if any, otherwise the provider's own image.
+    private var activeURL: String {
+        if let tvdbURL, !tvdbURL.isEmpty { return tvdbURL }
+        if let jikanURL, !jikanURL.isEmpty { return jikanURL }
+        if let cached = cachedTVDBURL { return cached }
+        return providerFallback
+    }
+
+    /// Carousel mode only: nothing resolved yet, nothing warm, TVDB hasn't
+    /// answered → hold the loading tint rather than painting provider art.
+    private var awaitingTVDB: Bool {
+        guard tvdbFirstPaint else { return false }
+        guard tvdbURL == nil, jikanURL == nil, !lookupDone else { return false }
+        return cachedTVDBURL == nil
+    }
+
+    init(media: Media, type: TVDBArtworkType = .poster, contentMode: SwiftUI.ContentMode = .fill, tvdbFirstPaint: Bool = false) {
         self.media = media
         self.type = type
         self.contentMode = contentMode
+        self.tvdbFirstPaint = tvdbFirstPaint
     }
 
     var body: some View {
-        CachedAsyncImage(urlString: tvdbURL ?? jikanURL ?? immediateURL, contentMode: contentMode)
-            .task(id: media.uniqueId) {
-                if let url = tvdbURL, !url.isEmpty { return }
-                // 1. TVDB for the exact series (season-matched poster / fanart).
-                let artwork = await TVDBMappingService.shared.getArtwork(for: media.id, provider: media.provider)
-                let url = (type == .poster) ? artwork.poster : artwork.fanart
-                if let url, !url.isEmpty, url != immediateURL {
-                    tvdbURL = url
-                    return
-                }
-                // 2. Provider art already covers this case synchronously via
-                //    `immediateURL` — nothing to do unless it's empty.
-                guard immediateURL.isEmpty else { return }
-                // 3. Jikan last resort (needs a MAL id).
-                guard let malId = media.idMal else { return }
-                jikanURL = await Self.jikanImageURL(malId: malId, isManga: media.isManga)
+        Group {
+            if awaitingTVDB {
+                // The exact tint CachedAsyncImage shows mid-load, so the hero
+                // reads “loading”, never “broken”. TVDB art (or the provider
+                // backup, when TVDB has nothing) takes over as soon as the
+                // lookup answers.
+                Color.gray.opacity(0.15)
+            } else {
+                CachedAsyncImage(urlString: activeURL, contentMode: contentMode)
             }
+        }
+        .task(id: media.uniqueId) {
+            // Reset per media — no stale art, no stale “resolved” state.
+            tvdbURL = nil
+            jikanURL = nil
+            lookupDone = false
+            // Warm mapping store: TVDB art is already the synchronous paint.
+            if cachedTVDBURL != nil { return }
+            // 1. TVDB for the exact series (season-matched poster / fanart).
+            let artwork = await TVDBMappingService.shared.getArtwork(for: media.id, provider: media.provider, malId: media.idMal)
+            guard !Task.isCancelled else { return }
+            let url = (type == .poster) ? artwork.poster : artwork.fanart
+            lookupDone = true
+            if let url, !url.isEmpty {
+                tvdbURL = url
+                return
+            }
+            // 2. Provider art already covers this case synchronously via
+            //    `activeURL` — nothing to do unless it's empty.
+            guard providerFallback.isEmpty else { return }
+            // 3. Jikan last resort (needs a MAL id).
+            guard let malId = media.idMal else { return }
+            let jikan = await Self.jikanImageURL(malId: malId, isManga: media.isManga)
+            guard !Task.isCancelled else { return }
+            jikanURL = jikan
+        }
     }
 
     /// v2.20 — Jikan (unofficial MyAnimeList API) last-resort image lookup.

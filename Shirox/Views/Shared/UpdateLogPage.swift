@@ -106,13 +106,17 @@ private let logEntries: [UpdateLogEntry] = [
             "A real download flow behind the Update Now button: the IPA is fetched inside the app with a live progress bar, byte counts, and speed read from actual network callbacks — never a fake spinner — then verified against the release's published SHA-256 checksum. When no checksum is published, the success card says the package is unverified instead of pretending it passed; a mismatch deletes the corrupt file and says so. The verified package lands in Files (Shirox+ → Updates) and can be shared to any sideload tool.",
             "Copy Link (with inline 'Copied' confirmation) and Share actions are available in every state of the update popup — before, during, and after a download, and in every failure state."
         ],
-        fixed: [],
+        fixed: [
+            "On iPad, the ambient fanart backdrop behind the carousel no longer keeps the previous slide's artwork on screen when you swipe — it resets together with the page, so the backdrop always matches the anime in front of it."
+        ],
         changed: [
             "Dismissed updates no longer bounce the cover back up: the login-screen check now runs non-forced, so a version you chose to skip doesn't re-prompt on every visit to the sources page. A fresh re-offer stays one tap away in the About page."
         ],
         improved: [
             "The update popup is a full Shirox+ surface instead of a basic alert with one button: it shows the new version number and your installed version side by side in capsule pills, a clean expandable What's New section with the changelog and release date, custom gradient and tinted capsule buttons, staggered spring entrance, breathing ambient background, haptics, and a centered card that scales properly from the smallest iPhone to the largest iPad. Non-critical updates offer a Maybe Later action (and a close button in the header); updates that are actually required still gate the app when you fall several versions behind.",
-            "Clear state coverage throughout: checking, connecting, downloading (with cancel), verifying, success, handed-off-to-LiveContainer, and failure each get their own honest card with the right actions — retry, copy link, open in Safari, or hand off to LiveContainer. The About page's Update and Install buttons now open this full popup instead of a raw Safari hop."
+            "Clear state coverage throughout: checking, connecting, downloading (with cancel), verifying, success, handed-off-to-LiveContainer, and failure each get their own honest card with the right actions — retry, copy link, open in Safari, or hand off to LiveContainer. The About page's Update and Install buttons now open this full popup instead of a raw Safari hop.",
+            "The featured carousel is now visibly TVDB-first: while a slide's TVDB artwork is still resolving, the carousel holds its standard loading tint instead of painting the AniList image first — so TVDB's sharper posters (iPhone) and full 1920×1080 backgrounds (iPad) are what you actually see, and AniList's art appears only as the backup it was always meant to be, when TVDB has nothing for that title. Warm caches still paint instantly, and titles whose AniList id is unknown to the mapping service are now also resolved through their MAL id, so more slides get real TVDB artwork.",
+            "The carousel's transparent title logo is about 40% larger, and every swipe now shows the title text first — readable for a moment — before the logo crossfades in to replace it. When a title has no TVDB logo at all, the text simply stays."
         ],
         removed: [],
         other: []

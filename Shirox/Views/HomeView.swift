@@ -386,9 +386,11 @@ struct FeaturedCarousel: View {
                                            value: max(0, proxy.frame(in: .named("homeScroll")).minY))
                 }
 
-                // iPad fanart background behind the cards
+                // iPad fanart background behind the cards (tvdbFirstPaint: the
+                // ambient backdrop holds the loading tint rather than provider
+                // art while TVDB resolves — same TVDB-first policy as the cards).
                 if isIPad, !displayItems.isEmpty {
-                    TVDBPosterImage(media: displayItems[currentIndex], type: .fanart)
+                    TVDBPosterImage(media: displayItems[currentIndex], type: .fanart, tvdbFirstPaint: true)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
 
@@ -434,11 +436,11 @@ struct FeaturedCarousel: View {
             .background {
                 // Hidden preloader — triggers image fetch for all items into NSCache
                 ForEach(displayItems.indices, id: \.self) { i in
-                    TVDBPosterImage(media: displayItems[i], type: .fanart)
+                    TVDBPosterImage(media: displayItems[i], type: .fanart, tvdbFirstPaint: true)
                         .frame(width: 1, height: 1)
                         .opacity(0)
                         .allowsHitTesting(false)
-                    TVDBPosterImage(media: displayItems[i], type: .poster)
+                    TVDBPosterImage(media: displayItems[i], type: .poster, tvdbFirstPaint: true)
                         .frame(width: 1, height: 1)
                         .opacity(0)
                         .allowsHitTesting(false)
@@ -765,8 +767,9 @@ private struct PageIndicator: View {
 // never cropped or stretched), and no border, background, or shadow is ever
 // added. While candidates resolve — and for any title with no TVDB logo at
 // all — the previous title text renders in its original style, so the slot
-// is never empty. Responsive sizing: a compact banner carries a 240x64pt
-// logo box, a regular (iPad) banner 320x84pt.
+// is never empty. Responsive sizing: v2.21 enlarged the logo boxes by ~40%
+// at the user's request — 336x90pt on a compact banner, 448x118pt on a
+// regular (iPad) banner.
 private struct CarouselTitleLogo: View {
     let media: Media
     /// iPad (regular width) gets the larger, streaming-hero-scale logo box.
@@ -777,8 +780,9 @@ private struct CarouselTitleLogo: View {
     /// new banner while its own candidate resolves.
     @State private var logoURL: String?
 
-    private var maxLogoWidth: CGFloat { isWide ? 320 : 240 }
-    private var maxLogoHeight: CGFloat { isWide ? 84 : 64 }
+    /// v2.21 — ~40% larger logo boxes (user request).
+    private var maxLogoWidth: CGFloat { isWide ? 448 : 336 }
+    private var maxLogoHeight: CGFloat { isWide ? 118 : 90 }
     /// v2.20 — FIXED slot height, reserved on every slide no matter what
     /// fills it. v2.19 sized this slot from the content (the fitted logo's
     /// intrinsic height, or 1 vs 2 lines of title text), which made
@@ -789,6 +793,13 @@ private struct CarouselTitleLogo: View {
     /// two-line `.title` fallback (worst case) fits without clipping.
     private var slotHeight: CGFloat { maxLogoHeight + 8 }
 
+    /// v2.21 — every page change shows the title TEXT first, then the logo
+    /// replaces it: the resolver's result is held back for at least this
+    /// long so a fast swipe (logo already prefetched and cached) still gives
+    /// a readable title moment instead of snapping straight to stylized
+    /// artwork. When no logo exists the title simply stays (last rung).
+    private static let minimumTitleWindow: TimeInterval = 0.45
+
     var body: some View {
         Group {
             if let logoURL {
@@ -797,6 +808,7 @@ private struct CarouselTitleLogo: View {
                     // VoiceOver still reads the title — the logo is decorative
                     // art for the same string.
                     .accessibilityLabel(media.title.displayTitle)
+                    .transition(.opacity)
             } else {
                 // Fallback / transitional title text — the exact style the
                 // carousel used before logos, kept as the last rung of the
@@ -808,21 +820,32 @@ private struct CarouselTitleLogo: View {
                     .lineLimit(2)
                     .minimumScaleFactor(0.7)
                     .frame(maxWidth: maxLogoWidth, alignment: .leading)
+                    .transition(.opacity)
             }
         }
         // THE fixed slot: constant height on every slide, every device size.
         // Content (logo or text) is vertically centered within it; the outer
         // VStack's leading alignment keeps it anchored bottom-left.
         .frame(height: slotHeight)
+        // v2.21 — the title→logo swap (and the reset back to title on page
+        // change) is a soft 0.3s crossfade instead of a hard cut.
+        .animation(.easeInOut(duration: 0.3), value: logoURL)
         .task(id: media.uniqueId) {
             // Reset per page: the new title's text shows immediately, then
             // its logo swaps in once a candidate actually decodes.
             logoURL = nil
+            let started = Date()
             let url = await CarouselLogoResolver.bestLogoURL(for: media)
-            guard !Task.isCancelled else { return }
-            withAnimation(.easeOut(duration: 0.25)) {
-                logoURL = url
+            // Hold the title through its minimum readable window before the
+            // logo takes over (cancel-aware — a fast swipe to the next page
+            // abandons this one mid-hold).
+            let elapsed = Date().timeIntervalSince(started)
+            if elapsed < Self.minimumTitleWindow {
+                let remaining = UInt64((Self.minimumTitleWindow - elapsed) * 1_000_000_000)
+                try? await Task.sleep(nanoseconds: remaining)
             }
+            guard !Task.isCancelled else { return }
+            logoURL = url
         }
     }
 }
@@ -851,7 +874,7 @@ private struct CarouselLogoPrefetcher: View {
 private enum CarouselLogoResolver {
     @MainActor
     static func bestLogoURL(for media: Media) async -> String? {
-        let candidates = await TVDBMappingService.shared.getLogoCandidates(for: media.id, provider: media.provider)
+        let candidates = await TVDBMappingService.shared.getLogoCandidates(for: media.id, provider: media.provider, malId: media.idMal)
         for url in candidates {
             if Task.isCancelled { return nil }
             if await CachedAsyncImage.preload(urlString: url) {
@@ -897,7 +920,7 @@ private struct FeaturedCard: View, Equatable {
                                 let screenW = geo.size.width > 0 ? geo.size.width : 1
                                 let extra: CGFloat = 80
                                 let px = -(extra / 2) - minX * (extra / (2 * screenW))
-                                TVDBPosterImage(media: media, type: .fanart)
+                                TVDBPosterImage(media: media, type: .fanart, tvdbFirstPaint: true)
                                     .frame(width: geo.size.width + extra, height: geo.size.height)
                                     .offset(x: px)
                                     .clipped()
@@ -918,12 +941,15 @@ private struct FeaturedCard: View, Equatable {
                 // iPhone: portrait with horizontal parallax. TVDB posters (typically
                 // 680×1000 or larger) are higher-resolution than AniList's extraLarge
                 // cover (~460×645), so the carousel paints visibly sharper at full
-                // screen scale. A 100pt buffer rides along so the parallax swipe
-                // reveals image instead of hard edges; centered via -(buffer/2).
+                // screen scale; v2.21 makes TVDB the visible source (the poster holds
+                // the loading tint while TVDB resolves instead of painting the
+                // provider's art first — AniList art appears only when TVDB has
+                // nothing for the title). A 100pt buffer rides along so the parallax
+                // swipe reveals image instead of hard edges; centered via -(buffer/2).
                 GeometryReader { geo in
                     let pageOffset = geo.frame(in: .global).minX
                     let buffer: CGFloat = 100
-                    TVDBPosterImage(media: media)
+                    TVDBPosterImage(media: media, tvdbFirstPaint: true)
                         .frame(width: geo.size.width + buffer, height: geo.size.height)
                         .offset(x: -(buffer / 2) - pageOffset * 0.25)
                 }
