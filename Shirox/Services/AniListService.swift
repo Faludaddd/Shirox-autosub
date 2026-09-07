@@ -428,6 +428,7 @@ final class AniListService {
               averageScore
               popularity
               genres
+              countryOfOrigin
               studios { edges { isMain node { id name } } }
             }
           }

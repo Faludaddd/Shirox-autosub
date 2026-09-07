@@ -164,7 +164,14 @@ final class AniListProvider: MediaProvider {
             studioNames: m.studios?.edges.filter { $0.isMain }.map { $0.node.name },
             source: m.source,
             duration: m.duration,
-            airDateRange: m.airDateRange
+            airDateRange: m.airDateRange,
+            // v2.20 — surfaced for the home carousel's relevance filter (see
+            // FeaturedCarousel.realItems): `popularity` powers the existing
+            // obscure-content cutoff (previously inert for anime because this
+            // mapper never carried the field), `countryOfOrigin` ("JP"/"CN"/…)
+            // is what keeps donghua out of the featured rotation.
+            popularity: m.popularity,
+            countryOfOrigin: m.countryOfOrigin
         )
     }
 

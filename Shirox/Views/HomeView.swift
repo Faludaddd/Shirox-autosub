@@ -323,6 +323,18 @@ struct FeaturedCarousel: View {
             if let format = media.format, format == "MUSIC" { return false }
             // Exclude titles with very low popularity (likely obscure)
             if let pop = media.popularity, pop < 1000 { return false }
+            // v2.20 — donghua filter. AniList's trending mix includes Chinese
+            // animation (e.g. "Renegade Immortal") and other non-Japanese
+            // entries; the featured carousel is for the app's Japanese-anime
+            // catalog, so anything with a known non-JP country of origin is
+            // dropped. Titles with no country data pass through (the field is
+            // new to the trending query — old cached entries decode it as nil).
+            if let country = media.countryOfOrigin, country != "JP" { return false }
+            // v2.20 — validity: every carousel slide needs a displayable title
+            // and at least one artwork URL, or the banner/logo pipelines have
+            // nothing to work with and the slide renders as a blank hero.
+            if media.title.displayTitle.isEmpty || media.title.displayTitle == "Unknown" { return false }
+            if (media.coverImage.best ?? media.bannerImage) == nil { return false }
             return true
         }.prefix(8).map { $0 }
     }
@@ -467,8 +479,12 @@ struct FeaturedCarousel: View {
 
                             // Genre capsules — replace the previous multi-line description
                             // (which was too dense for a carousel). Up to 3 tags, capped.
-                            if let genres = currentMedia.genres, !genres.isEmpty {
-                                HStack(spacing: 6) {
+                            // v2.20 — the row now has a RESERVED fixed height: when a
+                            // title has no genres the row is empty but still occupies its
+                            // 22pt, so the Start Watching button below never shifts.
+                            // Pill styling is exactly as before.
+                            HStack(spacing: 6) {
+                                if let genres = currentMedia.genres, !genres.isEmpty {
                                     ForEach(genres.prefix(3), id: \.self) { g in
                                         Text(g)
                                             .font(.caption2.weight(.semibold))
@@ -480,6 +496,7 @@ struct FeaturedCarousel: View {
                                     }
                                 }
                             }
+                            .frame(height: 22, alignment: .leading)
 
                             NavigationLink {
                                 if isManga {
@@ -762,6 +779,15 @@ private struct CarouselTitleLogo: View {
 
     private var maxLogoWidth: CGFloat { isWide ? 320 : 240 }
     private var maxLogoHeight: CGFloat { isWide ? 84 : 64 }
+    /// v2.20 — FIXED slot height, reserved on every slide no matter what
+    /// fills it. v2.19 sized this slot from the content (the fitted logo's
+    /// intrinsic height, or 1 vs 2 lines of title text), which made
+    /// everything below it — genre pills, Start Watching, the hint — shift
+    /// position from slide to slide. Now the slot is a constant-height
+    /// container: the artwork/text scales and centers INSIDE it, and the
+    /// rest of the overlay layout can never move. `+ 8` also guarantees a
+    /// two-line `.title` fallback (worst case) fits without clipping.
+    private var slotHeight: CGFloat { maxLogoHeight + 8 }
 
     var body: some View {
         Group {
@@ -780,8 +806,14 @@ private struct CarouselTitleLogo: View {
                     .foregroundStyle(.primary)
                     .multilineTextAlignment(.leading)
                     .lineLimit(2)
+                    .minimumScaleFactor(0.7)
+                    .frame(maxWidth: maxLogoWidth, alignment: .leading)
             }
         }
+        // THE fixed slot: constant height on every slide, every device size.
+        // Content (logo or text) is vertically centered within it; the outer
+        // VStack's leading alignment keeps it anchored bottom-left.
+        .frame(height: slotHeight)
         .task(id: media.uniqueId) {
             // Reset per page: the new title's text shows immediately, then
             // its logo swaps in once a candidate actually decodes.

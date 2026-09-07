@@ -331,6 +331,20 @@ extension CachedAsyncImage {
 
 // MARK: - TVDB Poster Image Wrapper
 
+/// Banner/poster artwork with the full v2.20 fallback chain:
+/// 1. **TheTVDB** (primary) — season-matched poster or background/fan-art for
+///    the exact series resolved from the AniList/MAL id via the anira mapping
+///    (ID-keyed, so artwork can never come from a merely similar-named title).
+/// 2. **Provider's own art** (first fallback) — AniList banner/cover or MAL
+///    cover, applied synchronously from `providerFallback` so a TVDB miss
+///    never paints a blank frame.
+/// 3. **Jikan** (last resort) — when BOTH TVDB and the provider have nothing
+///    (empty URLs), the title's MAL entry is looked up once and its cover
+///    image is used, so the carousel never renders a placeholder unless every
+///    source failed.
+/// Failures fall through automatically at each step; results are cached
+/// (TVDB paths in the mapping store, Jikan URLs in a small memory cache) so a
+/// retry doesn't re-walk the chain.
 struct TVDBPosterImage: View {
     let media: Media
     var type: TVDBArtworkType = .poster
@@ -338,6 +352,8 @@ struct TVDBPosterImage: View {
     var contentMode: SwiftUI.ContentMode = .fill
     // Only used for AniList async TVDB lookup
     @State private var tvdbURL: String?
+    /// v2.20 — Jikan last-resort URL (step 3 of the chain above).
+    @State private var jikanURL: String?
 
     enum TVDBArtworkType {
         case poster, fanart
@@ -363,14 +379,58 @@ struct TVDBPosterImage: View {
     }
 
     var body: some View {
-        CachedAsyncImage(urlString: tvdbURL ?? immediateURL, contentMode: contentMode)
+        CachedAsyncImage(urlString: tvdbURL ?? jikanURL ?? immediateURL, contentMode: contentMode)
             .task(id: media.uniqueId) {
                 if let url = tvdbURL, !url.isEmpty { return }
+                // 1. TVDB for the exact series (season-matched poster / fanart).
                 let artwork = await TVDBMappingService.shared.getArtwork(for: media.id, provider: media.provider)
                 let url = (type == .poster) ? artwork.poster : artwork.fanart
-                guard let url, !url.isEmpty, url != immediateURL else { return }
-                tvdbURL = url
+                if let url, !url.isEmpty, url != immediateURL {
+                    tvdbURL = url
+                    return
+                }
+                // 2. Provider art already covers this case synchronously via
+                //    `immediateURL` — nothing to do unless it's empty.
+                guard immediateURL.isEmpty else { return }
+                // 3. Jikan last resort (needs a MAL id).
+                guard let malId = media.idMal else { return }
+                jikanURL = await Self.jikanImageURL(malId: malId, isManga: media.isManga)
             }
+    }
+
+    /// v2.20 — Jikan (unofficial MyAnimeList API) last-resort image lookup.
+    /// Keyed in-memory (positive AND negative results — an empty string means
+    /// "already tried, nothing there") so repeat renders of the same title
+    /// never re-hit Jikan. Uses the entity detail endpoint (one small request)
+    /// rather than /pictures, which is heavier and flakier.
+    @MainActor private static var jikanCache: [String: String] = [:]
+
+    @MainActor
+    private static func jikanImageURL(malId: Int, isManga: Bool) async -> String? {
+        let key = "\(isManga ? "m" : "a")-\(malId)"
+        if let cached = jikanCache[key] { return cached.isEmpty ? nil : cached }
+        let endpoint = isManga ? "manga" : "anime"
+        guard let url = URL(string: "https://api.jikan.moe/v4/\(endpoint)/\(malId)") else {
+            jikanCache[key] = ""
+            return nil
+        }
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            struct Jpg: Decodable { let large_image_url: String? }
+            struct Images: Decodable { let jpg: Jpg }
+            struct JikanData: Decodable { let images: Images? }
+            struct JikanResponse: Decodable { let data: JikanData? }
+            let decoded = try JSONDecoder().decode(JikanResponse.self, from: data)
+            let image = decoded.data?.images?.jpg?.large_image_url
+            jikanCache[key] = image ?? ""
+            return image
+        } catch {
+            // Offline / rate-limited / MAL hiccup — remember the failure for
+            // this session so we don't hammer Jikan on every re-render.
+            jikanCache[key] = ""
+            Logger.shared.log("[TVDBPosterImage] Jikan fallback failed (\(endpoint) \(malId)): \(error.localizedDescription)", type: "Debug")
+            return nil
+        }
     }
 }
 

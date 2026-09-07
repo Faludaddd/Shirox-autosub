@@ -99,6 +99,20 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.20",
+        date: "2026-09-07",
+        added: [],
+        fixed: [
+            "The carousel's controls no longer move between slides. The logo, genre pills, and Start Watching button now live in reserved, constant-size rows: the transparent logo scales and centers inside its own fixed area regardless of the artwork's proportions, the pill row keeps its height even when a title has no genres, and the button's position is identical on every slide and every screen size, iPhone and iPad alike. Nothing about the carousel's design changed — same layout style, animations, swipe behavior, gradients, pagination, and logo placement.",
+            "Carousel artwork now walks a complete fallback chain instead of ever going blank: TheTVDB remains the primary source for banners, posters, and the transparent logo (matched to the exact series and season through the ID-based mapping, so artwork from a similarly named anime can't slip in); the provider's own art is the first fallback; and a Jikan (MyAnimeList) lookup — cached, including failures — is the last resort when both earlier sources come up empty. Each failed request falls through to the next source automatically.",
+            "The carousel no longer surfaces unrelated anime: Chinese animation and other non-Japanese entries that ride AniList's trending mix (\"Renegade Immortal\" and friends) are filtered out, the popularity floor that was supposed to keep obscure titles out is actually enforced now, and every slide must carry real title and artwork data before it can appear. The carousel still uses the same intended AniList trending selection — just cleaned."
+        ],
+        changed: [],
+        improved: [],
+        removed: [],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "2.19",
         date: "2026-09-07",
         added: [
