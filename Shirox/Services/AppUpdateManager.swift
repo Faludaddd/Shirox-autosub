@@ -78,12 +78,15 @@ final class AppUpdateManager: ObservableObject {
     /// mode" chip on the gate turns it off.
     @AppStorage("update.simulateOutdated") var simulateOutdated = false
 
-    /// v2.17 — True while the forced-update gate should cover the whole app.
+    /// v2.17 / v2.21 — True while the update cover should be presented.
     /// Raised the moment a check CONFIRMS a newer version exists; lowered
-    /// only when a check confirms the installed version is current again
-    /// (i.e. after the update is installed and the app relaunches) or the
+    /// when a check confirms the installed version is current (i.e. after
+    /// the update is installed and the app relaunches), when the user
+    /// taps Later on a NON-critical update (see `dismiss()`), or when the
     /// demo mode is exited. A FAILED re-check never lowers it — a flaky
-    /// network must not un-gate a known-outdated app.
+    /// network must not un-gate a known-outdated app. A DISMISSED update
+    /// never re-raises it: the About page keeps offering the install, and
+    /// the next version re-prompts on its own.
     @Published private(set) var gateVisible = false
 
     // MARK: - Manifest sources
@@ -257,10 +260,12 @@ final class AppUpdateManager: ObservableObject {
         }
 
         // A newer version exists. Don't re-prompt for one the user already
-        // dismissed (non-forced checks only).
+        // dismissed (non-forced checks only) — v2.21: a dismissed update
+        // stays quiet (no cover); the About page still offers the install
+        // and a forced check (About "Check for Updates", demo mode) can
+        // re-offer it.
         if !force, latest.version == lastDismissedVersion {
             state = .dismissed(info(from: latest))
-            gateVisible = true
             return
         }
 
@@ -278,13 +283,36 @@ final class AppUpdateManager: ObservableObject {
         Task { await checkForUpdates(force: true) }
     }
 
-    /// Marks the current available update as dismissed so non-forced checks
-    /// don't re-prompt. The info stays visible in About (dismissed state)
-    /// with an install button in case the sideload failed.
+    /// v2.21 — Later: lowers the update cover immediately and remembers
+    /// the version so automatic checks don't re-prompt. Works from the
+    /// `.available` state (first prompt) AND from a `.dismissed` state
+    /// (cover re-opened manually from the About page). Critical updates
+    /// are never dismissable — the guard keeps the gate up.
+    /// The info stays visible in About (dismissed state) with an install
+    /// button in case the sideload failed.
     func dismiss() {
-        guard case .available(let info) = state, !info.isCritical else { return }
-        lastDismissedVersion = info.newVersion
-        state = .dismissed(info)
+        guard let current = currentUpdateInfo, !current.isCritical else { return }
+        lastDismissedVersion = current.newVersion
+        state = .dismissed(current)
+        gateVisible = false
+    }
+
+    /// v2.21 — Presents the update cover manually (About page Update /
+    /// Install buttons) so the full popup flow — progress, verification,
+    /// LiveContainer handoff, copy/share — is reachable for an update the
+    /// user previously dismissed. No-ops when no update is known.
+    func presentUpdateFlow() {
+        guard currentUpdateInfo != nil else { return }
+        gateVisible = true
+    }
+
+    /// The detected update, whichever prompt state it's in (offered or
+    /// dismissed) — nil when none exists.
+    private var currentUpdateInfo: UpdateInfo? {
+        switch state {
+        case .available(let info), .dismissed(let info): return info
+        default: return nil
+        }
     }
 
     /// Called after the user starts the download flow. The update stays

@@ -440,8 +440,9 @@ private struct RootTabView: View {
     #if os(iOS)
     @ObservedObject private var playerPresenter = PlayerPresenter.shared
     @ObservedObject private var quickActions = QuickActionManager.shared
-    // v2.17 — Forced-update gate: observed here so the cover is presented /
-    // dismissed the moment the manager's verdict changes.
+    // v2.21 — Update cover: observed here so it is presented / dismissed
+    // the moment the manager's verdict changes (available → cover up,
+    // Later → down, current → down).
     @ObservedObject private var updateManager = AppUpdateManager.shared
     #endif
     @State private var selectedTab = 0
@@ -601,19 +602,23 @@ private struct RootTabView: View {
             }
         }
 
-        // v2.17 — Forced update gate. Presented over EVERYTHING (tabs,
-        // sheets, player) the moment AppUpdateManager confirms a newer
-        // version exists. The cover offers no dismissal — it clears only
-        // when a real check confirms the installed version is current
-        // again, i.e. after the user installs the update they downloaded
-        // from GitHub and iOS relaunches the app (or the user exits demo
-        // mode from the gate itself).
+        // v2.21 — Update cover. Presented over EVERYTHING (tabs, sheets,
+        // player) the moment AppUpdateManager confirms a newer version
+        // exists. Non-critical updates render as a dismissable popup card
+        // (Later / close lowers it for that version — the About page keeps
+        // offering the install); critical gaps (≥ 3 minor versions behind
+        // or a major bump) render the non-dismissable required gate, which
+        // clears only when a real check confirms the app is current again.
+        // Both presentations share the same action set: in-app download
+        // with live progress + SHA-256 verification, the LiveContainer
+        // handoff (only when LiveContainer is installed), Copy Link,
+        // Share, and honest failure states.
         #if os(iOS)
         .fullScreenCover(isPresented: Binding(
             get: { updateManager.gateVisible },
             set: { _ in }
         )) {
-            ForcedUpdateView()
+            UpdateCoverView()
         }
         #endif
 

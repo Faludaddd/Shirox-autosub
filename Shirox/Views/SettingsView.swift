@@ -2325,11 +2325,14 @@ struct SourcesSettingsPage: View {
         }
         .navigationTitle("Sources")
         // v2.17 — Forced update: re-check whenever the user reaches the
-        // login/sources screen (the app's login surface), per spec. Forced:
-        // arriving here should always produce a FRESH verdict, not an
-        // hour-old one.
+        // login/sources screen (the app's login surface), per spec.
+        // v2.21 — non-forced now: with a dismissable popup, a forced check
+        // here would re-offer a dismissed update on every visit, which
+        // defeats Later. The interval gate still refreshes the verdict
+        // hourly (and on every foreground entry); a force re-offer stays
+        // available from the About page's Check for Updates button.
         .onAppear {
-            Task { await AppUpdateManager.shared.checkForUpdates(force: true) }
+            Task { await AppUpdateManager.shared.checkForUpdates() }
         }
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
@@ -4557,11 +4560,12 @@ struct AboutSettingsPage: View {
 
     // MARK: - Hero Card
 
-    /// v2.17 — Five quick taps on the version row toggles forced-update
-    /// demo mode: the version comparison reports the installed build as
-    /// outdated so the real forced-update flow (gate + its Download from
-    /// GitHub CTA) can be exercised on a current build.
-    /// The gate itself carries an "Exit demo mode" chip to turn it off.
+    /// v2.17 — Five quick taps on the version row toggles update-flow demo
+    /// mode: the version comparison reports the installed build as outdated
+    /// so the whole update popup (download progress, verification,
+    /// LiveContainer handoff, Later) can be exercised on a current build.
+    /// The popup carries an "Exit demo" chip to turn it off, plus a
+    /// "Preview: required" chip to see the critical-gate presentation.
     private func handleVersionRowTap() {
         versionTaps += 1
         versionTapResetTask?.cancel()
@@ -4584,7 +4588,7 @@ struct AboutSettingsPage: View {
             updateManager.simulateOutdated = true
             ToastManager.shared.show(
                 title: "Forced Update",
-                message: "Demo mode on — the update gate will appear.",
+                message: "Demo mode on — the update popup will appear.",
                 icon: "arrow.down.circle.fill",
                 iconColor: .accentColor)
             Task { await updateManager.checkForUpdates(force: true) }
@@ -4697,14 +4701,13 @@ struct AboutSettingsPage: View {
                 Spacer()
             }
 
-            if let update = updateManager.availableUpdate {
+            if updateManager.availableUpdate != nil {
+                // v2.21 — The full update popup (progress, verification,
+                // LiveContainer handoff, copy/share) instead of a raw
+                // Safari hop.
                 Button {
-                    if let url = URL(string: update.downloadURL.absoluteString) {
-                        #if os(iOS)
-                        UIApplication.shared.open(url)
-                        #endif
-                    }
-                    updateManager.markDownloadStarted()
+                    Haptics.light()
+                    updateManager.presentUpdateFlow()
                 } label: {
                     Label("Update", systemImage: "arrow.down.circle.fill")
                         .font(.subheadline.weight(.bold))
@@ -4717,13 +4720,10 @@ struct AboutSettingsPage: View {
             }
 
             if case .dismissed(let update) = updateManager.state {
+                // v2.21 — Same popup flow, still reachable after Later.
                 Button {
-                    if let url = URL(string: update.downloadURL.absoluteString) {
-                        #if os(iOS)
-                        UIApplication.shared.open(url)
-                        #endif
-                    }
-                    updateManager.markDownloadStarted()
+                    Haptics.light()
+                    updateManager.presentUpdateFlow()
                 } label: {
                     Label("Install \(update.newVersion)", systemImage: "arrow.down.circle.fill")
                         .font(.subheadline.weight(.bold))

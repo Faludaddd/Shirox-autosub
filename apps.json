@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "2.21",
+          "buildVersion": "1",
+          "date": "2026-09-07",
+          "localizedDescription": "Every part of the update experience got a proper design instead of a bare alert. The update popup now shows the new version number, your installed version, and a clean What's New section with the full changelog, all in Shirox+ styling: capsule pills, springy entrance, breathing background, haptics, and full responsiveness on iPhone and iPad. Update Now downloads the package inside the app with a live progress bar, real speed, and byte counts, then verifies it against the release's published SHA-256 checksum before handing it over. There's a Copy Link button with inline confirmation, a Share option, and a Maybe Later close action for non-essential updates (required updates still gate the app when you're several versions behind). New: an Add to LiveContainer button hands the install straight to LiveContainer through its supported install link — it only appears when LiveContainer is actually installed, and if the link can't be reached the popup says so and offers the link to copy, share, or open in Safari instead. Every failure state is honest and retryable.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 11802967,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "2.20",
           "buildVersion": "1",
           "date": "2026-09-07",

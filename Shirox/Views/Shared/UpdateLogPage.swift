@@ -99,6 +99,25 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.21",
+        date: "2026-09-07",
+        added: [
+            "Add to LiveContainer: the update popup now detects LiveContainer honestly (through the system's canOpenURL probe, with the scheme declared in the app's Info.plist) and, when it's actually installed, hands the update straight to it via LiveContainer's supported install link so LiveContainer downloads and installs the package itself. When LiveContainer isn't installed — or iOS refuses the open — the popup says exactly that and falls back to the useful basics: copy the IPA link, share it through the system share sheet, or open it in Safari. Nothing is ever faked: the handoff is real or the button isn't there.",
+            "A real download flow behind the Update Now button: the IPA is fetched inside the app with a live progress bar, byte counts, and speed read from actual network callbacks — never a fake spinner — then verified against the release's published SHA-256 checksum. When no checksum is published, the success card says the package is unverified instead of pretending it passed; a mismatch deletes the corrupt file and says so. The verified package lands in Files (Shirox+ → Updates) and can be shared to any sideload tool.",
+            "Copy Link (with inline 'Copied' confirmation) and Share actions are available in every state of the update popup — before, during, and after a download, and in every failure state."
+        ],
+        fixed: [],
+        changed: [
+            "Dismissed updates no longer bounce the cover back up: the login-screen check now runs non-forced, so a version you chose to skip doesn't re-prompt on every visit to the sources page. A fresh re-offer stays one tap away in the About page."
+        ],
+        improved: [
+            "The update popup is a full Shirox+ surface instead of a basic alert with one button: it shows the new version number and your installed version side by side in capsule pills, a clean expandable What's New section with the changelog and release date, custom gradient and tinted capsule buttons, staggered spring entrance, breathing ambient background, haptics, and a centered card that scales properly from the smallest iPhone to the largest iPad. Non-critical updates offer a Maybe Later action (and a close button in the header); updates that are actually required still gate the app when you fall several versions behind.",
+            "Clear state coverage throughout: checking, connecting, downloading (with cancel), verifying, success, handed-off-to-LiveContainer, and failure each get their own honest card with the right actions — retry, copy link, open in Safari, or hand off to LiveContainer. The About page's Update and Install buttons now open this full popup instead of a raw Safari hop."
+        ],
+        removed: [],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "2.20",
         date: "2026-09-07",
         added: [],
