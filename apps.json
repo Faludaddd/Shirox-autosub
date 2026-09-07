@@ -29,10 +29,10 @@
         {
           "version": "2.22",
           "buildVersion": "1",
-          "date": "2026-09-08",
+          "date": "2026-09-07",
           "localizedDescription": "Updates get their own Settings section (current version, available version, Check for Updates, the full install flow, and what's new), and the Update Log is now the Change Log everywhere. Storage was rebuilt from scratch: every kind of stored data — offline anime episodes, manga chapters, image cache, anime data, manga data, metadata, music cache, and more — is listed separately with its own size and its own Clear button, with confirmations before anything important is removed and sizes that refresh instantly. The Schedule no longer lives or dies with AniList: it falls back to MyAnimeList's airing list, then to a saved offline copy of your last good schedule, and says honestly where the data came from. Manga shelves, detail pages, search, and every See All page now use the same multi-source fallback architecture — and titles coming from a backup source are mapped correctly so one manga's info can never bleed into another's. Downloading is one clean interface now: the Download button offers This Episode (the exact classic flow) or a Range with From/To inputs and a clear preview of what will be downloaded. There's a brand-new Music tab with anime openings and endings — searchable, cached, and tappable through to the anime. And updates are never forced anymore: the popup explains what's new and why upgrading may be recommended, but Maybe Later always works and the app never locks you out.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 11900000,
+          "size": 12101864,
           "minOSVersion": "15.0"
         },
         {
