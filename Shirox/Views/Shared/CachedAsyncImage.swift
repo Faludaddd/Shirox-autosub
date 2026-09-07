@@ -421,7 +421,7 @@ struct TVDBPosterImage: View {
             struct JikanData: Decodable { let images: Images? }
             struct JikanResponse: Decodable { let data: JikanData? }
             let decoded = try JSONDecoder().decode(JikanResponse.self, from: data)
-            let image = decoded.data?.images?.jpg?.large_image_url
+            let image = decoded.data?.images?.jpg.large_image_url
             jikanCache[key] = image ?? ""
             return image
         } catch {
