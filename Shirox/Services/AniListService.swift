@@ -91,6 +91,30 @@ final class AniListService {
         return false
     }
 
+    /// v2.24 — Runs an arbitrary GraphQL query through the SAME transport
+    /// as every other AniList call (pre-flight 403/429 breakers, Cloudflare
+    /// user-agent, pacing, error mapping). Used by AniChartProvider to run
+    /// AniChart's own airing-schedule query shape against the same backend
+    /// anichart.net itself uses — with one shared circuit breaker, so the
+    /// whole GraphQL backend is never double-hammered.
+    func runQuery(query: String, variables: [String: Any]) async throws -> Data {
+        try await post(query: query, variables: variables)
+    }
+
+    /// v2.24 — Real health check used by the Data Sources "Test Provider"
+    /// action: one minimal query. True only when the API answers usable
+    /// data; throws the real reason otherwise.
+    func healthCheck() async throws -> Bool {
+        struct ViewerEnvelope: Decodable {
+            struct Data: Decodable { let Viewer: Viewer? }
+            struct Viewer: Decodable { let id: Int? }
+            let data: Data?
+        }
+        let data = try await post(query: "query { Viewer { id } }", variables: [:])
+        let envelope = try? JSONDecoder().decode(ViewerEnvelope.self, from: data)
+        return envelope?.data?.Viewer?.id != nil
+    }
+
     private init() {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 15

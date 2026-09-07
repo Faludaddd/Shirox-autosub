@@ -49,6 +49,9 @@ struct UpdateLogPage: View {
             if !entry.improved.isEmpty {
                 categorySection(title: "Improved", icon: "sparkles", color: .purple, items: entry.improved)
             }
+            if !entry.removed.isEmpty {
+                categorySection(title: "Removed", icon: "minus.circle.fill", color: .red, items: entry.removed)
+            }
         }
     }
 
@@ -98,6 +101,34 @@ struct UpdateLogEntry {
 }
 
 private let logEntries: [UpdateLogEntry] = [
+    UpdateLogEntry(
+        version: "2.24",
+        date: "2026-09-08",
+        added: [
+            "A new Data Sources page in Settings: the control room for every provider. Each provider shows its name, API host, live health (Online / Degraded / Rate Limited / Unavailable / Offline), its position in the chain (PRIMARY or FALLBACK #n), the last successful request, measured latency, and current cooldown. Toggle any provider on or off, run a REAL test (a lightweight request with measured response time — 'Online · 142 ms' or the honest failure reason), and clear the anime / manga / schedule caches with their exact on-disk sizes.",
+            "Drag-and-drop priority ordering: press and hold a provider card's handle, drag it to a new position — the neighbors slide aside live with a haptic tick at every slot — and drop to commit. The order is saved instantly and every request the app makes follows it. 'Reset Order' restores the recommended chain (TVDB → MAL → AniList → Kitsu → AniDB). The arrow buttons remain for precise single-step moves.",
+            "The whole provider chain is rebuilt around one system: TVDB (artwork, seasons, episodes, characters, staff, ratings — the app's own TVDB key, so it works out of the box), Kitsu, and AniDB join MAL and AniList for anime; MangaBaka is the new manga primary; AniChart and AnimeSchedule lead the schedule chain. Everything flows through one central manager with per-domain priority, field-level fallback (the next provider fills only the missing fields — it never replaces the whole record), shared caching, and in-flight deduplication.",
+            "DOWNLOAD NOW: the update popup downloads the real package inside the app — live progress, transfer speed, total size — then verifies it byte-for-byte against the release's SHA-256 checksum. It never claims the download finished unless the file actually exists on disk. Afterward, DELETE FILE removes the package (with a small confirmation) and lets you re-download, and FIND FILE opens the Files interface at the app's Documents folder with the exact path spelled out — only shown when the location is actually known."
+        ],
+        fixed: [
+            "Provider failure storms are gone at the root: one failing provider now gets an exponential cooldown (60s → 2 min → 4 min, capped at 10 minutes) that every screen respects, the identical request is deduplicated while in flight (two screens asking for the same shelf share ONE request), failures are negatively cached for 45 seconds, and a provider that returns a rate limit pauses for 90 seconds instead of being re-asked. No more request storms, duplicate API calls, or endless provider-switching loops.",
+            "The Manga page can no longer go blank when its provider fails: MangaBaka → MAL → AniList chain with field-level fallback, and every state (loading / content / empty / error-with-retry) renders the page itself. The Schedule page is the same — AniChart → AnimeSchedule → MAL → AniList, cached timetable, and a proper 'Schedule Temporarily Unavailable' card only when everything is genuinely down.",
+            "Update detection was hardened end-to-end: version comparison is fully semantic (2.2 and 2.2.0 are equal, 2.10 is newer than 2.9, prefixes and suffixes normalize), a failed version check never assumes an update exists, and stale cache can't produce a false popup. When you're already on the latest version, nothing appears."
+        ],
+        changed: [
+            "Anime metadata is now TVDB-first: TVDB is the primary source for posters, covers, backdrops, logos, banners, episode and season artwork, synopsis, characters, staff, cast, genres, ratings, seasons, episodes, release info, and studios — with MAL, AniList, Kitsu, and AniDB filling in only what TVDB doesn't have, in that exact order. One chain, one health system, one cache — used by Home, Trending, Search, Details, Seasons, Episodes, Characters, Staff, Recommendations, and Schedule alike.",
+            "The update popup's action is DOWNLOAD NOW, making clear that you download the new app file rather than the installed app updating itself — with the current version, the new version, the release date, the file size when known, and the download/downloading/downloaded/error states, each honest.",
+            "Dead code and duplicate systems were consolidated: the old provider orchestration paths, the obsolete update plumbing, and every last trace of the Music feature's wiring — navigation, managers, models, caches, settings rows, and the VLCKit dependency — verified unreferenced and removed. The app returns to its lean size (roughly 12 MB, down from 55.9 MB)."
+        ],
+        improved: [
+            "Provider health is now a first-class system: healthy providers stay in their user-configured priority, failing ones cool down and are skipped silently, and a controlled health check (or a successful Test Provider run) restores normal priority automatically — no API spam, no manual unstick.",
+            "Every screen's request lifecycle is cancellable and timeout-bounded through the central system, so leaving a page mid-load actually stops the work instead of leaving orphaned requests competing for the same providers."
+        ],
+        removed: [
+            "Music — removed completely. The AnimeThemes-based Music feature (tab, player, managers, providers, models, caches, and settings) is gone, and with it the VLCKit framework that accounted for ~44 MB of the previous build. Nothing else was touched: anime details, navigation, search, home, playback, and settings work exactly as before."
+        ],
+        other: []
+    ),
     UpdateLogEntry(
         version: "2.23",
         date: "2026-09-08",

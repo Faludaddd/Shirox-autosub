@@ -350,14 +350,13 @@ struct ShiroxApp: App {
 
 #if targetEnvironment(macCatalyst) || os(macOS)
 enum SidebarTab: CaseIterable {
-    case home, library, downloads, music, settings, search
+    case home, library, downloads, settings, search
 
     var label: String {
         switch self {
         case .home:      return "Home"
         case .library:   return "Library"
         case .downloads: return "Downloads"
-        case .music:     return "Music"
         case .settings:  return "Settings"
         case .search:    return "Search"
         }
@@ -368,7 +367,6 @@ enum SidebarTab: CaseIterable {
         case .home:      return "house.fill"
         case .library:   return "books.vertical.fill"
         case .downloads: return "arrow.down.circle.fill"
-        case .music:     return "music.note"
         case .settings:  return "gearshape.fill"
         case .search:    return "magnifyingglass"
         }
@@ -451,9 +449,6 @@ private struct RootTabView: View {
     #if targetEnvironment(macCatalyst) || os(macOS)
     @State private var sidebarTab: SidebarTab = .home
     #endif
-    #if os(iOS) && !targetEnvironment(macCatalyst)
-    @ObservedObject private var musicPlayer = MusicPlayerManager.shared
-    #endif
 
     #if os(iOS)
     private func routePendingQuickAction() {
@@ -478,7 +473,6 @@ private struct RootTabView: View {
                     case .home:      HomeView()
                     case .library:   LibraryView()
                     case .downloads: DownloadsView()
-                    case .music:     NavigationStack { MusicView() }
                     case .settings:  SettingsView()
                     case .search:    SearchView()
                     }
@@ -490,7 +484,6 @@ private struct RootTabView: View {
                         switch sidebarTab {
                         case .home:      HomeView()
                         case .library:   LibraryView()
-                        case .music:     NavigationStack { MusicView() }
                         case .settings:  SettingsView()
                         case .search:    SearchView()
                         default: EmptyView()
@@ -516,11 +509,8 @@ private struct RootTabView: View {
                     }
                     // Requirement #6 — Schedule tab (where Settings used to sit
                     // in the bottom bar). Settings is now in the Home toolbar
-                    // (right icon) per requirement #7.
-                    // v2.23 — exactly five tabs: with the Music tab moved to
-                    // the Home toolbar (beside the manga toggle), the bar
-                    // never overflows into the system "More" menu — the
-                    // Schedule tab is always directly visible.
+                    // (right icon) per requirement #7. Exactly five tabs — the
+                    // bar never overflows into the system "More" menu.
                     Tab("Schedule", systemImage: "calendar", value: 4) {
                         ScheduleView().transition(.opacity)
                     }
@@ -552,8 +542,7 @@ private struct RootTabView: View {
                         .tabItem { Label("Search", systemImage: "magnifyingglass") }
                         .tag(3)
                     // Requirement #6 — Schedule tab (where Settings was).
-                    // v2.23 — five tabs total (Music lives in the Home
-                    // toolbar now) so nothing hides in a "More" overflow.
+                    // Five tabs total so nothing hides in a "More" overflow.
                     ScheduleView()
                         .smoothTabSwitch(value: selectedTab)
                         .tabItem { Label("Schedule", systemImage: "calendar") }
@@ -592,31 +581,6 @@ private struct RootTabView: View {
         #if os(iOS)
         .onAppear { routePendingQuickAction() }
         .onChange(of: quickActions.pending) { _ in routePendingQuickAction() }
-        #endif
-        // v2.23 — Music mini player bar: floats above the tab bar whenever
-        // a theme is playing, on every tab. Tapping it opens the expanded
-        // player. Playback itself lives in the shared MusicPlayerManager,
-        // so it continues app-wide.
-        //
-        // The player's fullScreenCover lives on a separate background node:
-        // SwiftUI only reliably presents ONE fullScreenCover per view — the
-        // update cover and rating sheet already own this node's other
-        // presentation slots.
-        #if os(iOS) && !targetEnvironment(macCatalyst)
-        .overlay(alignment: .bottom) {
-            MusicMiniPlayerBar()
-                .padding(.bottom, 48) // sits just above the system tab bar
-        }
-        .background {
-            Color.clear
-                .fullScreenCover(isPresented: Binding(
-                    get: { musicPlayer.isExpanded },
-                    set: { if !$0 { musicPlayer.isExpanded = false } }
-                )) {
-                    NavigationStack { MusicPlayerSheet() }
-                        .tint(.appAccent)
-                }
-        }
         #endif
         #if os(iOS)
         .sheet(isPresented: Binding(

@@ -105,35 +105,23 @@ final class SearchViewModel: ObservableObject {
                         )
                     }
                 } else {
-                    // Provider path. AniList has a full filter API; MAL's
-                    // public search endpoint only accepts a query string, so
-                    // filters are applied client-side after fetching when the
-                    // active provider is MAL. Manga mode forces the AniList
-                    // manga endpoints regardless of the active provider.
-                    let activeProvider = ProviderManager.shared.orderedProviders.first?.providerType ?? .anilist
+                    // Provider path. v2.24 — plain text searches run through
+                    // the UnifiedProviderSystem chains (anime: TVDB → MAL →
+                    // AniList → Kitsu; manga: MangaBaka → MAL → AniList) —
+                    // one shared, health-gated, deduplicated, cached chain.
+                    // AniList's FILTER search (genre/format/year filters)
+                    // only exists on AniList, so filtered queries keep their
+                    // direct AniList call — the chain has no equivalent.
                     let res: [Media]
                     if isMangaMode {
-                        // Manga mode: always use AniList MANGA endpoints so
-                        // anime results never appear in Reading Mode.
-                        // If AniList is disabled/rate-limited, fall back to
-                        // Jikan's manga search.
-                        if AniListService.shared.isApiDisabled() || AniListService.shared.isRateLimited() {
-                            Logger.shared.log("[Search] AniList unavailable — falling back to Jikan manga search", type: "Info")
-                            let jikanResults = try await MALDiscoveryService.shared.fetchList("manga",
-                                queryItems: [URLQueryItem(name: "q", value: q), URLQueryItem(name: "limit", value: "25")])
-                            res = jikanResults.map { MALDiscoveryService.shared.mapToMedia($0) }
-                        } else {
-                            let mangaMedia = try await AniListService.shared.mangaSearch(keyword: q)
-                            res = mangaMedia.map { AniListProvider.shared.mapMangaMedia($0) }
-                        }
-                    } else if activeProvider == .mal {
-                        let raw = try await MALProvider.shared.search(q)
-                        res = applyMALClientFilters(raw)
-                    } else if filters.isEmpty {
-                        res = try await ProviderManager.shared.call { try await $0.search(q) }
-                    } else {
+                        // Manga mode: the manga chain keeps anime results
+                        // out of Reading Mode.
+                        res = try await UnifiedProviderSystem.shared.searchManga(q)
+                    } else if !filters.isEmpty {
                         let aniListMedia = try await AniListService.shared.search(keyword: q, filters: filters)
                         res = aniListMedia.map { AniListProvider.shared.mapMedia($0) }
+                    } else {
+                        res = try await UnifiedProviderSystem.shared.searchAnime(q)
                     }
                     if !Task.isCancelled {
                         var seen = Set<String>()
@@ -218,30 +206,6 @@ final class SearchViewModel: ObservableObject {
             return try await JSEngine.shared.mangaSearch(keyword: q)
         }
         return try await JSEngine.shared.search(keyword: q)
-    }
-
-    /// MAL's public search endpoint only accepts a free-text `q` parameter —
-    /// no genre/year/format/etc. filters. To preserve the user's filter
-    /// selections when MAL is the active search source, we apply the filters
-    /// client-side on the returned Media array. Filters that MAL's Media
-    /// representation doesn't populate (studio, source, min/max episodes when
-    /// `episodes` is nil) are silently skipped.
-    private func applyMALClientFilters(_ items: [Media]) -> [Media] {
-        guard !filters.isEmpty else { return items }
-        return items.filter { media in
-            if let year = filters.year, media.seasonYear != year { return false }
-            if let season = filters.season, let s = media.season, s.uppercased() != season.uppercased() { return false }
-            if let format = filters.format, let mf = media.format, mf.uppercased() != format.uppercased() { return false }
-            if let status = filters.status, let ms = media.status, ms.uppercased() != status.uppercased() { return false }
-            if !filters.genres.isEmpty {
-                let mediaGenres = (media.genres ?? []).map { $0.lowercased() }
-                let needed = filters.genres.map { $0.lowercased() }
-                if !needed.allSatisfy({ mediaGenres.contains($0) }) { return false }
-            }
-            if let min = filters.minEpisodes, let ep = media.episodes, ep < min { return false }
-            if let max = filters.maxEpisodes, let ep = media.episodes, ep > max { return false }
-            return true
-        }
     }
 
     func clearResults() {

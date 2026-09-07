@@ -1590,10 +1590,10 @@ struct SourcesPickerSheet: View {
         providerManager.orderedProviders.first?.providerType
     }
 
-    /// Searchable providers — both AniList and MAL are surfaced. MAL is
-    /// functional for keyword search and basic client-side filters; advanced
-    /// filters that MAL's API doesn't support are silently skipped on the
-    /// MAL path (see `SearchViewModel.applyMALClientFilters`).
+    /// Searchable providers — both AniList and MAL are surfaced. Plain
+    /// keyword search runs through the unified chain (Data Sources
+    /// priority); AniList's advanced filter search stays direct because
+    /// only AniList serves those filters.
     private var searchableProviders: [ProviderType] { [.anilist, .mal] }
 
     var body: some View {

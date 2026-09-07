@@ -32,7 +32,11 @@ final class BrowseViewModel: ObservableObject {
         error = nil
         let nextPage = currentPage + 1
         do {
-            let newItems = try await ProviderManager.shared.call { try await $0.browse(category: self.category, page: nextPage) }
+            // v2.24 — See All pages run through the unified provider chain
+            // (TVDB → MAL → AniList → Kitsu) — the SAME chain, cache, and
+            // dedup the Home shelves use (the shelf IS page 1 of this
+            // browse), so opening See All right after Home costs nothing.
+            let newItems = try await UnifiedProviderSystem.shared.browse(category: self.category, page: nextPage)
             var seen = Set(items.map(\.uniqueId))
             let deduped = newItems.filter { seen.insert($0.uniqueId).inserted }
             items.append(contentsOf: deduped)

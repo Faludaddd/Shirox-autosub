@@ -1,0 +1,238 @@
+import Foundation
+
+/// Kitsu JSON:API provider — anime fallback #3. Keyless and public.
+///
+/// Cross-provider navigation works through Kitsu's `mappings` relationship
+/// (included in list/search requests): each anime carries its MyAnimeList
+/// and AniList ids, so results flow into the app's existing detail
+/// navigation with REAL ids (never invented). Items without a usable
+/// mapping are dropped instead of shown as dead ends.
+@MainActor
+final class KitsuProvider {
+    static let shared = KitsuProvider()
+
+    private let base = "https://kitsu.io/api/edge"
+
+    private static let session: URLSession = {
+        let cfg = URLSessionConfiguration.default
+        cfg.urlCache = nil
+        cfg.timeoutIntervalForRequest = 12
+        cfg.timeoutIntervalForResource = 25
+        return URLSession(configuration: cfg)
+    }()
+
+    private init() {}
+
+    // MARK: - Response models
+
+    private struct Document: Decodable {
+        let data: [Resource]
+        let included: [Included]?
+    }
+
+    private struct Resource: Decodable {
+        let id: String
+        let attributes: Attributes?
+        let relationships: Relationships?
+    }
+
+    private struct Included: Decodable {
+        let id: String
+        let type: String
+        let attributes: IncludedAttributes?
+    }
+
+    private struct IncludedAttributes: Decodable {
+        let externalSite: String?
+        let externalId: String?
+    }
+
+    private struct Attributes: Decodable {
+        let canonicalTitle: String?
+        let titles: [String: String]?
+        let synopsis: String?
+        let posterImage: Poster?
+        let coverImage: Cover?
+        let episodeCount: Int?
+        let averageRating: String?
+        let popularityRank: Int?
+        let ratingRank: Int?
+        let subtype: String?
+        let status: String?
+        let startDate: String?
+
+        struct Poster: Decodable {
+            let small: String?
+            let medium: String?
+            let large: String?
+            let original: String?
+        }
+        struct Cover: Decodable {
+            let tiny: String?
+            let small: String?
+            let original: String?
+        }
+    }
+
+    private struct Relationships: Decodable {
+        let mappings: MappingRef?
+        struct MappingRef: Decodable {
+            let data: [Link]?
+            struct Link: Decodable {
+                let id: String?
+                let type: String?
+            }
+        }
+    }
+
+    // MARK: - Health check
+
+    func healthCheck() async throws -> Bool {
+        guard let url = URL(string: "\(base)/trending/anime?limit=1") else { return false }
+        var req = URLRequest(url: url)
+        req.setValue("application/vnd.api+json", forHTTPHeaderField: "Accept")
+        let (data, response) = try await Self.session.data(for: req)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return false }
+        let doc = try? JSONDecoder().decode(Document.self, from: data)
+        return !(doc?.data ?? []).isEmpty
+    }
+
+    // MARK: - Mapping resolution
+
+    /// Resolves the MAL/AniList ids for a list of anime resources from the
+    /// document's `included` mappings. Only mappings referenced by each
+    /// resource's relationships are considered.
+    private func resolveIds(resources: [Resource], included: [Included]?) -> [String: (mal: Int?, anilist: Int?)] {
+        let mappingById: [String: Included] = (included ?? []).filter { $0.type == "mappings" }
+            .reduce(into: [:]) { $0[$1.id] = $1 }
+        var result: [String: (Int?, Int?)] = [:]
+        for resource in resources {
+            let mappingLinks = resource.relationships?.mappings?.data ?? []
+            var mal: Int?
+            var anilist: Int?
+            for link in mappingLinks {
+                guard let mapping = mappingById[link.id ?? ""],
+                      let site = mapping.attributes?.externalSite?.lowercased(),
+                      let idString = mapping.attributes?.externalId,
+                      let id = Int(idString), id > 0 else { continue }
+                if site.contains("myanimelist") { mal = mal ?? id }
+                if site.contains("anilist") { anilist = anilist ?? id }
+            }
+            result[resource.id] = (mal, anilist)
+        }
+        return result
+    }
+
+    // MARK: - Lists
+
+    func trending() async throws -> [Media] {
+        try await fetchList(path: "/trending/anime?limit=20&include=mappings")
+    }
+
+    /// Paged browse for the See All chain. Kitsu pages via offset
+    /// (page[limit] x page[offset]).
+    func browse(category: BrowseCategory, page: Int) async throws -> [Media] {
+        let offset = max(0, (page - 1)) * 20
+        let path: String
+        switch category {
+        case .trending:
+            path = "/anime?page[limit]=20&page[offset]=\(offset)&sort=followersCount&include=mappings&filter[status]=current,upcoming"
+        case .seasonal:
+            // Kitsu has no "current season" chart; sort by user count for
+            // a stable popular-now list (the chain treats it as a fallback
+            // after MAL/AniList anyway).
+            path = "/anime?page[limit]=20&page[offset]=\(offset)&sort=userCount&include=mappings&filter[status]=current"
+        case .popular:
+            path = "/anime?page[limit]=20&page[offset]=\(offset)&sort=userCount&include=mappings&filter[status]=current,finished"
+        case .topRated:
+            path = "/anime?page[limit]=20&page[offset]=\(offset)&sort=averageRating&include=mappings&filter[status]=finished"
+        }
+        return try await fetchList(path: path)
+    }
+
+    func popular() async throws -> [Media] {
+        try await fetchList(path: "/anime?page[limit]=20&sort=userCount&include=mappings&filter[status]=current,finished")
+    }
+
+    func topRated() async throws -> [Media] {
+        try await fetchList(path: "/anime?page[limit]=20&sort=averageRating&include=mappings&filter[status]=finished")
+    }
+
+    func search(query: String) async throws -> [Media] {
+        let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
+        return try await fetchList(path: "/anime?page[limit]=20&filter[text]=\(encoded)&include=mappings")
+    }
+
+    private func fetchList(path: String) async throws -> [Media] {
+        guard let url = URL(string: base + path) else { return [] }
+        var req = URLRequest(url: url)
+        req.setValue("application/vnd.api+json", forHTTPHeaderField: "Accept")
+        let (data, response) = try await Self.session.data(for: req)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw ProviderChainError.allProvidersFailed(lastReason: "Kitsu request failed (HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0))")
+        }
+        let doc = try JSONDecoder().decode(Document.self, from: data)
+        let ids = resolveIds(resources: doc.data, included: doc.included)
+        var media: [Media] = []
+        for resource in doc.data {
+            guard let attrs = resource.attributes else { continue }
+            let mapping = ids[resource.id] ?? (nil, nil)
+            guard let navId = mapping.anilist ?? mapping.mal else { continue }
+            let provider: ProviderType = mapping.anilist != nil ? .anilist : .mal
+            let titles = attrs.titles ?? [:]
+            let poster = attrs.posterImage?.large ?? attrs.posterImage?.medium ?? attrs.posterImage?.original
+            // Kitsu's averageRating is a percent string ("86.75") — the
+            // app's averageScore is 0–100, so parse and round.
+            let score = Int(Double(attrs.averageRating ?? "") ?? 0)
+            let year = attrs.startDate.flatMap { Int($0.prefix(4)) }
+            media.append(Media(
+                id: navId,
+                idMal: mapping.mal,
+                provider: provider,
+                title: MediaTitle(
+                    romaji: titles["en_jp"] ?? attrs.canonicalTitle,
+                    english: titles["en"],
+                    native: titles["ja_jp"]),
+                coverImage: MediaCoverImage(large: poster, extraLarge: attrs.posterImage?.original),
+                bannerImage: attrs.coverImage?.original,
+                description: attrs.synopsis,
+                episodes: attrs.episodeCount,
+                status: mapStatus(attrs.status),
+                averageScore: score > 0 ? score : nil,
+                genres: nil,
+                season: nil,
+                seasonYear: year,
+                nextAiringEpisode: nil,
+                relations: nil,
+                type: "ANIME",
+                format: mapFormat(attrs.subtype),
+                studioNames: nil,
+                source: nil,
+                duration: nil,
+                airDateRange: nil))
+        }
+        return media
+    }
+
+    private func mapStatus(_ raw: String?) -> String? {
+        switch raw {
+        case "current": return "RELEASING"
+        case "finished": return "FINISHED"
+        case "upcoming", "unreleased": return "NOT_YET_RELEASED"
+        case "tba": return "NOT_YET_RELEASED"
+        default: return raw
+        }
+    }
+
+    private func mapFormat(_ subtype: String?) -> String? {
+        switch subtype {
+        case "TV": return "TV"
+        case "movie": return "MOVIE"
+        case "OVA": return "OVA"
+        case "ONA": return "ONA"
+        case "special": return "SPECIAL"
+        case "music": return "MUSIC"
+        default: return subtype?.uppercased()
+        }
+    }
+}

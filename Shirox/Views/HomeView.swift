@@ -66,20 +66,6 @@ struct HomeView: View {
                     }
                     .accessibilityLabel(appMode.mode.toggleAccessibilityLabel)
                 }
-                // v2.23 — Music, directly beside the manga mode-toggle:
-                // [MANGA] [MUSIC] in the top-right navigation. Same icon
-                // size, spacing, and touch target as the other toolbar
-                // icons; opens the dedicated Music page (AnimeThemes).
-                ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink {
-                        MusicView()
-                    } label: {
-                        Image(systemName: "music.note")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundStyle(.primary)
-                    }
-                    .accessibilityLabel("Music")
-                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         showNotifications = true
@@ -2183,13 +2169,14 @@ struct ScheduleView: View {
     /// the preload completed during the 3.5s splash, `ScheduleView` renders
     /// instantly with no spinner.
     ///
-    /// v2.22 — Full fallback chain. AniList cache → AniList network →
-    /// Jikan /schedules (per-weekday airing lists from MyAnimeList) →
-    /// disk snapshot of the last successful schedule (≤ 48h). The page
-    /// only shows the error state when EVERY source failed; while a
-    /// backup source serves data a slim notice explains where it came
-    /// from. Successful loads (any source) refresh the snapshot so the
-    /// next outage starts from real recent data.
+    /// v2.24 — The unified schedule chain: AniChart (AniList's own airing
+    /// chart backend) → AnimeSchedule → MAL (Jikan) → AniList, all through
+    /// the centralized provider system (health-gated, deduped, cached —
+    /// every screen shares one request). The disk snapshot of the last
+    /// good schedule (≤ 48h) is the final fallback. The page only shows
+    /// the error state when EVERY source failed; while a backup source
+    /// serves data a slim notice explains where it came from. Successful
+    /// loads (any source) refresh the snapshot.
     private func load() async {
         isLoading = true
         loadError = nil
@@ -2208,32 +2195,33 @@ struct ScheduleView: View {
         var fetched: [UnifiedScheduleEntry] = []
         var fetchedFromBackup = false
 
-        // ── Primary: AniList (cache first, then network). ──────────────
-        do {
-            switch mode {
-            case .anime, .western, .combined:
-                // #124 — Western and Combined are no longer selectable from
-                // settings; `ScheduleSettings.defaultMode` always coerces to
-                // `.anime`. Treat any stale persisted value as Anime.
-                if let cached = AniListService.shared.cachedAiringSchedules(from: startTs, to: endTs) {
-                    fetched = cached.map { UnifiedScheduleEntry(item: $0) }
-                } else {
-                    let items = try await AniListService.shared.airingSchedules(from: startTs, to: endTs)
-                    fetched = items.map { UnifiedScheduleEntry(item: $0) }
-                }
-            }
-        } catch {
-            // ── Backup #1: Jikan /schedules (MyAnimeList airing lists). ─
-            Logger.shared.log("[Schedule] AniList failed (\(error.localizedDescription)) — trying Jikan backup", type: "Provider")
+        // ── The unified provider chain (AniChart → AnimeSchedule → MAL →
+        //    AniList), with the AniList in-memory cache checked first so a
+        //    completed splash preload still renders instantly. ──────────
+        if let cached = AniListService.shared.cachedAiringSchedules(from: startTs, to: endTs) {
+            fetched = cached.map { UnifiedScheduleEntry(item: $0) }
+        } else {
             do {
-                fetched = try await ScheduleFallbackService.shared.jikanSchedule(from: startTs, to: endTs)
-                fetchedFromBackup = !fetched.isEmpty
-                if fetchedFromBackup {
-                    sourceNotice = "AniList is unreachable — showing this week's airing list from MyAnimeList."
+                let result = try await UnifiedProviderSystem.shared.scheduleEntries(from: startTs, to: endTs)
+                fetched = result.entries
+                // Honest source notice when a backup (non-primary) source
+                // served the schedule.
+                if let source = result.source, source != .anichart {
+                    fetchedFromBackup = true
+                    switch source {
+                    case .animeschedule:
+                        sourceNotice = "AniChart is unreachable — showing this week's timetable from AnimeSchedule."
+                    case .mal:
+                        sourceNotice = "AniChart and AnimeSchedule are unreachable — showing this week's airing list from MyAnimeList."
+                    case .anilist:
+                        sourceNotice = "Showing this week's airing schedule from AniList."
+                    default:
+                        break
+                    }
                 }
             } catch {
-                Logger.shared.log("[Schedule] Jikan backup also failed (\(error.localizedDescription)) — trying offline snapshot", type: "Provider")
-                // ── Backup #2: disk snapshot of the last good schedule. ─
+                Logger.shared.log("[Schedule] provider chain failed (\(error.localizedDescription)) — trying offline snapshot", type: "Provider")
+                // ── Final fallback: disk snapshot of the last good schedule. ─
                 if let cached = ScheduleFallbackService.shared.cachedSnapshot(from: startTs, to: endTs) {
                     fetched = cached.entries
                     fetchedFromBackup = true
@@ -2272,17 +2260,6 @@ struct ScheduleView: View {
 
         // Refresh the pending-notification set so the bells reflect current state.
         scheduledIds = await EpisodeNotificationManager.shared.scheduledScheduleIds()
-    }
-
-    /// #93 — Helper used by the `.combined` branch of `load()`. Returns the
-    /// cached schedule entries for the window if the splash preload already
-    /// populated them, otherwise fetches fresh. Kept as a separate function
-    /// so it can be wrapped in `async let` alongside the Western fetch.
-    private func fetchAnimeCachedOrFresh(from: Int, to: Int) async throws -> [AniListAiringScheduleItem] {
-        if let cached = AniListService.shared.cachedAiringSchedules(from: from, to: to) {
-            return cached
-        }
-        return try await AniListService.shared.airingSchedules(from: from, to: to)
     }
 
     // MARK: - Day bucketing & calendar grid (timezone-aware)

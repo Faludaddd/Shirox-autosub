@@ -26,6 +26,16 @@ final class HomeViewModel: ObservableObject {
                 Task { await self.reload() }
             }
             .store(in: &cancellables)
+        // v2.24 — reload when the unified provider chain's anime order
+        // changes (Data Sources settings drag-reorder / reset).
+        UnifiedProviderSystem.shared.$animeOrder
+            .dropFirst()
+            .removeDuplicates { $0 == $1 }
+            .sink { [weak self] _ in
+                guard let self else { return }
+                Task { await self.reload() }
+            }
+            .store(in: &cancellables)
     }
 
     func load() async {
@@ -33,49 +43,22 @@ final class HomeViewModel: ObservableObject {
         isLoading = true
         error = nil
 
-        let isMAL = ProviderManager.shared.primary?.providerType == .mal
+        // v2.24 — every shelf now goes through the UnifiedProviderSystem
+        // chain (TVDB → MAL → AniList → Kitsu → AniDB, health-gated with
+        // cooldowns + in-flight dedup + disk cache). One shared chain for
+        // the whole app: multiple screens asking for the same shelf share
+        // ONE request, a failing provider is skipped for its whole
+        // cooldown window, and the Jikan layer paces outbound calls.
+        async let t: Void = loadTrending()
+        async let s: Void = loadSeasonal()
+        async let p: Void = loadPopular()
+        async let r: Void = loadTopRated()
+        async let rc: Void = loadRecentlyCompleted()
+        async let u: Void = loadUpcoming()
+        _ = await (t, s, p, r, rc, u)
 
-        if isMAL {
-            // MAL: sequential to avoid 429s. Recently Completed and Upcoming
-            // are AniList-only, so they won't load — that's expected.
-            do {
-                trending = try await ProviderManager.shared.call { try await $0.trending() }
-                try await Task.sleep(nanoseconds: 400_000_000)
-                seasonal = try await ProviderManager.shared.call { try await $0.seasonal() }
-                try await Task.sleep(nanoseconds: 400_000_000)
-                popular = try await ProviderManager.shared.call { try await $0.popular() }
-                try await Task.sleep(nanoseconds: 400_000_000)
-                topRated = try await ProviderManager.shared.call { try await $0.topRated() }
-            } catch {
-                self.error = error.localizedDescription
-            }
-            if !trending.isEmpty {
-                SnapshotStore.saveHomeShelves(trending: trending, seasonal: seasonal, popular: popular, topRated: topRated)
-            }
-        } else {
-            // AniList: fetch each section independently so a slow response
-            // from one doesn't block the others. Each result is assigned as
-            // soon as it arrives, so the UI populates progressively.
-            //
-            // v2.23 — every shelf now goes through ProviderManager.call —
-            // ONE fallback path shared by the whole app (AniList → MAL/Jikan
-            // → snapshot). The old per-shelf hand-rolled fallback fired
-            // SECOND, independent Jikan requests on top of the ones
-            // ProviderManager already made — the duplicate-request flood
-            // behind the Jikan 429s.
-            async let t: Void = loadTrending()
-            async let s: Void = loadSeasonal()
-            async let p: Void = loadPopular()
-            async let r: Void = loadTopRated()
-            async let rc: Void = loadRecentlyCompleted()
-            async let u: Void = loadUpcoming()
-            _ = await (t, s, p, r, rc, u)
-        }
-
-        // v2.23 — persist the last-good shelves AFTER everything settles so
-        // the snapshot captures the fully-populated page (the loaders run
-        // concurrently — saving inside one of them would snapshot empty
-        // shelves).
+        // Persist the last-good shelves AFTER everything settles so the
+        // snapshot captures the fully-populated page.
         if !trending.isEmpty {
             SnapshotStore.saveHomeShelves(trending: trending, seasonal: seasonal, popular: popular, topRated: topRated)
         }
@@ -86,7 +69,7 @@ final class HomeViewModel: ObservableObject {
 
     private func loadTrending() async {
         do {
-            trending = try await ProviderManager.shared.call { try await $0.trending() }
+            trending = try await UnifiedProviderSystem.shared.trending()
         } catch {
             serveSnapshotIfAvailable(error: error)
         }
@@ -94,7 +77,7 @@ final class HomeViewModel: ObservableObject {
 
     private func loadSeasonal() async {
         do {
-            seasonal = try await ProviderManager.shared.call { try await $0.seasonal() }
+            seasonal = try await UnifiedProviderSystem.shared.seasonal()
         } catch {
             // Snapshot of last-good data fills the shelf silently; the
             // trending loader reports the honest error once.
@@ -104,7 +87,7 @@ final class HomeViewModel: ObservableObject {
 
     private func loadPopular() async {
         do {
-            popular = try await ProviderManager.shared.call { try await $0.popular() }
+            popular = try await UnifiedProviderSystem.shared.popular()
         } catch {
             serveSnapshotIfAvailable(error: error, quiet: true)
         }
@@ -112,7 +95,7 @@ final class HomeViewModel: ObservableObject {
 
     private func loadTopRated() async {
         do {
-            topRated = try await ProviderManager.shared.call { try await $0.topRated() }
+            topRated = try await UnifiedProviderSystem.shared.topRated()
         } catch {
             serveSnapshotIfAvailable(error: error, quiet: true)
         }

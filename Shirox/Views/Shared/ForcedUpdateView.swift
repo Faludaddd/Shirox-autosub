@@ -212,6 +212,35 @@ final class UpdateDownloadService: NSObject, ObservableObject, URLSessionDownloa
         Haptics.selection()
     }
 
+    /// v2.24 — DELETE FILE: removes the downloaded package from
+    /// Documents/Updates, clears the file reference, and returns to the
+    /// idle state so the UI immediately offers the download again. The
+    /// caller confirms first; the removal itself is real and immediate.
+    @MainActor
+    func deletePackage() {
+        guard let url = packageURL else { return }
+        try? FileManager.default.removeItem(at: url)
+        packageURL = nil
+        setPhase(.idle)
+        Logger.shared.log("[Update] downloaded package deleted: \(url.lastPathComponent)", type: "Debug")
+    }
+
+    /// v2.24 — True when a previously downloaded package still exists on
+    /// disk (checked for real, not remembered). Drives the downloaded-file
+    /// management UI.
+    @MainActor
+    var hasDownloadedPackage: Bool {
+        guard let url = packageURL else { return false }
+        return FileManager.default.fileExists(atPath: url.path)
+    }
+
+    /// v2.24 — The package's location, presented as the Files-app path the
+    /// user can navigate to (Documents is file-sharing enabled).
+    var packageFilesPath: String? {
+        guard let url = packageURL else { return nil }
+        return "On My iPhone/Shirox+/Updates/\(url.lastPathComponent)"
+    }
+
     /// Hands the update to the chosen install tool via its documented deep
     /// link: the tool downloads the IPA from GitHub itself and installs it.
     /// Re-probes presence every call, reports honestly through the
@@ -440,6 +469,10 @@ struct UpdateCoverView: View {
     @State private var linkCopied = false
     /// Drag-to-dismiss translation.
     @State private var dragOffset: CGFloat = 0
+    /// v2.24 — Downloaded-file management (DELETE FILE / FIND FILE).
+    @State private var showDeleteFileConfirmation = false
+    @State private var showFileBrowser = false
+    @State private var findFileNotice: String?
 
     /// v2.23 — the install destination, remembered across launches. The
     /// dropdown writes here (a View-owned @AppStorage so SwiftUI refreshes
@@ -512,6 +545,25 @@ struct UpdateCoverView: View {
         .sheet(item: $shareItem) { item in
             shareSheet(item)
         }
+        .alert("Delete Downloaded File?", isPresented: $showDeleteFileConfirmation) {
+            Button("Delete File", role: .destructive) {
+                downloadService.deletePackage()
+                Haptics.success()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The update package will be removed from Updates. You can download it again any time.")
+        }
+        #if os(iOS)
+        .sheet(isPresented: $showFileBrowser) {
+            // FIND FILE — the Files interface. iOS provides no API to open
+            // Files rooted at an exact container path, so the picker opens
+            // in browsing mode and the path banner (shown next to the
+            // button that opened this) spells out exactly where the file
+            // lives: On My iPhone → Shirox+ → Updates.
+            DocumentBrowserSheet()
+        }
+        #endif
         .onAppear {
             Task { @MainActor in downloadService.refreshDestinationAvailability() }
             Haptics.warning()
@@ -839,10 +891,17 @@ struct UpdateCoverView: View {
             Button {
                 startDownload(info)
             } label: {
-                Label("Update Now", systemImage: "arrow.down.circle.fill")
+                Label("Download Now", systemImage: "arrow.down.circle.fill")
             }
             .buttonStyle(UpdatePrimaryButtonStyle())
             .disabled(isPreview)
+
+            // v2.24 — If a package from a previous download is still on
+            // disk, manage it right from the idle state too (delete or
+            // find) — not only after a fresh download.
+            if downloadService.hasDownloadedPackage {
+                downloadedFileManagement(compact: true)
+            }
 
             // Hand the IPA straight to the selected install tool (the tool
             // downloads and installs it itself). Only shown when that tool
@@ -1060,6 +1119,14 @@ struct UpdateCoverView: View {
             }
             .buttonStyle(UpdatePrimaryButtonStyle())
             #endif
+
+            // v2.24 — Downloaded file management: DELETE FILE (confirmed,
+            // real removal) and FIND FILE (opens the Files interface at
+            // the location containing the package, with the exact path
+            // shown — iOS offers no API to deep-link into an exact
+            // container path, so the Files app opens and the path is
+            // spelled out).
+            downloadedFileManagement(compact: false)
 
             // Hand the package to the preferred tool from here too.
             if downloadService.isDestinationAvailable(selectedDestination) {

@@ -1185,6 +1185,14 @@ struct AniListMangaDetailView: View {
             return
         }
 
+        // v2.24 — MangaBaka field-level enrichment. MangaBaka is the
+        // PRIMARY manga source: fields the page is missing (description,
+        // cover, genres, chapter/volume counts, authors/artists) come from
+        // it before the page settles. Keyed by the provider's own MAL link
+        // (never title-guessed); a MangaBaka miss or block degrades
+        // silently to the AniList/MAL data already on the page.
+        await enrichWithMangaBaka(malId: malId ?? media?.idMal)
+
         // Show the page immediately — the media is ready. Everything below
         // is secondary and shouldn't block the page from rendering.
         phase = .ready
@@ -1197,6 +1205,56 @@ struct AniListMangaDetailView: View {
         async let moduleResolve: Void = resolveMangaModule()
 
         _ = await (charRecs, entry, moduleResolve)
+    }
+
+    /// v2.24 — Applies MangaBaka's fields onto the page's Media. MangaBaka
+    /// is the PRIMARY manga source: its description, genres, chapter and
+    /// volume counts WIN when present; the AniList/MAL record already on
+    /// the page fills whatever MangaBaka doesn't carry (field-level
+    /// fallback, never a whole-object swap). No-op when MangaBaka is
+    /// blocked or has no exact match — the page never blanks.
+    private func enrichWithMangaBaka(malId: Int?) async {
+        guard let current = media else { return }
+        guard let fields = await UnifiedProviderSystem.shared.mangaDetailFields(
+            malId: malId, titleHint: current.title.displayTitle) else { return }
+        let newDescription = fields.description ?? current.description
+        let newGenres = (fields.genres?.isEmpty == false) ? fields.genres : current.genres
+        let newEpisodes = fields.chapters ?? current.episodes
+        let newVolumes = fields.volumes ?? current.volumes
+        let newCover: MediaCoverImage
+        if current.coverImage.best == nil, let cover = fields.coverURL {
+            newCover = MediaCoverImage(large: cover, extraLarge: nil)
+        } else {
+            newCover = current.coverImage
+        }
+        let merged = Media(
+            id: current.id,
+            idMal: current.idMal,
+            provider: current.provider,
+            title: current.title,
+            coverImage: newCover,
+            bannerImage: current.bannerImage,
+            description: newDescription,
+            episodes: newEpisodes,
+            status: current.status,
+            averageScore: current.averageScore,
+            genres: newGenres,
+            season: current.season,
+            seasonYear: current.seasonYear,
+            nextAiringEpisode: current.nextAiringEpisode,
+            relations: current.relations,
+            type: current.type,
+            format: current.format,
+            studioNames: current.studioNames,
+            source: current.source,
+            duration: current.duration,
+            airDateRange: current.airDateRange,
+            volumes: newVolumes,
+            popularity: current.popularity,
+            countryOfOrigin: current.countryOfOrigin)
+        if merged != current {
+            media = merged
+        }
     }
 
     /// Loose title comparison for the MAL→AniList enrichment guard:

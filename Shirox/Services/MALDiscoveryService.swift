@@ -413,6 +413,51 @@ final class MALDiscoveryService {
         ])
     }
 
+    // MARK: - Manga (v2.24 unified provider chain adapters)
+
+    /// Jikan manga search for the unified manga search chain
+    /// (MangaBaka → MAL → AniList).
+    func searchManga(_ query: String) async throws -> [Media] {
+        let list = try await fetchList("manga", queryItems: [
+            URLQueryItem(name: "q", value: query),
+            URLQueryItem(name: "limit", value: "25"),
+            URLQueryItem(name: "sfw", value: "true")
+        ])
+        return list.map { mapMangaToMedia($0) }
+    }
+
+    /// Jikan manga shelves for the unified manga home chain. Maps the
+    /// shelf kinds to their Jikan equivalents (the same endpoints the
+    /// manga home's per-shelf fallback already used).
+    func mangaShelf(_ shelf: MangaShelfKind) async throws -> [Media] {
+        switch shelf {
+        case .trending:
+            let list = try await fetchList("top/manga", queryItems: [
+                URLQueryItem(name: "filter", value: "bypopularity"),
+                URLQueryItem(name: "limit", value: "25")
+            ])
+            return list.map { mapMangaToMedia($0) }
+        case .popular:
+            let list = try await fetchList("top/manga", queryItems: [
+                URLQueryItem(name: "filter", value: "favorite"),
+                URLQueryItem(name: "limit", value: "25")
+            ])
+            return list.map { mapMangaToMedia($0) }
+        case .topRated:
+            let list = try await fetchList("top/manga", queryItems: [
+                URLQueryItem(name: "limit", value: "25")
+            ])
+            return list.map { mapMangaToMedia($0) }
+        case .latest:
+            let list = try await fetchList("manga", queryItems: [
+                URLQueryItem(name: "order_by", value: "start_date"),
+                URLQueryItem(name: "sort", value: "desc"),
+                URLQueryItem(name: "limit", value: "25")
+            ])
+            return list.map { mapMangaToMedia($0) }
+        }
+    }
+
     func detail(malId: Int) async throws -> JikanAnime {
         try await fetchSingle("anime/\(malId)/full")
     }

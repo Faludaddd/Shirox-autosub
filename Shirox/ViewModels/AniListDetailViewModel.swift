@@ -75,8 +75,12 @@ final class AniListDetailViewModel: ObservableObject {
                 verifyAgainst = preloaded?.title.displayTitle
             } else {
                 // No mapping exists — keep the Jikan data; the page stays
-                // functional (hero, episodes by title) without enrichment.
+                // functional (hero, episodes by title) without AniList
+                // enrichment. TVDB enrichment still runs (keyed by the MAL
+                // id) so the primary metadata source contributes its fields
+                // even while AniList is unreachable.
                 detailFetchFailed = true
+                await enrichWithTVDB(primaryId: id, malId: preloaded?.idMal ?? preloaded?.id)
                 isLoading = false
                 return
             }
@@ -129,7 +133,75 @@ final class AniListDetailViewModel: ObservableObject {
                 self.error = error.localizedDescription
             }
         }
+
+        // v2.24 — TVDB-first field-level enrichment. TVDB is the PRIMARY
+        // anime metadata source: the fields it serves (banner/backdrop,
+        // synopsis, genres, studios, runtime, episode artwork data) are
+        // applied to the page's Media — AniList/MAL fill everything TVDB
+        // doesn't carry (relations, recommendations, tracking, countdowns,
+        // richer characters with voice actors). The lookup is id-keyed so
+        // the TVDB record is the SAME series; failures degrade silently to
+        // the AniList/MAL data the page already has.
+        await enrichWithTVDB(primaryId: fetchId, malId: media?.idMal)
         isLoading = false
+    }
+
+    /// Applies TVDB's metadata fields onto the loaded Media (TVDB wins for
+    /// the fields it serves; nil fields keep the AniList/MAL values — that
+    /// IS the field-level fallback: TVDB first, others fill the gaps).
+    /// Cached on disk (6h) and id-keyed, so repeat visits cost nothing.
+    private func enrichWithTVDB(primaryId: Int, malId: Int?) async {
+        guard let current = media else { return }
+        let anilistId = current.provider == .anilist ? current.id : (current.provider == .mal ? nil : primaryId)
+        guard let fields = await UnifiedProviderSystem.shared.tvdbDetailFields(
+            anilistId: anilistId,
+            malId: malId ?? (current.provider == .mal ? current.id : nil)) else { return }
+
+        // TVDB is the PRIMARY source for these fields: its values WIN when
+        // present; AniList/MAL values are the fallback that fills the gaps
+        // (the field-level fallback order TVDB → MAL → AniList → Kitsu →
+        // AniDB, applied per field — never a whole-object replacement).
+        let newBanner = fields.bannerURL ?? current.bannerImage
+        let newDescription = fields.synopsis ?? current.description
+        let newGenres = (fields.genres?.isEmpty == false) ? fields.genres : current.genres
+        let newStudios = (fields.studios?.isEmpty == false) ? fields.studios : current.studioNames
+        let newDuration = fields.runtimeMinutes ?? current.duration
+        let newEpisodes = fields.episodeCount ?? current.episodes
+        // Poster: TVDB's poster fills a MISSING cover; AniList covers stay
+        // the display norm when present (field-level fallback, not blind
+        // replacement).
+        let newCover: MediaCoverImage
+        if current.coverImage.best == nil, let tvdbPoster = fields.posterURL {
+            newCover = MediaCoverImage(large: tvdbPoster, extraLarge: nil)
+        } else {
+            newCover = current.coverImage
+        }
+
+        let merged = Media(
+            id: current.id,
+            idMal: current.idMal,
+            provider: current.provider,
+            title: current.title,
+            coverImage: newCover,
+            bannerImage: newBanner,
+            description: newDescription,
+            episodes: newEpisodes,
+            status: current.status,
+            averageScore: current.averageScore,
+            genres: newGenres,
+            season: current.season,
+            seasonYear: current.seasonYear,
+            nextAiringEpisode: current.nextAiringEpisode,
+            relations: current.relations,
+            type: current.type,
+            format: current.format,
+            studioNames: newStudios,
+            source: current.source,
+            duration: newDuration,
+            airDateRange: current.airDateRange)
+        if merged != current {
+            media = merged
+        }
     }
 
     /// Loose title comparison for the MAL→AniList guard: alphanumeric

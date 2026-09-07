@@ -27,6 +27,13 @@
       },
       "versions": [
         {
+          "version": "2.24",
+          "date": "2026-09-08",
+          "localizedDescription": "v2.24 — The provider system is rebuilt around one chain: TVDB → MAL → AniList → Kitsu → AniDB for anime, MangaBaka → MAL → AniList for manga, AniChart → AnimeSchedule → MAL → AniList for schedules, with health tracking, cooldowns, request deduplication and shared caching so a failing provider is skipped — never hammered. A new Data Sources page in Settings shows every provider with live health, real Test-Provider latency, drag-to-reorder priorities and cache controls. The update flow now downloads the real package in-app (DOWNLOAD NOW with progress and checksum verification) and manages the downloaded file (DELETE FILE / FIND FILE). Music has been removed completely and the app returns to its lean ~12 MB size.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 12000000
+        },
+        {
           "version": "2.23",
           "date": "2026-09-07",
           "localizedDescription": "v2.23 — Music rebuilt on AnimeThemes with real in-app playback; the false update popup is fixed (same version never prompts again); the update popup is redesigned with a LiveContainer / SideStore / KSign install picker; Manga & Schedule are always reachable (five tabs, no More overflow); providers get circuit breakers (no more hammering a dead AniList or flooding Jikan); and the carousel's Start Watching is centered again with genre pills and ratings restored and donghua filtered by real production metadata.",

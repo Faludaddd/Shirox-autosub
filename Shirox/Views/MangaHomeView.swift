@@ -119,45 +119,32 @@ final class MangaHomeViewModel: ObservableObject {
         isLoading = true
         error = nil
 
-        // Try AniList first — each shelf independently so a failure on one
-        // doesn't blank the others.
-        async let trendingRes = try? AniListService.shared.mangaTrending()
-        async let popularRes = try? AniListService.shared.mangaPopular()
-        async let topRatedRes = try? AniListService.shared.mangaTopRated()
-        async let latestRes = try? AniListService.shared.mangaLatest()
-        let (t, p, r, l) = await (trendingRes, popularRes, topRatedRes, latestRes)
-        trending = (t ?? []).map { AniListProvider.shared.mapMangaMedia($0) }
-        popular = (p ?? []).map { AniListProvider.shared.mapMangaMedia($0) }
-        topRated = (r ?? []).map { AniListProvider.shared.mapMangaMedia($0) }
-        latest = (l ?? []).map { AniListProvider.shared.mapMangaMedia($0) }
-
-        // v2.22 — Per-shelf multi-source fallback. Any shelf AniList
-        // couldn't fill (outage, 403, 429, network error) gets its
-        // MyAnimeList/Jikan equivalent instead of leaving the page
-        // sparse. Entries are mapped with mapMangaToMedia so they carry
-        // correct manga typing (type "MANGA", chapters in `episodes`,
-        // volumes, member popularity) — no anime-shaped data sneaking
-        // into manga shelves.
-        if trending.isEmpty {
-            trending = await jikanMangaShelf(filter: "bypopularity")
-        }
-        if popular.isEmpty {
-            popular = await jikanMangaShelf(filter: "favorite")
-        }
-        if topRated.isEmpty {
-            topRated = await jikanMangaShelf(filter: nil) // default = highest rated
-        }
-        if latest.isEmpty {
-            latest = await jikanLatestManga()
-        }
+        // v2.24 — Manga shelves run through the unified provider chain
+        // (MangaBaka → MAL → AniList per the Data Sources priority).
+        // MangaBaka has no chart endpoints (its API is search + series
+        // detail), so the shelf chain effectively runs MAL → AniList,
+        // while MangaBaka remains the primary for search and DETAIL
+        // fields (mangaDetailFields). Each shelf independently so a
+        // failure on one doesn't blank the others; the shared chain
+        // dedups + caches so repeat loads are instant.
+        do {
+            trending = try await UnifiedProviderSystem.shared.mangaShelf(.trending)
+        } catch { trending = [] }
+        do {
+            popular = try await UnifiedProviderSystem.shared.mangaShelf(.popular)
+        } catch { popular = [] }
+        do {
+            topRated = try await UnifiedProviderSystem.shared.mangaShelf(.topRated)
+        } catch { topRated = [] }
+        do {
+            latest = try await UnifiedProviderSystem.shared.mangaShelf(.latest)
+        } catch { latest = [] }
 
         isLoading = false
         if trending.isEmpty && popular.isEmpty && topRated.isEmpty && latest.isEmpty {
-            // Distinguish between "AniList down + Jikan also failed" vs
-            // just a network error — show a more specific message when
-            // both providers are unavailable.
+            // Honest message when every provider in the chain is down.
             if AniListService.shared.isApiDisabled() || AniListService.shared.isRateLimited() {
-                error = "Manga data is temporarily unavailable. AniList and Jikan are both down. Please try again shortly."
+                error = "Manga data is temporarily unavailable — every manga source is unreachable. Please try again shortly."
             } else {
                 error = "Couldn't load manga. Check your connection and try again."
             }

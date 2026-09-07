@@ -138,6 +138,11 @@ struct SettingsView: View {
                     SettingsCategoryRow(icon: "person.crop.circle.badge.checkmark", title: "Sources", subtitle: "AniList, MyAnimeList, accounts")
                 }
                 NavigationLink {
+                    DataSourcesSettingsPage()
+                } label: {
+                    SettingsCategoryRow(icon: "server.rack", title: "Data Sources", subtitle: "Provider priority, health, tests, cache")
+                }
+                NavigationLink {
                     ModulesSettingsPage()
                 } label: {
                     SettingsCategoryRow(icon: "puzzlepiece.extension.fill", title: "Modules", subtitle: "Streaming sources, store")
@@ -3391,8 +3396,8 @@ private struct StoreModuleSkeletonTile: View {
 //     for confirmation showing exactly what goes away.
 //   • Caches — re-created automatically when needed. Safe to clear any
 //     time, no confirmation needed, sizes refresh immediately.
-//   • App Data — caches of anime/manga metadata, id mappings, music
-//     themes, the schedule backup, and small preference stores. Clearing
+//   • App Data — caches of anime/manga metadata, id mappings, the
+//     schedule backup, and small preference stores. Clearing
 //     one never touches the others.
 //   • Watch Data — continue-watching and history. Important user data:
 //     clearing asks for confirmation.
@@ -3418,7 +3423,6 @@ struct StorageManagementPage: View {
     @State private var mangaDataSize: Int = 0
     @State private var idMappingSize: Int = 0
     @State private var profileCacheSize: Int = 0
-    @State private var musicCacheSize: Int = 0
     @State private var scheduleBackupSize: Int = 0
     @State private var searchAliasSize: Int = 0
     @State private var episodeSortSize: Int = 0
@@ -3437,7 +3441,7 @@ struct StorageManagementPage: View {
         animeDownloadSize + mangaDownloadSize
             + Int64(imageCacheSize) + Int64(websiteDataSize) + Int64(tempFilesSize)
             + Int64(libraryCacheSize) + Int64(mangaDataSize) + Int64(idMappingSize)
-            + Int64(profileCacheSize) + Int64(musicCacheSize) + Int64(scheduleBackupSize)
+            + Int64(profileCacheSize) + Int64(scheduleBackupSize)
             + Int64(searchAliasSize) + Int64(episodeSortSize)
             + Int64(cwSize) + Int64(historySize)
     }
@@ -3545,15 +3549,6 @@ struct StorageManagementPage: View {
                     size: profileCacheSize
                 ) {
                     CacheManager.shared.clearProfileCache()
-                }
-                cacheRow(
-                    title: "Music Cache",
-                    detail: "Opening & ending theme data from AnimeThemes.",
-                    icon: "music.note.list",
-                    iconColor: .purple,
-                    size: musicCacheSize
-                ) {
-                    AnimeThemesService.shared.clearCaches()
                 }
                 cacheRow(
                     title: "Schedule Backup",
@@ -3878,7 +3873,6 @@ struct StorageManagementPage: View {
             mangaDataSize = MangaUpdatesChapterService.diskCacheBytes()
             idMappingSize = cache.idMappingSize
             profileCacheSize = cache.profileCacheSize
-            musicCacheSize = AnimeThemesService.diskCacheBytes()
             scheduleBackupSize = scheduleBackup
             searchAliasSize = cache.searchAliasSize
             episodeSortSize = cache.episodeSortSize
