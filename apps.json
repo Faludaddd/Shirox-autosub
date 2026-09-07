@@ -32,7 +32,7 @@
           "date": "2026-09-07",
           "localizedDescription": "Three fixes for the home carousel, with its design untouched. Fixed layout: the title logo, genre pills, and Start Watching button now sit in reserved, constant-size rows — the logo art scales inside its own fixed area and nothing below it can ever shift, so every slide shows the controls in exactly the same place on iPhone and iPad alike. Fixed artwork sourcing: banners and posters keep coming from TheTVDB first, with the provider's own art as the first fallback and a Jikan (MyAnimeList) lookup as a cached last resort, each failure falling through to the next source automatically instead of leaving a blank. Fixed selection: the carousel now filters out Chinese animation and other non-Japanese entries that were sneaking into AniList's trending mix, and every slide is required to have real title and artwork data before it can appear. Swiping, parallax, gradients, pagination, and the logo's bottom-left placement are all exactly as they were.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 11795678,
+          "size": 11802967,
           "minOSVersion": "15.0"
         },
         {
