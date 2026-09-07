@@ -754,7 +754,7 @@ struct UpdateCoverView: View {
                         Text(destination.displayName)
                             .font(.caption2)
                             .foregroundStyle(installed ? .secondary : .tertiary)
-                            .strikethrough(!installed)
+                            .opacity(installed ? 1 : 0.55)
                     }
                     .padding(.trailing, 10)
                 }
