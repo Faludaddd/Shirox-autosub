@@ -67,7 +67,7 @@ enum UpdateDestination: String, CaseIterable, Identifiable {
             return comps.url
         case .ksign:
             // Path form: Ksign://install/<https url>
-            URL(string: "Ksign://install/\(ipaURL.absoluteString)")
+            return URL(string: "Ksign://install/\(ipaURL.absoluteString)")
         }
     }
 
