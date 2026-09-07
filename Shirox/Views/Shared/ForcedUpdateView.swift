@@ -700,7 +700,6 @@ struct UpdateCoverView: View {
             Text("INSTALL WITH")
                 .font(.caption2.weight(.heavy))
                 .foregroundStyle(.secondary)
-                .tracking(0.8)
 
             Menu {
                 ForEach(UpdateDestination.allCases) { destination in
@@ -755,7 +754,7 @@ struct UpdateCoverView: View {
                         Text(destination.displayName)
                             .font(.caption2)
                             .foregroundStyle(installed ? .secondary : .tertiary)
-                            .strikethrough(!installed, color: Color.secondary)
+                            .strikethrough(!installed)
                     }
                     .padding(.trailing, 10)
                 }
