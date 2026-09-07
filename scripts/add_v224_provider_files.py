@@ -127,13 +127,29 @@ def insert_before(text, index, new_lines):
 
 
 def find_section_end_insertion_point(text, section_end_marker):
+    """
+    Find the insertion point for new entries on the line BEFORE the section
+    end marker. The marker line may be indented (the v2.23 pbxproj had
+    `                /* End PBXBuildFile section */`), so we locate the
+    marker, then back up to the START of its line and insert there —
+    never inside the marker's `/*` (which is exactly the corruption that
+    broke CI build 34164191391).
+    """
     end_pos = text.find(section_end_marker)
     if end_pos == -1:
         return None
+    # Back up to the start of the marker's line (right after the preceding \n).
     i = end_pos
-    while i > 0 and text[i - 1] == '\n':
+    while i > 0 and text[i - 1] != '\n':
         i -= 1
-    return i + 1
+    # If the marker line is the first thing after the last entry (no blank
+    # line), i now points at the marker line start — inserting here is safe.
+    # When a blank line separates them, prefer inserting after the previous
+    # content line (keep the blank line adjacent to the marker).
+    if i >= 2 and text[i - 2] == '\n':
+        # There's an empty line before the marker: insert at its start.
+        return i - 1
+    return i
 
 
 def main():

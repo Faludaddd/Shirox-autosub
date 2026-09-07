@@ -754,7 +754,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */ = {isa = PBXBui
                                 C6CE1B5A31348C73AABA02CD /* StaffAndVideosSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC272D4B21A0374FC3081540 /* StaffAndVideosSections.swift */; };
                                 756F68CD2C046ACE7EC4FB28 /* StaffAndVideosSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC272D4B21A0374FC3081540 /* StaffAndVideosSections.swift */; };
                                 229BEF165B3FC43B3A3A3E37 /* StaffAndVideosSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC272D4B21A0374FC3081540 /* StaffAndVideosSections.swift */; };
-                /		51E375895C444F3ABED4609E /* TVDBProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB34EFEE922491F892DADE3 /* TVDBProvider.swift */; };
+		51E375895C444F3ABED4609E /* TVDBProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB34EFEE922491F892DADE3 /* TVDBProvider.swift */; };
 		CAF7C6429D344C89857824F6 /* TVDBProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB34EFEE922491F892DADE3 /* TVDBProvider.swift */; };
 		3C1E2780E3414642A66DF068 /* TVDBProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB34EFEE922491F892DADE3 /* TVDBProvider.swift */; };
 		B33062947557401CA7F093E8 /* TVDBProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB34EFEE922491F892DADE3 /* TVDBProvider.swift */; };
@@ -782,7 +782,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */ = {isa = PBXBui
 		64C9B0B46E3949C8BC2B072A /* DataSourcesSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1490E05108E643F9959205B8 /* DataSourcesSettingsPage.swift */; };
 		CA904BD67DF8446FB1813485 /* DataSourcesSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1490E05108E643F9959205B8 /* DataSourcesSettingsPage.swift */; };
 		D97B2063009A40478A165DEF /* DataSourcesSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1490E05108E643F9959205B8 /* DataSourcesSettingsPage.swift */; };
-* End PBXBuildFile section */
+/* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
                 C226707E7AA5549144DA7C37 /* PBXContainerItemProxy */ = {
