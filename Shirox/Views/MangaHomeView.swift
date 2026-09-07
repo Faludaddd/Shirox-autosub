@@ -119,7 +119,8 @@ final class MangaHomeViewModel: ObservableObject {
         isLoading = true
         error = nil
 
-        // Try AniList first
+        // Try AniList first — each shelf independently so a failure on one
+        // doesn't blank the others.
         async let trendingRes = try? AniListService.shared.mangaTrending()
         async let popularRes = try? AniListService.shared.mangaPopular()
         async let topRatedRes = try? AniListService.shared.mangaTopRated()
@@ -130,25 +131,24 @@ final class MangaHomeViewModel: ObservableObject {
         topRated = (r ?? []).map { AniListProvider.shared.mapMangaMedia($0) }
         latest = (l ?? []).map { AniListProvider.shared.mapMangaMedia($0) }
 
-        // If AniList is disabled/rate-limited/failed and we got no data, try Jikan/MAL
-        if trending.isEmpty && popular.isEmpty && topRated.isEmpty && latest.isEmpty
-            && (AniListService.shared.isApiDisabled() || AniListService.shared.isRateLimited()) {
-            Logger.shared.logStructured(type: "Provider", feature: "MangaHome", operation: "Fallback to Jikan for manga", error: "AniList API disabled or rate-limited")
-            do {
-                let mangaTrending = try await MALDiscoveryService.shared.fetchList("top/manga",
-                    queryItems: [URLQueryItem(name: "filter", value: "bypopularity"), URLQueryItem(name: "limit", value: "25")])
-                trending = mangaTrending.map { MALDiscoveryService.shared.mapToMedia($0) }
-                try await Task.sleep(nanoseconds: 400_000_000)
-                let mangaPopular = try await MALDiscoveryService.shared.fetchList("top/manga",
-                    queryItems: [URLQueryItem(name: "filter", value: "favorite"), URLQueryItem(name: "limit", value: "25")])
-                popular = mangaPopular.map { MALDiscoveryService.shared.mapToMedia($0) }
-                try await Task.sleep(nanoseconds: 400_000_000)
-                let mangaTopRated = try await MALDiscoveryService.shared.fetchList("top/manga",
-                    queryItems: [URLQueryItem(name: "filter", value: "bypopularity"), URLQueryItem(name: "limit", value: "25")])
-                topRated = mangaTopRated.map { MALDiscoveryService.shared.mapToMedia($0) }
-            } catch {
-                Logger.shared.log("[MangaHome] Jikan fallback also failed: \(error.localizedDescription)", type: "Error")
-            }
+        // v2.22 — Per-shelf multi-source fallback. Any shelf AniList
+        // couldn't fill (outage, 403, 429, network error) gets its
+        // MyAnimeList/Jikan equivalent instead of leaving the page
+        // sparse. Entries are mapped with mapMangaToMedia so they carry
+        // correct manga typing (type "MANGA", chapters in `episodes`,
+        // volumes, member popularity) — no anime-shaped data sneaking
+        // into manga shelves.
+        if trending.isEmpty {
+            trending = await jikanMangaShelf(filter: "bypopularity")
+        }
+        if popular.isEmpty {
+            popular = await jikanMangaShelf(filter: "favorite")
+        }
+        if topRated.isEmpty {
+            topRated = await jikanMangaShelf(filter: nil) // default = highest rated
+        }
+        if latest.isEmpty {
+            latest = await jikanLatestManga()
         }
 
         isLoading = false
@@ -169,6 +169,37 @@ final class MangaHomeViewModel: ObservableObject {
         // patched in progressively (MangaUpdates cross-reference, disk
         // cached — repeat loads are instant).
         await enrichAiringChapterCounts()
+    }
+
+    /// One Jikan top/manga shelf, correctly mapped to manga semantics.
+    /// `filter` nil = Jikan's default (highest rated).
+    private func jikanMangaShelf(filter: String?) async -> [Media] {
+        var query: [URLQueryItem] = [URLQueryItem(name: "limit", value: "25")]
+        if let filter {
+            query.append(URLQueryItem(name: "filter", value: filter))
+        }
+        do {
+            let list = try await MALDiscoveryService.shared.fetchList("top/manga", queryItems: query)
+            return list.map { MALDiscoveryService.shared.mapMangaToMedia($0) }
+        } catch {
+            Logger.shared.log("[MangaHome] Jikan shelf fallback failed: \(error.localizedDescription)", type: "Error")
+            return []
+        }
+    }
+
+    /// Newest manga from Jikan (`order_by=start_date&sort=desc`) — the
+    /// Jikan equivalent of AniList's "Latest Manga" shelf.
+    private func jikanLatestManga() async -> [Media] {
+        do {
+            let list = try await MALDiscoveryService.shared.fetchList("manga",
+                queryItems: [URLQueryItem(name: "order_by", value: "start_date"),
+                             URLQueryItem(name: "sort", value: "desc"),
+                             URLQueryItem(name: "limit", value: "25")])
+            return list.map { MALDiscoveryService.shared.mapMangaToMedia($0) }
+        } catch {
+            Logger.shared.log("[MangaHome] Jikan latest-manga fallback failed: \(error.localizedDescription)", type: "Error")
+            return []
+        }
     }
 
     /// Patches the poster status line of airing manga from "Airing" to
@@ -670,21 +701,23 @@ struct MangaSettingsView: View {
                 }
             }
 
-            // Section 6: Update Log (universal)
+            // Section 6: Change Log (universal)
+            // (v2.22 — renamed from "Update Log")
             Section {
                 NavigationLink {
                     UpdateLogPage()
                 } label: {
-                    MangaSettingsCategoryRow(icon: "list.bullet.clipboard.fill", title: "Update Log", subtitle: "See what's new, fixed, and changed")
+                    MangaSettingsCategoryRow(icon: "list.bullet.clipboard.fill", title: "Change Log", subtitle: "See what's new, fixed, and changed")
                 }
             }
 
-            // Section 7: Advanced & Logs (universal)
+            // Section 7: Storage & Logs (v2.22 — Advanced Cache Management
+            // merged into Storage; per-category clearing)
             Section {
                 NavigationLink {
-                    AdvancedSettingsPage()
+                    StorageManagementPage()
                 } label: {
-                    MangaSettingsCategoryRow(icon: "gearshape.2.fill", title: "Advanced", subtitle: "Cache, reset, storage")
+                    MangaSettingsCategoryRow(icon: "internaldrive.fill", title: "Storage", subtitle: "Downloads, caches, per-category clearing")
                 }
                 NavigationLink {
                     LoggerSettingsPage()

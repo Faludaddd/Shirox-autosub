@@ -350,13 +350,14 @@ struct ShiroxApp: App {
 
 #if targetEnvironment(macCatalyst) || os(macOS)
 enum SidebarTab: CaseIterable {
-    case home, library, downloads, settings, search
+    case home, library, downloads, music, settings, search
 
     var label: String {
         switch self {
         case .home:      return "Home"
         case .library:   return "Library"
         case .downloads: return "Downloads"
+        case .music:     return "Music"
         case .settings:  return "Settings"
         case .search:    return "Search"
         }
@@ -367,6 +368,7 @@ enum SidebarTab: CaseIterable {
         case .home:      return "house.fill"
         case .library:   return "books.vertical.fill"
         case .downloads: return "arrow.down.circle.fill"
+        case .music:     return "music.note"
         case .settings:  return "gearshape.fill"
         case .search:    return "magnifyingglass"
         }
@@ -473,6 +475,7 @@ private struct RootTabView: View {
                     case .home:      HomeView()
                     case .library:   LibraryView()
                     case .downloads: DownloadsView()
+                    case .music:     MusicView()
                     case .settings:  SettingsView()
                     case .search:    SearchView()
                     }
@@ -484,6 +487,7 @@ private struct RootTabView: View {
                         switch sidebarTab {
                         case .home:      HomeView()
                         case .library:   LibraryView()
+                        case .music:     MusicView()
                         case .settings:  SettingsView()
                         case .search:    SearchView()
                         default: EmptyView()
@@ -512,6 +516,13 @@ private struct RootTabView: View {
                     // (right icon) per requirement #7.
                     Tab("Schedule", systemImage: "calendar", value: 4) {
                         ScheduleView().transition(.opacity)
+                    }
+                    // v2.22 — Music tab: a real dedicated section for anime
+                    // openings & endings. (On compact tab bars with five
+                    // visible slots iOS places extras in the system overflow —
+                    // nothing existing is displaced.)
+                    Tab("Music", systemImage: "music.note", value: 5) {
+                        MusicView().transition(.opacity)
                     }
                 }
                 .tabViewStyle(.sidebarAdaptable)
@@ -545,6 +556,11 @@ private struct RootTabView: View {
                         .smoothTabSwitch(value: selectedTab)
                         .tabItem { Label("Schedule", systemImage: "calendar") }
                         .tag(4)
+                    // v2.22 — Music tab (openings & endings).
+                    MusicView()
+                        .smoothTabSwitch(value: selectedTab)
+                        .tabItem { Label("Music", systemImage: "music.note") }
+                        .tag(5)
                 }
                 .tint(.appAccent)
                 .glassTabBarBackground()
@@ -602,15 +618,15 @@ private struct RootTabView: View {
             }
         }
 
-        // v2.21 — Update cover. Presented over EVERYTHING (tabs, sheets,
-        // player) the moment AppUpdateManager confirms a newer version
-        // exists. Non-critical updates render as a dismissable popup card
-        // (Later / close lowers it for that version — the About page keeps
-        // offering the install); critical gaps (≥ 3 minor versions behind
-        // or a major bump) render the non-dismissable required gate, which
-        // clears only when a real check confirms the app is current again.
-        // Both presentations share the same action set: in-app download
-        // with live progress + SHA-256 verification, the LiveContainer
+        // v2.21/v2.22 — Update cover. Presented over EVERYTHING (tabs,
+        // sheets, player) the moment AppUpdateManager confirms a newer
+        // version exists. Every update renders as a dismissable popup
+        // card (Later / close lowers it for that version — the Updates
+        // settings page keeps offering the install); critical gaps (3+
+        // minor versions behind or a major bump) show a prominent
+        // "strongly recommended" banner but NEVER lock the app anymore.
+        // The popup carries the full action set: in-app download with
+        // live progress + SHA-256 verification, the LiveContainer
         // handoff (only when LiveContainer is installed), Copy Link,
         // Share, and honest failure states.
         #if os(iOS)

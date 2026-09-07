@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Update Log page — replaces the old "Updates" tab in Settings.
+/// Change Log page (v2.22 — renamed from "Update Log").
 /// Shows a clean, organized log of everything that has been Added,
 /// Fixed, Changed, and Improved in the app. Each entry is grouped by
 /// version and category so users can easily find what changed.
@@ -17,7 +17,7 @@ struct UpdateLogPage: View {
             }
             .padding(.vertical, 16)
         }
-        .navigationTitle("Update Log")
+        .navigationTitle("Change Log")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.large)
         #endif
@@ -98,6 +98,35 @@ struct UpdateLogEntry {
 }
 
 private let logEntries: [UpdateLogEntry] = [
+    UpdateLogEntry(
+        version: "2.22",
+        date: "2026-09-08",
+        added: [
+            "A dedicated Updates section in Settings — everything update-related now lives in one place: your current version and build, the available version, Check for Updates with the honest six-state status card (including 'Couldn't verify version' with Retry), the What's New changelog, one-tap access to the full update popup (in-app download with progress and verification, LiveContainer handoff, copy link, share), and the Change Log.",
+            "A brand-new Music tab — a real dedicated section for anime openings and endings. Featured openers and endings rails with anime artwork, song titles, artists and episode ranges straight from the anime database, an All/Openings/Endings filter, and its own search across every anime's themes. Tap any track to jump straight to its anime. Themes are disk-cached, rate-limited, and parsed exactly as the database returns them — nothing is invented.",
+            "A complete multi-source fallback architecture across the app: the Schedule now falls back from AniList to MyAnimeList's weekly airing list, then to a saved offline copy of your last good schedule; manga shelves fall back per-shelf; See All and search pages use the same provider fallback — and the fallback provider now works even without a linked MAL account, since discovery never needed one to begin with.",
+            "Per-category storage clearing: the Storage page now lists anime episodes, manga chapters, image cache, website data, temp files, anime data, manga data, ID-mapping and profile metadata, music cache, schedule backup, search aliases, episode sort preferences, continue watching, and watch history — each with its own size, its own Clear button, and its own description of what clearing does."
+        ],
+        fixed: [
+            "See All pages failing when AniList is unavailable: the provider fallback used to skip the backup source entirely whenever no MAL account was linked — even though browse, search, trending, and detail data never needed an account. It also skipped the fallback whenever AniList's API was 'disabled', which is precisely when a fallback matters. Both blocks are gone; every category page, search, and home shelf now gets its data from the next source automatically.",
+            "Wrong-series data on fallback pages: opening a title that came from the backup source used to query AniList with a MyAnimeList id — which can resolve to a completely different series — mixing one title's info into another's page. Detail pages now resolve the real AniList id through the offline mapping service, verify the fetched title matches the one you tapped, and keep the correct data (skipping only AniList-only enrichment when no verified mapping exists).",
+            "Manga shelves loading empty whenever AniList hiccuped: the Jikan fallback only triggered when AniList was officially 'disabled' or rate-limited, so plain outages and 5xx errors left the page blank. Every manga shelf now falls back individually, and backup entries carry proper manga typing (chapters, volumes, status, start year) instead of anime-shaped data.",
+            "The Manga 'Latest' shelf had no backup source at all — it now falls back to the newest manga from MyAnimeList when AniList can't fill it."
+        ],
+        changed: [
+            "Updates are never forced anymore. Every new version shows the custom update popup with the version numbers, what's new, and why updating may be recommended — and Maybe Later (or the close button) always works, for normal and critical updates alike. Falling several versions behind now shows a prominent 'updating is strongly recommended' banner instead of a lockout; the app stays fully usable either way.",
+            "Update Log is now Change Log everywhere in the app (Settings, the manga settings page, and the page itself) — same clean release-by-release history, clearer name.",
+            "Downloading is one clean interface now: the Download button on an episode or chapter row opens a unified sheet offering 'This Episode' (the exact existing source-and-stream flow, untouched) or 'Download Range' with From/To steppers, quick presets, and a live summary of exactly what will be downloaded (already-downloaded items are skipped and counted). The separate range button that used to sit in the Episodes header is gone — merged in.",
+            "Advanced Cache Management is gone as a separate page — it merged into Storage, which separates offline content from re-downloadable caches at a glance and requires confirmation before anything important is removed. The single 'Clear All Cache' button was removed on purpose: every category clears on its own now."
+        ],
+        improved: [
+            "The Schedule's offline safety net: every successful load refreshes a snapshot on disk, so when every source is unreachable the page still shows the last good schedule with an honest 'saved X ago' banner instead of a blank error screen. Backup-source entries show a NEW badge (their source carries no episode numbers) and resolve their AniList cross-references from the offline mapping cache so bells and library actions keep working where possible.",
+            "Provider fallbacks no longer hammer dead APIs: the Jikan layer keeps its in-flight de-duplication, 2-minute cache, and request pacing across every screen that shares it; failed manifest and theme fetches are retried once, patiently, then reported honestly.",
+            "The Music tab's search is debounced, cancellable, and cached per query; its featured rails refresh from a 30-minute disk cache, so repeat visits are instant and outages show a proper retry card rather than an empty page."
+        ],
+        removed: [],
+        other: []
+    ),
     UpdateLogEntry(
         version: "2.21",
         date: "2026-09-07",

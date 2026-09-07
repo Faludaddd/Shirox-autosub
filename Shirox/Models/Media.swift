@@ -80,11 +80,12 @@ struct Media: Identifiable, Codable, Equatable, Hashable, Sendable {
 
     var statusDisplay: String? {
         switch status {
-        case "RELEASING", "currently_airing": return "Airing"
-        case "FINISHED", "finished_airing": return "Finished"
-        case "NOT_YET_RELEASED", "not_yet_aired": return "Upcoming"
+        case "RELEASING", "currently_airing", "Publishing", "Currently Airing": return "Airing"
+        case "FINISHED", "finished_airing", "Finished", "Finished Airing": return "Finished"
+        case "NOT_YET_RELEASED", "not_yet_aired", "Not yet published", "Not yet aired": return "Upcoming"
         case "CANCELLED": return "Cancelled"
-        case "HIATUS": return "Hiatus"
+        case "HIATUS", "On hiatus": return "Hiatus"
+        case "Discontinued": return "Discontinued"
         default: return status
         }
     }

@@ -57,6 +57,31 @@ final class AniListDetailViewModel: ObservableObject {
         isLoading = true
         error = nil
         detailFetchFailed = false
+
+        // v2.22 — MAL-source guard. When the caller passes preloaded
+        // Jikan/MAL data (`provider == .mal` — Browse/See-All fallback
+        // results, Music cards, recommendations), `id` is a MyAnimeList
+        // id. AniList ids are NOT MAL ids: querying AniList with a MAL id
+        // can return a COMPLETELY DIFFERENT anime and silently replace
+        // the correct preloaded page. Resolve the real AniList id through
+        // the mapping service, then verify the fetched title matches the
+        // preloaded one before adopting it. On failure the preloaded data
+        // stays and AniList-only enrichment is skipped honestly.
+        var fetchId = id
+        var verifyAgainst: String?
+        if preloaded?.provider == .mal, let malId = preloaded?.idMal ?? preloaded?.id {
+            if let anilistId = await IDMappingService.shared.anilistId(forMALId: malId) {
+                fetchId = anilistId
+                verifyAgainst = preloaded?.title.displayTitle
+            } else {
+                // No mapping exists — keep the Jikan data; the page stays
+                // functional (hero, episodes by title) without enrichment.
+                detailFetchFailed = true
+                isLoading = false
+                return
+            }
+        }
+
         do {
             // AniList is the EXCLUSIVE source for Characters and Statistics.
             // MAL's detail endpoint returns fewer fields (no voice actors,
@@ -68,7 +93,13 @@ final class AniListDetailViewModel: ObservableObject {
             // (MAL fallback for other purposes — like the provider-level
             // rate-limit fallback for the Watch flow — is a separate system
             // and is NOT removed here.)
-            let raw = try await AniListService.shared.detail(id: id)
+            let raw = try await AniListService.shared.detail(id: fetchId)
+            if let verify = verifyAgainst, !Self.titlesReferToSameSeries(raw.title.displayTitle, verify) {
+                // Mapped id points at a different series — never adopt it.
+                detailFetchFailed = true
+                isLoading = false
+                return
+            }
             media = AniListProvider.shared.mapMedia(raw)
             // Pre-populate characters + recommendations + staff from the same fetch.
             characters = raw.characters?.edges ?? []
@@ -77,7 +108,7 @@ final class AniListDetailViewModel: ObservableObject {
             // AniList may not have banner art for every title; reuse the
             // already-cached TVDB fanart as a fallback.
             if media?.bannerImage == nil {
-                let artwork = await TVDBMappingService.shared.getArtwork(for: id, provider: .anilist)
+                let artwork = await TVDBMappingService.shared.getArtwork(for: fetchId, provider: .anilist)
                 if let fanart = artwork.fanart {
                     media?.bannerImage = fanart
                 }
@@ -99,6 +130,18 @@ final class AniListDetailViewModel: ObservableObject {
             }
         }
         isLoading = false
+    }
+
+    /// Loose title comparison for the MAL→AniList guard: alphanumeric
+    /// skeletons so punctuation/spacing variants of the same title match,
+    /// while genuinely different series do not.
+    static func titlesReferToSameSeries(_ a: String?, _ b: String?) -> Bool {
+        func skeleton(_ s: String?) -> String {
+            (s ?? "").lowercased().filter { $0.isLetter || $0.isNumber }
+        }
+        let sa = skeleton(a), sb = skeleton(b)
+        guard !sa.isEmpty, !sb.isEmpty else { return false }
+        return sa == sb
     }
 
     /// Retries the detail fetch when the initial attempt failed (e.g. rate

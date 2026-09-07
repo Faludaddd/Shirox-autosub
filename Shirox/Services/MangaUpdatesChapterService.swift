@@ -55,6 +55,26 @@ final class MangaUpdatesChapterService {
         return dir.appendingPathComponent("mangaupdates-chapter-counts.json")
     }
 
+    /// Storage (v2.22) — bytes used by the on-disk chapter-count cache.
+    nonisolated static func diskCacheBytes() -> Int {
+        let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+        let url = dir.appendingPathComponent("mangaupdates-chapter-counts.json")
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let size = attrs[.size] as? NSNumber else { return 0 }
+        return size.intValue
+    }
+
+    /// Storage (v2.22) — clears the in-memory + disk chapter-count cache
+    /// (Manga Data). Counts re-populate on the next manga page load.
+    func clearCache() {
+        cacheLock.lock()
+        cache = [:]
+        didLoadDiskCache = true
+        cacheLock.unlock()
+        try? FileManager.default.removeItem(at: cacheURL)
+    }
+
     // MARK: - In-flight dedup + rate limiting
 
     private var inFlightTasks: [String: Task<Int?, Never>] = [:]

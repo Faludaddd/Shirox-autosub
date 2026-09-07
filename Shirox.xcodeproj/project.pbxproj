@@ -433,6 +433,18 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */ = {isa = PBXBui
                 243906CC2AB59FF9AE447BDF /* LibraryWriteSink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CF6D00FF0F0489890FAF52D /* LibraryWriteSink.swift */; };
                 24B2669799E112151390A199 /* MangaMatchManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B461E257ABDE206C5F8A5EE5 /* MangaMatchManager.swift */; };
                 F6B69536045F10D084008DC0 /* MangaUpdatesChapterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30FD5E40BC8C0909C930773A /* MangaUpdatesChapterService.swift */; };
+                ABCD03012FCA5623000FF9B4 /* ScheduleFallbackService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCD03042FCA397700C9BA56 /* ScheduleFallbackService.swift */; };
+                ABCD03022FCA5623000FF9B4 /* ScheduleFallbackService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCD03042FCA397700C9BA56 /* ScheduleFallbackService.swift */; };
+                ABCD03032FCA5623000FF9B4 /* ScheduleFallbackService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCD03042FCA397700C9BA56 /* ScheduleFallbackService.swift */; };
+                ABCD03112FCA5623000FF9B4 /* AnimeMusicService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCD03142FCA397700C9BA56 /* AnimeMusicService.swift */; };
+                ABCD03122FCA5623000FF9B4 /* AnimeMusicService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCD03142FCA397700C9BA56 /* AnimeMusicService.swift */; };
+                ABCD03132FCA5623000FF9B4 /* AnimeMusicService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCD03142FCA397700C9BA56 /* AnimeMusicService.swift */; };
+                ABCD03212FCA5623000FF9B4 /* MusicView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCD03242FCA397700C9BA56 /* MusicView.swift */; };
+                ABCD03222FCA5623000FF9B4 /* MusicView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCD03242FCA397700C9BA56 /* MusicView.swift */; };
+                ABCD03232FCA5623000FF9B4 /* MusicView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCD03242FCA397700C9BA56 /* MusicView.swift */; };
+                ABCD03312FCA5623000FF9B4 /* UnifiedDownloadSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCD03342FCA397700C9BA56 /* UnifiedDownloadSheet.swift */; };
+                ABCD03322FCA5623000FF9B4 /* UnifiedDownloadSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCD03342FCA397700C9BA56 /* UnifiedDownloadSheet.swift */; };
+                ABCD03332FCA5623000FF9B4 /* UnifiedDownloadSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCD03342FCA397700C9BA56 /* UnifiedDownloadSheet.swift */; };
                 CC9DBEB73A982481F236AF1F /* MangaUpdatesChapterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30FD5E40BC8C0909C930773A /* MangaUpdatesChapterService.swift */; };
                 3C544158A94E850EE768AE00 /* MangaUpdatesChapterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30FD5E40BC8C0909C930773A /* MangaUpdatesChapterService.swift */; };
                                 A71E4C9203F8B4D1A5C6E801 /* AutoPickEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D04B7FC5362BE9A1B4F1D846 /* AutoPickEngine.swift */; };
@@ -970,6 +982,10 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
                 B1DFF59F54F073D10B1F45FF /* JellyfinModuleFlagTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JellyfinModuleFlagTests.swift; sourceTree = "<group>"; };
                 B461E257ABDE206C5F8A5EE5 /* MangaMatchManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MangaMatchManager.swift; sourceTree = "<group>"; };
                 30FD5E40BC8C0909C930773A /* MangaUpdatesChapterService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MangaUpdatesChapterService.swift; sourceTree = "<group>"; };
+                ABCD03042FCA397700C9BA56 /* ScheduleFallbackService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScheduleFallbackService.swift; sourceTree = "<group>"; };
+                ABCD03142FCA397700C9BA56 /* AnimeMusicService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AnimeMusicService.swift; sourceTree = "<group>"; };
+                ABCD03242FCA397700C9BA56 /* MusicView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MusicView.swift; sourceTree = "<group>"; };
+                ABCD03342FCA397700C9BA56 /* UnifiedDownloadSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UnifiedDownloadSheet.swift; sourceTree = "<group>"; };
                                 D04B7FC5362BE9A1B4F1D846 /* AutoPickEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AutoPickEngine.swift; sourceTree = "<group>"; };
                 ABCD02042FCA397700C9BA56 /* NetworkMonitor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NetworkMonitor.swift; sourceTree = "<group>"; };
                 BAEE9A1A2FCB000000000001 /* BackgroundKeepAlive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundKeepAlive.swift; sourceTree = "<group>"; };
@@ -1192,6 +1208,8 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
                                 3CB5F43A448079ACC600D906 /* MangaProgressManager.swift */,
                                 B461E257ABDE206C5F8A5EE5 /* MangaMatchManager.swift */,
                                 30FD5E40BC8C0909C930773A /* MangaUpdatesChapterService.swift */,
+                                ABCD03042FCA397700C9BA56 /* ScheduleFallbackService.swift */,
+                                ABCD03142FCA397700C9BA56 /* AnimeMusicService.swift */,
                                                 D04B7FC5362BE9A1B4F1D846 /* AutoPickEngine.swift */,
                                                 ABCD02042FCA397700C9BA56 /* NetworkMonitor.swift */,
                                 9BAE193514A5E83E81EF31B8 /* MALMangaLibraryService.swift */,
@@ -1235,6 +1253,7 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
                         children = (
                                 1279E4A82FCA397700C9BA56 /* BatchDownloadModulePickerView.swift */,
                                 1279E4A92FCA397700C9BA56 /* BatchDownloadStreamPickerView.swift */,
+                                ABCD03342FCA397700C9BA56 /* UnifiedDownloadSheet.swift */,
                                 537BEA553BFE4B1F9A9B3FE3 /* DownloadRangePickerView.swift */,
                                 1279E4AA2FCA397700C9BA56 /* DownloadModulePickerView.swift */,
                                 1279E4AC2FCA397700C9BA56 /* DownloadStreamPickerView.swift */,
@@ -1353,6 +1372,7 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */,
                                 46A77C1128934BF5BD3A9047 /* RatingPromptView.swift */,
                                 1279E4DD2FCA397700C9BA56 /* EpisodeRowView.swift */,
                                 1279E4DE2FCA397700C9BA56 /* HomeView.swift */,
+                                ABCD03242FCA397700C9BA56 /* MusicView.swift */,
                                 1279E4DF2FCA397700C9BA56 /* LibraryView.swift */,
                                 1279E4E02FCA397700C9BA56 /* ModuleListView.swift */,
                                 1279E4E12FCA397700C9BA56 /* ModuleStreamPickerView.swift */,
@@ -1900,6 +1920,10 @@ A17F1001000000000000000A /* ForcedUpdateView.swift in Sources */,
                                 9DE6574CFDE3001B655FD492 /* MangaMatch.swift in Sources */,
                                 C83E6FA614EECF23C1D7791E /* MangaMatchManager.swift in Sources */,
                                 F6B69536045F10D084008DC0 /* MangaUpdatesChapterService.swift in Sources */,
+                                ABCD03012FCA5623000FF9B4 /* ScheduleFallbackService.swift in Sources */,
+                                ABCD03112FCA5623000FF9B4 /* AnimeMusicService.swift in Sources */,
+                                ABCD03212FCA5623000FF9B4 /* MusicView.swift in Sources */,
+                                ABCD03312FCA5623000FF9B4 /* UnifiedDownloadSheet.swift in Sources */,
                                                 A71E4C9203F8B4D1A5C6E801 /* AutoPickEngine.swift in Sources */,
                                                 ABCD02012FCA5623000FF9B4 /* NetworkMonitor.swift in Sources */,
                                 0A3107E133486B031DAAB01F /* MALMangaLibraryService.swift in Sources */,
@@ -2127,6 +2151,10 @@ A17F1001000000000000000B /* ForcedUpdateView.swift in Sources */,
                                 B03DE20B284328390A28EA99 /* MangaMatch.swift in Sources */,
                                 24B2669799E112151390A199 /* MangaMatchManager.swift in Sources */,
                                 CC9DBEB73A982481F236AF1F /* MangaUpdatesChapterService.swift in Sources */,
+                                ABCD03022FCA5623000FF9B4 /* ScheduleFallbackService.swift in Sources */,
+                                ABCD03122FCA5623000FF9B4 /* AnimeMusicService.swift in Sources */,
+                                ABCD03222FCA5623000FF9B4 /* MusicView.swift in Sources */,
+                                ABCD03322FCA5623000FF9B4 /* UnifiedDownloadSheet.swift in Sources */,
                                                 B82F5DA31409C7E6F2D1B724 /* AutoPickEngine.swift in Sources */,
                                                 ABCD02022FCA397700C9BA56 /* NetworkMonitor.swift in Sources */,
                                 973AD5CE33B4A1B0455FADE9 /* MALMangaLibraryService.swift in Sources */,
@@ -2355,6 +2383,10 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                 DC96B735178C288BFF58E50B /* MangaMatch.swift in Sources */,
                                 4CBFE6338E36B6529FDEE36B /* MangaMatchManager.swift in Sources */,
                                 3C544158A94E850EE768AE00 /* MangaUpdatesChapterService.swift in Sources */,
+                                ABCD03032FCA5623000FF9B4 /* ScheduleFallbackService.swift in Sources */,
+                                ABCD03132FCA5623000FF9B4 /* AnimeMusicService.swift in Sources */,
+                                ABCD03232FCA5623000FF9B4 /* MusicView.swift in Sources */,
+                                ABCD03332FCA5623000FF9B4 /* UnifiedDownloadSheet.swift in Sources */,
                                                 C93A6EB4251AD8F7A3E0C935 /* AutoPickEngine.swift in Sources */,
                                                 ABCD02032FCA397700C9BA56 /* NetworkMonitor.swift in Sources */,
                                 A0722750ED30A028878FF395 /* MALMangaLibraryService.swift in Sources */,
@@ -2436,7 +2468,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "@executable_path/Frameworks",
                                 );
                                 LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                                MARKETING_VERSION = 2.21;
+                                MARKETING_VERSION = 2.22;
                                 PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
                                 PRODUCT_NAME = "$(TARGET_NAME)";
                                 SDKROOT = appletvos;
@@ -2471,7 +2503,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "@executable_path/Frameworks",
                                 );
                                 LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                                MARKETING_VERSION = 2.21;
+                                MARKETING_VERSION = 2.22;
                                 PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
                                 PRODUCT_NAME = "$(TARGET_NAME)";
                                 SDKROOT = appletvos;
@@ -2588,7 +2620,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "$(inherited)",
                                         "@executable_path/Frameworks",
                                 );
-                                MARKETING_VERSION = 2.21;
+                                MARKETING_VERSION = 2.22;
                                 PRODUCT_NAME = shirox;
                                 PROVISIONING_PROFILE_SPECIFIER = "";
                                 SDKROOT = iphoneos;
@@ -2634,7 +2666,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "@executable_path/../Frameworks",
                                 );
                                 MACOSX_DEPLOYMENT_TARGET = 14.0;
-                                MARKETING_VERSION = 2.21;
+                                MARKETING_VERSION = 2.22;
                                 PRODUCT_NAME = shirox;
                                 SDKROOT = macosx;
                                 SUPPORTS_MACCATALYST = NO;
@@ -2660,7 +2692,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "$(inherited)",
                                         "@executable_path/Frameworks",
                                 );
-                                MARKETING_VERSION = 2.21;
+                                MARKETING_VERSION = 2.22;
                                 PRODUCT_NAME = shirox;
                                 PROVISIONING_PROFILE_SPECIFIER = "";
                                 SDKROOT = iphoneos;
@@ -2751,7 +2783,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "@executable_path/../Frameworks",
                                 );
                                 MACOSX_DEPLOYMENT_TARGET = 14.0;
-                                MARKETING_VERSION = 2.21;
+                                MARKETING_VERSION = 2.22;
                                 PRODUCT_NAME = shirox;
                                 SDKROOT = macosx;
                                 SUPPORTS_MACCATALYST = NO;

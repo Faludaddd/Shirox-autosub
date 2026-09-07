@@ -146,28 +146,16 @@ final class ProviderManager: ObservableObject {
             throw primaryError
         }
 
-        // If the fallback provider is NOT authenticated (e.g. user never
-        // connected a MAL account, or their token expired and was cleared),
-        // don't attempt the fallback — it will fail with
-        // "token refresh failed: unauthenticated" on every call, spamming
-        // the logs and leaving the page broken with no data from either
-        // provider. Throw the original error so the caller can surface a
-        // clear "AniList is rate-limited and no MAL account is linked"
-        // state to the user.
-        // Use a cooldown to avoid logging this on every single request.
-        if !fallback.isAuthenticated {
-            let now = Date()
-            if let last = fallbackUnauthLoggedAt, now.timeIntervalSince(last) < 30 {
-                // Already logged recently — just throw silently
-                throw primaryError
-            }
-            fallbackUnauthLoggedAt = now
-            Logger.shared.log(
-                "ProviderManager fallback \(fallback.providerType.rawValue) is not authenticated; skipping fallback",
-                type: "Provider"
-            )
-            throw primaryError
-        }
+        // If the fallback provider is NOT authenticated, we STILL try it:
+        // discovery endpoints (trending / seasonal / popular / browse /
+        // search / detail) go through Jikan and need no account at all.
+        // Auth-requiring operations throw `ProviderError.unauthenticated`
+        // themselves — we catch that here and rethrow the ORIGINAL error,
+        // which keeps library/profile behavior exactly as before while
+        // every discovery page gains a working MAL fallback for users
+        // with no MAL account linked (v2.22 — "See All" pages used to die
+        // with the primary because of this hard skip).
+        let fallbackNeedsAuthHint = !fallback.isAuthenticated
 
         fallbackActive = true
         Logger.shared.log(
@@ -186,6 +174,23 @@ final class ProviderManager: ObservableObject {
             cancelFallbackReset()
             return result
         } catch {
+            // An unauthenticated fallback only matters when the fallback
+            // needed auth for THIS operation (library/profile writes).
+            // Re-surface the primary's error instead so the UI shows the
+            // real cause; throttle the log so it can't spam.
+            if fallbackNeedsAuthHint, let pe = error as? ProviderError, case .unauthenticated = pe {
+                let now = Date()
+                if !(fallbackUnauthLoggedAt.map { now.timeIntervalSince($0) < 30 } ?? false) {
+                    fallbackUnauthLoggedAt = now
+                    Logger.shared.log(
+                        "ProviderManager fallback \(fallback.providerType.rawValue) requires an account for this action; rethrowing primary error",
+                        type: "Provider"
+                    )
+                }
+                fallbackActive = false
+                cancelFallbackReset()
+                throw primaryError
+            }
             // Fallback also failed — record its rate-limit cooldown if 429.
             if let cooldown = Self.rateLimitCooldown(for: error) {
                 recordRateLimit(fallback.providerType, duration: cooldown)
@@ -222,11 +227,10 @@ final class ProviderManager: ObservableObject {
 
     private func isFallbackEligible(_ error: Error) -> Bool {
         if error is CancellationError { return false }
-        // If AniList API is known to be disabled, don't bother with
-        // fallback — MAL won't have the same data and it just adds noise.
-        if AniListService.shared.isApiDisabled() {
-            return false
-        }
+        // NOTE: AniList being "API disabled" (their 403 stability page) no
+        // longer blocks the fallback — that is exactly when the app needs
+        // MAL/Jikan to keep Schedule, See All, Home and Search alive
+        // (v2.22).
         if let pe = error as? ProviderError { return pe.isFallbackEligible }
         if let urlError = error as? URLError {
             return urlError.code != .cancelled

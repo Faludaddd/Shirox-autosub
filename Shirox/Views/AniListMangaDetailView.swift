@@ -41,6 +41,17 @@ struct AniListMangaDetailView: View {
     @State private var newestFirst = false
     @State private var isSelectionMode = false
     @State private var selectedChapterHrefs: Set<String> = []
+    /// v2.22 — Presents the unified download sheet (Select Chapters /
+    /// Download Range) from the action-row Download button.
+    @State private var showUnifiedDownload = false
+    /// v2.22 — The resolved ANILIST id for this page, or nil when the page
+    /// is running on MyAnimeList/Jikan fallback data whose AniList id
+    /// couldn't be resolved. AniList ids are NOT MAL ids — using a MAL id
+    /// against AniList returns a *different* manga, which is exactly the
+    /// "one manga's info mixed with another's" bug this guards against.
+    /// AniList-only sections (characters, recommendations, library entry)
+    /// are skipped honestly when nil.
+    @State private var effectiveAniListId: Int?
     /// 0 = chapters view, 1 = connections view (relations + reading order).
     /// Toggled by the people/social icon button, matching the anime page.
     @State private var selectedTab = 0
@@ -150,6 +161,42 @@ struct AniListMangaDetailView: View {
         .fullScreenCover(item: $readerContext) { ctx in
             MangaReaderView(context: ctx)
         }
+        .adaptiveSheet(isPresented: $showUnifiedDownload) {
+            // v2.22 — Unified download UI: one custom sheet offering the
+            // classic "Select Chapters" flow (unchanged) and "Download
+            // Range" (From/To + live summary + confirm) in one place.
+            UnifiedMangaDownloadSheet(
+                mangaTitle: media?.title.displayTitle ?? "",
+                coverImage: media?.coverImage.best ?? "",
+                chapters: chapters,
+                isChapterDownloaded: { chapter in
+                    mangaDownloads.item(forChapterHref: chapter.href)?.state == .completed
+                },
+                onSelectChapters: {
+                    showUnifiedDownload = false
+                    Haptics.selection()
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        isSelectionMode = true
+                    }
+                },
+                onRangeConfirmed: { toDownload in
+                    showUnifiedDownload = false
+                    guard let item = resolvedItem, !toDownload.isEmpty else { return }
+                    let ctx = MangaDownloadContext(
+                        mangaTitle: item.title,
+                        mangaHref: item.href,
+                        coverImage: item.image,
+                        moduleId: moduleManager.activeModule?.id ?? "")
+                    mangaDownloads.batchDownload(chapters: toDownload, context: ctx)
+                    ToastManager.shared.show(
+                        title: "Downloads",
+                        message: "Started \(toDownload.count) chapter\(toDownload.count == 1 ? "" : "s")",
+                        icon: "arrow.down.circle.fill",
+                        iconColor: .green
+                    )
+                }
+            )
+        }
         .adaptiveSheet(isPresented: $showLibraryEdit) {
             if let media = self.media {
                 LibraryEntryEditSheet(
@@ -158,10 +205,19 @@ struct AniListMangaDetailView: View {
                     progressUnit: "chapter",
                     onSave: { status, progress, score in
                         Task {
+                            guard let trackedId = trackableAniListId else {
+                                ToastManager.shared.show(
+                                    title: "Tracking",
+                                    message: "This title couldn't be matched to AniList — tracking is unavailable for it right now.",
+                                    icon: "info.circle.fill",
+                                    iconColor: .orange
+                                )
+                                return
+                            }
                             if AniListAuthManager.shared.isLoggedIn {
                                 try? await AniListLibraryService.shared.updateEntry(
-                                    mediaId: mediaId, status: status, progress: progress, score: score, type: .manga)
-                                if let raw = try? await AniListLibraryService.shared.fetchEntry(mediaId: mediaId, type: .manga) {
+                                    mediaId: trackedId, status: status, progress: progress, score: score, type: .manga)
+                                if let raw = try? await AniListLibraryService.shared.fetchEntry(mediaId: trackedId, type: .manga) {
                                     existingEntry = AniListProvider.shared.mapEntry(raw)
                                 }
                             }
@@ -258,14 +314,13 @@ struct AniListMangaDetailView: View {
                     .buttonStyle(.plain)
 
                     // Download / selection-mode toggle — in the action row,
-                    // matching anime. Only shown when chapters are available.
+                    // matching anime. v2.22 opens the unified download sheet
+                    // (Select Chapters / Download Range). Only shown when
+                    // chapters are available.
                     if !chapters.isEmpty {
                         Button {
                             Haptics.selection()
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                                isSelectionMode.toggle()
-                                if !isSelectionMode { selectedChapterHrefs.removeAll() }
-                            }
+                            showUnifiedDownload = true
                         } label: {
                             Image(systemName: isSelectionMode ? "arrow.down.circle.fill" : "arrow.down.circle")
                                 .font(.system(size: 20, weight: .semibold))
@@ -295,10 +350,14 @@ struct AniListMangaDetailView: View {
                 // Some manga have 100+ chapters — having Characters/Recs
                 // before the chapter list keeps them reachable without an
                 // extremely long scroll.
-                CharactersSection(mediaId: media.id, isManga: true,
+                // v2.22 — Jikan-fallback pages have no verified AniList id;
+                // pass -1 so the AniList-backed sections fail honestly
+                // (empty) instead of silently loading a DIFFERENT manga's
+                // cast/recs from a numerically-colliding AniList id.
+                CharactersSection(mediaId: effectiveAniListId ?? -1, isManga: true,
                                   preloaded: preloadedCharacters)
                     .padding(.top, 16)
-                RecommendationsSection(mediaId: media.id, isManga: true,
+                RecommendationsSection(mediaId: effectiveAniListId ?? -1, isManga: true,
                                        preloaded: preloadedRecommendations)
                     .padding(.top, 8)
                 // Section order: when selectedTab == 0, show Relations +
@@ -686,6 +745,15 @@ struct AniListMangaDetailView: View {
                 }
                 #if os(iOS)
                 Divider()
+                // v2.22 — Range entry lives beside the classic single-chapter
+                // download in the same menu.
+                if !chapters.isEmpty {
+                    Button {
+                        showUnifiedDownload = true
+                    } label: {
+                        Label("Download Range…", systemImage: "arrow.down.to.line.compact")
+                    }
+                }
                 if let onDownload = chapterDownloadAction(for: chapter, state: dlState) {
                     if dlState == .completed {
                         Button(role: .destructive) { onDownload() } label: {
@@ -1063,14 +1131,55 @@ struct AniListMangaDetailView: View {
 
     private func resolve() async {
         guard phase == .loading else { return }
+
+        // v2.22 — Jikan/MAL fallback pages arrive with preloaded data whose
+        // `mediaId` is a MyAnimeList id. Resolve the real AniList id first
+        // (offline mapping cache, one network lookup on miss) and VERIFY the
+        // fetched title matches the preloaded one before adopting the
+        // AniList data. On any mismatch or failure the preloaded (Jikan)
+        // data stays and AniList-only enrichment is skipped — the page
+        // still renders and chapters still resolve by title.
+        let isMALSource = preloadedMedia?.provider == .mal
+        let malId = preloadedMedia?.idMal ?? preloadedMedia?.id
+
         if media == nil {
-            do { media = try await AniListProvider.shared.mangaDetail(id: mediaId) }
-            catch {
-                // Don't get stuck loading forever — show the error.
-                phase = .error(error.localizedDescription)
-                return
+            if isMALSource, let malId {
+                guard let anilistId = await IDMappingService.shared.anilistId(forMALId: malId) else {
+                    phase = .notFound
+                    return
+                }
+                do {
+                    media = try await AniListProvider.shared.mangaDetail(id: anilistId)
+                    effectiveAniListId = anilistId
+                } catch {
+                    phase = .error(error.localizedDescription)
+                    return
+                }
+            } else {
+                do { media = try await AniListProvider.shared.mangaDetail(id: mediaId) }
+                catch {
+                    // Don't get stuck loading forever — show the error.
+                    phase = .error(error.localizedDescription)
+                    return
+                }
+                effectiveAniListId = mediaId
             }
+        } else if isMALSource, let malId, let pre = preloadedMedia {
+            // Preloaded Jikan data — best-effort enrichment through the id
+            // mapping, with a title guard so the WRONG series can never
+            // replace the page content.
+            if let anilistId = await IDMappingService.shared.anilistId(forMALId: malId),
+               let raw = try? await AniListService.shared.mangaDetail(id: anilistId),
+               Self.titlesReferToSameSeries(raw.title.displayTitle, pre.title.displayTitle) {
+                media = AniListProvider.shared.mapMangaMedia(raw)
+                effectiveAniListId = anilistId
+            } else {
+                effectiveAniListId = nil
+            }
+        } else {
+            effectiveAniListId = mediaId
         }
+
         guard media != nil else {
             phase = .error("No data")
             return
@@ -1090,16 +1199,44 @@ struct AniListMangaDetailView: View {
         _ = await (charRecs, entry, moduleResolve)
     }
 
+    /// Loose title comparison for the MAL→AniList enrichment guard:
+    /// compares alphanumeric skeletons so punctuation/spacing variants of
+    /// the same title match, while genuinely different series do not.
+    private static func titlesReferToSameSeries(_ a: String?, _ b: String?) -> Bool {
+        func skeleton(_ s: String?) -> String {
+            (s ?? "").lowercased().filter { $0.isLetter || $0.isNumber }
+        }
+        let sa = skeleton(a), sb = skeleton(b)
+        guard !sa.isEmpty, !sb.isEmpty else { return false }
+        return sa == sb
+    }
+
+    /// v2.22 — The AniList id safe for tracking writes. `nil` when this
+    /// page runs on unresolved Jikan fallback data (a MAL id here would
+    /// silently track a DIFFERENT manga in the user's list).
+    private var trackableAniListId: Int? {
+        if preloadedMedia?.provider == .mal {
+            return effectiveAniListId
+        }
+        return effectiveAniListId ?? mediaId
+    }
+
     private func fetchCharactersAndRecommendations() async {
-        if let raw = try? await AniListService.shared.mangaDetail(id: mediaId) {
+        // v2.22 — Skipped when running on unresolved Jikan fallback data;
+        // a MAL id here could silently load a DIFFERENT manga's cast.
+        guard let anilistId = effectiveAniListId else { return }
+        if let raw = try? await AniListService.shared.mangaDetail(id: anilistId) {
             preloadedCharacters = raw.characters?.edges ?? []
             preloadedRecommendations = raw.recommendations?.nodes ?? []
         }
     }
 
     private func fetchLibraryEntry() async {
+        // v2.22 — Library writes/reads need the REAL AniList id; a MAL id
+        // would track the wrong title. Skipped honestly on fallback pages.
+        guard let anilistId = effectiveAniListId else { return }
         if AniListAuthManager.shared.isLoggedIn {
-            existingEntry = (try? await AniListLibraryService.shared.fetchEntry(mediaId: mediaId, type: .manga))
+            existingEntry = (try? await AniListLibraryService.shared.fetchEntry(mediaId: anilistId, type: .manga))
                 .flatMap { AniListProvider.shared.mapEntry($0) }
         }
     }

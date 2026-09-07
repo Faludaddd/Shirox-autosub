@@ -384,17 +384,11 @@ struct UpdateCoverView: View {
 
     @State private var appeared = false
     @State private var changelogExpanded = false
-    @State private var orbitAngle: Double = 0
     @State private var breath = false
-    @State private var bob: CGFloat = 0
     @State private var shareItem: ShareItem?
     /// Inline confirmation on the Copy Link button (the popup covers the
     /// root view, so root-level toasts wouldn't be visible here).
     @State private var linkCopied = false
-    /// Demo-only (About page → 5 taps on the version row): preview the
-    /// critical/forced presentation of the same content without actually
-    /// being 3+ versions behind.
-    @State private var demoPreviewForced = false
 
     private var info: AppUpdateManager.UpdateInfo? {
         switch updateManager.state {
@@ -403,25 +397,20 @@ struct UpdateCoverView: View {
         }
     }
 
-    /// Critical releases gate the app: no Later, no close button, a
-    /// required notice. Everything else is a dismissable popup.
-    private var isForced: Bool {
-        (info?.isCritical ?? false) || (updateManager.simulateOutdated && demoPreviewForced)
+    /// v2.22 — Updates are NEVER forced anymore. A critical gap (3+ minor
+    /// versions behind or a major bump) shows a prominent "strongly
+    /// recommended" banner instead of a lockout — the user can always
+    /// close the popup and keep using the app.
+    private var isRecommended: Bool {
+        info?.isCritical ?? false
     }
 
     var body: some View {
         ZStack {
             background
             if let info {
-                if isForced {
-                    // The gate scrolls as one long page.
-                    ScrollView(showsIndicators: false) {
-                        forcedLayout(info)
-                    }
-                } else {
-                    // The popup manages its own centered, scrollable card.
-                    promptLayout(info)
-                }
+                // The popup manages its own centered, scrollable card.
+                promptLayout(info)
             } else {
                 // A re-check is in flight while the cover is up — show
                 // an honest transient state instead of stale content.
@@ -440,10 +429,8 @@ struct UpdateCoverView: View {
             downloadService.probeLiveContainer()
             Haptics.warning()
             withAnimation(.spring(response: 0.55, dampingFraction: 0.85)) { appeared = true }
-            // Ambient loops — orbit drift, blob breathing, icon float.
-            withAnimation(.linear(duration: 18).repeatForever(autoreverses: false)) { orbitAngle = 360 }
+            // Ambient loop — blob breathing.
             withAnimation(.easeInOut(duration: 6).repeatForever(autoreverses: true)) { breath = true }
-            withAnimation(.easeInOut(duration: 1.9).repeatForever(autoreverses: true)) { bob = 5 }
         }
     }
 
@@ -499,6 +486,12 @@ struct UpdateCoverView: View {
 
             versionTransition(current: info.currentVersion, next: info.newVersion)
 
+            // v2.22 — Strong recommendation for critical gaps (3+ versions
+            // behind / major bump). Advisory, never a lockout.
+            if isRecommended {
+                recommendedBanner
+            }
+
             Rectangle()
                 .fill(Color.primary.opacity(0.07))
                 .frame(height: 1)
@@ -511,10 +504,13 @@ struct UpdateCoverView: View {
 
             actionArea(info)
 
-            // Demo-only escape hatch (mirrors the forced layout's footer).
+            // Demo-only escape hatch (Updates page → 5 taps on the version
+            // row) + last-checked line.
             if updateManager.simulateOutdated {
                 demoChips
                     .frame(maxWidth: .infinity)
+            } else {
+                lastCheckedLine
             }
         }
         .padding(20)
@@ -525,30 +521,36 @@ struct UpdateCoverView: View {
         .shadow(color: Color.black.opacity(0.28), radius: 32, y: 18)
     }
 
-    // MARK: - Forced (gate) presentation
-
-    private func forcedLayout(_ info: AppUpdateManager.UpdateInfo) -> some View {
-        VStack(spacing: 24) {
-            Color.clear.frame(height: 8)
-            identityMark
-                .modifier(Entrance(index: 0, appeared: appeared))
-            heroEmblem
-                .modifier(Entrance(index: 1, appeared: appeared, hero: true))
-            titleBlock
-                .modifier(Entrance(index: 2, appeared: appeared))
-            versionTransition(current: info.currentVersion, next: info.newVersion)
-                .modifier(Entrance(index: 3, appeared: appeared))
-            changelogCard(info)
-                .modifier(Entrance(index: 4, appeared: appeared))
-            actionArea(info)
-                .modifier(Entrance(index: 5, appeared: appeared))
-            footerBlock
-                .modifier(Entrance(index: 6, appeared: appeared))
-            Color.clear.frame(height: 16)
+    /// v2.22 — The honest advisory banner shown instead of the old forced
+    /// gate: this update contains important fixes, so updating is strongly
+    /// recommended — but the app stays usable and the popup stays
+    /// dismissable (Maybe Later / close button).
+    private var recommendedBanner: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.orange)
+                .padding(.top, 1)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Updating is strongly recommended")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.primary)
+                Text("You're several versions behind — this release contains important fixes and improvements. You can keep using Shirox+ without updating, but the newest experience is here when you're ready.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 24)
-        .frame(maxWidth: 500)
-        .frame(maxWidth: .infinity)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.orange.opacity(0.10))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.orange.opacity(0.25), lineWidth: 1)
+        )
     }
 
     // MARK: - Shared: action area (phase machine)
@@ -614,14 +616,13 @@ struct UpdateCoverView: View {
                 #endif
             }
 
-            if !isForced {
-                Button {
-                    laterTap()
-                } label: {
-                    Text("Maybe Later")
-                }
-                .buttonStyle(UpdateLaterButtonStyle())
+            // v2.22 — Never forced: Later is always offered.
+            Button {
+                laterTap()
+            } label: {
+                Text("Maybe Later")
             }
+            .buttonStyle(UpdateLaterButtonStyle())
         }
     }
 
@@ -808,10 +809,9 @@ struct UpdateCoverView: View {
                 .buttonStyle(UpdateSecondaryButtonStyle(height: 44, tint: Color.appAccent))
             }
 
-            if !isForced {
-                Button { laterTap() } label: { Text("Maybe Later") }
-                    .buttonStyle(UpdateLaterButtonStyle())
-            }
+            // v2.22 — Never forced: Later is always offered.
+            Button { laterTap() } label: { Text("Maybe Later") }
+                .buttonStyle(UpdateLaterButtonStyle())
         }
     }
 
@@ -846,10 +846,9 @@ struct UpdateCoverView: View {
                 Label("Download in App Instead", systemImage: "arrow.down.circle.fill")
             }
             .buttonStyle(UpdateSecondaryButtonStyle())
-            if !isForced {
-                Button { laterTap() } label: { Text("Maybe Later") }
-                    .buttonStyle(UpdateLaterButtonStyle())
-            }
+            // v2.22 — Never forced: Later is always offered.
+            Button { laterTap() } label: { Text("Maybe Later") }
+                .buttonStyle(UpdateLaterButtonStyle())
         }
     }
 
@@ -916,10 +915,9 @@ struct UpdateCoverView: View {
                 .buttonStyle(UpdateSecondaryButtonStyle(height: 44, tint: Color.appAccent))
             }
 
-            if !isForced {
-                Button { laterTap() } label: { Text("Maybe Later") }
-                    .buttonStyle(UpdateLaterButtonStyle())
-            }
+            // v2.22 — Never forced: Later is always offered.
+            Button { laterTap() } label: { Text("Maybe Later") }
+                .buttonStyle(UpdateLaterButtonStyle())
         }
     }
 
@@ -1056,16 +1054,6 @@ struct UpdateCoverView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// The same changelog, wrapped in its own card for the forced layout.
-    private func changelogCard(_ info: AppUpdateManager.UpdateInfo) -> some View {
-        whatsNewSection(info)
-            .padding(18)
-            .background(RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(Color.secondary.opacity(0.08)))
-            .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1))
-    }
-
     /// Neutral container for a transfer/terminal state block.
     private func statusCard<Content: View>(tint: Color = Color.appAccent,
                                            @ViewBuilder content: () -> Content) -> some View {
@@ -1104,139 +1092,26 @@ struct UpdateCoverView: View {
     private var background: some View {
         ZStack {
             Color(uiColor: .systemBackground)
-            if isForced {
-                Circle()
-                    .fill(RadialGradient(colors: [Color.appAccent.opacity(0.20), Color.appAccent.opacity(0)],
-                                         center: .center, startRadius: 12, endRadius: 210))
-                    .frame(width: 360, height: 360)
-                    .offset(x: 150, y: -290)
-                    .scaleEffect(breath ? 1.12 : 0.9)
-                Circle()
-                    .fill(RadialGradient(colors: [Color.purple.opacity(0.13), Color.purple.opacity(0)],
-                                         center: .center, startRadius: 12, endRadius: 180))
-                    .frame(width: 300, height: 300)
-                    .offset(x: -160, y: 340)
-                    .scaleEffect(breath ? 0.92 : 1.1)
-            } else {
-                // Prompt mode: same language, dialed down, plus a scrim so
-                // the card reads as a modal over the app world.
-                Circle()
-                    .fill(RadialGradient(colors: [Color.appAccent.opacity(0.13), Color.appAccent.opacity(0)],
-                                         center: .center, startRadius: 12, endRadius: 210))
-                    .frame(width: 360, height: 360)
-                    .offset(x: 150, y: -320)
-                    .scaleEffect(breath ? 1.08 : 0.94)
-                Circle()
-                    .fill(RadialGradient(colors: [Color.purple.opacity(0.08), Color.purple.opacity(0)],
-                                         center: .center, startRadius: 12, endRadius: 180))
-                    .frame(width: 300, height: 300)
-                    .offset(x: -170, y: 360)
-                    .scaleEffect(breath ? 0.94 : 1.06)
-                Color.primary.opacity(0.04)
-            }
+            // Prompt mode: ambient blobs dialed down, plus a scrim so
+            // the card reads as a modal over the app world.
+            Circle()
+                .fill(RadialGradient(colors: [Color.appAccent.opacity(0.13), Color.appAccent.opacity(0)],
+                                     center: .center, startRadius: 12, endRadius: 210))
+                .frame(width: 360, height: 360)
+                .offset(x: 150, y: -320)
+                .scaleEffect(breath ? 1.08 : 0.94)
+            Circle()
+                .fill(RadialGradient(colors: [Color.purple.opacity(0.08), Color.purple.opacity(0)],
+                                     center: .center, startRadius: 12, endRadius: 180))
+                .frame(width: 300, height: 300)
+                .offset(x: -170, y: 360)
+                .scaleEffect(breath ? 0.94 : 1.06)
+            Color.primary.opacity(0.04)
         }
         .ignoresSafeArea()
     }
 
-    // MARK: - Identity / hero (forced layout)
-
-    private var identityMark: some View {
-        VStack(spacing: 8) {
-            Image("app-logo")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 42, height: 42)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .shadow(color: Color.appAccent.opacity(0.35), radius: 10, y: 4)
-            Text("SHIROX+")
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .tracking(3)
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    private var heroEmblem: some View {
-        ZStack {
-            // Ambient glow behind the disc.
-            Circle()
-                .fill(Color.appAccent.opacity(0.16))
-                .frame(width: 185, height: 185)
-                .blur(radius: 36)
-                .scaleEffect(breath ? 1.08 : 0.94)
-
-            // Dashed orbit + three travelling sparkles. The whole container
-            // rotates; each dot is pre-rotated 120° apart on the ring.
-            ZStack {
-                Circle()
-                    .stroke(Color.appAccent.opacity(0.38),
-                            style: StrokeStyle(lineWidth: 1.2, dash: [1.5, 8]))
-                ForEach(0..<3, id: \.self) { i in
-                    Circle()
-                        .fill(i == 0 ? Color.appAccent : Color.secondary.opacity(0.55))
-                        .frame(width: i == 0 ? 6 : 4)
-                        .offset(y: -106)
-                        .rotationEffect(.degrees(Double(i) * 120))
-                }
-            }
-            .frame(width: 212, height: 212)
-            .rotationEffect(.degrees(orbitAngle))
-
-            emblemDisc
-        }
-        .frame(width: 250, height: 250)
-    }
-
-    private var emblemDisc: some View {
-        ZStack {
-            Circle()
-                .fill(.ultraThinMaterial)
-            Circle()
-                .stroke(LinearGradient(colors: [Color.appAccent.opacity(0.85), Color.purple.opacity(0.5)],
-                                       startPoint: .topLeading, endPoint: .bottomTrailing),
-                        lineWidth: 1.5)
-            Circle()
-                .fill(Color.appAccent.opacity(0.07))
-                .padding(12)
-
-            Image(systemName: "arrow.down.circle.fill")
-                .font(.system(size: 50, weight: .medium))
-                .foregroundStyle(LinearGradient(colors: [Color.appAccent, Color.purple.opacity(0.8)],
-                                                 startPoint: .top, endPoint: .bottom))
-                .offset(y: bob)
-        }
-        .frame(width: 150, height: 150)
-        .shadow(color: Color.appAccent.opacity(Color.glowEnabled ? 0.35 : 0),
-                radius: Color.glowEnabled ? Color.glowRadiusLarge * 0.45 : 0, y: 10)
-    }
-
-    private var titleBlock: some View {
-        VStack(spacing: 8) {
-            Text("Update Required")
-                .font(.system(size: 27, weight: .bold, design: .rounded))
-                .multilineTextAlignment(.center)
-            Text("A required update is available for Shirox+ — grab it below.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-        }
-    }
-
     // MARK: - Footer
-
-    private var footerBlock: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 5) {
-                Image(systemName: "lock.shield")
-                    .font(.system(size: 11, weight: .semibold))
-                Text("This update is required to keep using Shirox+.")
-                    .font(.caption2)
-            }
-            .foregroundStyle(.tertiary)
-
-            lastCheckedLine
-            demoChips
-        }
-    }
 
     private var lastCheckedLine: some View {
         Group {
@@ -1248,8 +1123,9 @@ struct UpdateCoverView: View {
         }
     }
 
-    /// Demo-only affordances (About page → 5 taps on the version row):
-    /// exit the simulation, or preview the forced presentation.
+    /// Demo-only affordance (Updates page → 5 taps on the version row):
+    /// exit the simulation. The forced-presentation preview was removed
+    /// with the forced gate itself (v2.22).
     private var demoChips: some View {
         Group {
             if updateManager.simulateOutdated {
@@ -1259,22 +1135,6 @@ struct UpdateCoverView: View {
                         updateManager.exitDemo()
                     } label: {
                         Label("Exit demo", systemImage: "xmark.circle")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(Color.appAccent)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(Capsule().fill(Color.appAccent.opacity(0.10)))
-                    }
-                    .buttonStyle(.plain)
-
-                    Button {
-                        Haptics.selection()
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                            demoPreviewForced.toggle()
-                        }
-                    } label: {
-                        Label(demoPreviewForced ? "Preview: popup" : "Preview: required",
-                              systemImage: "eye.fill")
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(Color.appAccent)
                             .padding(.horizontal, 12)

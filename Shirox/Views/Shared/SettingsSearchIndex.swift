@@ -32,7 +32,9 @@ enum SettingsPage: Hashable {
     case modules
     case schedule
     case notifications
-    case advanced
+    case storage
+    case updates
+    case changeLog
     case backup
     case logger
     case about
@@ -121,10 +123,16 @@ enum SettingsSearchIndex {
         .init("Schedule Timezone", aliases: ["utc", "local time", "schedule timezone"], category: "Schedule", page: .schedule, anchor: "timezone", icon: "globe"),
         .init("Notifications", aliases: ["alerts", "airing alerts", "push notifications"], category: "Notifications", page: .notifications, anchor: "notifications", icon: "bell.fill"),
 
-        // Advanced
-        .init("Advanced", aliases: ["cache", "clear cache", "reset", "storage"], category: "Advanced", page: .advanced, anchor: "advanced", icon: "gearshape.2.fill"),
-        .init("Clear Image Cache", aliases: ["delete images", "free space", "image cache"], category: "Advanced", page: .advanced, anchor: "clearImageCache", icon: "photo.stack"),
-        .init("Reset Continue Watching", aliases: ["clear continue watching", "reset progress", "cw reset"], category: "Advanced", page: .advanced, anchor: "resetCW", icon: "arrow.counterclockwise"),
+        // Storage (v2.22 — Advanced Cache Management merged in; every
+        // category clears individually there)
+        .init("Storage", aliases: ["cache", "clear cache", "space", "disk", "offline", "delete downloads", "image cache"], category: "Storage", page: .storage, anchor: "storage", icon: "internaldrive.fill"),
+        .init("Clear Image Cache", aliases: ["delete images", "free space", "image cache", "artwork cache"], category: "Storage", page: .storage, anchor: "clearImageCache", icon: "photo.stack"),
+        .init("Reset Continue Watching", aliases: ["clear continue watching", "reset progress", "cw reset", "resume points"], category: "Storage", page: .storage, anchor: "resetCW", icon: "arrow.counterclockwise"),
+
+        // Updates (v2.22 — dedicated section)
+        .init("Updates", aliases: ["new version", "check for updates", "install update", "update now", "updater", "whats new"], category: "Updates", page: .updates, anchor: "updates", icon: "arrow.down.circle.fill"),
+        .init("Change Log", aliases: ["update log", "changelog", "what changed", "release notes", "previous changes"], category: "Updates", page: .changeLog, anchor: "changeLog", icon: "list.bullet.clipboard.fill"),
+
         .init("Backup & Restore", aliases: ["export settings", "import settings", "backup json"], category: "Backup & Restore", page: .backup, anchor: "backup", icon: "externaldrive.badge.timemachine"),
         .init("Logger", aliases: ["logs", "debug log", "app logs"], category: "Logger", page: .logger, anchor: "logger", icon: "terminal"),
 
@@ -230,7 +238,9 @@ func settingsPageView(for page: SettingsPage) -> some View {
     case .modules:       ModulesSettingsPage()
     case .schedule:      ScheduleSettingsPage()
     case .notifications: NotificationsSettingsPage()
-    case .advanced:      AdvancedSettingsPage()
+    case .storage:       StorageManagementPage()
+    case .updates:       UpdatesSettingsPage()
+    case .changeLog:     UpdateLogPage()
     case .backup:        BackupRestoreSettingsPage()
     case .logger:        LoggerSettingsPage()
     case .about:         AboutSettingsPage()

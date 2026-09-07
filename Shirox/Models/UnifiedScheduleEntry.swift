@@ -39,7 +39,7 @@ enum ScheduleMode: String, Codable, Hashable, Sendable {
 // MARK: - UnifiedScheduleEntry
 
 /// A single upcoming episode, normalized across anime (AniList) and Western TV (TVMaze) sources.
-struct UnifiedScheduleEntry: Identifiable, Hashable, Sendable {
+struct UnifiedScheduleEntry: Identifiable, Hashable, Codable, Sendable {
 
     /// Unique entry id (AniList airing-schedule id for anime; TVMaze episode id for Western).
     let id: Int
@@ -196,9 +196,14 @@ struct UnifiedScheduleEntry: Identifiable, Hashable, Sendable {
 
     /// Compact episode badge text (e.g. "EP 12" or "S2 EP 4").
     /// For manga entries, shows "CH <episode>" (chapter) instead.
+    /// Jikan fallback entries carry no episode numbers — they show
+    /// "NEW" so the badge stays honest instead of inventing a count.
     var episodeBadge: String {
         if source == .manga {
             return "CH \(episode)"
+        }
+        if episode <= 0 {
+            return "NEW"
         }
         if let season = season, season > 0 {
             return "S\(season) EP \(episode)"

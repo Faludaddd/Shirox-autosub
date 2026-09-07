@@ -283,15 +283,17 @@ final class AppUpdateManager: ObservableObject {
         Task { await checkForUpdates(force: true) }
     }
 
-    /// v2.21 — Later: lowers the update cover immediately and remembers
+    /// v2.22 — Later: lowers the update cover immediately and remembers
     /// the version so automatic checks don't re-prompt. Works from the
     /// `.available` state (first prompt) AND from a `.dismissed` state
-    /// (cover re-opened manually from the About page). Critical updates
-    /// are never dismissable — the guard keeps the gate up.
-    /// The info stays visible in About (dismissed state) with an install
-    /// button in case the sideload failed.
+    /// (cover re-opened manually from the Updates settings page). NO
+    /// update is ever forced anymore — critical ones get a prominent
+    /// "strongly recommended" banner in the popup instead of a lockout,
+    /// so this works for every update.
+    /// The info stays visible in Updates/About (dismissed state) with an
+    /// install button in case the sideload failed.
     func dismiss() {
-        guard let current = currentUpdateInfo, !current.isCritical else { return }
+        guard let current = currentUpdateInfo else { return }
         lastDismissedVersion = current.newVersion
         state = .dismissed(current)
         gateVisible = false

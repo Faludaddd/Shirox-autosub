@@ -1363,6 +1363,11 @@ struct ScheduleView: View {
     @State private var entries: [UnifiedScheduleEntry] = []
     @State private var isLoading = false
     @State private var loadError: String?
+    /// v2.22 — Honest source notice. Non-nil when the schedule is being
+    /// served by a backup source (Jikan) or the offline snapshot because
+    /// AniList was unavailable. Rendered as a slim banner under the date
+    /// selector so the page NEVER goes blank while any source works.
+    @State private var sourceNotice: String?
     @ObservedObject private var appMode = AppModeManager.shared
 
     // Manga schedule state — populated when appMode.mode == .reading.
@@ -1680,19 +1685,18 @@ struct ScheduleView: View {
             let raw = try await AniListService.shared.mangaReleaseSchedule()
             mangaReleases = raw.map { AniListProvider.shared.mapMangaMedia($0) }
         } catch {
-            // AniList failed — try Jikan/MAL fallback for manga schedule.
-            if AniListService.shared.isApiDisabled() || AniListService.shared.isRateLimited() {
-                Logger.shared.log("[MangaSchedule] AniList failed, falling back to Jikan", type: "Info")
-                do {
-                    let mangaList = try await MALDiscoveryService.shared.fetchList("top/manga",
-                        queryItems: [URLQueryItem(name: "filter", value: "bypopularity"), URLQueryItem(name: "limit", value: "25")])
-                    mangaReleases = mangaList.map { MALDiscoveryService.shared.mapToMedia($0) }
-                } catch {
-                    mangaLoadError = "Manga schedule is temporarily unavailable. AniList and Jikan are both down. Please try again shortly."
-                    Logger.shared.log("[MangaSchedule] Jikan fallback also failed: \(error.localizedDescription)", type: "Error")
-                }
-            } else {
-                mangaLoadError = error.localizedDescription
+            // AniList failed — fall back to Jikan/MAL for the manga
+            // schedule on ANY failure (v2.22: not just when AniList is
+            // officially "disabled" or rate-limited — a network error or
+            // 5xx leaves the page just as empty).
+            Logger.shared.log("[MangaSchedule] AniList failed (\(error.localizedDescription)), falling back to Jikan", type: "Info")
+            do {
+                let mangaList = try await MALDiscoveryService.shared.fetchList("top/manga",
+                    queryItems: [URLQueryItem(name: "filter", value: "bypopularity"), URLQueryItem(name: "limit", value: "25")])
+                mangaReleases = mangaList.map { MALDiscoveryService.shared.mapToMedia($0) }
+            } catch {
+                mangaLoadError = "Manga schedule is temporarily unavailable. AniList and Jikan are both down. Please try again shortly."
+                Logger.shared.log("[MangaSchedule] Jikan fallback also failed: \(error.localizedDescription)", type: "Error")
             }
         }
         isLoadingManga = false
@@ -1710,6 +1714,36 @@ struct ScheduleView: View {
     // the selector are IDENTICAL across all ranges — only the date section
     // changes. The full Schedule pipeline (cards → countdown → notify →
     // notifications) is preserved untouched.
+
+    /// v2.22 — Slim banner shown while a backup source (Jikan or the
+    /// offline snapshot) is serving the schedule. Honest about where the
+    /// data comes from without taking over the page.
+    private func scheduleSourceNotice(_ text: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "wifi.exclamationmark")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.orange)
+            Text(text)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.orange.opacity(0.08))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color.orange.opacity(0.2), lineWidth: 1)
+        )
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+    }
+
     @ViewBuilder
     private var scheduleContent: some View {
         let buckets = buildBuckets()
@@ -1721,6 +1755,11 @@ struct ScheduleView: View {
                 switch windowDays {
                 case 30:  dateSelector1Month(buckets: buckets, countByDay: countByDay)
                 default:  dateSelectorWeeks(buckets: buckets, countByDay: countByDay, dayCount: windowDays)
+                }
+
+                // v2.22 — Backup-source notice (Jikan / offline snapshot).
+                if let notice = sourceNotice {
+                    scheduleSourceNotice(notice)
                 }
 
                 // ─── ANIME CARDS (identical for all ranges) ─────────────
@@ -2005,9 +2044,18 @@ struct ScheduleView: View {
     /// covering this exact window we skip the network call entirely — so when
     /// the preload completed during the 3.5s splash, `ScheduleView` renders
     /// instantly with no spinner.
+    ///
+    /// v2.22 — Full fallback chain. AniList cache → AniList network →
+    /// Jikan /schedules (per-weekday airing lists from MyAnimeList) →
+    /// disk snapshot of the last successful schedule (≤ 48h). The page
+    /// only shows the error state when EVERY source failed; while a
+    /// backup source serves data a slim notice explains where it came
+    /// from. Successful loads (any source) refresh the snapshot so the
+    /// next outage starts from real recent data.
     private func load() async {
         isLoading = true
         loadError = nil
+        sourceNotice = nil
         defer { isLoading = false }
 
         // Fetch window is always anchored to local-midnight today (independent of the
@@ -2020,23 +2068,15 @@ struct ScheduleView: View {
         let endTs = startTs + max(windowDays, 1) * 86_400
 
         var fetched: [UnifiedScheduleEntry] = []
+        var fetchedFromBackup = false
+
+        // ── Primary: AniList (cache first, then network). ──────────────
         do {
             switch mode {
-            case .anime:
-                // #93 — Cache hit from the splash preload? Skip the network.
-                if let cached = AniListService.shared.cachedAiringSchedules(from: startTs, to: endTs) {
-                    fetched = cached.map { UnifiedScheduleEntry(item: $0) }
-                } else {
-                    let items = try await AniListService.shared.airingSchedules(from: startTs, to: endTs)
-                    fetched = items.map { UnifiedScheduleEntry(item: $0) }
-                }
-
-            case .western, .combined:
+            case .anime, .western, .combined:
                 // #124 — Western and Combined are no longer selectable from
                 // settings; `ScheduleSettings.defaultMode` always coerces to
-                // `.anime`. Treat any stale persisted value as Anime so the
-                // schedule stays functional instead of crashing into a dead
-                // TVMaze path the user can no longer opt into.
+                // `.anime`. Treat any stale persisted value as Anime.
                 if let cached = AniListService.shared.cachedAiringSchedules(from: startTs, to: endTs) {
                     fetched = cached.map { UnifiedScheduleEntry(item: $0) }
                 } else {
@@ -2044,26 +2084,56 @@ struct ScheduleView: View {
                     fetched = items.map { UnifiedScheduleEntry(item: $0) }
                 }
             }
-
-            // Defensive filter: drop anything that fell before the start of today.
-            fetched = fetched.filter { $0.airingAt >= startTs }
-            // Sort by popularity (desc) first, then airing time (asc) for ties so the
-            // most popular shows surface to the top of each day's section.
-            entries = fetched.sorted {
-                if $0.popularity != $1.popularity {
-                    return $0.popularity > $1.popularity
-                }
-                return $0.airingAt < $1.airingAt
-            }
-
-            // Reset the calendar to today after every reload.
-            resetCalendarToToday()
-
-            // Refresh the pending-notification set so the bells reflect current state.
-            scheduledIds = await EpisodeNotificationManager.shared.scheduledScheduleIds()
         } catch {
-            loadError = error.localizedDescription
+            // ── Backup #1: Jikan /schedules (MyAnimeList airing lists). ─
+            Logger.shared.log("[Schedule] AniList failed (\(error.localizedDescription)) — trying Jikan backup", type: "Provider")
+            do {
+                fetched = try await ScheduleFallbackService.shared.jikanSchedule(from: startTs, to: endTs)
+                fetchedFromBackup = !fetched.isEmpty
+                if fetchedFromBackup {
+                    sourceNotice = "AniList is unreachable — showing this week's airing list from MyAnimeList."
+                }
+            } catch {
+                Logger.shared.log("[Schedule] Jikan backup also failed (\(error.localizedDescription)) — trying offline snapshot", type: "Provider")
+                // ── Backup #2: disk snapshot of the last good schedule. ─
+                if let cached = ScheduleFallbackService.shared.cachedSnapshot(from: startTs, to: endTs) {
+                    fetched = cached.entries
+                    fetchedFromBackup = true
+                    let f = RelativeDateTimeFormatter()
+                    sourceNotice = "Offline mode — showing the schedule saved \(f.localizedString(for: cached.storedAt, relativeTo: Date())) ago. Pull to refresh."
+                }
+            }
         }
+
+        // Only error out when every source produced nothing.
+        if fetched.isEmpty && loadError == nil && sourceNotice == nil {
+            loadError = "Schedule sources are all unreachable right now. Check your connection and try again."
+        }
+
+        // Defensive filter: drop anything that fell before the start of today.
+        fetched = fetched.filter { $0.airingAt >= startTs }
+        // Sort by popularity (desc) first, then airing time (asc) for ties so the
+        // most popular shows surface to the top of each day's section. Jikan
+        // entries carry a members/score-based popularity so they sort sensibly
+        // within their days too.
+        entries = fetched.sorted {
+            if $0.popularity != $1.popularity {
+                return $0.popularity > $1.popularity
+            }
+            return $0.airingAt < $1.airingAt
+        }
+
+        // Persist the last good schedule so future outages have real data
+        // to fall back on (any successful source counts).
+        if !entries.isEmpty, !fetchedFromBackup {
+            ScheduleFallbackService.shared.storeSnapshot(entries, from: startTs, to: endTs)
+        }
+
+        // Reset the calendar to today after every reload.
+        resetCalendarToToday()
+
+        // Refresh the pending-notification set so the bells reflect current state.
+        scheduledIds = await EpisodeNotificationManager.shared.scheduledScheduleIds()
     }
 
     /// #93 — Helper used by the `.combined` branch of `load()`. Returns the

@@ -223,6 +223,21 @@ final class MALDiscoveryService {
         let type: String?
         let source: String?
         let relations: [JikanRelation]?
+        // Manga-only fields (nil on anime entries) — present on /top/manga
+        // and /manga responses; used by mapMangaToMedia.
+        let chapters: Int?
+        let volumes: Int?
+        let members: Int?
+        let published: JikanPublished?
+
+        struct JikanPublished: Decodable {
+            // ISO-8601-ish string ("1997-07-22T00:00:00+00:00") or null.
+            let from: String?
+            var startYear: Int? {
+                guard let from, from.count >= 4 else { return nil }
+                return Int(from.prefix(4))
+            }
+        }
     }
 
     struct JikanImages: Decodable {
@@ -532,6 +547,43 @@ final class MALDiscoveryService {
     }
 
     // MARK: - Mapping to shared Media
+
+    /// Maps a Jikan MANGA entry to the shared `Media` model with correct
+    /// manga semantics (v2.22): `type` is "MANGA" so `isManga` is true,
+    /// `episodes` carries the chapter count, `volumes` and `popularity`
+    /// (member count) are filled, and the start year falls back to
+    /// `published.from` (the top-level `year` field only exists on anime
+    /// entries). Using this instead of `mapToMedia` for manga keeps shelf
+    /// posters, chapter-count enrichment, and detail navigation working
+    /// consistently for Jikan-sourced manga.
+    func mapMangaToMedia(_ m: JikanAnime) -> Media {
+        Media(
+            id: m.mal_id,
+            idMal: m.mal_id,
+            provider: .mal,
+            title: MediaTitle(romaji: m.title, english: m.title_english, native: m.title_japanese),
+            coverImage: MediaCoverImage(
+                large: m.images?.jpg?.image_url,
+                extraLarge: m.images?.jpg?.large_image_url
+            ),
+            bannerImage: nil,
+            description: m.synopsis,
+            episodes: m.chapters,
+            status: m.status,
+            averageScore: m.score.map { Int($0 * 10) },
+            genres: m.genres?.map { $0.name },
+            season: nil,
+            seasonYear: m.year ?? m.published?.startYear,
+            nextAiringEpisode: nil,
+            relations: nil,
+            type: "MANGA",
+            format: m.type,
+            studioNames: nil, source: m.source, duration: nil, airDateRange: nil,
+            volumes: m.volumes,
+            popularity: m.members,
+            countryOfOrigin: nil
+        )
+    }
 
     func mapToMedia(_ a: JikanAnime) -> Media {
         Media(

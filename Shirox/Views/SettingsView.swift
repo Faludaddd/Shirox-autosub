@@ -158,17 +158,13 @@ struct SettingsView: View {
                 }
             }
 
-            // Section 5: Data & Advanced
+            // Section 5: Data (v2.22 — Advanced Cache Management merged
+            // into Storage; every category clears individually there)
             Section {
                 NavigationLink {
                     StorageManagementPage()
                 } label: {
-                    SettingsCategoryRow(icon: "internaldrive.fill", title: "Storage", subtitle: "Download sizes, bulk delete")
-                }
-                NavigationLink {
-                    AdvancedSettingsPage()
-                } label: {
-                    SettingsCategoryRow(icon: "gearshape.2.fill", title: "Advanced", subtitle: "Cache, reset, storage")
+                    SettingsCategoryRow(icon: "internaldrive.fill", title: "Storage", subtitle: "Downloads, caches, per-category clearing")
                 }
                 NavigationLink {
                     BackupRestoreSettingsPage()
@@ -182,12 +178,19 @@ struct SettingsView: View {
                 }
             }
 
-            // Section 6: Update Log & About
+            // Section 6: Updates, Change Log & About (v2.22 — Updates got
+            // its own dedicated section; "Update Log" renamed to
+            // "Change Log")
             Section {
+                NavigationLink {
+                    UpdatesSettingsPage()
+                } label: {
+                    SettingsCategoryRow(icon: "arrow.down.circle.fill", title: "Updates", subtitle: "Version, check, install, what's new")
+                }
                 NavigationLink {
                     UpdateLogPage()
                 } label: {
-                    SettingsCategoryRow(icon: "list.bullet.clipboard.fill", title: "Update Log", subtitle: "See what's new, fixed, and changed")
+                    SettingsCategoryRow(icon: "list.bullet.clipboard.fill", title: "Change Log", subtitle: "See what's new, fixed, and changed")
                 }
                 NavigationLink {
                     AboutSettingsPage()
@@ -3377,33 +3380,233 @@ private struct StoreModuleSkeletonTile: View {
     }
 }
 
-// MARK: - Storage Management Page
+// MARK: - Storage Management Page (v2.22 rework)
+//
+// The one place for everything the app stores. Every category is listed
+// SEPARATELY with its own size and its own Clear button — there is no
+// giant "clear everything" action by design:
+//
+//   • Offline Content — downloaded episodes/chapters. NOT cache: these are
+//     real files the user chose to keep; deleting is destructive and asks
+//     for confirmation showing exactly what goes away.
+//   • Caches — re-created automatically when needed. Safe to clear any
+//     time, no confirmation needed, sizes refresh immediately.
+//   • App Data — caches of anime/manga metadata, id mappings, music
+//     themes, the schedule backup, and small preference stores. Clearing
+//     one never touches the others.
+//   • Watch Data — continue-watching and history. Important user data:
+//     clearing asks for confirmation.
+//
+// Sizes update immediately after every clear (single refresh pass), and
+// the total card shows the sum of every category above it.
 
-/// Storage management page — shows the disk space used by Anime downloads,
-/// Manga downloads, and image cache, with bulk-delete options.
 struct StorageManagementPage: View {
     @ObservedObject private var dm = DownloadManager.shared
     @ObservedObject private var mdm = MangaDownloadManager.shared
+
+    // Offline content
     @State private var animeDownloadSize: Int64 = 0
     @State private var mangaDownloadSize: Int64 = 0
-    @State private var imageCacheSize: Int64 = 0
-    @State private var totalSize: Int64 = 0
+
+    // Caches
+    @State private var imageCacheSize: Int = 0
+    @State private var websiteDataSize: Int = 0
+    @State private var tempFilesSize: Int = 0
+
+    // App data
+    @State private var libraryCacheSize: Int = 0
+    @State private var mangaDataSize: Int = 0
+    @State private var idMappingSize: Int = 0
+    @State private var profileCacheSize: Int = 0
+    @State private var musicCacheSize: Int = 0
+    @State private var scheduleBackupSize: Int = 0
+    @State private var searchAliasSize: Int = 0
+    @State private var episodeSortSize: Int = 0
+
+    // Watch data
+    @State private var cwSize: Int = 0
+    @State private var historySize: Int = 0
+
     @State private var isCalculating = false
     @State private var showDeleteAnime = false
     @State private var showDeleteManga = false
-    @State private var showDeleteAll = false
+    @State private var showResetCW = false
+    @State private var showResetHistory = false
+
+    private var totalSize: Int64 {
+        animeDownloadSize + mangaDownloadSize
+            + Int64(imageCacheSize) + Int64(websiteDataSize) + Int64(tempFilesSize)
+            + Int64(libraryCacheSize) + Int64(mangaDataSize) + Int64(idMappingSize)
+            + Int64(profileCacheSize) + Int64(musicCacheSize) + Int64(scheduleBackupSize)
+            + Int64(searchAliasSize) + Int64(episodeSortSize)
+            + Int64(cwSize) + Int64(historySize)
+    }
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
-                // Total storage card
+            VStack(spacing: 22) {
                 totalCard
-                // Anime downloads card
-                animeDownloadsCard
-                // Manga downloads card
-                mangaDownloadsCard
-                // Image cache card
-                imageCacheCard
+
+                sectionHeader(
+                    "Offline Content",
+                    icon: "arrow.down.circle.fill",
+                    tint: .blue,
+                    caption: "Downloaded episodes and chapters stored on this device. Deleting removes the actual offline files — you would need to re-download them to watch or read offline."
+                )
+                offlineRow(
+                    title: "Anime Episodes",
+                    icon: "tv.fill",
+                    iconColor: .blue,
+                    count: dm.items.count,
+                    size: animeDownloadSize,
+                    onDelete: dm.items.isEmpty ? nil : { showDeleteAnime = true }
+                )
+                offlineRow(
+                    title: "Manga Chapters",
+                    icon: "book.fill",
+                    iconColor: .teal,
+                    count: mdm.items.count,
+                    size: mangaDownloadSize,
+                    onDelete: mdm.items.isEmpty ? nil : { showDeleteManga = true }
+                )
+
+                sectionHeader(
+                    "Caches",
+                    icon: "internaldrive.fill",
+                    tint: .orange,
+                    caption: "Temporary data the app rebuilds automatically. Safe to clear any time — posters, images, and pages simply load again when you open them."
+                )
+                cacheRow(
+                    title: "Image Cache",
+                    detail: "Poster and artwork images.",
+                    icon: "photo.stack.fill",
+                    iconColor: .orange,
+                    size: imageCacheSize
+                ) {
+                    CacheManager.shared.clearImageCache()
+                }
+                cacheRow(
+                    title: "Website Data",
+                    detail: "WebView cookies and site storage from streaming sources.",
+                    icon: "safari.fill",
+                    iconColor: .orange,
+                    size: websiteDataSize
+                ) {
+                    Task { await CacheManager.shared.clearWebsiteData() }
+                }
+                cacheRow(
+                    title: "Temp Files",
+                    detail: "Scratch files from downloads and playback.",
+                    icon: "clock.arrow.circlepath",
+                    iconColor: .orange,
+                    size: tempFilesSize
+                ) {
+                    CacheManager.shared.clearTempFiles()
+                }
+
+                sectionHeader(
+                    "App Data",
+                    icon: "archivebox.fill",
+                    tint: .purple,
+                    caption: "Cached metadata and small preference stores. Each clears on its own — one category never touches another."
+                )
+                cacheRow(
+                    title: "Anime Data",
+                    detail: "Cached anime library and detail snapshots.",
+                    icon: "sparkles",
+                    iconColor: .purple,
+                    size: libraryCacheSize
+                ) {
+                    CacheManager.shared.clearLibraryCache()
+                }
+                cacheRow(
+                    title: "Manga Data",
+                    detail: "Cached live chapter counts for ongoing manga.",
+                    icon: "text.book.closed.fill",
+                    iconColor: .purple,
+                    size: mangaDataSize
+                ) {
+                    MangaUpdatesChapterService.shared.clearCache()
+                }
+                cacheRow(
+                    title: "Metadata — ID Mappings",
+                    detail: "AniList ↔ MyAnimeList ↔ TVDB cross-reference mappings.",
+                    icon: "link.circle.fill",
+                    iconColor: .purple,
+                    size: idMappingSize
+                ) {
+                    CacheManager.shared.clearIDMappingCache()
+                }
+                cacheRow(
+                    title: "Metadata — Profiles",
+                    detail: "Cached tracker profiles and avatars.",
+                    icon: "person.crop.circle.fill",
+                    iconColor: .purple,
+                    size: profileCacheSize
+                ) {
+                    CacheManager.shared.clearProfileCache()
+                }
+                cacheRow(
+                    title: "Music Cache",
+                    detail: "Opening & ending themes for the Music tab.",
+                    icon: "music.note.list",
+                    iconColor: .purple,
+                    size: musicCacheSize
+                ) {
+                    AnimeMusicService.shared.clearCaches()
+                }
+                cacheRow(
+                    title: "Schedule Backup",
+                    detail: "The last good schedule, kept for offline fallbacks.",
+                    icon: "calendar.badge.clock",
+                    iconColor: .purple,
+                    size: scheduleBackupSize
+                ) {
+                    ScheduleFallbackService.shared.clearSnapshot()
+                }
+                cacheRow(
+                    title: "Search Aliases",
+                    detail: "Remembered source-search tweaks per title.",
+                    icon: "magnifyingglass.circle.fill",
+                    iconColor: .purple,
+                    size: searchAliasSize
+                ) {
+                    CacheManager.shared.clearSearchAliases()
+                }
+                cacheRow(
+                    title: "Episode Sort Preferences",
+                    detail: "Per-series ascending/descending episode order.",
+                    icon: "arrow.up.arrow.down.circle.fill",
+                    iconColor: .purple,
+                    size: episodeSortSize
+                ) {
+                    CacheManager.shared.clearEpisodeSortPreferences()
+                }
+
+                sectionHeader(
+                    "Watch Data",
+                    icon: "eye.fill",
+                    tint: .green,
+                    caption: "Your personal progress. Clearing is permanent — a confirmation will show exactly what is removed."
+                )
+                cacheRow(
+                    title: "Continue Watching",
+                    detail: "Resume points for anime episodes.",
+                    icon: "play.circle.fill",
+                    iconColor: .green,
+                    size: cwSize,
+                    confirm: true,
+                    onClear: { showResetCW = true }
+                )
+                cacheRow(
+                    title: "Watch History",
+                    detail: "Which episodes you have already finished.",
+                    icon: "clock.fill",
+                    iconColor: .green,
+                    size: historySize,
+                    confirm: true,
+                    onClear: { showResetHistory = true }
+                )
             }
             .padding(.vertical, 16)
         }
@@ -3412,37 +3615,45 @@ struct StorageManagementPage: View {
         .navigationBarTitleDisplayMode(.inline)
         .task { await refreshSizes() }
         .refreshable { await refreshSizes() }
-        .alert("Delete All Anime Downloads?", isPresented: $showDeleteAnime) {
+        .alert("Delete All Anime Episodes?", isPresented: $showDeleteAnime) {
             Button("Delete", role: .destructive) {
                 for item in dm.items { dm.remove(item) }
                 Task { await refreshSizes() }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This will permanently delete all \(dm.items.count) anime download\(dm.items.count == 1 ? "" : "s") and free up \(formatSize(animeDownloadSize)).")
+            Text("This permanently removes all \(dm.items.count) downloaded episode\(dm.items.count == 1 ? "" : "s") (\(formatSize(animeDownloadSize))) from this device. You can re-download them later.")
         }
-        .alert("Delete All Manga Downloads?", isPresented: $showDeleteManga) {
+        .alert("Delete All Manga Chapters?", isPresented: $showDeleteManga) {
             Button("Delete", role: .destructive) {
                 for item in mdm.items { mdm.remove(item) }
                 Task { await refreshSizes() }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This will permanently delete all \(mdm.items.count) manga download\(mdm.items.count == 1 ? "" : "s") and free up \(formatSize(mangaDownloadSize)).")
+            Text("This permanently removes all \(mdm.items.count) downloaded chapter\(mdm.items.count == 1 ? "" : "s") (\(formatSize(mangaDownloadSize))) from this device. You can re-download them later.")
         }
-        .alert("Delete Everything?", isPresented: $showDeleteAll) {
-            Button("Delete All", role: .destructive) {
-                for item in dm.items { dm.remove(item) }
-                for item in mdm.items { mdm.remove(item) }
+        .alert("Reset Continue Watching?", isPresented: $showResetCW) {
+            Button("Reset", role: .destructive) {
+                CacheManager.shared.clearContinueWatching()
                 Task { await refreshSizes() }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This will permanently delete all anime and manga downloads, freeing up \(formatSize(animeDownloadSize + mangaDownloadSize)). Image cache is not affected.")
+            Text("Every resume point is erased — playback starts from episode 1 for all anime. Downloaded files are not affected.")
+        }
+        .alert("Reset Watch History?", isPresented: $showResetHistory) {
+            Button("Reset", role: .destructive) {
+                CacheManager.shared.clearWatchHistory()
+                Task { await refreshSizes() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Your finished-episode records are erased. This does not change your AniList or MyAnimeList lists and does not delete downloads.")
         }
     }
 
-    // MARK: - Cards
+    // MARK: - Total card
 
     private var totalCard: some View {
         VStack(spacing: 10) {
@@ -3456,7 +3667,7 @@ struct StorageManagementPage: View {
                         .foregroundStyle(Color.appAccent)
                 }
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Total Used")
+                    Text("Total Used by Shirox+")
                         .font(.headline)
                     Text(formatSize(totalSize))
                         .font(.title2.weight(.bold).monospacedDigit())
@@ -3486,86 +3697,34 @@ struct StorageManagementPage: View {
         .padding(.horizontal, 16)
     }
 
-    private var animeDownloadsCard: some View {
-        storageRow(
-            icon: "tv.fill",
-            iconColor: .blue,
-            title: "Anime Downloads",
-            count: dm.items.count,
-            size: animeDownloadSize,
-            onDelete: dm.items.isEmpty ? nil : { showDeleteAnime = true }
-        )
-    }
+    // MARK: - Section header
 
-    private var mangaDownloadsCard: some View {
-        storageRow(
-            icon: "book.fill",
-            iconColor: .teal,
-            title: "Manga Downloads",
-            count: mdm.items.count,
-            size: mangaDownloadSize,
-            onDelete: mdm.items.isEmpty ? nil : { showDeleteManga = true }
-        )
-    }
-
-    private var imageCacheCard: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(Color.orange.opacity(0.12))
-                        .frame(width: 50, height: 50)
-                    Image(systemName: "photo.stack.fill")
-                        .font(.system(size: 22))
-                        .foregroundStyle(.orange)
-                }
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Image Cache")
-                        .font(.headline)
-                    Text(formatSize(imageCacheSize))
-                        .font(.subheadline.weight(.semibold).monospacedDigit())
-                        .foregroundStyle(.primary)
-                }
+    private func sectionHeader(_ title: String, icon: String, tint: Color, caption: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(tint)
+                Text(title)
+                    .font(.title3.weight(.bold))
                 Spacer()
             }
-            Text("Image cache is managed automatically and can be safely cleared. Poster images will re-download when needed.")
+            Text(caption)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Button {
-                Haptics.light()
-                CacheManager.shared.clearImageCache()
-                Task { await refreshSizes() }
-            } label: {
-                Label("Clear Image Cache", systemImage: "trash")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.red)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color.red.opacity(0.1))
-                    )
-            }
-            .buttonStyle(.plain)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(.secondarySystemGroupedBackground))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-        )
         .padding(.horizontal, 16)
     }
 
-    @ViewBuilder
-    private func storageRow(
+    // MARK: - Rows
+
+    /// Offline (downloaded) row — count + size, destructive Delete with
+    /// confirmation supplied by the caller.
+    private func offlineRow(
+        title: String,
         icon: String,
         iconColor: Color,
-        title: String,
         count: Int,
         size: Int64,
         onDelete: (() -> Void)?
@@ -3575,9 +3734,9 @@ struct StorageManagementPage: View {
                 ZStack {
                     Circle()
                         .fill(iconColor.opacity(0.12))
-                        .frame(width: 50, height: 50)
+                        .frame(width: 46, height: 46)
                     Image(systemName: icon)
-                        .font(.system(size: 22))
+                        .font(.system(size: 20))
                         .foregroundStyle(iconColor)
                 }
                 VStack(alignment: .leading, spacing: 4) {
@@ -3624,6 +3783,77 @@ struct StorageManagementPage: View {
         .padding(.horizontal, 16)
     }
 
+    /// Cache/app-data row — individual Clear button, immediate size
+    /// refresh. `confirm: true` rows route through a destructive
+    /// confirmation instead of clearing directly.
+    private func cacheRow(
+        title: String,
+        detail: String,
+        icon: String,
+        iconColor: Color,
+        size: Int,
+        confirm: Bool = false,
+        onClear: (() -> Void)? = nil
+    ) -> some View {
+        let clearAction: () -> Void = onClear ?? {}
+        return VStack(spacing: 10) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(iconColor.opacity(0.12))
+                        .frame(width: 46, height: 46)
+                    Image(systemName: icon)
+                        .font(.system(size: 20))
+                        .foregroundStyle(iconColor)
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text(title)
+                            .font(.headline)
+                        Spacer(minLength: 0)
+                        Text(formatSize(size))
+                            .font(.subheadline.weight(.semibold).monospacedDigit())
+                            .foregroundStyle(size > 0 ? .primary : .secondary)
+                    }
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Button {
+                Haptics.light()
+                if confirm {
+                    clearAction()
+                } else {
+                    clearAction()
+                    Task { await refreshSizes() }
+                }
+            } label: {
+                Label("Clear", systemImage: confirm ? "trash" : "trash")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(confirm ? .red : Color.appAccent)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 9)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill((confirm ? Color.red : Color.appAccent).opacity(0.1))
+                    )
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(.secondarySystemGroupedBackground))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        )
+        .padding(.horizontal, 16)
+    }
+
     // MARK: - Helpers
 
     private func refreshSizes() async {
@@ -3633,12 +3863,27 @@ struct StorageManagementPage: View {
         let mangaDir = docs.appendingPathComponent("MangaDownloads")
         let anime = directorySize(at: animeDir)
         let manga = directorySize(at: mangaDir)
-        let cache = Int64(CacheManager.shared.imageCacheSize)
+        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        let scheduleBackup = (try? FileManager.default.attributesOfItem(
+            atPath: caches.appendingPathComponent("schedule-fallback-snapshot.json").path))?[.size] as? Int ?? 0
+        let cache = CacheManager.shared
+        let image = await cache.imageCacheSize
         await MainActor.run {
             animeDownloadSize = anime
             mangaDownloadSize = manga
-            imageCacheSize = cache
-            totalSize = anime + manga + cache
+            imageCacheSize = image
+            websiteDataSize = cache.websiteDataSize
+            tempFilesSize = cache.tempFilesSize
+            libraryCacheSize = cache.libraryCacheSize
+            mangaDataSize = MangaUpdatesChapterService.diskCacheBytes()
+            idMappingSize = cache.idMappingSize
+            profileCacheSize = cache.profileCacheSize
+            musicCacheSize = AnimeMusicService.diskCacheBytes()
+            scheduleBackupSize = scheduleBackup
+            searchAliasSize = cache.searchAliasSize
+            episodeSortSize = cache.episodeSortSize
+            cwSize = cache.continueWatchingSize
+            historySize = cache.watchHistorySize
             isCalculating = false
         }
     }
@@ -3661,202 +3906,6 @@ struct StorageManagementPage: View {
         formatter.countStyle = .file
         return formatter.string(fromByteCount: bytes)
     }
-}
-
-// MARK: - Advanced Settings Page
-
-struct AdvancedSettingsPage: View {
-    @State private var showResetCW = false
-    @State private var showResetHistory = false
-    @State private var showClearImage = false
-    @State private var showClearAll = false
-
-    @State private var imageCacheSize: Int = 0
-    @State private var websiteDataSize: Int = 0
-    @State private var tempFilesSize: Int = 0
-    @State private var searchAliasSize: Int = 0
-    @State private var idMappingSize: Int = 0
-    @State private var episodeSortSize: Int = 0
-    @State private var libraryCacheSize: Int = 0
-    @State private var profileCacheSize: Int = 0
-    @State private var cwSize: Int = 0
-    @State private var historySize: Int = 0
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                cacheManagementCard
-                watchDataCard
-                clearAllCard
-            }
-            .padding()
-        }
-        .navigationTitle("Advanced")
-        .inlineNavBar()
-        .task { await updateSizes() }
-        .alert("Clear Image Cache?", isPresented: $showClearImage) {
-            Button("Clear", role: .destructive) {
-                CacheManager.shared.clearImageCache()
-                Task { await updateSizes() }
-            }
-            Button("Cancel", role: .cancel) {}
-        }
-        .alert("Reset Continue Watching?", isPresented: $showResetCW) {
-            Button("Reset", role: .destructive) {
-                CacheManager.shared.clearContinueWatching()
-                Task { await updateSizes() }
-            }
-            Button("Cancel", role: .cancel) {}
-        }
-        .alert("Reset Watch History?", isPresented: $showResetHistory) {
-            Button("Reset", role: .destructive) {
-                CacheManager.shared.clearWatchHistory()
-                Task { await updateSizes() }
-            }
-            Button("Cancel", role: .cancel) {}
-        }
-        .alert("Clear All Cache?", isPresented: $showClearAll) {
-            Button("Clear All", role: .destructive) {
-                Task {
-                    await CacheManager.shared.clearEverything()
-                    await updateSizes()
-                }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This will clear all cache, continue watching, watch history, and search aliases. This cannot be undone.")
-        }
-    }
-
-    // MARK: - Cache Management Card
-
-    private var cacheManagementCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            cardHeader("Cache Management", systemImage: "internaldrive")
-            VStack(spacing: 0) {
-                cacheRow(label: "Image Cache", size: imageCacheSize) {
-                    showClearImage = true
-                }
-                rowDivider
-                cacheRow(label: "Website Data", size: websiteDataSize) {
-                    Task { await CacheManager.shared.clearWebsiteData(); await updateSizes() }
-                }
-                rowDivider
-                cacheRow(label: "Temp Files", size: tempFilesSize) {
-                    CacheManager.shared.clearTempFiles()
-                    Task { await updateSizes() }
-                }
-                rowDivider
-                cacheRow(label: "Search Aliases", size: searchAliasSize) {
-                    CacheManager.shared.clearSearchAliases()
-                    Task { await updateSizes() }
-                }
-                rowDivider
-                cacheRow(label: "ID Mapping Cache", size: idMappingSize) {
-                    CacheManager.shared.clearIDMappingCache()
-                    Task { await updateSizes() }
-                }
-                rowDivider
-                cacheRow(label: "Episode Sort Prefs", size: episodeSortSize) {
-                    CacheManager.shared.clearEpisodeSortPreferences()
-                    Task { await updateSizes() }
-                }
-                rowDivider
-                cacheRow(label: "Library Cache", size: libraryCacheSize) {
-                    CacheManager.shared.clearLibraryCache()
-                    Task { await updateSizes() }
-                }
-                rowDivider
-                cacheRow(label: "Profile Cache", size: profileCacheSize) {
-                    CacheManager.shared.clearProfileCache()
-                    Task { await updateSizes() }
-                }
-            }
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondary.opacity(0.08),
-                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    // MARK: - Watch Data Card
-
-    private var watchDataCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            cardHeader("Watch Data", systemImage: "eye.fill")
-            VStack(spacing: 0) {
-                cacheRow(label: "Continue Watching", size: cwSize) { showResetCW = true }
-                rowDivider
-                cacheRow(label: "Watch History", size: historySize) { showResetHistory = true }
-            }
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondary.opacity(0.08),
-                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    // MARK: - Clear All Card
-
-    private var clearAllCard: some View {
-        VStack(spacing: 8) {
-            Button(role: .destructive) {
-                showClearAll = true
-            } label: {
-                Label("Clear All Cache", systemImage: "trash.fill")
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 4)
-            }
-            .buttonStyle(.bordered)
-            Text("Removes every cache above plus continue watching and watch history.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .padding()
-        .frame(maxWidth: .infinity)
-        .background(Color.red.opacity(0.06),
-                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    // MARK: - Helpers
-
-    private func cardHeader(_ title: String, systemImage: String) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: systemImage)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Color.appAccent)
-                .frame(width: 28, height: 28)
-                .background(Color.secondary.opacity(0.12),
-                            in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            Text(title)
-                .font(.headline)
-            Spacer()
-        }
-    }
-
-    private var rowDivider: some View {
-        Divider().opacity(0.4)
-    }
-
-    private func cacheRow(label: String, size: Int, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack {
-                Text(label)
-                    .foregroundStyle(.primary)
-                Spacer()
-                Text(formatSize(size))
-                    .font(.subheadline.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                Image(systemName: "chevron.right")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
-            .contentShape(Rectangle())
-            .padding(.vertical, 10)
-        }
-        .buttonStyle(.plain)
-    }
 
     private func formatSize(_ bytes: Int) -> String {
         if bytes <= 0 { return "0 KB" }
@@ -3864,21 +3913,6 @@ struct AdvancedSettingsPage: View {
         f.allowedUnits = [.useMB, .useKB]
         f.countStyle = .file
         return f.string(fromByteCount: Int64(bytes))
-    }
-
-    @MainActor
-    private func updateSizes() async {
-        let cache = CacheManager.shared
-        imageCacheSize   = await cache.imageCacheSize
-        websiteDataSize  = cache.websiteDataSize
-        tempFilesSize    = cache.tempFilesSize
-        cwSize           = cache.continueWatchingSize
-        historySize      = cache.watchHistorySize
-        searchAliasSize  = cache.searchAliasSize
-        idMappingSize    = cache.idMappingSize
-        episodeSortSize  = cache.episodeSortSize
-        libraryCacheSize = cache.libraryCacheSize
-        profileCacheSize = cache.profileCacheSize
     }
 }
 
@@ -4522,13 +4556,21 @@ struct LandscapeSubtitlePreview: View {
 #endif
 
 
-// MARK: - About Settings Page
+// MARK: - Updates Settings Page (v2.22)
+//
+// The dedicated Updates section. Everything update-related moved here from
+// the About page: current app version (with the 5-tap demo trigger),
+// available version, Check for Updates with all six honest check states,
+// update/download options (the full popup flow — in-app IPA download,
+// verification, LiveContainer handoff, copy/share), the What's New
+// changelog, and a link into the Change Log.
 
-struct AboutSettingsPage: View {
+struct UpdatesSettingsPage: View {
     @ObservedObject private var updateManager = AppUpdateManager.shared
 
-    /// v2.17 — Tap counter for the forced-update demo trigger (5 taps on
-    /// the version row, each within ~1.8s of the last).
+    /// v2.17 — Tap counter for the update-flow demo trigger (5 taps on
+    /// the version row, each within ~1.8s of the last). Moved from the
+    /// About page in v2.22 along with the rest of the update UI.
     @State private var versionTaps = 0
     @State private var versionTapResetTask: Task<Void, Never>?
 
@@ -4548,24 +4590,24 @@ struct AboutSettingsPage: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                heroCard
+                versionCard
                 updateStatusCard
-                legalCard
+                changeLogCard
             }
             .padding()
         }
-        .navigationTitle("About")
+        .background(Color(.systemGroupedBackground).ignoresSafeArea())
+        .navigationTitle("Updates")
         .inlineNavBar()
     }
 
-    // MARK: - Hero Card
+    // MARK: - Version card
 
-    /// v2.17 — Five quick taps on the version row toggles update-flow demo
-    /// mode: the version comparison reports the installed build as outdated
-    /// so the whole update popup (download progress, verification,
+    /// v2.17 — Five quick taps on the version row toggles update-flow
+    /// demo mode: the version comparison reports the installed build as
+    /// outdated so the whole update popup (download progress, verification,
     /// LiveContainer handoff, Later) can be exercised on a current build.
-    /// The popup carries an "Exit demo" chip to turn it off, plus a
-    /// "Preview: required" chip to see the critical-gate presentation.
+    /// The popup carries an "Exit demo" chip to turn it off.
     private func handleVersionRowTap() {
         versionTaps += 1
         versionTapResetTask?.cancel()
@@ -4580,14 +4622,14 @@ struct AboutSettingsPage: View {
         if updateManager.simulateOutdated {
             updateManager.exitDemo()
             ToastManager.shared.show(
-                title: "Forced Update",
+                title: "Update Flow",
                 message: "Demo mode off — re-checking your real version.",
                 icon: "checkmark.circle.fill",
                 iconColor: .green)
         } else {
             updateManager.simulateOutdated = true
             ToastManager.shared.show(
-                title: "Forced Update",
+                title: "Update Flow",
                 message: "Demo mode on — the update popup will appear.",
                 icon: "arrow.down.circle.fill",
                 iconColor: .accentColor)
@@ -4595,49 +4637,55 @@ struct AboutSettingsPage: View {
         }
     }
 
-    private var heroCard: some View {
-        VStack(spacing: 14) {
-            // #94 — Single clean app icon: just the bundled `app-logo` asset
-            // in a rounded rect. No gradient background, no extra frame, no
-            // SF-Symbol fallback wrapping — the image speaks for itself.
-            Image("app-logo")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 80, height: 80)
-                .clipShape(RoundedRectangle(cornerRadius: 18))
-
-            VStack(spacing: 4) {
-                Text("Shirox+")
-                    .font(.system(size: 28, weight: .bold))
-                Text("Version \(version) (\(build))")
-                    .font(.subheadline.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                    .onTapGesture { handleVersionRowTap() }
+    private var versionCard: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(Color.appAccent.opacity(0.12))
+                        .frame(width: 50, height: 50)
+                    Image(systemName: "arrow.down.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(Color.appAccent)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Current Version")
+                        .font(.headline)
+                    Text("\(version) (\(build))")
+                        .font(.title3.weight(.bold).monospacedDigit())
+                        .onTapGesture { handleVersionRowTap() }
+                    if let last = lastCheckedText {
+                        Text("Checked \(last) ago")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
             }
-
-            HStack(spacing: 8) {
-                Label("Anime", systemImage: "sparkles")
-                Label("Manga", systemImage: "book.fill")
-                Label("Tracking", systemImage: "checkmark.seal.fill")
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(Color.secondary.opacity(0.1), in: Capsule())
+            Text("Updates are never forced — you can always keep using Shirox+ and install new versions whenever you're ready. Checks run automatically on launch and hourly after that.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(24)
-        .frame(maxWidth: .infinity)
-        .background(Color.secondary.opacity(0.08),
-                    in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(.secondarySystemGroupedBackground))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        )
     }
 
-    // MARK: - Update Status Card
+    // MARK: - Update status card
 
-    /// Renders every AppUpdateManager.CheckState distinctly — v2.10 honest
-    /// states. "Up to date" is only ever shown after a REAL successful
+    /// Renders every AppUpdateManager.CheckState distinctly — honest
+    /// states only. "Up to date" appears only after a REAL successful
     /// comparison; a failed check gets its own retry state instead of a
-    /// fake green checkmark.
+    /// fake green checkmark. When an update is known (offered OR
+    /// dismissed) the card also shows the version pair and the update
+    /// actions.
     @ViewBuilder
     private var updateStatusCard: some View {
         VStack(spacing: 14) {
@@ -4649,7 +4697,7 @@ struct AboutSettingsPage: View {
                     case .idle:
                         Text("Version not checked yet")
                             .font(.headline)
-                        Text("Checks run automatically on launch and hourly after that.")
+                        Text("Tap Check for Updates below.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
 
@@ -4680,13 +4728,28 @@ struct AboutSettingsPage: View {
                     case .available(let update):
                         Text("Update Available")
                             .font(.headline)
-                        Text("Version \(update.newVersion)")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Color.appAccent)
+                        HStack(spacing: 6) {
+                            Text(update.currentVersion)
+                                .font(.subheadline.weight(.semibold).monospacedDigit())
+                                .foregroundStyle(.secondary)
+                            Image(systemName: "arrow.right")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                            Text(update.newVersion)
+                                .font(.subheadline.weight(.bold).monospacedDigit())
+                                .foregroundStyle(Color.appAccent)
+                        }
+                        if update.isCritical {
+                            // v2.22 — advisory only, never a lockout.
+                            Label("Strongly recommended — you're several versions behind", systemImage: "exclamationmark.triangle.fill")
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                        }
                         Text(update.changelog)
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                            .lineLimit(3)
+                            .lineLimit(4)
+                            .fixedSize(horizontal: false, vertical: true)
 
                     case .dismissed(let update):
                         Text("Update available — dismissed")
@@ -4701,31 +4764,14 @@ struct AboutSettingsPage: View {
                 Spacer()
             }
 
-            if updateManager.availableUpdate != nil {
-                // v2.21 — The full update popup (progress, verification,
-                // LiveContainer handoff, copy/share) instead of a raw
-                // Safari hop.
+            if updateManager.availableUpdate != nil || isDismissedState {
+                // v2.21/v2.22 — The full update popup (progress,
+                // verification, LiveContainer handoff, copy/share).
                 Button {
                     Haptics.light()
                     updateManager.presentUpdateFlow()
                 } label: {
-                    Label("Update", systemImage: "arrow.down.circle.fill")
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(Color.appAccent, in: RoundedRectangle(cornerRadius: 12))
-                }
-                .buttonStyle(.plain)
-            }
-
-            if case .dismissed(let update) = updateManager.state {
-                // v2.21 — Same popup flow, still reachable after Later.
-                Button {
-                    Haptics.light()
-                    updateManager.presentUpdateFlow()
-                } label: {
-                    Label("Install \(update.newVersion)", systemImage: "arrow.down.circle.fill")
+                    Label(updateButtonTitle, systemImage: "arrow.down.circle.fill")
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
@@ -4762,6 +4808,18 @@ struct AboutSettingsPage: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
         )
+    }
+
+    private var isDismissedState: Bool {
+        if case .dismissed = updateManager.state { return true }
+        return false
+    }
+
+    private var updateButtonTitle: String {
+        if case .dismissed(let update) = updateManager.state {
+            return "Install \(update.newVersion)"
+        }
+        return "Update Now"
     }
 
     /// Leading icon for the update card, per state.
@@ -4806,6 +4864,108 @@ struct AboutSettingsPage: View {
         case .failed, .available: return .orange
         case .dismissed, .idle: return .secondary
         }
+    }
+
+    // MARK: - Change Log card
+
+    /// The full history of previous app changes, one clean page.
+    private var changeLogCard: some View {
+        NavigationLink {
+            UpdateLogPage()
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "list.bullet.clipboard.fill")
+                    .font(.system(size: 18))
+                    .foregroundStyle(Color.appAccent)
+                    .frame(width: 36, height: 36)
+                    .background(Color.appAccent.opacity(0.1), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Change Log")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Text("Everything added, fixed, and changed — release by release.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color(.secondarySystemGroupedBackground))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - About Settings Page
+
+struct AboutSettingsPage: View {
+
+    private var version: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "-"
+    }
+    private var build: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "-"
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                heroCard
+                legalCard
+            }
+            .padding()
+        }
+        .navigationTitle("About")
+        .inlineNavBar()
+    }
+
+    // MARK: - Hero Card
+
+    private var heroCard: some View {
+        VStack(spacing: 14) {
+            // #94 — Single clean app icon: just the bundled `app-logo` asset
+            // in a rounded rect. No gradient background, no extra frame, no
+            // SF-Symbol fallback wrapping — the image speaks for itself.
+            Image("app-logo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 80, height: 80)
+                .clipShape(RoundedRectangle(cornerRadius: 18))
+
+            VStack(spacing: 4) {
+                Text("Shirox+")
+                    .font(.system(size: 28, weight: .bold))
+                Text("Version \(version) (\(build))")
+                    .font(.subheadline.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack(spacing: 8) {
+                Label("Anime", systemImage: "sparkles")
+                Label("Manga", systemImage: "book.fill")
+                Label("Tracking", systemImage: "checkmark.seal.fill")
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Color.secondary.opacity(0.1), in: Capsule())
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity)
+        .background(Color.secondary.opacity(0.08),
+                    in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
     // MARK: - Legal Card
