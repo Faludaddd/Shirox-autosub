@@ -28,10 +28,10 @@
       "versions": [
         {
           "version": "2.23",
-          "date": "2026-09-08",
+          "date": "2026-09-07",
           "localizedDescription": "v2.23 — Music rebuilt on AnimeThemes with real in-app playback; the false update popup is fixed (same version never prompts again); the update popup is redesigned with a LiveContainer / SideStore / KSign install picker; Manga & Schedule are always reachable (five tabs, no More overflow); providers get circuit breakers (no more hammering a dead AniList or flooding Jikan); and the carousel's Start Watching is centered again with genre pills and ratings restored and donghua filtered by real production metadata.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 12100000
+          "size": 58599537
         },
         {
           "version": "2.22",
