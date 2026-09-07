@@ -263,17 +263,17 @@ final class ScheduleFallbackService {
             throw URLError(.badServerResponse)
         }
         let root = try JSONDecoder().decode(JikanScheduleRoot.self, from: data)
-        return (root.data ?? []).map {
-            JikanScheduleItem(
-                malId: $0.mal_id,
-                title: $0.title,
-                coverImage: $0.images?.jpg?.large_image_url ?? $0.images?.jpg?.image_url,
-                type: $0.type,
-                genres: $0.genres?.compactMap { $0.name }.filter { !$0.isEmpty }.isEmpty
-                    ? nil : $0.genres?.compactMap { $0.name },
-                broadcastTime: $0.broadcast?.time,
-                score: $0.score,
-                members: $0.members
+        return (root.data ?? []).map { raw in
+            let genres = raw.genres?.compactMap { $0.name }.filter { !$0.isEmpty }
+            return JikanScheduleItem(
+                malId: raw.mal_id,
+                title: raw.title,
+                coverImage: raw.images?.jpg?.large_image_url ?? raw.images?.jpg?.image_url,
+                type: raw.type,
+                genres: (genres?.isEmpty ?? true) ? nil : genres,
+                broadcastTime: raw.broadcast?.time,
+                score: raw.score,
+                members: raw.members
             )
         }
     }

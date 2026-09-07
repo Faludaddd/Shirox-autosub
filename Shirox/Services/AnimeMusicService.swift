@@ -28,7 +28,7 @@ final class AnimeMusicService: ObservableObject {
 
     // MARK: - Song model
 
-    struct AnimeSong: Identifiable, Equatable {
+    struct AnimeSong: Identifiable, Equatable, Codable {
 
         enum Kind: String, CaseIterable {
             case opening = "OP"
@@ -186,7 +186,7 @@ final class AnimeMusicService: ObservableObject {
     }
 
     private func fetchAnimeList(path: String, query: [URLQueryItem]) async throws -> [JikanThemeAnime] {
-        let urlKey = "\(path)?\(query.map { "\($0.name)=\($0.value)" }.joined(separator: "&"))"
+        let urlKey = "\(path)?\(query.map { "\($0.name)=\($0.value ?? "")" }.joined(separator: "&"))"
 
         inFlightLock.lock()
         if let existing = inFlight[urlKey] {
