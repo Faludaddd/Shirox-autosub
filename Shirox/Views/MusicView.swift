@@ -164,7 +164,7 @@ struct MusicView: View {
     }
 
     /// Horizontal rail of large "now playing" style cards.
-    private func featuredRail(_ songs: [AnimeMusicService.AnimeSong]) -> some View {
+    private func featuredRail(_ songs: [AnimeSong]) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(spacing: 12) {
                 ForEach(songs.prefix(20)) { song in
@@ -174,7 +174,7 @@ struct MusicView: View {
         }
     }
 
-    private func searchResultsSection(_ results: [AnimeMusicService.AnimeSong]) -> some View {
+    private func searchResultsSection(_ results: [AnimeSong]) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             sectionHeader("Results", icon: "magnifyingglass", tint: .blue)
             if results.isEmpty {
@@ -289,10 +289,10 @@ enum MusicFilter: String, CaseIterable, Identifiable {
 
 @MainActor
 final class MusicViewModel: ObservableObject {
-    @Published var openings: [AnimeMusicService.AnimeSong] = []
-    @Published var endings: [AnimeMusicService.AnimeSong] = []
+    @Published var openings: [AnimeSong] = []
+    @Published var endings: [AnimeSong] = []
     @Published var searchText: String = "" { didSet { scheduleSearch() } }
-    @Published var searchResults: [AnimeMusicService.AnimeSong]?
+    @Published var searchResults: [AnimeSong]?
     @Published var isSearching = false
     @Published var isLoading = false
     @Published var error: String?
@@ -301,10 +301,10 @@ final class MusicViewModel: ObservableObject {
     private var loaded = false
     private var searchDebounceTask: Task<Void, Never>?
 
-    var filteredOpenings: [AnimeMusicService.AnimeSong] {
+    var filteredOpenings: [AnimeSong] {
         filter == .all || filter == .openings ? openings : []
     }
-    var filteredEndings: [AnimeMusicService.AnimeSong] {
+    var filteredEndings: [AnimeSong] {
         filter == .all || filter == .endings ? endings : []
     }
 
@@ -320,8 +320,8 @@ final class MusicViewModel: ObservableObject {
             isLoading = true
         }
         do {
-            async let op: [AnimeMusicService.AnimeSong] = AnimeMusicService.shared.featured(kind: .opening)
-            async let ed: [AnimeMusicService.AnimeSong] = AnimeMusicService.shared.featured(kind: .ending)
+            async let op: [AnimeSong] = AnimeMusicService.shared.featured(kind: .opening)
+            async let ed: [AnimeSong] = AnimeMusicService.shared.featured(kind: .ending)
             let (o, e) = try await (op, ed)
             openings = o
             endings = e
@@ -394,7 +394,7 @@ final class MusicViewModel: ObservableObject {
 /// Large "now playing" style card: anime artwork, gradient scrim, theme
 /// badge, song title, artist, anime name.
 struct MusicFeaturedCard: View {
-    let song: AnimeMusicService.AnimeSong
+    let song: AnimeSong
     let width: CGFloat
 
     var body: some View {
@@ -466,7 +466,7 @@ struct MusicFeaturedCard: View {
 // MARK: - Song Row
 
 struct MusicSongRow: View {
-    let song: AnimeMusicService.AnimeSong
+    let song: AnimeSong
 
     var body: some View {
         NavigationLink {
@@ -541,7 +541,7 @@ struct MusicSongRow: View {
 // own MAL-id resolution then decides what it can honestly load.
 
 struct MusicAnimeRouter: View {
-    let song: AnimeMusicService.AnimeSong
+    let song: AnimeSong
     @State private var resolvedId: Int?
     @State private var resolved = false
 

@@ -1,6 +1,41 @@
 import Foundation
 import Combine
 
+// MARK: - Song model (file scope — actor-neutral, so Codable synthesis is safe)
+
+/// One anime opening/ending theme, parsed from MyAnimeList's theme string.
+struct AnimeSong: Identifiable, Equatable, Codable {
+
+    enum Kind: String, CaseIterable, Codable {
+        case opening = "OP"
+        case ending = "ED"
+
+        var label: String { self == .opening ? "Opening" : "Ending" }
+    }
+
+    /// Stable id: "op-16498-1" (kind-malId-number). Deterministic so
+    /// disk-cached songs keep their identity across launches.
+    let id: String
+    let kind: Kind
+    /// Theme number within the anime (1, 2, 3…). `nil` when MAL didn't number it.
+    let number: Int?
+    let title: String
+    let artist: String?
+    /// e.g. "eps 1-13" — shown only when the source provided it.
+    let episodesRange: String?
+    let animeMALId: Int
+    let animeTitle: String
+    let coverImage: String?
+    let animeYear: Int?
+    /// AniList cross-reference from the offline mapping cache
+    /// (`nil` = unknown; the view resolves on tap, best-effort).
+    var anilistMediaId: Int?
+
+    static func == (lhs: AnimeSong, rhs: AnimeSong) -> Bool { lhs.id == rhs.id }
+}
+
+// MARK: - Service
+
 /// Anime openings & endings — the data layer behind the Music tab.
 ///
 /// MyAnimeList (through Jikan) is the one database the app can query for
@@ -25,38 +60,6 @@ final class AnimeMusicService: ObservableObject {
     static let shared = AnimeMusicService()
 
     private init() {}
-
-    // MARK: - Song model
-
-    struct AnimeSong: Identifiable, Equatable, Codable {
-
-        enum Kind: String, CaseIterable {
-            case opening = "OP"
-            case ending = "ED"
-
-            var label: String { self == .opening ? "Opening" : "Ending" }
-        }
-
-        /// Stable id: "op-16498-1" (kind-malId-number). Deterministic so
-        /// disk-cached songs keep their identity across launches.
-        let id: String
-        let kind: Kind
-        /// Theme number within the anime (1, 2, 3…). `nil` when MAL didn't number it.
-        let number: Int?
-        let title: String
-        let artist: String?
-        /// e.g. "eps 1-13" — shown only when the source provided it.
-        let episodesRange: String?
-        let animeMALId: Int
-        let animeTitle: String
-        let coverImage: String?
-        let animeYear: Int?
-        /// AniList cross-reference from the offline mapping cache
-        /// (`nil` = unknown; the view resolves on tap, best-effort).
-        var anilistMediaId: Int?
-
-        static func == (lhs: AnimeSong, rhs: AnimeSong) -> Bool { lhs.id == rhs.id }
-    }
 
     // MARK: - Networking
 
