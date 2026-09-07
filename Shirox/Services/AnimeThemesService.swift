@@ -553,7 +553,7 @@ final class AnimeThemesService: ObservableObject {
         struct SongTitle: Decodable { let romaji: String? }
         struct Performance: Decodable {
             let artist: RawArtist?
-            let as: String?
+            let `as`: String?
         }
     }
     private struct RawArtist: Decodable {
