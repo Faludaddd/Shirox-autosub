@@ -99,6 +99,35 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.23",
+        date: "2026-09-08",
+        added: [
+            "Music, rebuilt on AnimeThemes.moe — the dedicated anime openings/endings database — through its official GraphQL API. Openings, endings, and insert songs with the real song titles, artists (including 'as' credits), episode ranges, versions, and anime artwork. A music-note icon now sits directly beside the manga toggle in the Home toolbar; tapping it opens the Music page with a Featured rail (the provider's own shuffle), this season's openings and endings, an artists rail, and search across anime, songs, and artists.",
+            "Real in-app playback: tapping a theme plays its actual media (AnimeThemes theme → entry → video/audio) inside the app via VLCKit — the OP/ED video or its audio track, with a mini player bar that persists across every tab, an expanded player with seek bar, queue, and lock-screen controls. Music never opens AnimeThemes in Safari, and it has zero AniList dependency — it keeps working while AniList is down.",
+            "A redesigned update popup (built from scratch, not a tweak): a bottom-sheet card in the app's design language with the version transition (Installed → New), the changelog, and an INSTALL WITH picker for LiveContainer, SideStore, and KSign — each verified against that tool's own documented install link, probed for availability, and remembered across launches.",
+            "Provider circuit breakers and a 6-hour offline snapshot for the Home shelves, so the carousel keeps real data through full outages."
+        ],
+        fixed: [
+            "The false update popup: an accidental five taps on the version row persisted a hidden 'demo mode' that made every check report the installed build as outdated — the popup could appear with the same version on both sides (2.2 → 2.2). The simulation is gone; the comparison is purely real, normalized (whitespace, v-prefixes, pre-release suffixes, missing patch numbers), and takes the newest manifest version semantically. 2.2 + 2.2 never prompts; 2.10 + 2.9 never prompts; a failed check never assumes an update.",
+            "Schedule and Music 'not showing': six bottom tabs overflowed the bar into the system 'More' menu, hiding them. Music moved to the toolbar and the bar is exactly five tabs again — Schedule is always directly visible, and every page renders its loading / content / offline snapshot / empty / error states no matter which APIs are down.",
+            "AniList 403 flooding: a disabled AniList response now trips a 5-minute circuit breaker checked before every request (every screen fails fast instead of re-403ing), and a failing Jikan gets a 45-second failure cache plus a shared outage cooldown — the duplicate, independent fallback requests that caused the 429 storms are gone (Home now routes through the one central provider path).",
+            "Donghua in the trending carousel: when AniList is down the Jikan fallback fed a global top-airing list with no country data, so Chinese animation sailed through the carousel's Japan filter. The fallback now classifies each entry from the provider's own production metadata (Chinese production companies, JST broadcasts, kana in the Japanese title) and the AniList query itself filters to Japanese anime at the source.",
+            "The Start Watching button hugging the left edge: it's centered in the carousel again, in its own centering container so it never shifts with title length, poster size, or screen size."
+        ],
+        changed: [
+            "The carousel shows its richer information again: genre pills (up to six, with a +N overflow chip, never overflowing off-screen), a star rating, the year, format, and episode count — all in fixed-height rows so every slide still lays out in exactly the same spot (the v2.20 position-stability guarantee, preserved).",
+            "Update destination handoffs are honest by construction: LiveContainer, SideStore, and KSign each get their own documented install link, availability is probed with canOpenURL, and success is only claimed when iOS confirms the open. The download + SHA-256 verification flow is unchanged and still runs in-app.",
+            "The Updates settings page's hidden five-tap trigger is replaced by a clearly labeled 'Preview the update popup' row that can never affect the real version check."
+        ],
+        improved: [
+            "Music request hygiene: every AnimeThemes query is deduplicated in flight, cached in memory and on disk, paced under the documented 90/minute limit, and failures are remembered for 45 seconds — several screens never re-request a dead endpoint.",
+            "Manga and Schedule pages keep their honest state chain (provider → fallback → snapshot → error with retry) with the new circuit breakers, so temporary API failures degrade gracefully instead of emptying the page.",
+            "The update popup's design preview is clearly labeled and disables every action — nothing in preview mode touches GitHub or any install tool."
+        ],
+        removed: [],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "2.22",
         date: "2026-09-08",
         added: [

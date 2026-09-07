@@ -9,6 +9,33 @@ final class ProviderManager: ObservableObject {
     @Published var orderedProviders: [any MediaProvider] = []
     @Published var fallbackActive = false
 
+    /// v2.23 — Centralized provider state. ONE source of truth every
+    /// screen can observe: which provider is currently serving discovery
+    /// data (the primary, or the fallback while the primary cools down),
+    /// plus per-provider outages. Screens no longer hand-roll their own
+    /// fallback logic — they call `call{}` and read `activeProviderType`.
+    @Published var malOutageUntil: Date?
+
+    /// The provider currently serving discovery traffic — the primary
+    /// unless it (or the MAL fallback) is in a cooldown window.
+    var activeProviderType: ProviderType? {
+        if let primary, !isRateLimited(primary.providerType) {
+            return primary.providerType
+        }
+        if let fallback, !isRateLimited(fallback.providerType), !isJikanCoolingDown {
+            return fallback.providerType
+        }
+        return nil // both cooling down — snapshots/caches only
+    }
+
+    /// True while the Jikan/MAL fallback is inside its outage cooldown.
+    var isJikanCoolingDown: Bool {
+        guard let until = malOutageUntil else { return false }
+        if until > Date() { return true }
+        malOutageUntil = nil
+        return false
+    }
+
     /// Per-provider rate-limit cooldowns. When a provider returns a 429 (or
     /// `AniListError.rateLimited`), we record the time at which it's safe to
     /// retry. Calls during the cooldown skip the rate-limited provider
@@ -269,6 +296,21 @@ final class ProviderManager: ObservableObject {
         rateLimitUntil[type] = until
         Logger.shared.log(
             "[ProviderManager] \(type.rawValue) rate-limited for \(Int(duration))s (until \(until))",
+            type: "Provider"
+        )
+    }
+
+    /// v2.23 — Called by MALDiscoveryService when the Jikan fallback is
+    /// failing (429 / 5xx). Records a short MAL cooldown so every screen
+    /// sees the SAME provider state (no duplicate switching) and skips
+    /// straight to caches/snapshots. Jikan recovers quickly — 60s covers
+    /// the typical rate-limit blip without freezing the fallback for long.
+    func recordJikanOutage() {
+        let until = Date().addingTimeInterval(60)
+        if let current = malOutageUntil, current > until { return }
+        malOutageUntil = until
+        Logger.shared.log(
+            "[ProviderManager] MAL/Jikan cooling down for 60s (outage recorded)",
             type: "Provider"
         )
     }

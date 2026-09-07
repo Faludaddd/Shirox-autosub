@@ -34,6 +34,8 @@
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>livecontainer</string>
+		<string>sidestore</string>
+		<string>ksign</string>
 	</array>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>

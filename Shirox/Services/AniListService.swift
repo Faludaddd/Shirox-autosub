@@ -408,7 +408,7 @@ final class AniListService {
         let query = """
         query {
           Page(page: 1, perPage: 20) {
-            media(type: ANIME, sort: TRENDING_DESC, isAdult: false) {
+            media(type: ANIME, sort: TRENDING_DESC, isAdult: false, countryOfOrigin: "JP") {
               id
               idMal
               title { romaji english native }
@@ -1493,8 +1493,13 @@ final class AniListService {
 
                 if isApiDisabled {
                     // AniList API is down — cache this state so we don't
-                    // keep hammering it with every request.
-                    aniListApiDisabledUntil = Date().addingTimeInterval(60)
+                    // keep hammering it with every request. v2.23: 5 minutes
+                    // (was 60s) — a disabled API doesn't recover in a minute,
+                    // and every expiry costs one more 403 round-trip per
+                    // screen. The cooldown is checked BEFORE any request in
+                    // post(), so every caller (direct or via ProviderManager)
+                    // fails fast into the fallback chain.
+                    aniListApiDisabledUntil = Date().addingTimeInterval(300)
                 }
 
                 Logger.shared.logStructured(

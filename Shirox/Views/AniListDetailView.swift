@@ -736,6 +736,15 @@ struct AniListDetailView: View {
                 VideosSection(mediaId: media.id, malId: media.idMal)
                     .frame(maxWidth: .infinity)
                     .padding(.top, 8)
+
+                // v2.23 — AnimeThemes: this anime's openings/endings, with
+                // one-tap in-app playback and a link into the Music section.
+                // Uses the provider's exact AniList resource mapping, so the
+                // themes always belong to THIS anime. Hidden entirely (no
+                // placeholder) when AnimeThemes has nothing for it.
+                AnimeThemesSection(anilistId: media.id)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 8)
                 #endif
 
                 #if os(iOS)

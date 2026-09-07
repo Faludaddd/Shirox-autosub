@@ -70,23 +70,21 @@ final class AppUpdateManager: ObservableObject {
     @AppStorage("update.lastDismissedVersion") var lastDismissedVersion: String = ""
     @AppStorage("update.checkIntervalSeconds") var checkIntervalSeconds: Int = 3600
 
-    /// v2.17 — Forced-update demo mode. When true, the version comparison
-    /// treats the installed build as outdated no matter what the manifest
-    /// says, so the entire forced-update flow (gate + its Download from
-    /// GitHub CTA) can be exercised on a current build. Toggled by
-    /// tapping the version row on the About page five times; an "Exit demo
-    /// mode" chip on the gate turns it off.
-    @AppStorage("update.simulateOutdated") var simulateOutdated = false
-
-    /// v2.17 / v2.21 — True while the update cover should be presented.
+    /// v2.21 / v2.23 — True while the update cover should be presented.
     /// Raised the moment a check CONFIRMS a newer version exists; lowered
     /// when a check confirms the installed version is current (i.e. after
-    /// the update is installed and the app relaunches), when the user
-    /// taps Later on a NON-critical update (see `dismiss()`), or when the
-    /// demo mode is exited. A FAILED re-check never lowers it — a flaky
+    /// the update is installed and the app relaunches) or when the user
+    /// taps Maybe Later. A FAILED re-check never lowers it — a flaky
     /// network must not un-gate a known-outdated app. A DISMISSED update
-    /// never re-raises it: the About page keeps offering the install, and
-    /// the next version re-prompts on its own.
+    /// never re-raises it: the Updates page keeps offering the install,
+    /// and the next version re-prompts on its own.
+    ///
+    /// v2.23 — the "demo mode" simulation is GONE. It was the root cause
+    /// of the false-update bug: five accidental taps on the version row
+    /// persisted `simulateOutdated`, after which every check reported the
+    /// installed build as outdated — the popup appeared with IDENTICAL
+    /// versions on both sides ("2.2 → 2.2"). The comparison is now purely
+    /// real: same versions → no popup, ever.
     @Published private(set) var gateVisible = false
 
     // MARK: - Manifest sources
@@ -148,14 +146,38 @@ final class AppUpdateManager: ObservableObject {
     }
 
     // MARK: - Version Comparison
+    //
+    // v2.23 — hardened semantic comparison. The old parser was numeric but
+    // strict about format: whitespace, a "v" prefix, or a trailing
+    // "-beta"/"+build" made a component parse to nil and the version read
+    // as older than it was. Every comparison now runs through
+    // `normalizedComponents`, which trims whitespace, strips prefixes and
+    // suffixes, and pads missing components — so "2.2", "2.2.0", and
+    // " v2.2-rc1 " all compare as 2.2.0. Anything unparseable compares as
+    // NOT newer (fail-closed: a garbage manifest can never trigger the
+    // update popup).
 
-    /// Returns true if `newVersion` is strictly newer than `currentVersion`.
-    /// Compares by splitting on `.` and comparing numeric components left to
-    /// right ("2.10" IS newer than "2.9"). Returns false if either string is
-    /// empty or unparseable.
+    /// Normalizes a version string into numeric components.
+    /// " v2.10-beta " → [2, 10]. "2" → [2]. "" → [] (unparseable).
+    static func normalizedComponents(_ version: String) -> [Int] {
+        var s = version.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Strip a leading "v"/"V" prefix.
+        if s.hasPrefix("v") || s.hasPrefix("V") { s.removeFirst() }
+        // Strip prerelease/build suffixes ("2.2-beta", "2.2+5").
+        if let dash = s.firstIndex(where: { $0 == "-" || $0 == "+" }) {
+            s = String(s[..<dash])
+        }
+        return s.split(separator: ".").compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+    }
+
+    /// Returns true if `newVersion` is strictly newer than `currentVersion`
+    /// — a SEMANTIC comparison: components compared numerically left to
+    /// right ("2.10" IS newer than "2.9"), missing components padded as
+    /// zero ("2.2" == "2.2.0"). Returns false if either string is empty or
+    /// unparseable — a failed parse can never claim an update exists.
     static func isNewer(_ newVersion: String, than currentVersion: String) -> Bool {
-        let newParts = newVersion.split(separator: ".").compactMap { Int($0) }
-        let curParts = currentVersion.split(separator: ".").compactMap { Int($0) }
+        let newParts = normalizedComponents(newVersion)
+        let curParts = normalizedComponents(currentVersion)
         guard !newParts.isEmpty, !curParts.isEmpty else { return false }
         let maxLen = max(newParts.count, curParts.count)
         for i in 0..<maxLen {
@@ -224,7 +246,7 @@ final class AppUpdateManager: ObservableObject {
             // All sources failed. If we already KNOW an update exists (from
             // an earlier successful check), keep that knowledge — a flaky
             // re-check must never hide a known update. Otherwise this is an
-            // honest "couldn't verify" failure.
+            // honest "couldn't verify" failure — NEVER an assumed update.
             switch state {
             case .available, .dismissed:
                 break
@@ -236,12 +258,7 @@ final class AppUpdateManager: ObservableObject {
 
         lastSuccessfulCheck = Date()
 
-        // v2.17 — In demo mode the comparison always reports "outdated" so
-        // the forced-update flow can be demoed on the latest build; the UI
-        // still shows the real installed version.
-        let installedForComparison = simulateOutdated ? "0.0.0" : currentVersion
-
-        guard Self.isNewer(latest.version, than: installedForComparison) else {
+        guard Self.isNewer(latest.version, than: currentVersion) else {
             state = .current
             gateVisible = false
             return
@@ -275,23 +292,15 @@ final class AppUpdateManager: ObservableObject {
         gateVisible = true
     }
 
-    /// v2.17 — Turns off forced-update demo mode and immediately re-checks,
-    /// so the gate clears as soon as the honest comparison says "current".
-    func exitDemo() {
-        simulateOutdated = false
-        gateVisible = false
-        Task { await checkForUpdates(force: true) }
-    }
-
-    /// v2.22 — Later: lowers the update cover immediately and remembers
-    /// the version so automatic checks don't re-prompt. Works from the
-    /// `.available` state (first prompt) AND from a `.dismissed` state
-    /// (cover re-opened manually from the Updates settings page). NO
-    /// update is ever forced anymore — critical ones get a prominent
-    /// "strongly recommended" banner in the popup instead of a lockout,
-    /// so this works for every update.
-    /// The info stays visible in Updates/About (dismissed state) with an
-    /// install button in case the sideload failed.
+    /// v2.22 / v2.23 — Later: lowers the update cover immediately and
+    /// remembers the version so automatic checks don't re-prompt. Works
+    /// from the `.available` state (first prompt) AND from a `.dismissed`
+    /// state (cover re-opened manually from the Updates settings page). NO
+    /// update is ever forced — critical gaps get a prominent "strongly
+    /// recommended" banner in the popup instead of a lockout, so this
+    /// works for every update. The info stays visible in the Updates
+    /// settings page (dismissed state) with an install button in case the
+    /// sideload failed.
     func dismiss() {
         guard let current = currentUpdateInfo else { return }
         lastDismissedVersion = current.newVersion
@@ -299,13 +308,38 @@ final class AppUpdateManager: ObservableObject {
         gateVisible = false
     }
 
-    /// v2.21 — Presents the update cover manually (About page Update /
+    /// v2.23 — PREVIEW ONLY: presents the update popup with the CURRENT
+    /// version info so the design can be reviewed without any version
+    /// trickery. Replaces the removed 5-tap "demo mode" (which made every
+    /// real check lie about being outdated). Reachable exclusively from
+    /// the clearly-labeled "Preview the update popup" row in Updates
+    /// settings — it can never trigger accidentally, and it never touches
+    /// the check state or the version comparison.
+    func presentPreview() {
+        previewing = true
+        gateVisible = true
+    }
+
+    /// True while the cover shows a design PREVIEW (presentPreview). The
+    /// popup labels itself clearly and the flag resets when the cover
+    /// lowers.
+    @Published private(set) var previewing = false
+
+    /// v2.21 — Presents the update cover manually (Updates page Update /
     /// Install buttons) so the full popup flow — progress, verification,
-    /// LiveContainer handoff, copy/share — is reachable for an update the
+    /// install destinations, copy/share — is reachable for an update the
     /// user previously dismissed. No-ops when no update is known.
     func presentUpdateFlow() {
         guard currentUpdateInfo != nil else { return }
         gateVisible = true
+    }
+
+    /// v2.23 — Lowers a PREVIEW cover (clears the preview flag + the gate).
+    /// Also called when the cover disappears for any reason — both writes
+    /// are idempotent and never touch the real check state.
+    func dismissPreview() {
+        previewing = false
+        gateVisible = false
     }
 
     /// The detected update, whichever prompt state it's in (offered or
@@ -368,10 +402,23 @@ final class AppUpdateManager: ObservableObject {
             manifest = try JSONDecoder().decode(Manifest.self, from: decoded)
         }
 
-        guard let latest = manifest.apps.first?.versions.first else {
+        guard let latest = Self.semanticallyLatest(manifest.apps.first?.versions) else {
             throw URLError(.cannotParseResponse)
         }
         return latest
+    }
+
+    /// v2.23 — the newest entry by SEMANTIC version, not array position.
+    /// `versions.first` trusted the manifest's ordering; if a source ever
+    /// serves entries out of order (a mirror, a bad commit), the "latest"
+    /// could be an OLD version. Taking the semantic max is ordering-proof.
+    /// Two entries with the same normalized version fall back to the
+    /// earlier one (stable).
+    private static func semanticallyLatest(_ entries: [VersionEntry]?) -> VersionEntry? {
+        guard let entries, !entries.isEmpty else { return nil }
+        return entries.reduce(entries[0]) { best, candidate in
+            isNewer(candidate.version, than: best.version) ? candidate : best
+        }
     }
 
     // MARK: - Notification Integration

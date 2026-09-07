@@ -66,6 +66,20 @@ struct HomeView: View {
                     }
                     .accessibilityLabel(appMode.mode.toggleAccessibilityLabel)
                 }
+                // v2.23 — Music, directly beside the manga mode-toggle:
+                // [MANGA] [MUSIC] in the top-right navigation. Same icon
+                // size, spacing, and touch target as the other toolbar
+                // icons; opens the dedicated Music page (AnimeThemes).
+                ToolbarItem(placement: .topBarTrailing) {
+                    NavigationLink {
+                        MusicView()
+                    } label: {
+                        Image(systemName: "music.note")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(.primary)
+                    }
+                    .accessibilityLabel("Music")
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         showNotifications = true
@@ -479,66 +493,66 @@ struct FeaturedCarousel: View {
                         VStack(alignment: .leading, spacing: 10) {
                             CarouselTitleLogo(media: currentMedia, isWide: isIPad)
 
-                            // Genre capsules — replace the previous multi-line description
-                            // (which was too dense for a carousel). Up to 3 tags, capped.
-                            // v2.20 — the row now has a RESERVED fixed height: when a
-                            // title has no genres the row is empty but still occupies its
-                            // 22pt, so the Start Watching button below never shifts.
-                            // Pill styling is exactly as before.
-                            HStack(spacing: 6) {
-                                if let genres = currentMedia.genres, !genres.isEmpty {
-                                    ForEach(genres.prefix(3), id: \.self) { g in
-                                        Text(g)
-                                            .font(.caption2.weight(.semibold))
-                                            .foregroundStyle(.primary)
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 3)
-                                            .background(Color.primary.opacity(0.1), in: Capsule())
-                                            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
+                            // v2.23 — Meta chips (rating / year / format) +
+                            // genre pills, both in fixed-height reserved rows
+                            // so the Start Watching button below NEVER shifts
+                            // between slides (v2.20's position-stability
+                            // guarantee, preserved). The pills show the anime's
+                            // REAL metadata — up to 6 genres with a "+N"
+                            // overflow chip when the list is longer, in a
+                            // horizontally scrollable row that never runs
+                            // off-screen.
+                            carouselMetaRow(currentMedia)
+                            carouselGenreRow(currentMedia)
+
+                            // v2.23 — Start Watching is CENTERED in the
+                            // carousel content again (it went left-aligned
+                            // with v2.19's bottom-left logo anchor). It sits
+                            // in its own centering container so it never
+                            // shifts with title length, poster size, or
+                            // screen size — the same spot on every slide.
+                            VStack(spacing: 10) {
+                                NavigationLink {
+                                    if isManga {
+                                        AniListMangaDetailView(mediaId: currentMedia.id, preloadedMedia: currentMedia)
+                                    } else {
+                                        AniListDetailView(mediaId: currentMedia.id, preloadedMedia: currentMedia)
                                     }
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: isManga ? "book.fill" : "play.fill").font(.caption.weight(.bold))
+                                        Text(isManga ? "Start Reading" : "Start Watching")
+                                            .font(.subheadline.weight(.semibold))
+                                            .lineLimit(1)
+                                            .minimumScaleFactor(0.7)
+                                    }
+                                    .foregroundStyle(.primary)
+                                    .frame(height: 38)
+                                    .padding(.horizontal, 16)
+                                    .background(.ultraThinMaterial, in: Capsule())
+                                    .overlay(Capsule().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
                                 }
-                            }
-                            .frame(height: 22, alignment: .leading)
+                                .buttonStyle(.plain)
 
-                            NavigationLink {
-                                if isManga {
-                                    AniListMangaDetailView(mediaId: currentMedia.id, preloadedMedia: currentMedia)
-                                } else {
-                                    AniListDetailView(mediaId: currentMedia.id, preloadedMedia: currentMedia)
+                                // "Slide to browse" hint — fades out after the first swipe.
+                                if !hasInteracted {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "chevron.compact.left")
+                                            .font(.subheadline.weight(.bold))
+                                        Text("Slide to browse")
+                                            .font(.caption.weight(.semibold))
+                                        Image(systemName: "chevron.compact.right")
+                                            .font(.subheadline.weight(.bold))
+                                    }
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(.ultraThinMaterial, in: Capsule())
+                                    .overlay(Capsule().strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
+                                    .transition(.opacity.combined(with: .move(edge: .bottom)))
                                 }
-                            } label: {
-                                HStack(spacing: 6) {
-                                    Image(systemName: isManga ? "book.fill" : "play.fill").font(.caption.weight(.bold))
-                                    Text(isManga ? "Start Reading" : "Start Watching")
-                                        .font(.subheadline.weight(.semibold))
-                                        .lineLimit(1)
-                                        .minimumScaleFactor(0.7)
-                                }
-                                .foregroundStyle(.primary)
-                                .frame(height: 38)
-                                .padding(.horizontal, 16)
-                                .background(.ultraThinMaterial, in: Capsule())
-                                .overlay(Capsule().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
                             }
-                            .buttonStyle(.plain)
-
-                            // "Slide to browse" hint — fades out after the first swipe.
-                            if !hasInteracted {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "chevron.compact.left")
-                                        .font(.subheadline.weight(.bold))
-                                    Text("Slide to browse")
-                                        .font(.caption.weight(.semibold))
-                                    Image(systemName: "chevron.compact.right")
-                                        .font(.subheadline.weight(.bold))
-                                }
-                                .foregroundStyle(.secondary)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(.ultraThinMaterial, in: Capsule())
-                                .overlay(Capsule().strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
-                                .transition(.opacity.combined(with: .move(edge: .bottom)))
-                            }
+                            .frame(maxWidth: .infinity)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.horizontal, 20)
@@ -588,6 +602,130 @@ struct FeaturedCarousel: View {
         #elseif !os(tvOS)
         MacFeaturedCarousel(items: realItems)
         #endif
+    }
+
+    // MARK: - v2.23 carousel info rows
+    //
+    // Both rows have RESERVED heights so every slide lays out identically —
+    // the Start Watching button and the hint sit in the exact same spot no
+    // matter what metadata the current anime carries (v2.20's stability
+    // contract). All values come from the current Media object — image,
+    // logo, pills, rating, and button all describe the SAME slide.
+
+    /// Rating / year / format chips, 20pt tall, gradient-faded at the end.
+    @ViewBuilder
+    private func carouselMetaRow(_ media: Media) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                if let score = media.averageScore, score > 0 {
+                    HStack(spacing: 4) {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(.yellow)
+                        Text(String(format: "%.1f", Double(score) / 10.0))
+                            .font(.caption2.weight(.bold))
+                            .monospacedDigit()
+                            .foregroundStyle(.primary)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color.primary.opacity(0.1), in: Capsule())
+                    .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
+                }
+                if let year = media.seasonYear, year > 0 {
+                    Text(String(year))
+                        .font(.caption2.weight(.semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Color.primary.opacity(0.1), in: Capsule())
+                        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
+                }
+                if let format = media.format, !format.isEmpty, format != "MUSIC" {
+                    Text(format)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Color.primary.opacity(0.1), in: Capsule())
+                        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
+                }
+                if let episodes = media.episodes, episodes > 0 {
+                    Text("\(episodes) ep\(episodes == 1 ? "" : "s")")
+                        .font(.caption2.weight(.semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Color.primary.opacity(0.1), in: Capsule())
+                        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
+                }
+            }
+        }
+        .frame(height: 20, alignment: .leading)
+        // Hit-testing off: the rows sit over the swipeable carousel — a
+        // scrollable strip there would eat sideways swipes. Content is
+        // short enough to fit or fade out gracefully within the row.
+        .allowsHitTesting(false)
+        .mask(alignment: .leading) {
+            HStack(spacing: 0) {
+                Rectangle().frame(maxWidth: .infinity)
+                LinearGradient(
+                    stops: [
+                        .init(color: .black, location: 0),
+                        .init(color: .clear, location: 1)
+                    ],
+                    startPoint: .leading, endPoint: .trailing
+                )
+                .frame(width: 24)
+            }
+        }
+    }
+
+    /// Genre pills — up to 6, with a "+N" overflow chip, 22pt tall.
+    @ViewBuilder
+    private func carouselGenreRow(_ media: Media) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                if let genres = media.genres, !genres.isEmpty {
+                    ForEach(Array(genres.prefix(6).enumerated()), id: \.offset) { _, g in
+                        Text(g)
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Color.primary.opacity(0.1), in: Capsule())
+                            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
+                    }
+                    // Truncation that says so — never silently clipped.
+                    if genres.count > 6 {
+                        Text("+\(genres.count - 6)")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(Color.primary.opacity(0.07), in: Capsule())
+                    }
+                }
+            }
+        }
+        .frame(height: 22, alignment: .leading)
+        .allowsHitTesting(false)
+        .mask(alignment: .leading) {
+            HStack(spacing: 0) {
+                Rectangle().frame(maxWidth: .infinity)
+                LinearGradient(
+                    stops: [
+                        .init(color: .black, location: 0),
+                        .init(color: .clear, location: 1)
+                    ],
+                    startPoint: .leading, endPoint: .trailing
+                )
+                .frame(width: 24)
+            }
+        }
     }
 }
 

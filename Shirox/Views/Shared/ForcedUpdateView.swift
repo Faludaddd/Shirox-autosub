@@ -2,32 +2,101 @@
 import SwiftUI
 import CryptoKit
 
+// MARK: - Update destination (v2.23)
+//
+// Where an update gets installed. All three handoffs use the install
+// tool's REAL, documented deep link — verified against each tool's own
+// source/docs (not invented):
+//
+//   LiveContainer  livecontainer://install?url=<percent-encoded https URL>
+//                  — LCAppListView.handleURL case "install" reads the
+//                    `url` query item and downloads/installs the IPA itself.
+//   SideStore      sidestore://install?url=<percent-encoded https URL>
+//                  — SideStore/DeepLinks/URLHandler.swift case "install"
+//                    reads the `url` query item and imports the app.
+//   KSign          Ksign://install/<https URL in the path>
+//                  — KSign's documented URL scheme (kurdstore docs):
+//                    "You can trigger app installation directly using
+//                    Ksign://install/https://your-app-download-url.com/app.ipa"
+//
+// Every destination is probed with canOpenURL (schemes declared in
+// LSApplicationQueriesSchemes) — unavailable tools are shown but clearly
+// marked "Not installed", and nothing claims success unless iOS's open
+// completion handler confirms the handoff was accepted.
+
+enum UpdateDestination: String, CaseIterable, Identifiable {
+    case liveContainer = "livecontainer"
+    case sideStore = "sidestore"
+    case ksign = "ksign"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .liveContainer: return "LiveContainer"
+        case .sideStore:     return "SideStore"
+        case .ksign:         return "KSign"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .liveContainer: return "square.stack.3d.up.fill"
+        case .sideStore:     return "arrow.down.app.fill"
+        case .ksign:         return "checkmark.seal.fill"
+        }
+    }
+
+    var scheme: String {
+        switch self {
+        case .liveContainer: return "livecontainer"
+        case .sideStore:     return "sidestore"
+        case .ksign:         return "Ksign"
+        }
+    }
+
+    /// The tool's own install deep link for an IPA URL.
+    func installLink(for ipaURL: URL) -> URL? {
+        switch self {
+        case .liveContainer, .sideStore:
+            // Query-item form: <scheme>://install?url=<encoded>
+            var comps = URLComponents()
+            comps.scheme = scheme
+            comps.host = "install"
+            comps.queryItems = [URLQueryItem(name: "url", value: ipaURL.absoluteString)]
+            return comps.url
+        case .ksign:
+            // Path form: Ksign://install/<https url>
+            URL(string: "Ksign://install/\(ipaURL.absoluteString)")
+        }
+    }
+
+    /// Honest probe — true only when the tool is installed on this device.
+    @MainActor
+    func isInstalled() -> Bool {
+        guard let probe = URL(string: "\(scheme)://") else { return false }
+        return UIApplication.shared.canOpenURL(probe)
+    }
+}
+
 // MARK: - Update Download Service
 //
 // Owns the "get the new IPA onto this device" half of the update flow
 // (AppUpdateManager owns the "is one needed" half):
 //
 //   idle → connecting → downloading → verifying → succeeded(verified)
-//                ↘ failed (retryable)              ↘ handedToLiveContainer
+//                ↘ failed (retryable)              ↘ handedTo(installer)
 //
 // The download runs on a plain URLSession download task so progress is
 // real (delegate callbacks, not polling). Verification streams a SHA-256
 // over the file and compares it against the checksum published next to
-// the release asset (`<downloadURL>.sha256`) — the same checksum the
-// release pipeline regenerates on every build. If the checksum can't be
+// the release asset (`<downloadURL>.sha256`). If the checksum can't be
 // fetched, verification is skipped HONESTLY (the success card says so)
 // rather than silently claiming the package was verified.
 //
-// iOS cannot install an IPA from inside a sandboxed app, so the final
-// handoff goes to LiveContainer — the user's container app — via its
-// documented URL scheme `livecontainer://install?url=<encoded>`. The
-// scheme is verified against LiveContainer's own source (its app list
-// handles the `install` host by downloading and installing the given
-// URL); the button is only shown when `canOpenURL` confirms LiveContainer
-// is installed (LSApplicationQueriesSchemes in Info.plist). For setups
-// without LiveContainer, the downloaded + verified package can be shared
-// from the app's Files-visible Updates folder to any sideload tool, and
-// the download link can always be copied or opened in Safari.
+// The final handoff goes to the user's chosen install tool via its
+// documented URL scheme. iOS's open completion verdict is surfaced
+// honestly — success is never claimed for a handoff that didn't happen.
 final class UpdateDownloadService: NSObject, ObservableObject, URLSessionDownloadDelegate {
     static let shared = UpdateDownloadService()
 
@@ -40,21 +109,23 @@ final class UpdateDownloadService: NSObject, ObservableObject, URLSessionDownloa
         /// checksum was fetched AND matched; false means the checksum was
         /// unavailable (download still arrived over HTTPS from GitHub).
         case succeeded(verified: Bool)
-        /// LiveContainer was opened with the install link — it is
-        /// downloading and installing the update itself.
-        case handedToLiveContainer
+        /// The chosen install tool accepted the install deep link and is
+        /// downloading/installing the update itself.
+        case handedTo(installer: String)
         case failed(reason: String)
     }
 
     @Published private(set) var phase: Phase = .idle
-    /// Probed on first render and re-probed before every handoff: true
-    /// when LiveContainer is installed on this device. Drives button
-    /// visibility only — never any pretend integration.
-    @Published private(set) var liveContainerAvailable = false
 
     /// Local URL of the downloaded (and, when a checksum was available,
     /// verified) .ipa — nil until success.
     private(set) var packageURL: URL?
+
+    /// v2.23 — the remembered install destination is a VIEW concern (the
+    /// dropdown owns the @AppStorage so SwiftUI refreshes the label); the
+    /// service receives the chosen destination per handoff. Availability
+    /// probes live here (refreshed before every handoff).
+    @Published private(set) var availableDestinations: [UpdateDestination: Bool] = [:]
 
     private var remoteURL: URL?
     private var expectedSHA256: String?
@@ -74,30 +145,34 @@ final class UpdateDownloadService: NSObject, ObservableObject, URLSessionDownloa
     private var speedSamples: [(time: Date, bytes: Int64)] = []
     private var lastPhasePublish = Date.distantPast
 
-    private override init() { super.init() }
+    private override init() {
+        super.init()
+    }
 
     var isBusy: Bool {
         switch phase {
-        case .idle, .failed, .succeeded, .handedToLiveContainer: return false
+        case .idle, .failed, .succeeded, .handedTo: return false
         default: return true
         }
     }
 
-    // MARK: - LiveContainer detection
+    // MARK: - Destination availability
 
-    /// True when LiveContainer is installed (honest probe — the app
-    /// declares the `livecontainer` scheme in LSApplicationQueriesSchemes
-    /// so `canOpenURL` is allowed to answer). Refreshed before every
-    /// handoff so installing LiveContainer mid-flow enables the button.
-    @discardableResult
-    func probeLiveContainer() -> Bool {
-        guard let probe = URL(string: "livecontainer://") else {
-            liveContainerAvailable = false
-            return false
+    /// Re-probes every destination's presence (canOpenURL is cheap and
+    /// allowed — every scheme is declared in LSApplicationQueriesSchemes).
+    @MainActor
+    func refreshDestinationAvailability() {
+        var result: [UpdateDestination: Bool] = [:]
+        for destination in UpdateDestination.allCases {
+            result[destination] = destination.isInstalled()
         }
-        let available = UIApplication.shared.canOpenURL(probe)
-        if liveContainerAvailable != available { liveContainerAvailable = available }
-        return available
+        availableDestinations = result
+    }
+
+    @MainActor
+    func isDestinationAvailable(_ destination: UpdateDestination) -> Bool {
+        if let known = availableDestinations[destination] { return known }
+        return destination.isInstalled()
     }
 
     // MARK: - Actions
@@ -116,7 +191,7 @@ final class UpdateDownloadService: NSObject, ObservableObject, URLSessionDownloa
 
         // Drop stale packages from earlier updates, then race the checksum
         // fetch against the download itself — the checksum (a 77-byte text
-        // file) always wins that race for an 11 MB IPA.
+        // file) always wins that race for an IPA.
         cleanUpdatesDirectory(keeping: nil)
         if let shaURL = URL(string: info.downloadURL.absoluteString + ".sha256") {
             fetchExpectedChecksum(from: shaURL)
@@ -137,259 +212,245 @@ final class UpdateDownloadService: NSObject, ObservableObject, URLSessionDownloa
         Haptics.selection()
     }
 
-    /// Hands the update straight to LiveContainer via its documented
-    /// `install` URL action: LiveContainer downloads the IPA from GitHub
-    /// itself and installs it into its container. Re-probes presence every
-    /// call, reports honestly through the completion handler whether iOS
-    /// actually accepted the open, and cancels a redundant in-app download.
-    func openInLiveContainer(url: URL) {
+    /// Hands the update to the chosen install tool via its documented deep
+    /// link: the tool downloads the IPA from GitHub itself and installs it.
+    /// Re-probes presence every call, reports honestly through the
+    /// completion handler whether iOS actually accepted the open, and
+    /// cancels a redundant in-app download.
+    @MainActor
+    func handOff(to destination: UpdateDestination, url: URL) {
         if isBusy { cancel() }
-        guard probeLiveContainer() else {
+        refreshDestinationAvailability()
+        guard destination.isInstalled(), let installLink = destination.installLink(for: url) else {
             Haptics.error()
-            setPhase(.failed(reason: "LiveContainer wasn't found on this device. Install or open LiveContainer, then tap Try Again — or use Update Now to download the package here and share it to any sideload tool."))
+            setPhase(.failed(reason: "\(destination.displayName) wasn't found on this device. Install or open it, then tap Try Again — or use Update Now to download the package here and share it to any install tool."))
             return
         }
-        var comps = URLComponents()
-        comps.scheme = "livecontainer"
-        comps.host = "install"
-        comps.queryItems = [URLQueryItem(name: "url", value: url.absoluteString)]
-        guard let installURL = comps.url else { return }
-        UIApplication.shared.open(installURL, options: [:]) { [weak self] accepted in
+        UIApplication.shared.open(installLink, options: [:]) { [weak self] accepted in
             guard let self else { return }
             if accepted {
                 Haptics.success()
-                self.setPhase(.handedToLiveContainer)
+                self.setPhase(.handedTo(installer: destination.displayName))
             } else {
                 Haptics.error()
-                self.setPhase(.failed(reason: "iOS refused to open the LiveContainer link. Copy the download link instead and add it to LiveContainer manually (Add by URL)."))
+                self.setPhase(.failed(reason: "iOS couldn't open \(destination.displayName). Copy the IPA link and open it in \(destination.displayName) manually — or use Update Now and share the package file."))
             }
         }
     }
 
-    private func setPhase(_ newPhase: Phase) {
-        // Phase swaps rebuild the action area (different card per state),
-        // so animate them — cross-fade the terminal states; the download
-        // progress values inside one card carry their own animation.
-        if Thread.isMainThread {
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { phase = newPhase }
-        } else {
-            DispatchQueue.main.async {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { self.phase = newPhase }
-            }
-        }
-    }
-
-    // MARK: - URLSessionDownloadDelegate (background queue)
+    // MARK: - URLSessionDownloadDelegate
 
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask,
                     didWriteData bytesWritten: Int64, totalBytesWritten: Int64,
                     totalBytesExpectedToWrite: Int64) {
         let now = Date()
         speedSamples.append((now, totalBytesWritten))
-        while let first = speedSamples.first, now.timeIntervalSince(first.time) > 1.5 {
-            speedSamples.removeFirst()
-        }
-        var bytesPerSecond: Double = 0
-        if let first = speedSamples.first, let last = speedSamples.last, last.bytes > first.bytes {
-            let window = max(0.15, last.time.timeIntervalSince(first.time))
-            bytesPerSecond = Double(last.bytes - first.bytes) / window
-        }
-        let total = max(totalBytesExpectedToWrite, 0)
-        let progress = total > 0 ? min(1, Double(totalBytesWritten) / Double(total)) : 0
+        // Keep a trailing ~5s window.
+        speedSamples.removeAll { now.timeIntervalSince($0.time) > 5 }
 
-        // Throttle published churn to ~5 Hz — the bar animates linearly
-        // between updates so it still reads as perfectly smooth.
-        guard now.timeIntervalSince(lastPhasePublish) > 0.18 else { return }
+        let progress: Double
+        if totalBytesExpectedToWrite > 0 {
+            progress = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
+        } else {
+            progress = 0
+        }
+
+        var speed: Double = 0
+        if let first = speedSamples.first, now.timeIntervalSince(first.time) > 0.3 {
+            speed = Double(totalBytesWritten - first.bytes) / now.timeIntervalSince(first.time)
+        }
+
+        // Throttle @Published churn to ~10/s — the bar animates smoothly
+        // without flooding SwiftUI updates.
+        guard now.timeIntervalSince(lastPhasePublish) > 0.1 else { return }
         lastPhasePublish = now
-        setPhase(.downloading(progress: progress, downloadedBytes: totalBytesWritten,
-                              totalBytes: total, bytesPerSecond: bytesPerSecond))
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            if case .downloading = self.phase {
+                self.phase = .downloading(progress: progress,
+                                          downloadedBytes: totalBytesWritten,
+                                          totalBytes: totalBytesExpectedToWrite,
+                                          bytesPerSecond: speed)
+            }
+        }
     }
 
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask,
                     didFinishDownloadingTo location: URL) {
-        // The system deletes `location` when this callback returns, so the
-        // file must move NOW (on the delegate queue, before returning).
-        let destination = Self.updatesDirectory
-            .appendingPathComponent("Shirox-\(versionLabel.isEmpty ? "update" : versionLabel).ipa")
-        try? FileManager.default.removeItem(at: destination)
+        guard remoteURL != nil else { return }
         do {
-            try FileManager.default.moveItem(at: location, to: destination)
+            let destination = try persistPackage(at: location)
+            packageURL = destination
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.setPhase(.verifying(progress: 0))
+            }
+            verify(packageAt: destination)
         } catch {
-            setPhase(.failed(reason: "Couldn't save the update package: \(error.localizedDescription)"))
-            Haptics.error()
-            return
-        }
-        packageURL = destination
-        setPhase(.verifying(progress: 0))
-
-        // Stream a SHA-256 over the file off the main thread, comparing
-        // against the published checksum fetched earlier.
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self else { return }
-            var hasher = SHA256()
-            var reported: Double = 0
-            var readFailed = false
-            do {
-                let handle = try FileHandle(forReadingFrom: destination)
-                defer { try? handle.close() }
-                let total = (try? FileManager.default.attributesOfItem(atPath: destination.path)[.size] as? Int64) ?? 0
-                var processed: Int64 = 0
-                let chunkSize = 1 << 20
-                while true {
-                    guard let chunk = try handle.read(upToCount: chunkSize), !chunk.isEmpty else { break }
-                    hasher.update(data: chunk)
-                    processed += Int64(chunk.count)
-                    let p = total > 0 ? Double(processed) / Double(total) : 0
-                    if p - reported > 0.1 {
-                        reported = p
-                        self.setPhase(.verifying(progress: p))
-                    }
-                }
-            } catch {
-                readFailed = true
-            }
-            let digest = hasher.finalize().map { String(format: "%02x", $0) }.joined()
-
-            func complete(_ verified: Bool) {
-                self.setPhase(.succeeded(verified: verified))
-                Haptics.success()
-            }
-
-            if let expected = self.expectedSHA256, !readFailed {
-                if digest.caseInsensitiveCompare(expected) == .orderedSame {
-                    complete(true)
-                } else {
-                    try? FileManager.default.removeItem(at: destination)
-                    self.packageURL = nil
-                    self.setPhase(.failed(reason: "The download didn't match its published checksum — the package is corrupt or truncated. Retry downloads it fresh."))
-                    Haptics.error()
-                }
-            } else {
-                // No checksum was published/fetchable — the bytes still
-                // arrived from GitHub over TLS; the UI labels this state
-                // honestly instead of claiming verification.
-                complete(false)
-            }
+            setPhase(.failed(reason: "Saving the download failed: \(error.localizedDescription)"))
         }
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        guard let error else { return } // success path handled above
-        let ns = error as NSError
-        guard ns.code != NSURLErrorCancelled else { return }
-        setPhase(.failed(reason: "Download failed: \(ns.localizedDescription)"))
-        Haptics.error()
-    }
-
-    // MARK: - Checksum + files
-
-    private func fetchExpectedChecksum(from url: URL) {
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 12
-        session.dataTask(with: request) { [weak self] data, response, error in
-            guard error == nil,
-                  let data, let http = response as? HTTPURLResponse,
-                  (200..<300).contains(http.statusCode),
-                  let text = String(data: data, encoding: .utf8) else { return }
-            // Format: "<hex>  Shirox.ipa" (shasum output).
-            let hex = text.split(whereSeparator: { $0 == " " || $0 == "\n" || $0 == "\t" || $0 == "*" })
-                .first.map(String.init)?.lowercased()
-            if let hex, hex.count == 64, hex.allSatisfy({ $0.isHexDigit }) {
-                self?.expectedSHA256 = hex
+        guard let error else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            if case .downloading = self.phase {
+                self.setPhase(.failed(reason: "Download failed: \((error as? URLError)?.localizedDescription ?? error.localizedDescription)"))
             }
-        }.resume()
+        }
     }
 
-    static var updatesDirectory: URL {
+    // MARK: - Package storage
+
+    private var updatesDirectory: URL {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let dir = docs.appendingPathComponent("Updates")
+        let dir = docs.appendingPathComponent("Updates", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }
 
-    private func cleanUpdatesDirectory(keeping: URL?) {
-        let dir = Self.updatesDirectory
-        guard let files = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else { return }
-        for file in files where file.pathExtension.lowercased() == "ipa" && file != keeping {
+    private func persistPackage(at tempLocation: URL) throws -> URL {
+        let name = "Shirox-\(versionLabel.isEmpty ? "update" : versionLabel).ipa"
+        let destination = updatesDirectory.appendingPathComponent(name)
+        try? FileManager.default.removeItem(at: destination)
+        try FileManager.default.moveItem(at: tempLocation, to: destination)
+        return destination
+    }
+
+    private func cleanUpdatesDirectory(keeping kept: String?) {
+        guard let contents = try? FileManager.default.contentsOfDirectory(
+            at: updatesDirectory, includingPropertiesForKeys: nil) else { return }
+        for file in contents where file.lastPathComponent != kept {
             try? FileManager.default.removeItem(at: file)
         }
     }
-}
 
-// MARK: - Share sheet
+    // MARK: - Checksum + verification
 
-/// Something to hand to the system share sheet — either the remote IPA
-/// URL (before a download) or the downloaded package FILE (after). The
-/// sheet is the honest fallback: the user picks where it goes (AirDrop,
-/// Save to Files, LiveContainer's share extension, or any sideload tool).
-private struct ShareItem: Identifiable {
-    let id = UUID()
-    let items: [Any]
-
-    init(url: URL) { items = [url] }
-    init(fileURL: URL) { items = [fileURL] }
-}
-
-#if os(iOS)
-private struct ActivityShareSheet: UIViewControllerRepresentable {
-    let items: [Any]
-
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    private func fetchExpectedChecksum(from shaURL: URL) {
+        URLSession.shared.dataTask(with: shaURL) { [weak self] data, response, _ in
+            guard let self,
+                  let data,
+                  let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
+                  let text = String(data: data, encoding: .utf8) else { return }
+            // The file is "<hex>  Shirox.ipa" — take the first token.
+            let checksum = text
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .split(separator: " ")
+                .first
+                .map(String.init)?
+                .lowercased()
+            guard let checksum, checksum.count == 64 else { return }
+            DispatchQueue.main.async { self.expectedSHA256 = checksum }
+        }.resume()
     }
 
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+    /// Streams a SHA-256 over the file. With a published checksum it
+    /// compares and the phase says verified/unverified honestly; without
+    /// one it skips verification and the success card says THAT instead.
+    private func verify(packageAt url: URL) {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self else { return }
+            guard let stream = InputStream(url: url) else {
+                Task { @MainActor in self.setPhase(.failed(reason: "The downloaded package couldn't be read.")) }
+                return
+            }
+            stream.open()
+            defer { stream.close() }
+
+            var hasher = SHA256()
+            let bufferSize = 4 * 1024 * 1024
+            var buffer = [UInt8](repeating: 0, count: bufferSize)
+            var totalRead = 0
+            let totalSize = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64) ?? 0
+
+            while stream.hasBytesAvailable {
+                let read = stream.read(&buffer, maxLength: bufferSize)
+                guard read > 0 else { break }
+                totalRead += read
+                hasher.update(data: Data(buffer[0..<read]))
+                let progress = totalSize > 0 ? Double(totalRead) / Double(totalSize) : 0
+                let completed = totalRead
+                Task { @MainActor [weak self] in
+                    guard let self, case .verifying = self.phase else { return }
+                    self.phase = .verifying(progress: progress)
+                }
+            }
+
+            let digest = hasher.finalize().map { String(format: "%02x", $0) }.joined()
+            let verified: Bool
+            if let expected = self.expectedSHA256 {
+                verified = digest == expected
+            } else {
+                verified = false // no checksum published — honest "unverified"
+            }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.setPhase(.succeeded(verified: verified))
+                if verified { Haptics.success() }
+            }
+        }
+    }
+
+    private func setPhase(_ newPhase: Phase) {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.phase = newPhase
+        }
+    }
 }
 #endif
 
-// MARK: - Update Cover View
+// MARK: - Update cover (v2.23 — complete redesign)
 //
-// The update surface presented as a fullScreenCover from the root view
-// the moment AppUpdateManager confirms a newer version exists. It renders
-// ONE content set in TWO presentations:
+// The update surface, designed from scratch to belong to Shirox: a
+// bottom-anchored sheet-style card over a blurred scrim (not a system
+// alert), with the app's capsule-badge language, continuous-corner cards,
+// gradient primary button, and honest state coverage.
 //
-//   • Prompt mode (everyday release, non-critical): a centered popup
-//     card over a dimmed ambient background, with a close (X) header
-//     button, a "Maybe Later" footer action, and the full action set —
-//     Update Now (real in-app download with live progress + SHA-256
-//     verification), Add to LiveContainer (its documented
-//     livecontainer://install?url= handoff, only shown when
-//     LiveContainer is actually installed), Copy Link, and Share.
-//     Later dismisses the popup for this version; the About page keeps
-//     offering the install, and the next version re-prompts.
+// Contents (top → bottom):
+//   • grabber + drag-to-dismiss
+//   • header: app mark, "Update Available", release date
+//   • version transition: Installed pill → New pill (both real numbers)
+//   • advisory banner for critical gaps (recommend, never lock)
+//   • INSTALL WITH selector — LiveContainer / SideStore / KSign dropdown,
+//     availability-probed, selection remembered across launches
+//   • What's New — expandable changelog from the release manifest
+//   • phase-driven action area:
+//       idle: Update Now (real in-app download + SHA-256) + hand-off to
+//             the selected tool + Copy Link / Share + Maybe Later
+//       connecting / downloading (cancelable) / verifying / succeeded
+//       (share the verified package, open the tool) / failed (retry)
 //
-//   • Forced mode (critical gap — ≥ 3 minor versions behind or a major
-//     bump, see AppUpdateManager.isCriticalGap): the full-screen gate.
-//     Same content and actions, no Later/X, a "required" notice, and the
-//     orbit emblem hero. The cover clears only when a real version check
-//     confirms the app is current again.
-//
-// Action honesty rules: every state is real (download progress comes
-// from URLSession delegate callbacks; verification is an actual SHA-256
-// over the file, and when no checksum is published the success card SAYS
-// it wasn't verified instead of faking a seal); the LiveContainer button
-// only ever appears after canOpenURL confirms the app, and iOS's own
-// completion handler decides whether the handoff succeeded.
-//
-// Visual language mirrors the rest of Shirox+ exactly: Color.appAccent
-// (user's chosen accent), .rounded typography with monospaced digits,
-// secondary.opacity(0.08) cards in 22pt continuous corners, capsule pills
-// with tint.opacity(0.12) fills, hairline .primary.opacity(0.06) strokes,
-// spring(response: 0.3–0.5, dampingFraction: 0.8) motion, glow language
-// from GlowToggleStyle (shadow radius scaled by glowIntensity), and
-// Haptics on every meaningful interaction.
+// Updates are NEVER forced — Later always works. The preview mode (from
+// the Updates settings page) is clearly labeled and never touches the
+// version comparison.
+
+#if canImport(UIKit)
 struct UpdateCoverView: View {
     @ObservedObject private var updateManager = AppUpdateManager.shared
     @ObservedObject private var downloadService = UpdateDownloadService.shared
 
     @State private var appeared = false
     @State private var changelogExpanded = false
-    @State private var breath = false
     @State private var shareItem: ShareItem?
-    /// Inline confirmation on the Copy Link button (the popup covers the
-    /// root view, so root-level toasts wouldn't be visible here).
+    /// Inline confirmation on the Copy Link button (the cover overlays the
+    /// root view, so root-level toasts aren't visible here).
     @State private var linkCopied = false
+    /// Drag-to-dismiss translation.
+    @State private var dragOffset: CGFloat = 0
 
+    /// v2.23 — the install destination, remembered across launches. The
+    /// dropdown writes here (a View-owned @AppStorage so SwiftUI refreshes
+    /// the label instantly); every handoff passes the value to the service.
+    @AppStorage("update.installDestination") private var destinationRaw: String = UpdateDestination.liveContainer.rawValue
+
+    private var selectedDestination: UpdateDestination {
+        UpdateDestination(rawValue: destinationRaw) ?? .liveContainer
+    }
+
+    /// The real update info (available or dismissed states).
     private var info: AppUpdateManager.UpdateInfo? {
         switch updateManager.state {
         case .available(let info), .dismissed(let info): return info
@@ -397,134 +458,215 @@ struct UpdateCoverView: View {
         }
     }
 
-    /// v2.22 — Updates are NEVER forced anymore. A critical gap (3+ minor
-    /// versions behind or a major bump) shows a prominent "strongly
-    /// recommended" banner instead of a lockout — the user can always
-    /// close the popup and keep using the app.
-    private var isRecommended: Bool {
-        info?.isCritical ?? false
+    /// v2.23 — Design preview (Updates settings → "Preview the update
+    /// popup"): current version on both sides, labeled PREVIEW, and none
+    /// of the actions touch the real manifest.
+    private var previewInfo: AppUpdateManager.UpdateInfo? {
+        guard updateManager.previewing, info == nil else { return nil }
+        return AppUpdateManager.UpdateInfo(
+            newVersion: updateManager.currentVersion,
+            currentVersion: updateManager.currentVersion,
+            changelog: "This is a preview of the update popup design. Nothing here installs anything — the real popup appears only when a newer version is actually available.",
+            downloadURL: URL(string: "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa")!,
+            isCritical: false,
+            releaseDate: Date()
+        )
     }
+
+    private var activeInfo: AppUpdateManager.UpdateInfo? { info ?? previewInfo }
+
+    /// v2.22 — Updates are NEVER forced. A critical gap (3+ minor versions
+    /// behind or a major bump) shows a prominent advisory banner instead of
+    /// a lockout — the user can always dismiss and keep using the app.
+    private var isRecommended: Bool {
+        activeInfo?.isCritical ?? false
+    }
+
+    private var isPreview: Bool { updateManager.previewing }
 
     var body: some View {
         ZStack {
-            background
-            if let info {
-                // The popup manages its own centered, scrollable card.
-                promptLayout(info)
+            // Scrim — blurred, dims the app behind the sheet.
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .ignoresSafeArea()
+                .overlay(Color.black.opacity(appeared ? 0.32 : 0))
+                .onTapGesture { laterTap() }
+
+            if let info = activeInfo {
+                sheetCard(info)
             } else {
-                // A re-check is in flight while the cover is up — show
-                // an honest transient state instead of stale content.
+                // A re-check is in flight while the cover is up — show an
+                // honest transient state instead of stale content.
                 VStack(spacing: 14) {
                     ProgressView()
                     Text("Checking for updates…")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
+                .padding(30)
+                .background(RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .fill(Color(uiColor: .systemBackground).opacity(0.95)))
             }
         }
         .sheet(item: $shareItem) { item in
             shareSheet(item)
         }
         .onAppear {
-            downloadService.probeLiveContainer()
+            Task { @MainActor in downloadService.refreshDestinationAvailability() }
             Haptics.warning()
-            withAnimation(.spring(response: 0.55, dampingFraction: 0.85)) { appeared = true }
-            // Ambient loop — blob breathing.
-            withAnimation(.easeInOut(duration: 6).repeatForever(autoreverses: true)) { breath = true }
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) { appeared = true }
+        }
+        .onDisappear {
+            updateManager.dismissPreview()
         }
     }
 
-    // MARK: - Prompt (popup) presentation
+    // MARK: - Sheet card
 
-    /// Centered card that scrolls when content outgrows the screen —
-    /// responsive on every iPhone and iPad size.
-    private func promptLayout(_ info: AppUpdateManager.UpdateInfo) -> some View {
+    private func sheetCard(_ info: AppUpdateManager.UpdateInfo) -> some View {
         GeometryReader { geo in
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 0) {
-                    Color.clear.frame(minHeight: 48)
-                    popupCard(info)
-                        .modifier(Entrance(index: 0, appeared: appeared, hero: true))
-                    Color.clear.frame(minHeight: 48)
+            VStack(spacing: 0) {
+                Spacer(minLength: 0)
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        grabber
+                        header(info)
+                        versionTransition(current: info.currentVersion, next: info.newVersion)
+                        if isRecommended { recommendedBanner }
+                        destinationSection(info)
+                        whatsNewSection(info)
+                        actionArea(info)
+                        footerLine
+                    }
+                    .frame(maxWidth: 560)
+                    .frame(maxWidth: .infinity)
                 }
-                .padding(.horizontal, 22)
-                .frame(maxWidth: 480)
-                .frame(maxWidth: .infinity)
-                .frame(minHeight: geo.size.height)
+                .frame(maxHeight: geo.size.height * 0.94, alignment: .bottom)
+                .background(
+                    SheetTopRoundedShape(radius: 34)
+                        .fill(Color(uiColor: .systemBackground).opacity(0.97))
+                        .shadow(color: .black.opacity(0.3), radius: 30, y: -12)
+                        .ignoresSafeArea(edges: .bottom)
+                )
+                .overlay(
+                    SheetTopRoundedShape(radius: 34)
+                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                        .ignoresSafeArea(edges: .bottom)
+                )
+            }
+            .offset(y: appeared ? max(0, dragOffset) : geo.size.height)
+        }
+        .gesture(dismissDrag)
+        .animation(.spring(response: 0.5, dampingFraction: 0.86), value: appeared)
+    }
+
+    private var grabber: some View {
+        VStack(spacing: 6) {
+            Capsule()
+                .fill(Color.primary.opacity(0.22))
+                .frame(width: 40, height: 5)
+                .padding(.top, 9)
+            if isPreview {
+                Text("PREVIEW")
+                    .font(.caption2.weight(.heavy))
+                    .foregroundStyle(.orange)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(Color.orange.opacity(0.14)))
             }
         }
+        .frame(maxWidth: .infinity)
+        .padding(.bottom, 4)
     }
 
-    private func popupCard(_ info: AppUpdateManager.UpdateInfo) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Header — identity + close.
-            HStack(alignment: .top, spacing: 12) {
-                Image("app-logo")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 44, height: 44)
-                    .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
-                    .shadow(color: Color.appAccent.opacity(0.3), radius: 7, y: 3)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Update Available")
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
-                    Text("A new version of Shirox+ is ready to install.")
+    // MARK: - Header + versions
+
+    private func header(_ info: AppUpdateManager.UpdateInfo) -> some View {
+        HStack(alignment: .center, spacing: 13) {
+            Image("app-logo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 50, height: 50)
+                .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                .shadow(color: Color.appAccent.opacity(0.3), radius: 8, y: 3)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Update Available")
+                    .font(.system(size: 21, weight: .bold, design: .rounded))
+                if let date = info.releaseDate {
+                    Text(Self.releaseDateText(date))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("A new version of Shirox+ is ready")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                Spacer(minLength: 8)
-                Button {
-                    laterTap()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 24))
-                        .foregroundStyle(.tertiary)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Close")
             }
-
-            versionTransition(current: info.currentVersion, next: info.newVersion)
-
-            // v2.22 — Strong recommendation for critical gaps (3+ versions
-            // behind / major bump). Advisory, never a lockout.
-            if isRecommended {
-                recommendedBanner
+            Spacer(minLength: 8)
+            Button {
+                laterTap()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 24))
+                    .foregroundStyle(.tertiary)
             }
-
-            Rectangle()
-                .fill(Color.primary.opacity(0.07))
-                .frame(height: 1)
-
-            whatsNewSection(info)
-
-            Rectangle()
-                .fill(Color.primary.opacity(0.07))
-                .frame(height: 1)
-
-            actionArea(info)
-
-            // Demo-only escape hatch (Updates page → 5 taps on the version
-            // row) + last-checked line.
-            if updateManager.simulateOutdated {
-                demoChips
-                    .frame(maxWidth: .infinity)
-            } else {
-                lastCheckedLine
-            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Close")
         }
-        .padding(20)
-        .background(RoundedRectangle(cornerRadius: 30, style: .continuous)
-            .fill(Color(uiColor: .systemBackground).opacity(0.92)))
-        .overlay(RoundedRectangle(cornerRadius: 30, style: .continuous)
-            .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
-        .shadow(color: Color.black.opacity(0.28), radius: 32, y: 18)
+        .padding(.horizontal, 20)
+        .padding(.top, 6)
+        .padding(.bottom, 12)
     }
 
-    /// v2.22 — The honest advisory banner shown instead of the old forced
-    /// gate: this update contains important fixes, so updating is strongly
-    /// recommended — but the app stays usable and the popup stays
-    /// dismissable (Maybe Later / close button).
+    private static func releaseDateText(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        return f.string(from: date)
+    }
+
+    /// Installed → New version transition, in the app's capsule style.
+    private func versionTransition(current: String, next: String) -> some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .center, spacing: 2) {
+                Text(current)
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                Text("Installed")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(minWidth: 74)
+            .padding(.vertical, 8)
+            .background(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.primary.opacity(0.06)))
+
+            Image(systemName: "arrow.right")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(Color.appAccent)
+
+            VStack(alignment: .center, spacing: 2) {
+                Text(next)
+                    .font(.system(size: 19, weight: .heavy, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(Color.appAccent)
+                Text("New")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(Color.appAccent.opacity(0.75))
+            }
+            .frame(minWidth: 74)
+            .padding(.vertical, 8)
+            .background(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.appAccent.opacity(0.12)))
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 14)
+    }
+
+    /// Advisory (never a lockout): this gap is big enough that updating is
+    /// strongly recommended.
     private var recommendedBanner: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "exclamationmark.triangle.fill")
@@ -534,8 +676,7 @@ struct UpdateCoverView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("Updating is strongly recommended")
                     .font(.subheadline.weight(.bold))
-                    .foregroundStyle(.primary)
-                Text("You're several versions behind — this release contains important fixes and improvements. You can keep using Shirox+ without updating, but the newest experience is here when you're ready.")
+                Text("This release is several versions ahead and contains important fixes. You can keep using Shirox+ without updating — the newest experience is here when you're ready.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -543,17 +684,133 @@ struct UpdateCoverView: View {
             Spacer(minLength: 0)
         }
         .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.orange.opacity(0.10))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color.orange.opacity(0.25), lineWidth: 1)
-        )
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .fill(Color.orange.opacity(0.10)))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .strokeBorder(Color.orange.opacity(0.25), lineWidth: 1))
+        .padding(.horizontal, 20)
+        .padding(.bottom, 14)
     }
 
-    // MARK: - Shared: action area (phase machine)
+    // MARK: - Destination dropdown
+
+    private func destinationSection(_ info: AppUpdateManager.UpdateInfo) -> some View {
+        let selected = selectedDestination
+        return VStack(alignment: .leading, spacing: 8) {
+            Text("INSTALL WITH")
+                .font(.caption2.weight(.heavy))
+                .foregroundStyle(.secondary)
+                .tracking(0.8)
+
+            Menu {
+                ForEach(UpdateDestination.allCases) { destination in
+                    let installed = downloadService.isDestinationAvailable(destination)
+                    Button {
+                        Haptics.selection()
+                        destinationRaw = destination.rawValue
+                    } label: {
+                        HStack {
+                            if selected == destination {
+                                Image(systemName: "checkmark")
+                            }
+                            Text(destination.displayName)
+                            if !installed {
+                                Text("— not installed")
+                            }
+                        }
+                    }
+                    .disabled(!installed)
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: selected.systemImage)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.appAccent)
+                    Text(selected.displayName)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                    Spacer(minLength: 6)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 13)
+                .padding(.vertical, 11)
+                .background(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.primary.opacity(0.05)))
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1))
+            }
+            .menuStyle(.borderlessButton)
+            .accessibilityLabel("Choose install destination")
+
+            // Availability summary under the dropdown — honest per tool.
+            HStack(spacing: 0) {
+                ForEach(UpdateDestination.allCases) { destination in
+                    let installed = downloadService.isDestinationAvailable(destination)
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(installed ? Color.green : Color.secondary.opacity(0.4))
+                            .frame(width: 5, height: 5)
+                        Text(destination.displayName)
+                            .font(.caption2)
+                            .foregroundStyle(installed ? .secondary : .tertiary)
+                            .strikethrough(!installed, color: .tertiary)
+                    }
+                    .padding(.trailing, 10)
+                }
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 14)
+    }
+
+    // MARK: - What's New
+
+    private func whatsNewSection(_ info: AppUpdateManager.UpdateInfo) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Button {
+                Haptics.selection()
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    changelogExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 7) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Color.appAccent)
+                    Text("What's New")
+                        .font(.subheadline.weight(.bold))
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(changelogExpanded ? 180 : 0))
+                }
+            }
+            .buttonStyle(.plain)
+
+            if changelogExpanded {
+                ScrollView {
+                    Text(info.changelog)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 2)
+                }
+                .frame(maxHeight: 230, alignment: .leading)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .fill(Color.primary.opacity(0.035)))
+        .padding(.horizontal, 20)
+        .padding(.bottom, 16)
+    }
+
+    // MARK: - Action area (phase machine)
 
     @ViewBuilder
     private func actionArea(_ info: AppUpdateManager.UpdateInfo) -> some View {
@@ -568,14 +825,16 @@ struct UpdateCoverView: View {
             verifyCard(progress: progress)
         case .succeeded(let verified):
             successSection(info, verified: verified)
-        case .handedToLiveContainer:
-            handedOffSection(info)
+        case .handedTo(let installer):
+            handedOffSection(info, installer: installer)
         case .failed(let reason):
             failedSection(info, reason: reason)
         }
     }
 
-    /// The full action set before anything is in flight.
+    /// The full action set before anything is in flight. In PREVIEW mode
+    /// every action is disabled — the preview reviews the design, and
+    /// nothing touches GitHub or any install tool.
     private func idleActions(_ info: AppUpdateManager.UpdateInfo) -> some View {
         VStack(spacing: 10) {
             Button {
@@ -584,15 +843,22 @@ struct UpdateCoverView: View {
                 Label("Update Now", systemImage: "arrow.down.circle.fill")
             }
             .buttonStyle(UpdatePrimaryButtonStyle())
+            .disabled(isPreview)
 
-            if downloadService.liveContainerAvailable {
+            // Hand the IPA straight to the selected install tool (the tool
+            // downloads and installs it itself). Only shown when that tool
+            // is actually installed.
+            if downloadService.isDestinationAvailable(selectedDestination) {
                 Button {
                     Haptics.light()
-                    downloadService.openInLiveContainer(url: info.downloadURL)
+                    downloadService.handOff(to: selectedDestination,
+                                             url: info.downloadURL)
                 } label: {
-                    Label("Add to LiveContainer", systemImage: "arrow.down.app.fill")
+                    Label("Install with \(selectedDestination.displayName)",
+                          systemImage: selectedDestination.systemImage)
                 }
                 .buttonStyle(UpdateSecondaryButtonStyle())
+                .disabled(isPreview)
             }
 
             HStack(spacing: 10) {
@@ -604,6 +870,7 @@ struct UpdateCoverView: View {
                         .lineLimit(1)
                 }
                 .buttonStyle(UpdateSecondaryButtonStyle(height: 44, tint: linkCopied ? .green : Color.appAccent))
+                .disabled(isPreview)
 
                 #if os(iOS)
                 Button {
@@ -613,7 +880,16 @@ struct UpdateCoverView: View {
                         .lineLimit(1)
                 }
                 .buttonStyle(UpdateSecondaryButtonStyle(height: 44, tint: Color.appAccent))
+                .disabled(isPreview)
                 #endif
+            }
+
+            if isPreview {
+                Text("Design preview — actions are disabled. The real popup appears only when a newer version exists.")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
             }
 
             // v2.22 — Never forced: Later is always offered.
@@ -624,9 +900,11 @@ struct UpdateCoverView: View {
             }
             .buttonStyle(UpdateLaterButtonStyle())
         }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 8)
     }
 
-    // MARK: - Shared: transfer states
+    // MARK: - Transfer states
 
     private var connectingCard: some View {
         statusCard {
@@ -646,6 +924,8 @@ struct UpdateCoverView: View {
                     .buttonStyle(.plain)
             }
         }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 8)
     }
 
     private func progressCard(progress: Double, downloaded: Int64, total: Int64, speed: Double) -> some View {
@@ -695,6 +975,8 @@ struct UpdateCoverView: View {
                 }
             }
         }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 8)
     }
 
     private func verifyCard(progress: Double) -> some View {
@@ -705,7 +987,6 @@ struct UpdateCoverView: View {
                         .font(.system(size: 26))
                         .foregroundStyle(Color.appAccent)
                         .symbolRenderingMode(.hierarchical)
-                        .scaleEffect(breath ? 1.06 : 0.96)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Verifying package")
                             .font(.headline)
@@ -726,9 +1007,11 @@ struct UpdateCoverView: View {
                 .animation(.easeInOut(duration: 0.15), value: progress)
             }
         }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 8)
     }
 
-    // MARK: - Shared: terminal states
+    // MARK: - Terminal states
 
     private func successSection(_ info: AppUpdateManager.UpdateInfo, verified: Bool) -> some View {
         VStack(spacing: 12) {
@@ -744,7 +1027,6 @@ struct UpdateCoverView: View {
                                 .foregroundStyle(.green)
                         }
                         .transition(.scale(scale: 0.4).combined(with: .opacity))
-
                         VStack(alignment: .leading, spacing: 2) {
                             Text(verified ? "Package verified" : "Package ready")
                                 .font(.headline)
@@ -780,468 +1062,383 @@ struct UpdateCoverView: View {
             .buttonStyle(UpdatePrimaryButtonStyle())
             #endif
 
-            if downloadService.liveContainerAvailable {
+            // Hand the package to the preferred tool from here too.
+            if downloadService.isDestinationAvailable(selectedDestination) {
                 Button {
-                    Haptics.light()
-                    downloadService.openInLiveContainer(url: info.downloadURL)
+                    downloadService.handOff(to: selectedDestination,
+                                             url: info.downloadURL)
                 } label: {
-                    Label("Add to LiveContainer", systemImage: "arrow.down.app.fill")
+                    Label("Install with \(selectedDestination.displayName)",
+                          systemImage: selectedDestination.systemImage)
                 }
                 .buttonStyle(UpdateSecondaryButtonStyle())
             }
 
             HStack(spacing: 10) {
-                Button {
-                    copyLink(info)
-                } label: {
+                Button { copyLink(info) } label: {
                     Label(linkCopied ? "Copied" : "Copy Link",
                           systemImage: linkCopied ? "checkmark.circle.fill" : "link")
                         .lineLimit(1)
                 }
                 .buttonStyle(UpdateSecondaryButtonStyle(height: 44, tint: linkCopied ? .green : Color.appAccent))
-
                 Button {
-                    openInSafari(info)
+                    if let url = URL(string: "https://github.com/Faludaddd/Shirox-autosub/releases/tag/beta") {
+                        UIApplication.shared.open(url)
+                    }
                 } label: {
-                    Label("Safari", systemImage: "safari.fill")
+                    Label("Safari", systemImage: "safari")
                         .lineLimit(1)
                 }
                 .buttonStyle(UpdateSecondaryButtonStyle(height: 44, tint: Color.appAccent))
             }
 
-            // v2.22 — Never forced: Later is always offered.
-            Button { laterTap() } label: { Text("Maybe Later") }
-                .buttonStyle(UpdateLaterButtonStyle())
+            Button { laterTap() } label: {
+                Text("Maybe Later")
+            }
+            .buttonStyle(UpdateLaterButtonStyle())
         }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 8)
     }
 
-    private func handedOffSection(_ info: AppUpdateManager.UpdateInfo) -> some View {
+    private func handedOffSection(_ info: AppUpdateManager.UpdateInfo, installer: String) -> some View {
         VStack(spacing: 12) {
             statusCard {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 12) {
-                        ZStack {
-                            Circle()
-                                .fill(Color.appAccent.opacity(0.14))
-                                .frame(width: 48, height: 48)
-                            Image(systemName: "arrow.down.app.fill")
-                                .font(.system(size: 24, weight: .semibold))
-                                .foregroundStyle(Color.appAccent)
-                        }
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("LiveContainer took over")
-                                .font(.headline)
-                            Text("LiveContainer is downloading and installing the update from GitHub. Launch Shirox+ from LiveContainer once it finishes.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        Spacer(minLength: 0)
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.appAccent.opacity(0.12))
+                            .frame(width: 48, height: 48)
+                        Image(systemName: "arrow.down.app.fill")
+                            .font(.system(size: 24, weight: .semibold))
+                            .foregroundStyle(Color.appAccent)
                     }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(installer) took over")
+                            .font(.headline)
+                        Text("\(installer) was opened with the install link — it's downloading and installing the update itself. Relaunch Shirox+ from \(installer) when it finishes.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 0)
                 }
             }
+
+            // Alternative: download in-app instead of waiting on the tool.
             Button {
                 startDownload(info)
             } label: {
-                Label("Download in App Instead", systemImage: "arrow.down.circle.fill")
+                Label("Download Here Instead", systemImage: "arrow.down.circle")
             }
             .buttonStyle(UpdateSecondaryButtonStyle())
-            // v2.22 — Never forced: Later is always offered.
-            Button { laterTap() } label: { Text("Maybe Later") }
-                .buttonStyle(UpdateLaterButtonStyle())
+
+            HStack(spacing: 10) {
+                Button { copyLink(info) } label: {
+                    Label(linkCopied ? "Copied" : "Copy Link",
+                          systemImage: linkCopied ? "checkmark.circle.fill" : "link")
+                        .lineLimit(1)
+                }
+                .buttonStyle(UpdateSecondaryButtonStyle(height: 44, tint: linkCopied ? .green : Color.appAccent))
+                Button {
+                    if let url = URL(string: "https://github.com/Faludaddd/Shirox-autosub/releases/tag/beta") {
+                        UIApplication.shared.open(url)
+                    }
+                } label: {
+                    Label("Safari", systemImage: "safari")
+                        .lineLimit(1)
+                }
+                .buttonStyle(UpdateSecondaryButtonStyle(height: 44, tint: Color.appAccent))
+            }
+
+            Button { laterTap() } label: {
+                Text("Maybe Later")
+            }
+            .buttonStyle(UpdateLaterButtonStyle())
         }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 8)
     }
 
     private func failedSection(_ info: AppUpdateManager.UpdateInfo, reason: String) -> some View {
         VStack(spacing: 12) {
             statusCard(tint: .orange) {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 12) {
-                        ZStack {
-                            Circle()
-                                .fill(Color.orange.opacity(0.14))
-                                .frame(width: 48, height: 48)
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.system(size: 24, weight: .semibold))
-                                .foregroundStyle(.orange)
-                        }
-                        .modifier(ErrorWiggler())
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Couldn't get the update")
-                                .font(.headline)
-                            Text(reason)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        Spacer(minLength: 0)
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(.orange)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Update didn't complete")
+                            .font(.headline)
+                        Text(reason)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
+                    Spacer(minLength: 0)
                 }
             }
 
             Button {
                 startDownload(info)
             } label: {
-                Label("Retry Download", systemImage: "arrow.clockwise")
+                Label("Try Again", systemImage: "arrow.clockwise")
             }
             .buttonStyle(UpdatePrimaryButtonStyle())
 
-            if downloadService.liveContainerAvailable {
+            if downloadService.isDestinationAvailable(selectedDestination) {
                 Button {
-                    Haptics.light()
-                    downloadService.openInLiveContainer(url: info.downloadURL)
+                    downloadService.handOff(to: selectedDestination,
+                                             url: info.downloadURL)
                 } label: {
-                    Label("Add to LiveContainer", systemImage: "arrow.down.app.fill")
+                    Label("Try \(selectedDestination.displayName)",
+                          systemImage: selectedDestination.systemImage)
                 }
                 .buttonStyle(UpdateSecondaryButtonStyle())
             }
 
             HStack(spacing: 10) {
-                Button {
-                    copyLink(info)
-                } label: {
+                Button { copyLink(info) } label: {
                     Label(linkCopied ? "Copied" : "Copy Link",
                           systemImage: linkCopied ? "checkmark.circle.fill" : "link")
                         .lineLimit(1)
                 }
                 .buttonStyle(UpdateSecondaryButtonStyle(height: 44, tint: linkCopied ? .green : Color.appAccent))
-
                 Button {
-                    openInSafari(info)
+                    if let url = URL(string: "https://github.com/Faludaddd/Shirox-autosub/releases/tag/beta") {
+                        UIApplication.shared.open(url)
+                    }
                 } label: {
-                    Label("Safari", systemImage: "safari.fill")
+                    Label("Safari", systemImage: "safari")
                         .lineLimit(1)
                 }
                 .buttonStyle(UpdateSecondaryButtonStyle(height: 44, tint: Color.appAccent))
             }
 
-            // v2.22 — Never forced: Later is always offered.
-            Button { laterTap() } label: { Text("Maybe Later") }
-                .buttonStyle(UpdateLaterButtonStyle())
+            Button { laterTap() } label: {
+                Text("Maybe Later")
+            }
+            .buttonStyle(UpdateLaterButtonStyle())
         }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 8)
+    }
+
+    // MARK: - Footer
+
+    private var footerLine: some View {
+        HStack(spacing: 6) {
+            if let date = updateManager.lastSuccessfulCheck {
+                let f = RelativeDateTimeFormatter()
+                Text("Checked \(f.localizedString(for: date, relativeTo: Date())) ago")
+            } else {
+                Text("Shirox+ checks for updates automatically")
+            }
+            Text("· detection is exact — same version never prompts")
+                .foregroundStyle(.tertiary)
+        }
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity)
+        .padding(.bottom, 14)
+    }
+
+    // MARK: - Drag to dismiss
+
+    private var dismissDrag: some Gesture {
+        DragGesture(minimumDistance: 12)
+            .onChanged { value in
+                if value.translation.y > 0 { dragOffset = value.translation.y }
+            }
+            .onEnded { value in
+                if value.translation.y > 110 {
+                    laterTap()
+                } else {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                        dragOffset = 0
+                    }
+                }
+            }
     }
 
     // MARK: - Actions
 
     private func startDownload(_ info: AppUpdateManager.UpdateInfo) {
-        Haptics.medium()
-        updateManager.markDownloadStarted()
+        Haptics.light()
+        // Preview mode disables the buttons — this is unreachable there.
         downloadService.start(info: info)
     }
 
     private func laterTap() {
         Haptics.selection()
-        updateManager.dismiss()
+        if isPreview {
+            updateManager.dismissPreview()
+        } else {
+            updateManager.dismiss()
+        }
     }
 
     private func copyLink(_ info: AppUpdateManager.UpdateInfo) {
         UIPasteboard.general.string = info.downloadURL.absoluteString
         Haptics.light()
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) { linkCopied = true }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
-            withAnimation(.easeOut(duration: 0.3)) { linkCopied = false }
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) { linkCopied = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            withAnimation { self.linkCopied = false }
         }
     }
 
     private func shareLink(_ info: AppUpdateManager.UpdateInfo) {
-        Haptics.light()
         shareItem = ShareItem(url: info.downloadURL)
     }
 
     private func sharePackage() {
         guard let packageURL = downloadService.packageURL else { return }
-        Haptics.light()
-        shareItem = ShareItem(fileURL: packageURL)
+        shareItem = ShareItem(url: packageURL)
     }
 
-    private func openInSafari(_ info: AppUpdateManager.UpdateInfo) {
-        Haptics.light()
-        UIApplication.shared.open(info.downloadURL)
+    // MARK: - Share sheet
+
+    private struct ShareItem: Identifiable {
+        let id = UUID()
+        let url: URL
     }
 
-    @ViewBuilder
     private func shareSheet(_ item: ShareItem) -> some View {
-        #if os(iOS)
-        ActivityShareSheet(items: item.items)
-        #else
-        // tvOS has no UIActivityViewController; the Share button is only
-        // rendered on iOS so this branch never shows in practice.
-        Text("Sharing isn't available here.")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        #endif
+        ActivityShareSheet(items: [item.url])
+            .adaptivePresentationDetents([.medium, .large])
     }
 
-    // MARK: - Shared sections
+    // MARK: - Shared status card
 
-    /// Version comparison — the installed pill, an arrow, the new pill,
-    /// each with a tiny caption so the numbers are unambiguous.
-    private func versionTransition(current: String, next: String) -> some View {
-        HStack(spacing: 12) {
-            VStack(spacing: 5) {
-                Text(current)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 13)
-                    .padding(.vertical, 6)
-                    .background(Capsule().fill(Color.secondary.opacity(0.12)))
-                    .overlay(Capsule().strokeBorder(Color.secondary.opacity(0.15), lineWidth: 0.8))
-                Text("Installed")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
-
-            Image(systemName: "arrow.right")
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(Color.appAccent)
-                .scaleEffect(x: appeared ? 1 : 0.1, y: 1)
-                .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.35), value: appeared)
-                .padding(.bottom, 14)
-
-            VStack(spacing: 5) {
-                Text(next)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 13)
-                    .padding(.vertical, 6)
-                    .background(
-                        Capsule().fill(LinearGradient(colors: [Color.appAccent, Color.appAccent.opacity(0.7)],
-                                                      startPoint: .topLeading, endPoint: .bottomTrailing))
-                    )
-                    .overlay(Capsule().strokeBorder(Color.white.opacity(0.18), lineWidth: 0.8))
-                    .shadow(color: Color.appAccent.opacity(0.4), radius: 8, y: 3)
-                Text("New")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
+    private func statusCard(tint: Color = .clear,
+                            @ViewBuilder content: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            content()
         }
-        .frame(maxWidth: .infinity)
-    }
-
-    /// "What's New" header + changelog — used bare inside the popup card.
-    private func whatsNewSection(_ info: AppUpdateManager.UpdateInfo) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.appAccent)
-                Text("What's New")
-                    .font(.headline)
-                Spacer()
-                if let date = info.releaseDate {
-                    Text(date.formatted(date: .abbreviated, time: .omitted))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            Text(info.changelog)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .lineSpacing(3)
-                .lineLimit(changelogExpanded ? nil : 7)
-                .animation(.spring(response: 0.35, dampingFraction: 0.85), value: changelogExpanded)
-            if info.changelog.count > 420 {
-                Button(changelogExpanded ? "Show Less" : "Show All") {
-                    Haptics.light()
-                    changelogExpanded.toggle()
-                }
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Color.appAccent)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    /// Neutral container for a transfer/terminal state block.
-    private func statusCard<Content: View>(tint: Color = Color.appAccent,
-                                           @ViewBuilder content: () -> Content) -> some View {
-        content()
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(tint.opacity(0.07)))
-            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(tint.opacity(0.15), lineWidth: 1))
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .fill(tint == .clear ? Color.primary.opacity(0.04) : tint.opacity(0.08)))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .strokeBorder(tint == .clear ? Color.primary.opacity(0.07) : tint.opacity(0.22), lineWidth: 1))
     }
 
     private var statDivider: some View {
         Rectangle()
-            .fill(Color.primary.opacity(0.07))
-            .frame(width: 1, height: 26)
-            .padding(.horizontal, 14)
+            .fill(Color.primary.opacity(0.08))
+            .frame(width: 1, height: 28)
+            .padding(.horizontal, 6)
     }
 
     private func statCell(value: String, caption: String) -> some View {
-        VStack(spacing: 2) {
+        VStack(alignment: .leading, spacing: 2) {
             Text(value)
-                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .font(.system(size: 14, weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .lineLimit(1)
-                .minimumScaleFactor(0.7)
             Text(caption)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
-        .frame(maxWidth: .infinity)
-    }
-
-    // MARK: - Background
-
-    private var background: some View {
-        ZStack {
-            Color(uiColor: .systemBackground)
-            // Prompt mode: ambient blobs dialed down, plus a scrim so
-            // the card reads as a modal over the app world.
-            Circle()
-                .fill(RadialGradient(colors: [Color.appAccent.opacity(0.13), Color.appAccent.opacity(0)],
-                                     center: .center, startRadius: 12, endRadius: 210))
-                .frame(width: 360, height: 360)
-                .offset(x: 150, y: -320)
-                .scaleEffect(breath ? 1.08 : 0.94)
-            Circle()
-                .fill(RadialGradient(colors: [Color.purple.opacity(0.08), Color.purple.opacity(0)],
-                                     center: .center, startRadius: 12, endRadius: 180))
-                .frame(width: 300, height: 300)
-                .offset(x: -170, y: 360)
-                .scaleEffect(breath ? 0.94 : 1.06)
-            Color.primary.opacity(0.04)
-        }
-        .ignoresSafeArea()
-    }
-
-    // MARK: - Footer
-
-    private var lastCheckedLine: some View {
-        Group {
-            if let last = updateManager.lastSuccessfulCheck {
-                Text("Checked \(RelativeDateTimeFormatter().localizedString(for: last, relativeTo: Date())) ago")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
-        }
-    }
-
-    /// Demo-only affordance (Updates page → 5 taps on the version row):
-    /// exit the simulation. The forced-presentation preview was removed
-    /// with the forced gate itself (v2.22).
-    private var demoChips: some View {
-        Group {
-            if updateManager.simulateOutdated {
-                HStack(spacing: 8) {
-                    Button {
-                        Haptics.selection()
-                        updateManager.exitDemo()
-                    } label: {
-                        Label("Exit demo", systemImage: "xmark.circle")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(Color.appAccent)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(Capsule().fill(Color.appAccent.opacity(0.10)))
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
-// MARK: - Entrance stagger
+/// iOS 15-compatible sheet shape: rounded top corners, square bottom
+/// (UnevenRoundedRectangle requires iOS 16.4; the app targets iOS 15).
+struct SheetTopRoundedShape: Shape {
+    var radius: CGFloat
 
-/// Fades + slides a section in when the cover first appears, staggered by
-/// index so the screen composes itself top-to-bottom.
-private struct Entrance: ViewModifier {
-    let index: Int
-    let appeared: Bool
-    var hero = false
-
-    func body(content: Content) -> some View {
-        content
-            .opacity(appeared ? 1 : 0)
-            .scaleEffect(appeared ? 1 : (hero ? 0.86 : 0.97))
-            .offset(y: appeared ? 0 : 24)
-            .animation(.spring(response: 0.5, dampingFraction: 0.82).delay(0.07 * Double(index)),
-                       value: appeared)
-    }
-}
-
-/// One-shot attention shake for the error icon.
-private struct ErrorWiggler: ViewModifier {
-    @State private var wiggled = false
-
-    func body(content: Content) -> some View {
-        content
-            .rotationEffect(.degrees(wiggled ? 0 : -9))
-            .onAppear {
-                withAnimation(.spring(response: 0.12, dampingFraction: 0.4).repeatCount(3)) {
-                    wiggled = true
-                }
-            }
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY + radius))
+        path.addArc(center: CGPoint(x: rect.minX + radius, y: rect.minY + radius),
+                    radius: radius,
+                    startAngle: .degrees(180),
+                    endAngle: .degrees(270),
+                    clockwise: false)
+        path.addLine(to: CGPoint(x: rect.maxX - radius, y: rect.minY))
+        path.addArc(center: CGPoint(x: rect.maxX - radius, y: rect.minY + radius),
+                    radius: radius,
+                    startAngle: .degrees(270),
+                    endAngle: .degrees(0),
+                    clockwise: false)
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.closeSubpath()
+        return path
     }
 }
 
 // MARK: - Button styles
 
-/// The prominent CTA — gradient capsule with the app's glow language
-/// (shadow radius scaled by the global glow settings) and a press spring.
-/// Matches the app's bold .rounded typography.
-private struct UpdatePrimaryButtonStyle: ButtonStyle {
+struct UpdatePrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 17, weight: .bold, design: .rounded))
+            .font(.headline.weight(.semibold))
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
-            .frame(height: 56)
+            .frame(height: 52)
             .background(
-                ZStack {
-                    Capsule().fill(LinearGradient(colors: [Color.appAccent, Color.appAccent.opacity(0.72)],
-                                                  startPoint: .top, endPoint: .bottom))
-                    Capsule().strokeBorder(Color.white.opacity(0.14), lineWidth: 0.8)
-                }
+                Capsule().fill(
+                    LinearGradient(
+                        colors: [Color.appAccent, Color.appAccent.opacity(0.72)],
+                        startPoint: .topLeading, endPoint: .bottomTrailing
+                    )
+                )
             )
-            .shadow(color: Color.appAccent.opacity(Color.glowEnabled ? 0.45 : 0),
-                    radius: Color.glowEnabled ? Color.glowRadiusLarge * 0.4 : 0, y: 8)
-            .scaleEffect(configuration.isPressed ? 0.965 : 1)
-            .opacity(configuration.isPressed ? 0.9 : 1)
-            .animation(.spring(response: 0.28, dampingFraction: 0.7), value: configuration.isPressed)
+            .shadow(color: Color.appAccent.opacity(0.35), radius: 12, y: 5)
+            .opacity(configuration.isPressed ? 0.85 : 1)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: configuration.isPressed)
     }
 }
 
-/// Secondary CTA — tinted capsule (LiveContainer, Safari, Copy, Share…)
-/// using the app's pill language. Height is tunable so compact rows sit
-/// alongside the primary without fighting it.
-private struct UpdateSecondaryButtonStyle: ButtonStyle {
+struct UpdateSecondaryButtonStyle: ButtonStyle {
     var height: CGFloat = 50
     var tint: Color = Color.appAccent
 
+    init(height: CGFloat = 50, tint: Color = Color.appAccent) {
+        self.height = height
+        self.tint = tint
+    }
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 15, weight: .semibold, design: .rounded))
+            .font(.subheadline.weight(.semibold))
             .foregroundStyle(tint)
             .frame(maxWidth: .infinity)
             .frame(height: height)
-            .background(Capsule().fill(tint.opacity(0.12)))
-            .overlay(Capsule().strokeBorder(tint.opacity(0.25), lineWidth: 0.8))
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .opacity(configuration.isPressed ? 0.85 : 1)
-            .animation(.spring(response: 0.26, dampingFraction: 0.75), value: configuration.isPressed)
+            .background(
+                Capsule().fill(tint.opacity(configuration.isPressed ? 0.18 : 0.12))
+            )
+            .overlay(Capsule().strokeBorder(tint.opacity(0.28), lineWidth: 1))
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: configuration.isPressed)
     }
 }
 
-/// The quiet "Maybe Later" text action — deliberately low-weight so it
-/// never competes with the primary CTA.
-private struct UpdateLaterButtonStyle: ButtonStyle {
+struct UpdateLaterButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 15, weight: .medium, design: .rounded))
+            .font(.subheadline.weight(.medium))
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity)
-            .frame(height: 42)
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .frame(height: 44)
             .opacity(configuration.isPressed ? 0.6 : 1)
-            .animation(.spring(response: 0.26, dampingFraction: 0.75), value: configuration.isPressed)
     }
 }
+
+/// UIKit share sheet bridge (os(iOS)-guarded — no macOS availability).
+#if os(iOS)
+struct ActivityShareSheet: UIViewControllerRepresentable {
+    var items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+#endif
 #endif

@@ -39,6 +39,16 @@ final class MALDiscoveryService {
     private let minRequestSpacing: TimeInterval = 0.4  // 400ms between Jikan requests
     private let rateLimitLock = NSLock()
 
+    /// v2.23 — Failure (negative) cache: key → when it failed. A key that
+    /// failed within `failureCacheTTL` throws immediately without touching
+    /// the network, so the many screens that independently fall back to
+    /// Jikan during an AniList outage don't each re-request the same dead
+    /// endpoint (the 429/504 flood the logs showed). One honest retry is
+    /// allowed per key per cooldown window.
+    private var failureCache: [String: Date] = [:]
+    private let failureCacheTTL: TimeInterval = 45
+    private let failureCacheLock = NSLock()
+
     /// Enforces minimum spacing between Jikan requests. Called before
     /// every outbound request. If the last request was less than
     /// `minRequestSpacing` ago, sleeps until the gap is met.
@@ -63,7 +73,9 @@ final class MALDiscoveryService {
     }
 
     /// Shared fetch for list endpoints — deduplicates in-flight requests,
-    /// caches results for 120s, and rate-limits outbound calls.
+    /// caches results for 120s, rate-limits outbound calls, and (v2.23)
+    /// remembers failures for 45s so repeated fallback attempts don't
+    /// re-request a dead endpoint.
     private func sharedFetchList(_ path: String, queryItems: [URLQueryItem]) async throws -> [JikanAnime] {
         let key = cacheKey(path: path, queryItems: queryItems)
 
@@ -71,6 +83,12 @@ final class MALDiscoveryService {
         if let cached = listCache[key], Date().timeIntervalSince(cached.timestamp) < cacheTTL {
             Logger.shared.log("[Jikan] Cache hit: \(key)", type: "Debug")
             return cached.data
+        }
+
+        // v2.23 — failure cache: this exact request just failed; fail fast
+        // instead of feeding the outage with another round-trip.
+        if let failedAt = failureValue(forKey: key), Date().timeIntervalSince(failedAt) < failureCacheTTL {
+            throw ProviderError.serverError(503)
         }
 
         // Check in-flight
@@ -130,6 +148,12 @@ final class MALDiscoveryService {
             inFlightLock.lock()
             inFlightTasks.removeValue(forKey: key)
             inFlightLock.unlock()
+            // v2.23 — remember the failure so other screens (and this one)
+            // fail fast for the next 45s instead of re-requesting; also
+            // record a MAL outage window in the ProviderManager so the
+            // central state knows the fallback is cooling down.
+            recordFailure(forKey: key)
+            broadcastOutage(error)
             throw error
         }
     }
@@ -186,7 +210,46 @@ final class MALDiscoveryService {
             inFlightLock.lock()
             inFlightTasks.removeValue(forKey: key)
             inFlightLock.unlock()
+            // v2.23 — same failure caching as the list layer.
+            recordFailure(forKey: key)
+            broadcastOutage(error)
             throw error
+        }
+    }
+
+    // MARK: - v2.23 failure cache helpers
+
+    private func failureValue(forKey key: String) -> Date? {
+        failureCacheLock.lock()
+        defer { failureCacheLock.unlock() }
+        return failureCache[key]
+    }
+
+    private func recordFailure(forKey key: String) {
+        failureCacheLock.lock()
+        failureCache[key] = Date()
+        // Bound the map — purge entries older than the TTL.
+        let now = Date()
+        failureCache = failureCache.filter { now.timeIntervalSince($0.value) < failureCacheTTL * 4 }
+        failureCacheLock.unlock()
+    }
+
+    /// Tells the central ProviderManager the Jikan fallback is failing —
+    /// it records a short provider cooldown so every screen sees the same
+    /// state (no duplicate switching) and skips straight to caches/
+    /// snapshots. Rate-limited to one broadcast per window (the failure
+    /// cache already throttles the requests).
+    private var lastOutageBroadcast: Date = .distantPast
+    private func broadcastOutage(_ error: Error) {
+        let now = Date()
+        guard now.timeIntervalSince(lastOutageBroadcast) > 30 else { return }
+        lastOutageBroadcast = now
+        let code = (error as? ProviderError).flatMap { pe -> Int? in
+            if case .serverError(let c) = pe { return c } else { return nil }
+        } ?? 0
+        Logger.shared.log("[Jikan] request failed (\(code)) — recording MAL outage cooldown", type: "Warning")
+        Task { @MainActor in
+            ProviderManager.shared.recordJikanOutage()
         }
     }
 
@@ -223,12 +286,28 @@ final class MALDiscoveryService {
         let type: String?
         let source: String?
         let relations: [JikanRelation]?
+        // v2.23 — country-of-origin inference signals (provider metadata):
+        // Japanese TV broadcast timezone + Chinese production companies.
+        let broadcast: JikanBroadcast?
+        let producers: [JikanNamedRef]?
+        let studios: [JikanNamedRef]?
         // Manga-only fields (nil on anime entries) — present on /top/manga
         // and /manga responses; used by mapMangaToMedia.
         let chapters: Int?
         let volumes: Int?
         let members: Int?
         let published: JikanPublished?
+
+        struct JikanBroadcast: Decodable {
+            let day: String?
+            let time: String?
+            let timezone: String?
+            let string: String?
+        }
+        struct JikanNamedRef: Decodable {
+            let mal_id: Int?
+            let name: String?
+        }
 
         struct JikanPublished: Decodable {
             // ISO-8601-ish string ("1997-07-22T00:00:00+00:00") or null.
@@ -655,7 +734,71 @@ final class MALDiscoveryService {
             }(),
             type: a.type,
             format: a.source,
-            studioNames: nil, source: nil, duration: nil, airDateRange: nil
+            studioNames: nil, source: nil, duration: nil, airDateRange: nil,
+            // v2.23 — the Jikan fallback path now carries the same metadata
+            // the AniList path does, so the carousel's popularity floor and
+            // country filter actually apply to fallback data (they were
+            // inert before: donghua sailed through with nil/nil).
+            popularity: a.members,
+            countryOfOrigin: Self.inferCountry(from: a)
         )
+    }
+
+    // MARK: - v2.23 country-of-origin inference (Jikan path)
+
+    /// Jikan has no country field, so this reads the provider's own
+    /// production metadata — NOT title blacklisting:
+    ///   • A Chinese production company among producers/studios → "CN".
+    ///     (The major Chinese media companies behind virtually all donghua;
+    ///     company metadata from the provider, not title matching.)
+    ///   • A live Japanese TV broadcast (timezone Asia/Tokyo) → "JP".
+    ///   • Japanese kana in `title_japanese` → "JP" (Chinese titles are
+    ///     hanzi-only; Japanese titles almost always contain kana).
+    ///   • Otherwise nil — unknown, same as AniList entries without the
+    ///     field (those pass the carousel filter unchanged).
+    private static func inferCountry(from a: JikanAnime) -> String? {
+        let companyNames = ((a.producers ?? []) + (a.studios ?? []))
+            .compactMap { $0.name?.lowercased() }
+            .filter { !$0.isEmpty }
+        if companyNames.contains(where: { name in
+            chineseProductionCompanies.contains(where: { name.contains($0) })
+        }) {
+            return "CN"
+        }
+        if let tz = a.broadcast?.timezone, tz == "Asia/Tokyo" {
+            return "JP"
+        }
+        if let jp = a.title_japanese, !jp.isEmpty, jp.contains(where: isKana) {
+            return "JP"
+        }
+        return nil
+    }
+
+    /// Major Chinese production companies (bilibili, Tencent Penguin
+    /// Pictures, Youku, iQIYI, Haoliners, Big Firebird, Sparkly Key…).
+    /// Matched as substrings of the provider's company names.
+    private static let chineseProductionCompanies: [String] = [
+        "bilibili",
+        "tencent",
+        "penguin pictures",
+        "youku",
+        "iqiyi",
+        "haoliners",
+        "big firebird",
+        "sparkly key",
+        "b.cmay",
+        "colored pencil animation",
+        "netease",
+        "chinese ",
+        "shanghai ",
+        "beijing "
+    ]
+
+    /// Hiragana (U+3040–309F) or Katakana (U+30A0–30FF) — script used by
+    /// Japanese titles and never by Chinese ones.
+    private static func isKana(_ c: Character) -> Bool {
+        c.unicodeScalars.contains { scalar in
+            (0x3040...0x309F).contains(scalar.value) || (0x30A0...0x30FF).contains(scalar.value)
+        }
     }
 }

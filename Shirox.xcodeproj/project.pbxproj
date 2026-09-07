@@ -22,6 +22,7 @@
                 103B47B23E79F93642A4E001 /* restricted_hosts.txt in Resources */ = {isa = PBXBuildFile; fileRef = E1C750867F19DF886AA2D7E8 /* restricted_hosts.txt */; };
                 11B06136CDF5130E68376E06 /* AniListMangaDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 411CE099883B23D8BFF554F8 /* AniListMangaDetailView.swift */; };
                 121D9B332FCA527E000FF9B4 /* GoogleCastDynamicCore in Frameworks */ = {isa = PBXBuildFile; platformFilter = ios; productRef = 121D9B322FCA527E000FF9B4 /* GoogleCastDynamicCore */; };
+                F24C52AD3065B7871DF413B7 /* VLCKitSPM in Frameworks */ = {isa = PBXBuildFile; platformFilter = ios; productRef = F24B6D9DAC42297DB37E6994 /* VLCKitSPM */; };
                 121D9B452FCA53AA000FF9B4 /* FakeWebKit in Frameworks */ = {isa = PBXBuildFile; productRef = 121D9B442FCA53AA000FF9B4 /* FakeWebKit */; };
                 121D9B462FCA5603000FF9B4 /* EpisodeLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E46B2FCA397700C9BA56 /* EpisodeLink.swift */; };
                 121D9B472FCA5603000FF9B4 /* ContinueWatchingItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4692FCA397700C9BA56 /* ContinueWatchingItem.swift */; };
@@ -436,12 +437,18 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */ = {isa = PBXBui
                 ABCD03012FCA5623000FF9B4 /* ScheduleFallbackService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCD03042FCA397700C9BA56 /* ScheduleFallbackService.swift */; };
                 ABCD03022FCA5623000FF9B4 /* ScheduleFallbackService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCD03042FCA397700C9BA56 /* ScheduleFallbackService.swift */; };
                 ABCD03032FCA5623000FF9B4 /* ScheduleFallbackService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCD03042FCA397700C9BA56 /* ScheduleFallbackService.swift */; };
-                ABCD03112FCA5623000FF9B4 /* AnimeMusicService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCD03142FCA397700C9BA56 /* AnimeMusicService.swift */; };
-                ABCD03122FCA5623000FF9B4 /* AnimeMusicService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCD03142FCA397700C9BA56 /* AnimeMusicService.swift */; };
-                ABCD03132FCA5623000FF9B4 /* AnimeMusicService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCD03142FCA397700C9BA56 /* AnimeMusicService.swift */; };
                 ABCD03212FCA5623000FF9B4 /* MusicView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCD03242FCA397700C9BA56 /* MusicView.swift */; };
                 ABCD03222FCA5623000FF9B4 /* MusicView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCD03242FCA397700C9BA56 /* MusicView.swift */; };
                 ABCD03232FCA5623000FF9B4 /* MusicView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCD03242FCA397700C9BA56 /* MusicView.swift */; };
+                F23BBEC228CCFDADECB133B7 /* AnimeThemesService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F23AFF8E5CE05781952A22DF /* AnimeThemesService.swift */; };
+                F23C1066793E04E2C79EAA88 /* AnimeThemesService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F23AFF8E5CE05781952A22DF /* AnimeThemesService.swift */; };
+                F23D7A2EC1786CE38F72CF0E /* AnimeThemesService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F23AFF8E5CE05781952A22DF /* AnimeThemesService.swift */; };
+                F23FE61E7D282E406E713F47 /* MusicPlayerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F23EA333BB558E49B96951FA /* MusicPlayerManager.swift */; };
+                F23BD3932703AD940CD7B70E /* MusicPlayerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F23EA333BB558E49B96951FA /* MusicPlayerManager.swift */; };
+                F2339AD92187A3D30C0A3A02 /* MusicPlayerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F23EA333BB558E49B96951FA /* MusicPlayerManager.swift */; };
+                F239246A2ED86518D0899645 /* MusicPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2383D11A1507161AE3E6660 /* MusicPlayerView.swift */; };
+                F23B98C54F24B9A513BD1D1D /* MusicPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2383D11A1507161AE3E6660 /* MusicPlayerView.swift */; };
+                F231AB4C7496777A49493465 /* MusicPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2383D11A1507161AE3E6660 /* MusicPlayerView.swift */; };
                 ABCD03312FCA5623000FF9B4 /* UnifiedDownloadSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCD03342FCA397700C9BA56 /* UnifiedDownloadSheet.swift */; };
                 ABCD03322FCA5623000FF9B4 /* UnifiedDownloadSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCD03342FCA397700C9BA56 /* UnifiedDownloadSheet.swift */; };
                 ABCD03332FCA5623000FF9B4 /* UnifiedDownloadSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCD03342FCA397700C9BA56 /* UnifiedDownloadSheet.swift */; };
@@ -983,8 +990,10 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
                 B461E257ABDE206C5F8A5EE5 /* MangaMatchManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MangaMatchManager.swift; sourceTree = "<group>"; };
                 30FD5E40BC8C0909C930773A /* MangaUpdatesChapterService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MangaUpdatesChapterService.swift; sourceTree = "<group>"; };
                 ABCD03042FCA397700C9BA56 /* ScheduleFallbackService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScheduleFallbackService.swift; sourceTree = "<group>"; };
-                ABCD03142FCA397700C9BA56 /* AnimeMusicService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AnimeMusicService.swift; sourceTree = "<group>"; };
                 ABCD03242FCA397700C9BA56 /* MusicView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MusicView.swift; sourceTree = "<group>"; };
+                F23AFF8E5CE05781952A22DF /* AnimeThemesService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AnimeThemesService.swift; sourceTree = "<group>"; };
+                F23EA333BB558E49B96951FA /* MusicPlayerManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MusicPlayerManager.swift; sourceTree = "<group>"; };
+                F2383D11A1507161AE3E6660 /* MusicPlayerView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MusicPlayerView.swift; sourceTree = "<group>"; };
                 ABCD03342FCA397700C9BA56 /* UnifiedDownloadSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UnifiedDownloadSheet.swift; sourceTree = "<group>"; };
                                 D04B7FC5362BE9A1B4F1D846 /* AutoPickEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AutoPickEngine.swift; sourceTree = "<group>"; };
                 ABCD02042FCA397700C9BA56 /* NetworkMonitor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NetworkMonitor.swift; sourceTree = "<group>"; };
@@ -1082,6 +1091,7 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
                                 42F7F6A06C1039A0472932B8 /* JavaScriptCore.framework in Frameworks */,
                                 0FB47691410BFA732D132352 /* WebKit.framework in Frameworks */,
                                 121D9B332FCA527E000FF9B4 /* GoogleCastDynamicCore in Frameworks */,
+                                F24C52AD3065B7871DF413B7 /* VLCKitSPM in Frameworks */,
                         );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -1209,7 +1219,8 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
                                 B461E257ABDE206C5F8A5EE5 /* MangaMatchManager.swift */,
                                 30FD5E40BC8C0909C930773A /* MangaUpdatesChapterService.swift */,
                                 ABCD03042FCA397700C9BA56 /* ScheduleFallbackService.swift */,
-                                ABCD03142FCA397700C9BA56 /* AnimeMusicService.swift */,
+                                F23AFF8E5CE05781952A22DF /* AnimeThemesService.swift */,
+                                F23EA333BB558E49B96951FA /* MusicPlayerManager.swift */,
                                                 D04B7FC5362BE9A1B4F1D846 /* AutoPickEngine.swift */,
                                                 ABCD02042FCA397700C9BA56 /* NetworkMonitor.swift */,
                                 9BAE193514A5E83E81EF31B8 /* MALMangaLibraryService.swift */,
@@ -1373,6 +1384,7 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */,
                                 1279E4DD2FCA397700C9BA56 /* EpisodeRowView.swift */,
                                 1279E4DE2FCA397700C9BA56 /* HomeView.swift */,
                                 ABCD03242FCA397700C9BA56 /* MusicView.swift */,
+                                F2383D11A1507161AE3E6660 /* MusicPlayerView.swift */,
                                 1279E4DF2FCA397700C9BA56 /* LibraryView.swift */,
                                 1279E4E02FCA397700C9BA56 /* ModuleListView.swift */,
                                 1279E4E12FCA397700C9BA56 /* ModuleStreamPickerView.swift */,
@@ -1619,6 +1631,7 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */,
                                 1279E5DB2FCA3A1200C9BA56 /* XCRemoteSwiftPackageReference "google-cast-spm" */,
                                 121D9B432FCA53AA000FF9B4 /* XCRemoteSwiftPackageReference "FakeWebKit" */,
                                 0F474E202FE9E7D600FAC2BA /* XCRemoteSwiftPackageReference "Kingfisher" */,
+                                F24AC51474FDD01A0B9626DE /* XCRemoteSwiftPackageReference "vlckit-spm" */,
                         );
                         productRefGroup = 73D712B4138A3740575F996E /* Products */;
                         projectDirPath = "";
@@ -1921,8 +1934,10 @@ A17F1001000000000000000A /* ForcedUpdateView.swift in Sources */,
                                 C83E6FA614EECF23C1D7791E /* MangaMatchManager.swift in Sources */,
                                 F6B69536045F10D084008DC0 /* MangaUpdatesChapterService.swift in Sources */,
                                 ABCD03012FCA5623000FF9B4 /* ScheduleFallbackService.swift in Sources */,
-                                ABCD03112FCA5623000FF9B4 /* AnimeMusicService.swift in Sources */,
                                 ABCD03212FCA5623000FF9B4 /* MusicView.swift in Sources */,
+                                F23BBEC228CCFDADECB133B7 /* AnimeThemesService.swift in Sources */,
+                        F23FE61E7D282E406E713F47 /* MusicPlayerManager.swift in Sources */,
+                        F239246A2ED86518D0899645 /* MusicPlayerView.swift in Sources */,
                                 ABCD03312FCA5623000FF9B4 /* UnifiedDownloadSheet.swift in Sources */,
                                                 A71E4C9203F8B4D1A5C6E801 /* AutoPickEngine.swift in Sources */,
                                                 ABCD02012FCA5623000FF9B4 /* NetworkMonitor.swift in Sources */,
@@ -2152,8 +2167,10 @@ A17F1001000000000000000B /* ForcedUpdateView.swift in Sources */,
                                 24B2669799E112151390A199 /* MangaMatchManager.swift in Sources */,
                                 CC9DBEB73A982481F236AF1F /* MangaUpdatesChapterService.swift in Sources */,
                                 ABCD03022FCA5623000FF9B4 /* ScheduleFallbackService.swift in Sources */,
-                                ABCD03122FCA5623000FF9B4 /* AnimeMusicService.swift in Sources */,
                                 ABCD03222FCA5623000FF9B4 /* MusicView.swift in Sources */,
+                                F23C1066793E04E2C79EAA88 /* AnimeThemesService.swift in Sources */,
+                        F23BD3932703AD940CD7B70E /* MusicPlayerManager.swift in Sources */,
+                        F23B98C54F24B9A513BD1D1D /* MusicPlayerView.swift in Sources */,
                                 ABCD03322FCA5623000FF9B4 /* UnifiedDownloadSheet.swift in Sources */,
                                                 B82F5DA31409C7E6F2D1B724 /* AutoPickEngine.swift in Sources */,
                                                 ABCD02022FCA397700C9BA56 /* NetworkMonitor.swift in Sources */,
@@ -2384,8 +2401,10 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                 4CBFE6338E36B6529FDEE36B /* MangaMatchManager.swift in Sources */,
                                 3C544158A94E850EE768AE00 /* MangaUpdatesChapterService.swift in Sources */,
                                 ABCD03032FCA5623000FF9B4 /* ScheduleFallbackService.swift in Sources */,
-                                ABCD03132FCA5623000FF9B4 /* AnimeMusicService.swift in Sources */,
                                 ABCD03232FCA5623000FF9B4 /* MusicView.swift in Sources */,
+                                F23D7A2EC1786CE38F72CF0E /* AnimeThemesService.swift in Sources */,
+                        F2339AD92187A3D30C0A3A02 /* MusicPlayerManager.swift in Sources */,
+                        F231AB4C7496777A49493465 /* MusicPlayerView.swift in Sources */,
                                 ABCD03332FCA5623000FF9B4 /* UnifiedDownloadSheet.swift in Sources */,
                                                 C93A6EB4251AD8F7A3E0C935 /* AutoPickEngine.swift in Sources */,
                                                 ABCD02032FCA397700C9BA56 /* NetworkMonitor.swift in Sources */,
@@ -2468,7 +2487,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "@executable_path/Frameworks",
                                 );
                                 LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                                MARKETING_VERSION = 2.22;
+                                MARKETING_VERSION = 2.23;
                                 PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
                                 PRODUCT_NAME = "$(TARGET_NAME)";
                                 SDKROOT = appletvos;
@@ -2503,7 +2522,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "@executable_path/Frameworks",
                                 );
                                 LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                                MARKETING_VERSION = 2.22;
+                                MARKETING_VERSION = 2.23;
                                 PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
                                 PRODUCT_NAME = "$(TARGET_NAME)";
                                 SDKROOT = appletvos;
@@ -2620,7 +2639,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "$(inherited)",
                                         "@executable_path/Frameworks",
                                 );
-                                MARKETING_VERSION = 2.22;
+                                MARKETING_VERSION = 2.23;
                                 PRODUCT_NAME = shirox;
                                 PROVISIONING_PROFILE_SPECIFIER = "";
                                 SDKROOT = iphoneos;
@@ -2666,7 +2685,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "@executable_path/../Frameworks",
                                 );
                                 MACOSX_DEPLOYMENT_TARGET = 14.0;
-                                MARKETING_VERSION = 2.22;
+                                MARKETING_VERSION = 2.23;
                                 PRODUCT_NAME = shirox;
                                 SDKROOT = macosx;
                                 SUPPORTS_MACCATALYST = NO;
@@ -2692,7 +2711,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "$(inherited)",
                                         "@executable_path/Frameworks",
                                 );
-                                MARKETING_VERSION = 2.22;
+                                MARKETING_VERSION = 2.23;
                                 PRODUCT_NAME = shirox;
                                 PROVISIONING_PROFILE_SPECIFIER = "";
                                 SDKROOT = iphoneos;
@@ -2783,7 +2802,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "@executable_path/../Frameworks",
                                 );
                                 MACOSX_DEPLOYMENT_TARGET = 14.0;
-                                MARKETING_VERSION = 2.22;
+                                MARKETING_VERSION = 2.23;
                                 PRODUCT_NAME = shirox;
                                 SDKROOT = macosx;
                                 SUPPORTS_MACCATALYST = NO;
@@ -2851,6 +2870,14 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                 minimumVersion = 8.10.0;
                         };
                 };
+                F24AC51474FDD01A0B9626DE /* XCRemoteSwiftPackageReference "vlckit-spm" */ = {
+                        isa = XCRemoteSwiftPackageReference;
+                        repositoryURL = "https://github.com/tylerjonesio/vlckit-spm";
+                        requirement = {
+                                kind = upToNextMajorVersion;
+                                minimumVersion = 3.6.0;
+                        };
+                };
                 121D9B432FCA53AA000FF9B4 /* XCRemoteSwiftPackageReference "FakeWebKit" */ = {
                         isa = XCRemoteSwiftPackageReference;
                         repositoryURL = "https://github.com/undeaDD/FakeWebKit";
@@ -2870,6 +2897,11 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+                F24B6D9DAC42297DB37E6994 /* VLCKitSPM */ = {
+                        isa = XCSwiftPackageProductDependency;
+                        package = F24AC51474FDD01A0B9626DE /* XCRemoteSwiftPackageReference "vlckit-spm" */;
+                        productName = VLCKitSPM;
+                };
                 0F474E212FE9E7D600FAC2BA /* Kingfisher */ = {
                         isa = XCSwiftPackageProductDependency;
                         package = 0F474E202FE9E7D600FAC2BA /* XCRemoteSwiftPackageReference "Kingfisher" */;

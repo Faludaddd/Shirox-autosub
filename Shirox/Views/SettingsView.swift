@@ -3548,12 +3548,12 @@ struct StorageManagementPage: View {
                 }
                 cacheRow(
                     title: "Music Cache",
-                    detail: "Opening & ending themes for the Music tab.",
+                    detail: "Opening & ending theme data from AnimeThemes.",
                     icon: "music.note.list",
                     iconColor: .purple,
                     size: musicCacheSize
                 ) {
-                    AnimeMusicService.shared.clearCaches()
+                    AnimeThemesService.shared.clearCaches()
                 }
                 cacheRow(
                     title: "Schedule Backup",
@@ -3878,7 +3878,7 @@ struct StorageManagementPage: View {
             mangaDataSize = MangaUpdatesChapterService.diskCacheBytes()
             idMappingSize = cache.idMappingSize
             profileCacheSize = cache.profileCacheSize
-            musicCacheSize = AnimeMusicService.diskCacheBytes()
+            musicCacheSize = AnimeThemesService.diskCacheBytes()
             scheduleBackupSize = scheduleBackup
             searchAliasSize = cache.searchAliasSize
             episodeSortSize = cache.episodeSortSize
@@ -4568,12 +4568,6 @@ struct LandscapeSubtitlePreview: View {
 struct UpdatesSettingsPage: View {
     @ObservedObject private var updateManager = AppUpdateManager.shared
 
-    /// v2.17 — Tap counter for the update-flow demo trigger (5 taps on
-    /// the version row, each within ~1.8s of the last). Moved from the
-    /// About page in v2.22 along with the rest of the update UI.
-    @State private var versionTaps = 0
-    @State private var versionTapResetTask: Task<Void, Never>?
-
     private var version: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "-"
     }
@@ -4603,40 +4597,6 @@ struct UpdatesSettingsPage: View {
 
     // MARK: - Version card
 
-    /// v2.17 — Five quick taps on the version row toggles update-flow
-    /// demo mode: the version comparison reports the installed build as
-    /// outdated so the whole update popup (download progress, verification,
-    /// LiveContainer handoff, Later) can be exercised on a current build.
-    /// The popup carries an "Exit demo" chip to turn it off.
-    private func handleVersionRowTap() {
-        versionTaps += 1
-        versionTapResetTask?.cancel()
-        versionTapResetTask = Task {
-            try? await Task.sleep(nanoseconds: 1_800_000_000)
-            if !Task.isCancelled { versionTaps = 0 }
-        }
-        guard versionTaps >= 5 else { return }
-        versionTaps = 0
-        versionTapResetTask?.cancel()
-        Haptics.medium()
-        if updateManager.simulateOutdated {
-            updateManager.exitDemo()
-            ToastManager.shared.show(
-                title: "Update Flow",
-                message: "Demo mode off — re-checking your real version.",
-                icon: "checkmark.circle.fill",
-                iconColor: .green)
-        } else {
-            updateManager.simulateOutdated = true
-            ToastManager.shared.show(
-                title: "Update Flow",
-                message: "Demo mode on — the update popup will appear.",
-                icon: "arrow.down.circle.fill",
-                iconColor: .accentColor)
-            Task { await updateManager.checkForUpdates(force: true) }
-        }
-    }
-
     private var versionCard: some View {
         VStack(spacing: 12) {
             HStack(spacing: 14) {
@@ -4653,7 +4613,6 @@ struct UpdatesSettingsPage: View {
                         .font(.headline)
                     Text("\(version) (\(build))")
                         .font(.title3.weight(.bold).monospacedDigit())
-                        .onTapGesture { handleVersionRowTap() }
                     if let last = lastCheckedText {
                         Text("Checked \(last) ago")
                             .font(.caption)
@@ -4662,10 +4621,35 @@ struct UpdatesSettingsPage: View {
                 }
                 Spacer()
             }
-            Text("Updates are never forced — you can always keep using Shirox+ and install new versions whenever you're ready. Checks run automatically on launch and hourly after that.")
+            Text("Updates are never forced — you can always keep using Shirox+ and install new versions whenever you're ready. Checks run automatically on launch and hourly after that. The version comparison is exact: the same version never prompts.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
+            // v2.23 — explicit, clearly-labeled popup preview (replaces the
+            // hidden 5-tap trigger that caused false update popups).
+            Button {
+                Haptics.selection()
+                updateManager.presentPreview()
+            } label: {
+                HStack(spacing: 7) {
+                    Image(systemName: "eye")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("Preview the update popup")
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.appAccent.opacity(0.08))
+                )
+                .foregroundStyle(Color.appAccent)
+            }
+            .buttonStyle(.plain)
         }
         .padding(16)
         .background(
