@@ -32,7 +32,7 @@
           "date": "2026-09-07",
           "localizedDescription": "The home carousel now wears each title's official transparent logo. Instead of plain text, the banner's bottom-left corner — right where Netflix and friends put it — shows TheTVDB's clearlogo artwork for the exact series you're looking at: real official art with its transparency, proportions, and look kept untouched, no borders, no background box, sized to sit comfortably on both iPhone and iPad. Picking the art is just as careful: the English clearlogo wins when it exists, otherwise the best alternate (Japanese, then any other language, ranked by community score and resolution), and only when a title has no logo anywhere does the familiar title text return. Everything else about the carousel — the banner art, swipe, parallax, gradient, and the poster system underneath — is exactly as it was.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 11779316,
+          "size": 11795678,
           "minOSVersion": "15.0"
         },
         {
