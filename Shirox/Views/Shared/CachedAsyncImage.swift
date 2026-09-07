@@ -292,6 +292,43 @@ struct CachedAsyncImage: View {
     }
 }
 
+// MARK: - Candidate preloading (v2.19)
+
+extension CachedAsyncImage {
+    /// Reports whether `urlString` can be decoded, and warms the cache doing
+    /// it: one pass through the exact Kingfisher pipeline the display path
+    /// uses (memory → disk → network with hotlink headers), so a follow-up
+    /// `CachedAsyncImage` for the same URL paints from memory with no flicker.
+    /// Used by the featured carousel to walk its ordered TVDB clearlogo
+    /// candidates and commit to the first one that actually loads; a candidate
+    /// that fails here (404, undecodable, offline) falls through to the next.
+    @MainActor
+    static func preload(urlString: String) async -> Bool {
+        guard !urlString.isEmpty, let url = URL(string: urlString) else { return false }
+        // Resolve CF cookie/UA on the MainActor, then hand Kingfisher a
+        // value-type request modifier (its downloader runs off-main) — mirrors
+        // `load()` so the two paths share identical request semantics.
+        let cookieHeader = url.host.flatMap { CloudflareBypassManager.shared.fullCookieHeader(for: $0) }
+        let bypassUA = url.host.flatMap { CloudflareBypassManager.shared.bypassUserAgent(for: $0) }
+        let reqHeaders = KingfisherImageCache.headers(for: url, cookieHeader: cookieHeader, bypassUserAgent: bypassUA)
+        let modifier = AnyModifier { request in
+            var mutable = request
+            for (key, value) in reqHeaders { mutable.setValue(value, forHTTPHeaderField: key) }
+            return mutable
+        }
+        let resource = Kingfisher.ImageResource(downloadURL: url, cacheKey: urlString)
+        let kfImage: PlatformImage? = await withCheckedContinuation { (continuation: CheckedContinuation<PlatformImage?, Never>) in
+            KingfisherManager.shared.retrieveImage(
+                with: resource,
+                options: [.requestModifier(modifier)]
+            ) { result in
+                continuation.resume(returning: try? result.get().image)
+            }
+        }
+        return kfImage != nil
+    }
+}
+
 // MARK: - TVDB Poster Image Wrapper
 
 struct TVDBPosterImage: View {

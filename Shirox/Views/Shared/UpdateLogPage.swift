@@ -99,6 +99,18 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.19",
+        date: "2026-09-07",
+        added: [
+            "The home carousel now shows each title's official transparent logo. Where the plain title text used to sit, the banner's bottom-left corner — the spot official streaming platforms reserve for it — carries TheTVDB's clearlogo artwork for the exact series on screen: genuine official art with its transparency, proportions, and original look preserved, never cropped or stretched, and never boxed in by a border or background. Sizing is responsive, tuned to look right on both iPhone and iPad. The pick is equally deliberate: the English clearlogo when one exists, otherwise the best alternate — Japanese next, then any other language, each ranked by community score and resolution — and the familiar title text returns only when a title has no logo anywhere. Everything else about the carousel is untouched: banner art, swiping, parallax, gradient, and the TVDB poster system all behave exactly as before."
+        ],
+        fixed: [],
+        changed: [],
+        improved: [],
+        removed: [],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "2.18",
         date: "2026-09-06",
         added: [],

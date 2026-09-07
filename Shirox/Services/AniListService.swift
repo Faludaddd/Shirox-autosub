@@ -1623,6 +1623,11 @@ enum BrowseCategory: String, CaseIterable, Hashable {
         var epOffsetFetched: Bool?  // nil = old entry (pre-epOffset), true = fetched fresh
         var posterPath: String?
         var fanartPath: String?
+        /// v2.19 — Ordered transparent-logo candidates (TVDB clearlogos, best
+        /// first). Empty = TVDB was checked and has none; nil = not checked yet
+        /// (also the value old cached entries decode to). Defaults to nil so
+        /// existing `CachedData(...)` call sites compile unchanged.
+        var logoPaths: [String]? = nil
     }
     private var cache: [Int: CachedData] = [:]       // keyed by AniList ID
     private var malCache: [Int: CachedData] = [:]     // keyed by MAL ID
@@ -1917,13 +1922,44 @@ enum BrowseCategory: String, CaseIterable, Hashable {
         if provider == .mal {
             malCache[id]?.posterPath = artwork.poster
             malCache[id]?.fanartPath = artwork.fanart
+            malCache[id]?.logoPaths = artwork.logos
             saveMALCache()
         } else {
             cache[id]?.posterPath = artwork.poster
             cache[id]?.fanartPath = artwork.fanart
+            cache[id]?.logoPaths = artwork.logos
             saveCache()
         }
         return (formatURL(artwork.poster), formatURL(artwork.fanart))
+    }
+
+    /// v2.19 — Ordered transparent-logo candidates for a title, best first
+    /// (TVDB clearlogos; see `fetchTVDBIdArtwork` for the ranking). The chain:
+    /// (1) English clearlogo, (2) alternate TVDB logos — Japanese, then any
+    /// other language, then clearart, each ranked by community score and
+    /// resolution — and plain title text only when the list comes back empty
+    /// (no TVDB mapping, or TVDB has no logo artwork at all). Candidates are
+    /// also cached in `CachedData.logoPaths` so repeat renders never refetch.
+    func getLogoCandidates(for id: Int, provider: ProviderType = .anilist) async -> [String] {
+        if let c = tvdbCache(for: provider)[id], let paths = c.logoPaths {
+            return paths.compactMap { formatURL($0) }
+        }
+        guard let mapping = await getTVDBId(for: id, provider: provider), mapping.id > 0 else {
+            return []
+        }
+        let artwork = await fetchTVDBIdArtwork(tid: mapping.id, targetSeason: mapping.season)
+        if provider == .mal {
+            malCache[id]?.posterPath = artwork.poster
+            malCache[id]?.fanartPath = artwork.fanart
+            malCache[id]?.logoPaths = artwork.logos
+            saveMALCache()
+        } else {
+            cache[id]?.posterPath = artwork.poster
+            cache[id]?.fanartPath = artwork.fanart
+            cache[id]?.logoPaths = artwork.logos
+            saveCache()
+        }
+        return artwork.logos.compactMap { formatURL($0) }
     }
 
 
@@ -2171,13 +2207,36 @@ enum BrowseCategory: String, CaseIterable, Hashable {
         }
     }
 
+    /// In-flight dedup for `fetchTVDBIdArtwork`. The carousel's poster, fanart,
+    /// and logo prefetchers can all request the same series within the same
+    /// appearance window; concurrent callers share one network fetch instead
+    /// of firing duplicate /series/extended requests (same pattern as
+    /// `bulkLoadTask`). Keyed by tid+season so identical calls dedup while
+    /// same-tid/different-season lookups stay independent.
+    private var tvdbArtworkInFlight: [String: Task<(poster: String?, fanart: String?, logos: [String]), Never>] = [:]
+
     /// Shared TVDB artwork fetch used by both AniList and MAL paths.
-    private func fetchTVDBIdArtwork(tid: Int, targetSeason: Int?) async -> (poster: String?, fanart: String?) {
+    /// v2.19 — also extracts transparent-logo candidates (see `logos`).
+    private func fetchTVDBIdArtwork(tid: Int, targetSeason: Int?) async -> (poster: String?, fanart: String?, logos: [String]) {
+        let key = "\(tid)-\(targetSeason ?? -1)"
+        if let existing = tvdbArtworkInFlight[key] {
+            return await existing.value
+        }
+        let task = Task { await performTVDBIdArtworkFetch(tid: tid, targetSeason: targetSeason) }
+        tvdbArtworkInFlight[key] = task
+        let result = await task.value
+        tvdbArtworkInFlight[key] = nil
+        return result
+    }
+
+    private func performTVDBIdArtworkFetch(tid: Int, targetSeason: Int?) async -> (poster: String?, fanart: String?, logos: [String]) {
         struct Artwork: Decodable {
             let image: String
             let type: Int
             let width: Int?
             let height: Int?
+            let language: String?
+            let score: Int?
         }
         struct SeasonType: Decodable { let id: Int; let type: String? }
         struct Season: Decodable { let id: Int; let number: Int; let type: SeasonType? }
@@ -2209,10 +2268,40 @@ enum BrowseCategory: String, CaseIterable, Hashable {
                 return res.data.artwork ?? []
             }
 
-            guard let seriesData = await fetchSeriesExtended() else { return (nil, nil) }
+            guard let seriesData = await fetchSeriesExtended() else { return (nil, nil, []) }
             let artworks = seriesData.artworks ?? []
             let bySize: (Artwork, Artwork) -> Bool = { ($0.width ?? 0) * ($0.height ?? 0) > ($1.width ?? 0) * ($1.height ?? 0) }
             let fanart = artworks.filter { $0.type == 3 }.sorted(by: bySize).first?.image
+
+            // v2.19 — Transparent logo candidates. TVDB artwork type IDs
+            // (verified against /artwork/types): 23 = series ClearLogo
+            // (800x310 transparent PNGs), 22 = ClearArt (1000x562 transparent
+            // key art, kept as the last TVDB resort). Banners (1/6/16) are
+            // JPGs — NOT transparent — and posters/backgrounds aren't logos,
+            // so nothing else qualifies. Ranking: English logos first (the
+            // app presents English titles), Japanese second, then any other
+            // language; within a language, community score wins, then pixel
+            // area (highest-quality appropriate transparent logo).
+            let logoLanguageTier: (Artwork) -> Int = { artwork in
+                switch artwork.language?.lowercased() {
+                case "eng", "en", nil: return 0
+                case "jpn", "ja": return 1
+                default: return 2
+                }
+            }
+            let byLogoQuality: (Artwork, Artwork) -> Bool = {
+                let tier = logoLanguageTier($0) - logoLanguageTier($1)
+                if tier != 0 { return tier < 0 }
+                if ($0.score ?? 0) != ($1.score ?? 0) { return ($0.score ?? 0) > ($1.score ?? 0) }
+                return ($0.width ?? 0) * ($0.height ?? 0) > ($1.width ?? 0) * ($1.height ?? 0)
+            }
+            var logoCandidates = artworks.filter { $0.type == 23 }.sorted(by: byLogoQuality).map(\.image)
+            logoCandidates += artworks.filter { $0.type == 22 }.sorted(by: byLogoQuality).map(\.image)
+            // TVDB sometimes serves the same artwork under multiple entries
+            // (different scores/languages pointing at one file) — dedup while
+            // preserving the priority order.
+            var logoSeen = Set<String>()
+            logoCandidates = logoCandidates.filter { logoSeen.insert($0).inserted }
 
             var poster: String?
             if let targetSeason {
@@ -2226,10 +2315,10 @@ enum BrowseCategory: String, CaseIterable, Hashable {
             if poster == nil {
                 poster = artworks.filter { $0.type == 2 }.sorted(by: bySize).first?.image
             }
-            return (poster, fanart)
+            return (poster, fanart, logoCandidates)
         } catch {
             Logger.shared.log("TVDB artwork fetch error: \(error)", type: "Error")
-            return (nil, nil)
+            return (nil, nil, [])
         }
     }
     }

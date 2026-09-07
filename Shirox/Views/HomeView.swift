@@ -430,6 +430,14 @@ struct FeaturedCarousel: View {
                         .frame(width: 1, height: 1)
                         .opacity(0)
                         .allowsHitTesting(false)
+                    // v2.19 — logo prefetch: resolves each title's TVDB clearlogo
+                    // (sharing the poster/fanart fetch above via the service's
+                    // in-flight dedup) and warms Kingfisher, so the visible logo
+                    // paints the instant its page becomes current.
+                    CarouselLogoPrefetcher(media: displayItems[i])
+                        .frame(width: 1, height: 1)
+                        .opacity(0)
+                        .allowsHitTesting(false)
                 }
             }
             .overlay(alignment: .bottom) {
@@ -448,12 +456,14 @@ struct FeaturedCarousel: View {
                     .allowsHitTesting(false)
 
                     if let currentMedia {
-                        VStack(spacing: 10) {
-                            Text(currentMedia.title.displayTitle)
-                                .font(.title.weight(.bold))
-                                .foregroundStyle(.primary)
-                                .multilineTextAlignment(.center)
-                                .lineLimit(2)
+                        // v2.19 — the plain title text is replaced by the TVDB
+                        // transparent clearlogo (CarouselTitleLogo below), anchored
+                        // in the banner's bottom-left area like official streaming
+                        // heroes, so the stack is leading-aligned. Everything else
+                        // about the overlay — gradient, spacing, paddings, genre
+                        // capsules, button, hint, animations — is unchanged.
+                        VStack(alignment: .leading, spacing: 10) {
+                            CarouselTitleLogo(media: currentMedia, isWide: isIPad)
 
                             // Genre capsules — replace the previous multi-line description
                             // (which was too dense for a carousel). Up to 3 tags, capped.
@@ -724,6 +734,99 @@ private struct PageIndicator: View {
                     .animation(.easeInOut(duration: 0.25), value: currentPage)
             }
         }
+    }
+}
+
+// MARK: - Carousel Title Logo (v2.19)
+//
+// The featured carousel's title slot: the plain `Text` is replaced with the
+// title's official TRANSPARENT artwork from TheTVDB — the series clearlogo
+// (artwork type 23, 800x310 transparent PNG) when present, else clearart
+// (type 22), English entries ranked first by the service (see
+// `TVDBMappingService.getLogoCandidates`). Rendering rules: transparency,
+// aspect ratio, and original appearance are preserved exactly (scaledToFit —
+// never cropped or stretched), and no border, background, or shadow is ever
+// added. While candidates resolve — and for any title with no TVDB logo at
+// all — the previous title text renders in its original style, so the slot
+// is never empty. Responsive sizing: a compact banner carries a 240x64pt
+// logo box, a regular (iPad) banner 320x84pt.
+private struct CarouselTitleLogo: View {
+    let media: Media
+    /// iPad (regular width) gets the larger, streaming-hero-scale logo box.
+    var isWide: Bool = false
+
+    /// `nil` = unresolved or no logo available (title text shows). Reset at
+    /// the top of every page change so a stale logo never lingers over the
+    /// new banner while its own candidate resolves.
+    @State private var logoURL: String?
+
+    private var maxLogoWidth: CGFloat { isWide ? 320 : 240 }
+    private var maxLogoHeight: CGFloat { isWide ? 84 : 64 }
+
+    var body: some View {
+        Group {
+            if let logoURL {
+                CachedAsyncImage(urlString: logoURL, contentMode: .fit)
+                    .frame(maxWidth: maxLogoWidth, maxHeight: maxLogoHeight)
+                    // VoiceOver still reads the title — the logo is decorative
+                    // art for the same string.
+                    .accessibilityLabel(media.title.displayTitle)
+            } else {
+                // Fallback / transitional title text — the exact style the
+                // carousel used before logos, kept as the last rung of the
+                // candidate chain (and while the logo resolves).
+                Text(media.title.displayTitle)
+                    .font(.title.weight(.bold))
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(2)
+            }
+        }
+        .task(id: media.uniqueId) {
+            // Reset per page: the new title's text shows immediately, then
+            // its logo swaps in once a candidate actually decodes.
+            logoURL = nil
+            let url = await CarouselLogoResolver.bestLogoURL(for: media)
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.25)) {
+                logoURL = url
+            }
+        }
+    }
+}
+
+/// Invisible offscreen warmer: resolves (and Kingfisher-caches) a title's
+/// best logo so the visible `CarouselTitleLogo` paints the moment its page
+/// becomes current. 1x1, opacity 0, no hit testing — the same trick the
+/// poster/fanart preloader uses.
+private struct CarouselLogoPrefetcher: View {
+    let media: Media
+
+    var body: some View {
+        Color.clear
+            .accessibilityHidden(true)
+            .task(id: media.uniqueId) {
+                _ = await CarouselLogoResolver.bestLogoURL(for: media)
+            }
+    }
+}
+
+/// The candidate walk shared by the visible logo view and the prefetcher:
+/// fetch the ordered TVDB logo candidates, then preload each in turn until
+/// one decodes — that winner is what the carousel shows. A `nil` result (no
+/// TVDB mapping, TVDB has no logo artwork, or every candidate failed to
+/// load) means the caller falls back to plain title text.
+private enum CarouselLogoResolver {
+    @MainActor
+    static func bestLogoURL(for media: Media) async -> String? {
+        let candidates = await TVDBMappingService.shared.getLogoCandidates(for: media.id, provider: media.provider)
+        for url in candidates {
+            if Task.isCancelled { return nil }
+            if await CachedAsyncImage.preload(urlString: url) {
+                return url
+            }
+        }
+        return nil
     }
 }
 
