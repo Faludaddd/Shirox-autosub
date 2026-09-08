@@ -50,8 +50,14 @@ struct DiscoveryGenre: Identifiable, Hashable, Codable {
 
     /// Names the Kitsu category-to-genre classifier accepts (Kitsu mixes
     /// genres with themes/demographics in one category list — only these
-    /// titles count as GENRES).
-    static let genreNames: Set<String> = Set(catalog.map(\.displayName))
+    /// titles count as GENRES). Includes the database's own title for each
+    /// genre where it differs from the display name (Kitsu calls Sci-Fi
+    /// "Science Fiction" — verified live).
+    static let genreNames: Set<String> = {
+        var names = Set(catalog.map(\.displayName))
+        names.formUnion(["Science Fiction"])
+        return names
+    }()
 
     /// True when a database category title is one of the canonical genres.
     static func isGenreName(_ title: String) -> Bool {
