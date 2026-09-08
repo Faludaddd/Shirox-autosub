@@ -31,12 +31,6 @@ struct DataSourcesSettingsPage: View {
     @State private var scheduleCacheSize: Int64 = 0
     @State private var discoveryCacheSize: Int64 = 0
 
-    // User-configurable credentials (AnimeSchedule token / AniDB client).
-    @State private var animescheduleToken = ""
-    @State private var anidbClientName = ""
-    @State private var anidbClientVersion = ""
-    @State private var loadedCredentials = false
-
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
@@ -54,7 +48,6 @@ struct DataSourcesSettingsPage: View {
         .inlineNavBar()
         .onAppear {
             refreshCacheSizes()
-            loadCredentials()
         }
     }
 
@@ -321,14 +314,6 @@ struct DataSourcesSettingsPage: View {
         mangaCacheSize = providers.cacheSize(domain: .manga)
         scheduleCacheSize = providers.cacheSize(domain: .schedule)
         discoveryCacheSize = providers.cacheSize(domain: .discovery)
-    }
-
-    private func loadCredentials() {
-        guard !loadedCredentials else { return }
-        animescheduleToken = AnimeScheduleProvider.shared.apiToken
-        anidbClientName = AniDBProvider.shared.clientName
-        anidbClientVersion = AniDBProvider.shared.clientVersion
-        loadedCredentials = true
     }
 
     // MARK: - Footnote
