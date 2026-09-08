@@ -41,6 +41,25 @@ struct SubtitleCaptionText: View {
     }
 
     var body: some View {
+        // Batch 23 (item 7) — System renderer mode renders the caption with
+        // Apple's DEFAULT subtitle look (white text on a semi-transparent
+        // black plate, system font, centered — no custom knobs). Custom
+        // mode is the full styling set below, unchanged.
+        if settings.useSystemRenderer {
+            Text(text)
+                .font(.system(size: 26, weight: .regular))
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+                .lineLimit(nil)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color.black.opacity(0.6))
+                )
+                .frame(maxWidth: maxWidthCap, alignment: .center)
+        } else {
         let stroke = outlineWidth
         let strokeColor = SubtitleSettingsManager.color(fromName: settings.strokeColorName)
         let useAutoOutline = settings.resolvedStrokeWidth <= 0
@@ -75,6 +94,7 @@ struct SubtitleCaptionText: View {
                     x: 0,
                     y: CGFloat(max(settings.shadowOffset / 2.0, 0)))
             .frame(maxWidth: maxWidthCap, alignment: .center)
+        }
     }
 }
 

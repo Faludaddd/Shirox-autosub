@@ -44,6 +44,8 @@ final class SubtitleSettingsManager: ObservableObject {
         static let maxWidthPercent   = "subtitle.maxWidthPercent"
         static let shadowOffset      = "subtitle.shadowOffset"
         static let verticalOffset    = "subtitle.verticalOffset"
+        // Batch 23 (item 7) — subtitle renderer choice.
+        static let useSystemRenderer = "subtitle.useSystemRenderer"
     }
 
     // MARK: - Published Properties
@@ -106,6 +108,23 @@ final class SubtitleSettingsManager: ObservableObject {
         didSet { UserDefaults.standard.set(verticalOffset, forKey: Keys.verticalOffset) }
     }
 
+    // MARK: - Renderer choice (Batch 23, item 7)
+
+    /// Which subtitle renderer the player uses:
+    /// - `false` (default, Custom): the app's own overlay renders every
+    ///   subtitle — embedded tracks are deselected so the custom styling
+    ///   is ALWAYS what plays (the v2.15 contract).
+    /// - `true` (System): AVPlayer renders EMBEDDED subtitle tracks
+    ///   natively with Apple's default styling; external subtitle FILES
+    ///   (which AVPlayer cannot side-load) still render through the app
+    ///   overlay, but with Apple's default caption look instead of the
+    ///   custom knobs.
+    /// Persisted, so the choice survives restarts. Exposed in the
+    /// in-player subtitle menu and in Settings → Subtitles.
+    @Published var useSystemRenderer: Bool {
+        didSet { UserDefaults.standard.set(useSystemRenderer, forKey: Keys.useSystemRenderer) }
+    }
+
     // MARK: - Init
 
     private init() {
@@ -126,7 +145,8 @@ final class SubtitleSettingsManager: ObservableObject {
             Keys.lineSpacing:       1.0,
             Keys.maxWidthPercent:   90.0,
             Keys.shadowOffset:      0.0,
-            Keys.verticalOffset:    0.0
+            Keys.verticalOffset:    0.0,
+            Keys.useSystemRenderer: false
         ])
 
         SubtitleSettingsManager.migrateLegacy()
@@ -148,6 +168,7 @@ final class SubtitleSettingsManager: ObservableObject {
         maxWidthPercent   = d.double(forKey: Keys.maxWidthPercent)
         shadowOffset      = d.double(forKey: Keys.shadowOffset)
         verticalOffset    = d.double(forKey: Keys.verticalOffset)
+        useSystemRenderer = d.bool(forKey: Keys.useSystemRenderer)
     }
 
     /// One-time port of the old (disconnected) Settings-page keys onto the

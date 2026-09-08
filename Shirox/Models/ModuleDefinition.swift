@@ -48,6 +48,18 @@ struct ModuleDefinition: Codable, Identifiable, Equatable {
         type.lowercased().contains("novel")
     }
 
+    /// Batch 23 — ONE shared definition of "a module that can stream
+    /// anime", used by EVERY consumer: the stream picker, Auto Pick, the
+    /// detail-page module selector, and the Settings module list. It
+    /// previously lived as three separately-drifting inline filters; the
+    /// Settings list only checked `!isManga`, so novel / local-playback /
+    /// Jellyfin modules appeared there as if watchable while every watch
+    /// flow said "no anime modules installed" — the exact "modules ARE
+    /// installed but the app says no modules" report.
+    var isAnimeStreamModule: Bool {
+        !isManga && !isNovel && !isLocalPlayback && !isJellyfin
+    }
+
     private enum CodingKeys: String, CodingKey {
         case sourceName, iconUrl, author, version, baseUrl, searchBaseUrl,
              scriptUrl, type, asyncJS, streamType, quality, language, softsub,

@@ -310,12 +310,15 @@ final class AniListDetailViewModel: ObservableObject {
         let currentEpNum = selectedEpisodeNumber ?? 1
         let mediaTitle = media.title.displayTitle
         // availableEpisodes = how many are currently aired (may be < series total for ongoing shows)
-        // Order of precedence:
-        // 1. AniList's nextAiringEpisode (fallback airing count)
-        // 2. The count passed from the module (best for accurate "caught up" tracking on a specific provider)
+        // Batch 23 — order of precedence FIXED (the module count is now
+        // first, per the "stale 8/8 caught-up" report):
+        // 1. The count from the module's REAL episode list (authoritative —
+        //    it's what the user can actually watch; AniList's static total
+        //    can be stale or wrong)
+        // 2. AniList's nextAiringEpisode (fallback airing count)
         // 3. AniList's total episodes (general fallback)
         let anilistAiring = media.nextAiringEpisode != nil ? (media.nextAiringEpisode!.episode - 1) : nil
-        let availEps: Int? = anilistAiring ?? availableEpisodes ?? media.episodes
+        let availEps: Int? = availableEpisodes ?? anilistAiring ?? media.episodes
         // totalEpisodes = full series count (nil if unknown)
         let totalEpisodes: Int? = media.episodes
         let episodeThumbnail = TVDBMappingService.shared.getCachedEpisode(for: media.id, episodeNumber: currentEpNum)?.thumbnail

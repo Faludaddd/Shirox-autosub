@@ -216,7 +216,9 @@ struct AutoPickSettingsPage: View {
                 .disabled(availableModulesToAdd.isEmpty)
 
                 Button("Reset Priority") {
-                    modulePriority = moduleManager.modules.filter { !$0.isManga }.map { $0.id }
+                    // Batch 23 — the reset list matches what Auto Pick can
+                    // actually use (shared anime-stream definition).
+                    modulePriority = moduleManager.modules.filter { $0.isAnimeStreamModule }.map { $0.id }
                     savePriority()
                 }
                 .font(.caption)

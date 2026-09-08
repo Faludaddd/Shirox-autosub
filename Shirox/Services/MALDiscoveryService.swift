@@ -403,7 +403,30 @@ final class MALDiscoveryService {
         case .seasonal: return try await seasonal(page: page)
         case .popular:  return try await popular(page: page)
         case .topRated: return try await topRated(page: page)
+        case .recentlyCompleted: return try await recentlyCompleted(page: page)
+        case .upcoming: return try await upcoming(page: page)
         }
+    }
+
+    /// Batch 23 — the real backing list for the "Recently Completed" See
+    /// All page: Jikan's previous-season list (the season's shows are
+    /// finished by now). Replaces the old .popular fallback that showed
+    /// all-time-popular anime under the "Recently Completed" title.
+    func recentlyCompleted(page: Int = 1) async throws -> [JikanAnime] {
+        let (season, year) = AniListSeason.previous()
+        return try await fetchList("seasons/\(year)/\(season.rawValue.lowercased())", queryItems: [
+            URLQueryItem(name: "limit", value: "20"),
+            URLQueryItem(name: "page", value: "\(page)")
+        ])
+    }
+
+    /// Batch 23 — the real backing list for the "Upcoming" See All page:
+    /// Jikan's dedicated upcoming-seasons endpoint.
+    func upcoming(page: Int = 1) async throws -> [JikanAnime] {
+        try await fetchList("seasons/upcoming", queryItems: [
+            URLQueryItem(name: "limit", value: "20"),
+            URLQueryItem(name: "page", value: "\(page)")
+        ])
     }
 
     func search(_ query: String) async throws -> [JikanAnime] {

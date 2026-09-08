@@ -49,6 +49,9 @@ final class HomeViewModel: ObservableObject {
         // the whole app: multiple screens asking for the same shelf share
         // ONE request, a failing provider is skipped for its whole
         // cooldown window, and the Jikan layer paces outbound calls.
+        // Batch 23 — recentlyCompleted/upcoming joined the chain too
+        // (they were AniList-only direct calls, so the AniList outage
+        // blanked them even while MAL/Kitsu were serving fine).
         async let t: Void = loadTrending()
         async let s: Void = loadSeasonal()
         async let p: Void = loadPopular()
@@ -60,7 +63,8 @@ final class HomeViewModel: ObservableObject {
         // Persist the last-good shelves AFTER everything settles so the
         // snapshot captures the fully-populated page.
         if !trending.isEmpty {
-            SnapshotStore.saveHomeShelves(trending: trending, seasonal: seasonal, popular: popular, topRated: topRated)
+            SnapshotStore.saveHomeShelves(trending: trending, seasonal: seasonal, popular: popular, topRated: topRated,
+                                          recentlyCompleted: recentlyCompleted, upcoming: upcoming)
         }
 
         loaded = true
@@ -103,21 +107,20 @@ final class HomeViewModel: ObservableObject {
 
     private func loadRecentlyCompleted() async {
         do {
-            let media = try await AniListService.shared.recentlyCompletedLastSeason()
-            recentlyCompleted = media.map { AniListProvider.shared.mapMedia($0) }
+            // Batch 23 — through the unified chain: Jikan's previous-season
+            // list, AniList's FINISHED+previous-season query, and Kitsu's
+            // completed list all serve this shelf now (not AniList alone).
+            recentlyCompleted = try await UnifiedProviderSystem.shared.recentlyCompleted()
         } catch {
-            // AniList-only feature — no Jikan equivalent for "recently
-            // completed last season"
-            recentlyCompleted = []
+            serveSnapshotIfAvailable(error: error, quiet: true)
         }
     }
 
     private func loadUpcoming() async {
         do {
-            let media = try await AniListService.shared.upcoming()
-            upcoming = media.map { AniListProvider.shared.mapMedia($0) }
+            upcoming = try await UnifiedProviderSystem.shared.upcoming()
         } catch {
-            upcoming = []
+            serveSnapshotIfAvailable(error: error, quiet: true)
         }
     }
 
@@ -139,6 +142,14 @@ final class HomeViewModel: ObservableObject {
             }
             if topRated.isEmpty, let snapTop = snapshot.topRated, !snapTop.isEmpty {
                 topRated = snapTop
+            }
+            // Batch 23 — the two new shelves snapshot-serve too (6h TTL,
+            // same bridge-over-outage contract as the other shelves).
+            if recentlyCompleted.isEmpty, let snapRC = snapshot.recentlyCompleted, !snapRC.isEmpty {
+                recentlyCompleted = snapRC
+            }
+            if upcoming.isEmpty, let snapUp = snapshot.upcoming, !snapUp.isEmpty {
+                upcoming = snapUp
             }
         }
         if trending.isEmpty, !quiet {
@@ -174,15 +185,22 @@ enum SnapshotStore {
         let seasonal: [Media]?
         let popular: [Media]?
         let topRated: [Media]?
+        // Batch 23 — two more shelves in the snapshot. Optional + defaulted
+        // so snapshots written before these fields existed still decode.
+        var recentlyCompleted: [Media]? = nil
+        var upcoming: [Media]? = nil
     }
 
-    static func saveHomeShelves(trending: [Media], seasonal: [Media], popular: [Media], topRated: [Media]) {
+    static func saveHomeShelves(trending: [Media], seasonal: [Media], popular: [Media], topRated: [Media],
+                                 recentlyCompleted: [Media] = [], upcoming: [Media] = []) {
         guard !trending.isEmpty else { return }
         let snapshot = ShelfSnapshot(savedAt: Date(),
                                      trending: trending,
                                      seasonal: seasonal.isEmpty ? nil : seasonal,
                                      popular: popular.isEmpty ? nil : popular,
-                                     topRated: topRated.isEmpty ? nil : topRated)
+                                     topRated: topRated.isEmpty ? nil : topRated,
+                                     recentlyCompleted: recentlyCompleted.isEmpty ? nil : recentlyCompleted,
+                                     upcoming: upcoming.isEmpty ? nil : upcoming)
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
         try? data.write(to: fileURL, options: .atomic)
     }

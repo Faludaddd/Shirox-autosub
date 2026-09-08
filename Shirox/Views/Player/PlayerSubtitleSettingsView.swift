@@ -18,6 +18,22 @@ struct PlayerSubtitleSettingsView: View {
                         .tint(.appAccent)
                 }
 
+                // Batch 23 (item 7) — renderer choice: Apple's default
+                // subtitle UI or the app's custom styling. The flag is
+                // `useSystemRenderer`: true = System/Apple default look,
+                // false = the app's custom styled overlay.
+                Section {
+                    Picker("Subtitle Style", selection: $settings.useSystemRenderer) {
+                        Text("Apple Default").tag(true)
+                        Text("Shirox Custom").tag(false)
+                    }
+                    .pickerStyle(.segmented)
+                } footer: {
+                    Text(settings.useSystemRenderer
+                         ? "Apple Default: embedded subtitles render with the system's native look; external subtitle files render with the system's default caption style."
+                         : "Shirox Custom: embedded and external subtitles render through the app's styled overlay — every appearance setting below applies.")
+                }
+
                 if let tracks = availableTracks, !tracks.isEmpty {
                     Section("Subtitle Track") {
                         trackRow(title: "Default", isActive: selectedTrack == nil) {
@@ -41,33 +57,37 @@ struct PlayerSubtitleSettingsView: View {
                     }
                 }
 
-                Section("Appearance") {
-                    #if !os(tvOS)
-                    ColorPicker("Text Color", selection: $settings.foregroundColor)
+                // Appearance knobs only apply to the custom renderer —
+                // hidden entirely while Apple Default is selected (Batch 23).
+                if !settings.useSystemRenderer {
+                    Section("Appearance") {
+                        #if !os(tvOS)
+                        ColorPicker("Text Color", selection: $settings.foregroundColor)
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text("Font Size")
-                            Spacer()
-                            Text("\(Int(settings.fontSize))")
-                                .foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text("Font Size")
+                                Spacer()
+                                Text("\(Int(settings.fontSize))")
+                                    .foregroundStyle(.secondary)
+                            }
+                            Slider(value: $settings.fontSize, in: 12...40, step: 1)
                         }
-                        Slider(value: $settings.fontSize, in: 12...40, step: 1)
-                    }
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text("Shadow")
-                            Spacer()
-                            Text(String(format: "%.1f", settings.shadowRadius))
-                                .foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text("Shadow")
+                                Spacer()
+                                Text(String(format: "%.1f", settings.shadowRadius))
+                                    .foregroundStyle(.secondary)
+                            }
+                            Slider(value: $settings.shadowRadius, in: 0...8, step: 0.5)
                         }
-                        Slider(value: $settings.shadowRadius, in: 0...8, step: 0.5)
-                    }
-                    #endif
+                        #endif
 
-                    Toggle("Background", isOn: $settings.backgroundEnabled)
-                        .tint(.appAccent)
+                        Toggle("Background", isOn: $settings.backgroundEnabled)
+                            .tint(.appAccent)
+                    }
                 }
 
                 Section("Position") {

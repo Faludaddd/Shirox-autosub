@@ -2443,8 +2443,23 @@ struct ModulesSettingsPage: View {
     private var filteredModules: [ModuleDefinition] {
         switch mediaType {
         case .manga: return moduleManager.modules.filter { $0.isManga }
-        case nil: return moduleManager.modules.filter { !$0.isManga }
+        // Batch 23 — the anime list shows modules that can actually
+        // stream anime (the ONE shared definition the watch flows and
+        // Auto Pick use). Non-manga modules that can't stream anime
+        // (novels, local playback, Jellyfin) move to their own honest
+        // section below — previously they sat in THIS list, so Settings
+        // showed "modules installed" while the watch flow correctly
+        // said "no anime modules" — the exact mismatch report.
+        case nil: return moduleManager.modules.filter { $0.isAnimeStreamModule }
         }
+    }
+
+    /// Non-manga modules that CANNOT stream anime (novel / local
+    /// playback / Jellyfin). Still listed so the user can manage them —
+    /// just no longer counted as anime sources.
+    private var otherNonMangaModules: [ModuleDefinition] {
+        guard mediaType == nil else { return [] }
+        return moduleManager.modules.filter { !$0.isManga && !$0.isAnimeStreamModule }
     }
 
     var body: some View {
@@ -2508,6 +2523,41 @@ struct ModulesSettingsPage: View {
                             moduleManager.removeModule(snapshot[i])
                         }
                     }
+                }
+            }
+            // Batch 23 — honest split: non-manga modules that can't stream
+            // anime (novels, local playback, Jellyfin) get their own
+            // section instead of masquerading as anime sources.
+            if !otherNonMangaModules.isEmpty {
+                Section {
+                    ForEach(otherNonMangaModules) { module in
+                        HStack(spacing: 12) {
+                            AsyncImage(url: URL(string: module.iconUrl ?? "")) { phase in
+                                if case .success(let img) = phase { img.resizable().scaledToFill() }
+                                else { Image(systemName: "puzzlepiece.extension").foregroundStyle(.secondary) }
+                            }
+                            .frame(width: 32, height: 32)
+                            .clipShape(RoundedRectangle(cornerRadius: 7))
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(module.sourceName).font(.body.weight(.medium))
+                                Text(module.isNovel ? "Novel source" : (module.isJellyfin ? "Jellyfin" : "Local playback"))
+                                    .font(.caption2).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture { moduleManager.selectModule(module) }
+                    }
+                    .onDelete { indices in
+                        let snapshot = otherNonMangaModules
+                        for i in indices where i < snapshot.count {
+                            moduleManager.removeModule(snapshot[i])
+                        }
+                    }
+                } header: {
+                    Text("Other Modules")
+                } footer: {
+                    Text("These modules can't stream anime — novels, local playback and Jellyfin have their own entry points, so they never appear in the watch flow's module list.")
                 }
             }
             Section("Add Module") {
@@ -3942,6 +3992,7 @@ struct SubtitleSettingsPage: View {
         ScrollView {
             VStack(spacing: 16) {
                 masterToggleCard
+                rendererCard
                 quickPresetsCard
                 livePreviewCard
                 appearanceControlsCard
@@ -3987,6 +4038,35 @@ struct SubtitleSettingsPage: View {
                     .font(.headline)
             }
             .tint(.appAccent)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    // MARK: - Renderer Card (Batch 23, item 7)
+
+    /// Subtitle style: Apple's default subtitle UI vs the app's custom
+    /// styling. Genuinely selectable, persisted, and honored by the player
+    /// (embedded tracks render natively with Apple's look in System mode;
+    /// the styled overlay is the renderer in Custom mode).
+    private var rendererCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Subtitle Style", systemImage: "paintbrush")
+                .font(.headline)
+
+            Picker("Subtitle Style", selection: $settings.useSystemRenderer) {
+                Text("Apple Default").tag(true)
+                Text("Shirox Custom").tag(false)
+            }
+            .pickerStyle(.segmented)
+
+            Text(settings.useSystemRenderer
+                 ? "Apple Default: embedded subtitles render with the system's native look; external subtitle files render with the system's default caption style."
+                 : "Shirox Custom: every subtitle renders through the app's styled overlay — all the appearance controls below apply.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()

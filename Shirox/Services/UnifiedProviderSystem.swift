@@ -341,6 +341,11 @@ final class UnifiedProviderSystem: ObservableObject {
         // provider reports the honest reason and the chain moves on.
         statuses[.anidb]?.note = AniDBProvider.shared.isConfigured
             ? nil : "Requires a registered AniDB client identity (name + version) — fill it in below."
+        // AnimeSchedule requires the user's own free API token (their terms
+        // forbid shipping an app token). Without one it is SKIPPED by the
+        // chain (see activeChain) instead of being attempted and failing.
+        statuses[.animeschedule]?.note = AnimeScheduleProvider.shared.isConfigured
+            ? nil : "Optional — add a free API token from animeschedule.net below to activate this schedule source."
     }
 
     // MARK: - Ordering & enablement (Data Sources UI entry points)
@@ -420,6 +425,10 @@ final class UnifiedProviderSystem: ObservableObject {
             // AniDB without a registered client is skipped (honest
             // unavailability — its HTTP API rejects unknown clients).
             if kind == .anidb && !AniDBProvider.shared.isConfigured { return false }
+            // AnimeSchedule without the user's API token is skipped the
+            // same way — their API answers 401 without a token, so there
+            // is nothing to attempt until one is configured in settings.
+            if kind == .animeschedule && !AnimeScheduleProvider.shared.isConfigured { return false }
             return true
         }
     }
@@ -466,6 +475,7 @@ final class UnifiedProviderSystem: ObservableObject {
     private func shouldSkip(_ kind: MetaProviderKind) -> Bool {
         guard isEnabled(kind) else { return true }
         if kind == .anidb && !AniDBProvider.shared.isConfigured { return true }
+        if kind == .animeschedule && !AnimeScheduleProvider.shared.isConfigured { return true }
         guard let status = statuses[kind] else { return false }
         return status.isCoolingDown
     }
@@ -580,17 +590,29 @@ final class UnifiedProviderSystem: ObservableObject {
             if Task.isCancelled { throw CancellationError() }
             if shouldSkip(kind) {
                 lastReason = statuses[kind]?.note ?? "cooling down"
+                Logger.shared.log(
+                    "[Providers] \(kind.displayName) skipped \(operation): \(lastReason ?? "")",
+                    type: "Provider")
                 continue
             }
             if isOperationFailureCached(kind, operation: operation) {
                 lastReason = "recent failure"
+                Logger.shared.log(
+                    "[Providers] \(kind.displayName) skipped \(operation): recent failure (negative cache)",
+                    type: "Provider")
                 continue
             }
             do {
                 let started = Date()
                 guard let value = try await fetch(kind) else {
                     // Provider doesn't serve this data — skip WITHOUT a
-                    // failure record (not an error).
+                    // failure record (not an error). Logged so the chain's
+                    // walk is fully visible in the debug log (e.g. TVDB
+                    // genuinely IS asked first for browse — it just has no
+                    // chart endpoints and hands over to the next provider).
+                    Logger.shared.log(
+                        "[Providers] \(kind.displayName) has no \(operation) data (doesn't serve this category) — trying next",
+                        type: "Provider")
                     continue
                 }
                 let latency = Int(Date().timeIntervalSince(started) * 1000)
@@ -599,6 +621,9 @@ final class UnifiedProviderSystem: ObservableObject {
                 if let fullKey {
                     ProviderCacheStore.write(value, key: fullKey, domain: domain)
                 }
+                Logger.shared.log(
+                    "[Providers] \(operation) served by \(kind.displayName) in \(latency) ms",
+                    type: "Provider")
                 return (value, kind)
             } catch {
                 if ProviderManager.isCancellationError(error) { throw error }
@@ -622,13 +647,21 @@ final class UnifiedProviderSystem: ObservableObject {
     func seasonal() async throws -> [Media] { try await browse(category: .seasonal, page: 1) }
     func popular() async throws -> [Media] { try await browse(category: .popular, page: 1) }
     func topRated() async throws -> [Media] { try await browse(category: .topRated, page: 1) }
-
-    // MARK: - Anime search
+    func recentlyCompleted() async throws -> [Media] { try await browse(category: .recentlyCompleted, page: 1) }
+    func upcoming() async throws -> [Media] { try await browse(category: .upcoming, page: 1) }
 
     /// Browse (See All) pagination through the same chain. Page-level cache
     /// keys keep the chain's dedup/cache benefits per page.
+    ///
+    /// Batch 23 — every browse result is filtered to the app's Japanese-
+    /// anime catalog (same policy the carousel has had since v2.20): entries
+    /// KNOWN to originate outside Japan are dropped; unknown-origin entries
+    /// pass (the nil-passes rule). Each provider feeds that filter with its
+    /// own real signal — AniList filters at the source AND carries the
+    /// field, Jikan infers from production metadata (v2.23), Kitsu infers
+    /// from the title script (hanzi-without-kana = Chinese production).
     func browse(category: BrowseCategory, page: Int) async throws -> [Media] {
-        try await runChain(
+        let list = try await runChain(
             domain: .anime,
             operation: "browse-\(category.rawValue)",
             cacheKey: "p\(page)",
@@ -648,7 +681,21 @@ final class UnifiedProviderSystem: ObservableObject {
                 return nil
             }
         }.value
+        return Self.japaneseCatalogOnly(list)
     }
+
+    /// The catalog filter shared by every anime browse/shelf surface:
+    /// drops entries whose country of origin is known AND not Japan.
+    /// Unknown origin passes (AniList entries from before the field, Kitsu
+    /// entries without a CJK title to judge).
+    static func japaneseCatalogOnly(_ list: [Media]) -> [Media] {
+        list.filter { media in
+            guard let country = media.countryOfOrigin else { return true }
+            return country == "JP"
+        }
+    }
+
+    // MARK: - Anime search
 
     func searchAnime(_ query: String) async throws -> [Media] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -757,6 +804,37 @@ final class UnifiedProviderSystem: ObservableObject {
     /// returns data for titles it can resolve exactly).
     func mangaDetailFields(malId: Int?, titleHint: String?) async -> MangaBakaDetailFields? {
         await MangaBakaProvider.shared.detailFields(malId: malId, titleHint: titleHint)
+    }
+
+    /// Batch 23 — the manga release feed (Reading-mode Schedule) runs
+    /// through the SAME unified chain as every other manga endpoint:
+    /// MangaBaka has no chart endpoint (honest nil skip), MAL serves
+    /// top/manga by popularity, AniList serves its releasing-manga feed.
+    /// In-flight dedup + disk cache + provider cooldowns all apply — the
+    /// old hand-rolled AniList→Jikan fallback fired one request per caller
+    /// (three simultaneous duplicate fetches in the reported log).
+    func mangaReleaseSchedule() async throws -> [Media] {
+        try await runChain(
+            domain: .manga,
+            operation: "release-schedule",
+            cacheKey: "current",
+            cacheTTL: 15 * 60) { kind in
+            switch kind {
+            case .mangabaka:
+                return nil // search + series detail only — no release feed
+            case .mal:
+                let list = try await MALDiscoveryService.shared.fetchList("top/manga", queryItems: [
+                    URLQueryItem(name: "filter", value: "bypopularity"),
+                    URLQueryItem(name: "limit", value: "25")
+                ])
+                return list.map { MALDiscoveryService.shared.mapMangaToMedia($0) }
+            case .anilist:
+                let media = try await AniListService.shared.mangaReleaseSchedule()
+                return media.map { AniListProvider.shared.mapMangaMedia($0) }
+            default:
+                return nil
+            }
+        }.value
     }
 
     // MARK: - Schedule

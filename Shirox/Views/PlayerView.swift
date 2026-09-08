@@ -692,6 +692,15 @@ struct PlayerView: View {
             .id(subtitleTracks?.count ?? 0)            .adaptivePresentationDetents([.medium, .large])
         }
         .onChangeOf(selectedSubtitleTrack) { loadSubtitles() }
+        // Batch 23 (item 7) — renderer switch (System ↔ Custom) applies to
+        // the CURRENT playback too: embedded tracks move between native
+        // (Apple-styled) selection and the custom-overlay-only contract.
+        .onChangeOf(subtitleSettings.useSystemRenderer) { _ in
+            let externalActive = selectedSubtitleTrack != nil
+                || !(currentStream.subtitle ?? "").isEmpty
+                || subtitleCues.isEmpty == false
+            syncNativeSubtitleSelection(externalActive: externalActive)
+        }
         .sheet(isPresented: $showNextEpisodePicker, onDismiss: {
             nextEpisodeStreams = []
             nextEpisodeNumber = 0
@@ -1982,6 +1991,11 @@ struct PlayerView: View {
 
     private func loadSubtitles() {
         if let track = selectedSubtitleTrack {
+            // Batch 23 (item 7) — an external file is serving: make sure the
+            // embedded (native) tracks are deselected so subtitles never
+            // double-render in System renderer mode (no-op in Custom mode,
+            // where they're already deselected).
+            syncNativeSubtitleSelection(externalActive: true)
             Task {
                 do {
                     subtitleCues = try await VTTSubtitlesLoader.load(from: track.url.absoluteString, headers: track.headers)
@@ -1998,6 +2012,7 @@ struct PlayerView: View {
                 selectedSubtitleTrack = matched
                 return
             }
+            syncNativeSubtitleSelection(externalActive: true)
             Task {
                 do {
                     subtitleCues = try await VTTSubtitlesLoader.load(from: urlString, headers: currentStream.subtitleHeaders)
@@ -2017,6 +2032,40 @@ struct PlayerView: View {
                     Logger.shared.log("[Subtitles] Failed to load first track: \(error)", type: "Error")
                 }
             }
+        } else {
+            // No external subtitles exist at all — in System renderer mode
+            // the embedded tracks keep (or return to) AVPlayer's automatic
+            // native selection.
+            syncNativeSubtitleSelection(externalActive: false)
+        }
+    }
+
+    /// Batch 23 (item 7) — keeps AVPlayer's embedded-track selection in
+    /// sync with the renderer choice and the external-subtitle state:
+    /// - Custom renderer (default): embedded tracks are ALWAYS deselected —
+    ///   the custom overlay is the only subtitle renderer (v2.15 contract).
+    /// - System renderer: embedded tracks stay under AVPlayer's automatic
+    ///   (native, Apple-styled) selection — unless an EXTERNAL subtitle
+    ///   file is serving cues, in which case they're deselected so the two
+    ///   never render on top of each other.
+    private func syncNativeSubtitleSelection(externalActive: Bool) {
+        guard let item = player?.currentItem else { return }
+        let shouldDeselect = !SubtitleSettingsManager.shared.useSystemRenderer || externalActive
+        Task {
+            guard let group = try? await item.asset.loadMediaSelectionGroup(for: .legible),
+                  !group.options.isEmpty else { return }
+            await MainActor.run {
+                if shouldDeselect {
+                    item.select(nil, in: group)
+                } else {
+                    // Restore AVPlayer's automatic selection — native,
+                    // Apple-styled embedded subtitles.
+                    item.select(group.defaultOption, in: group)
+                }
+            }
+            Logger.shared.log(
+                "[Subtitles] Renderer sync: embedded legible tracks \(shouldDeselect ? "deselected (custom renderer or external file serving)" : "returned to native selection (system renderer)")",
+                type: "Debug")
         }
     }
 
@@ -2115,6 +2164,14 @@ struct PlayerView: View {
     /// custom overlay, sources with embedded tracks didn't). Deselecting the
     /// legible group makes the custom overlay the only subtitle renderer.
     private func disableNativeSubtitles(asset: AVURLAsset, item: AVPlayerItem) {
+        // Batch 23 (item 7) — in System renderer mode, AVPlayer's automatic
+        // media selection stays ON so EMBEDDED subtitle tracks render
+        // natively with Apple's default styling. When an external subtitle
+        // file actually serves cues, `syncNativeSubtitleSelection`
+        // (called from loadSubtitles) deselects the group so the two never
+        // double-render. Custom mode keeps the v2.15 contract: the custom
+        // overlay is the only renderer, always.
+        if SubtitleSettingsManager.shared.useSystemRenderer { return }
         Task {
             guard let group = try? await asset.loadMediaSelectionGroup(for: .legible),
                   !group.options.isEmpty else { return }

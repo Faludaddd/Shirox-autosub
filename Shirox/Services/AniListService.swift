@@ -592,68 +592,10 @@ final class AniListService {
         return try await fetchPage(query: query, variables: ["season": season.rawValue, "year": year, "sort": sort])
     }
 
-    /// Recently completed anime from the previous season.
-    /// Powers the "Recently Completed Last Season" home section.
-    func recentlyCompletedLastSeason() async throws -> [AniListMedia] {
-        let (season, year) = AniListSeason.previous()
-        let query = """
-        query ($season: MediaSeason, $year: Int) {
-          Page(page: 1, perPage: 20) {
-            media(season: $season, seasonYear: $year, type: ANIME, status: FINISHED, sort: POPULARITY_DESC, isAdult: false) {
-              id
-              idMal
-              title { romaji english native }
-              coverImage { large extraLarge }
-              bannerImage
-              description(asHtml: false)
-              episodes
-              duration
-              status
-              source
-              format
-              season
-              seasonYear
-              startDate { year month day }
-              endDate { year month day }
-              averageScore
-              popularity
-              genres
-              studios { edges { isMain node { id name } } }
-            }
-          }
-        }
-        """
-        return try await fetchPage(query: query, variables: ["season": season.rawValue, "year": year])
-    }
-
-    /// Upcoming anime (not yet released), sorted by popularity.
-    func upcoming() async throws -> [AniListMedia] {
-        let query = """
-        query {
-          Page(page: 1, perPage: 30) {
-            media(type: ANIME, status: NOT_YET_RELEASED, sort: POPULARITY_DESC, isAdult: false) {
-              id
-              idMal
-              title { romaji english native }
-              coverImage { large extraLarge }
-              bannerImage
-              description(asHtml: false)
-              episodes
-              status
-              format
-              season
-              seasonYear
-              startDate { year month day }
-              averageScore
-              popularity
-              genres
-              studios { edges { isMain node { id name } } }
-            }
-          }
-        }
-        """
-        return try await fetchPage(query: query)
-    }
+    // Batch 23 — recentlyCompletedLastSeason() and upcoming() were removed:
+    // dead after the shelves moved to the unified chain. The real queries
+    // live in browse(category:) (.recentlyCompleted / .upcoming cases) with
+    // the JP-catalog filter and the countryOfOrigin field selected.
 
     /// Anime airing today (next episode within the next 24 hours), sorted by airing time.
     /// Uses the AiringSchedule API for precise scheduling data.
@@ -845,12 +787,19 @@ final class AniListService {
     }
 
     func browse(category: BrowseCategory, page: Int) async throws -> [AniListMedia] {
-        // All four categories share the same field selection and perPage; only
+        // All categories share the same field selection and perPage; only
         // the `sort` (and, for `.seasonal`, the season/seasonYear filters)
         // differ. Building the query from a single template avoids four
         // near-identical ~15-line GraphQL string literals drifting out of sync.
+        //
+        // Batch 23 — the template now ALSO filters `countryOfOrigin: "JP"`
+        // at the source and SELECTS the field: the app's browse surfaces
+        // are a Japanese-anime catalog (the v2.20 carousel policy — the
+        // filter previously existed only on the old trending() query, which
+        // the unified chain bypassed, letting donghua back into every
+        // shelf and See All page).
         let sort: String
-        var mediaArgs = ["type: ANIME", "isAdult: false"]
+        var mediaArgs = ["type: ANIME", "isAdult: false", "countryOfOrigin: \"JP\""]
         var varDecls = ["$page: Int"]
         var variables: [String: Any] = ["page": page]
 
@@ -868,6 +817,16 @@ final class AniListService {
             sort = "POPULARITY_DESC"
         case .topRated:
             sort = "SCORE_DESC"
+        case .recentlyCompleted:
+            sort = "POPULARITY_DESC"
+            let (season, year) = AniListSeason.previous()
+            mediaArgs.append(contentsOf: ["season: $season", "seasonYear: $year", "status: FINISHED"])
+            varDecls.append(contentsOf: ["$season: MediaSeason", "$year: Int"])
+            variables["season"] = season.rawValue
+            variables["year"] = year
+        case .upcoming:
+            sort = "POPULARITY_DESC"
+            mediaArgs.append("status: NOT_YET_RELEASED")
         }
         mediaArgs.append("sort: \(sort)")
 
@@ -896,6 +855,7 @@ final class AniListService {
               averageScore
               popularity
               genres
+              countryOfOrigin
               studios { edges { isMain node { id name } } }
             }
           }
@@ -1618,6 +1578,13 @@ enum BrowseCategory: String, CaseIterable, Hashable {
     case seasonal
     case popular
     case topRated
+    /// Batch 23 — previously the "Recently Completed" home tile fell back
+    /// to the .popular query (BrowseCategory had no such case), so its
+    /// See All page showed all-time-popular anime under the wrong title.
+    case recentlyCompleted
+    /// Batch 23 — same correction for the "Upcoming" tile (it previously
+    /// fetched the trending list).
+    case upcoming
 
     var title: String {
         switch self {
@@ -1625,6 +1592,8 @@ enum BrowseCategory: String, CaseIterable, Hashable {
         case .seasonal: return "This Season"
         case .popular:  return "All-Time Popular"
         case .topRated: return "Top Rated"
+        case .recentlyCompleted: return "Recently Completed"
+        case .upcoming: return "Upcoming"
         }
     }
 }

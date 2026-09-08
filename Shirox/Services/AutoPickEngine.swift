@@ -135,9 +135,9 @@ final class AutoPickEngine: ObservableObject {
         Logger.shared.log("[AutoPick:\(requestId)] Started — EP \(episode) — \(media.title.displayTitle) — quality \(quality), language \(language), fallback \(useFallback)", type: "Info")
 
         let manager = ModuleManager.shared
-        let allAnimeModules = manager.modules.filter {
-            !$0.isManga && !$0.isNovel && !$0.isLocalPlayback && !$0.isJellyfin
-        }
+        // Batch 23 — ONE shared definition of "can stream anime" (the same
+        // one the Settings module list and the stream picker use).
+        let allAnimeModules = manager.modules.filter { $0.isAnimeStreamModule }
 
         // Priority list first (only IDs that still exist), then any modules
         // not in the list, so a stale priority entry never hides a module.

@@ -223,9 +223,14 @@ import Combine
 
                 // User is caught up on all aired episodes: don't advance/create an "Up Next",
                 // but refresh an existing card's availability so its "Caught up" label stays accurate.
+                // Batch 23 — RAISE-ONLY: AniList's count may be STALE (the
+                // reported bug — card said 8/8 while the module actually
+                // serves 9). A stale AniList sync must never LOWER a count
+                // the module's real episode list already established.
                 if let avail = availableEpisodes, nextEp > avail {
                     if let idx = newItems.firstIndex(where: { matchesShow($0, aniListID: media.id, moduleId: nil, mediaTitle: "") }) {
-                        newItems[idx].availableEpisodes = avail
+                        let existingCount = newItems[idx].availableEpisodes ?? 0
+                        newItems[idx].availableEpisodes = max(avail, existingCount)
                         newItems[idx].isAiring = isAiring
                         if let updatedAt = entry.updatedAt { newItems[idx].aniListUpdatedAt = updatedAt }
                     }
@@ -245,7 +250,10 @@ import Combine
                         mediaTitle: media.title.displayTitle,
                         imageUrl: media.coverImage.best ?? existing.imageUrl,
                         totalEpisodes: media.episodes ?? existing.totalEpisodes,
-                        availableEpisodes: availableEpisodes,
+                        // Batch 23 — raise-only: keep the higher of
+                        // AniList's count and what the card already had
+                        // (a module-established count is authoritative).
+                        availableEpisodes: max(availableEpisodes ?? 0, existing.availableEpisodes ?? 0) == 0 ? nil : max(availableEpisodes ?? 0, existing.availableEpisodes ?? 0),
                         isAiring: isAiring,
                         detailHref: existing.detailHref,
                         aniListUpdatedAt: entry.updatedAt

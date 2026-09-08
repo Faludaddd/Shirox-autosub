@@ -270,17 +270,20 @@ struct HomeView: View {
                 count: vm.topRated.count,
                 imageURL: vm.topRated.first?.coverImage.best
             ),
-            // #120 — Recently Completed and Upcoming use .popular/.trending as
-            // fetch fallbacks (BrowseCategory only has 4 cases), but the tile
-            // titles and gradients are distinct so the grid reads as 6 entries.
+            // Batch 23 — Recently Completed and Upcoming are REAL
+            // BrowseCategory cases now: each tile's See All page fetches
+            // the list its title promises (previously they borrowed the
+            // .popular/.trending queries — the "Recently Completed" page
+            // showed all-time-popular anime and "Upcoming" showed
+            // trending, with donghua mixed in).
             BrowseGridItem(
-                title: "Recently Completed", category: .popular, iconName: "checkmark.seal.fill",
+                title: "Recently Completed", category: .recentlyCompleted, iconName: "checkmark.seal.fill",
                 gradientColors: [Color.appAccent.opacity(0.6), Color.appAccent.opacity(0.35)],
                 count: vm.recentlyCompleted.count,
                 imageURL: vm.recentlyCompleted.first?.coverImage.best
             ),
             BrowseGridItem(
-                title: "Upcoming", category: .trending, iconName: "clock.fill",
+                title: "Upcoming", category: .upcoming, iconName: "clock.fill",
                 gradientColors: [Color.gray.opacity(0.6), Color.secondary.opacity(0.5)],
                 count: vm.upcoming.count,
                 imageURL: vm.upcoming.first?.coverImage.best
@@ -669,42 +672,58 @@ struct FeaturedCarousel: View {
         }
     }
 
-    /// Genre pills — up to 6, with a "+N" overflow chip, 22pt tall.
+    /// Genre pills — up to 6, with a "+N" overflow chip. Batch 23 (item 1):
+    /// slightly larger than the meta chips above (caption weight, taller
+    /// capsules) and HORIZONTALLY CENTERED as a group — the same centered
+    /// alignment the Start Watching / Start Reading button below uses.
+    /// The row still scrolls when the pills genuinely overflow (long genre
+    /// lists) and hit-testing stays off so the strip can't eat swipes.
     @ViewBuilder
     private func carouselGenreRow(_ media: Media) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 if let genres = media.genres, !genres.isEmpty {
                     ForEach(Array(genres.prefix(6).enumerated()), id: \.offset) { _, g in
                         Text(g)
-                            .font(.caption2.weight(.semibold))
+                            .font(.caption.weight(.semibold))
                             .foregroundStyle(.primary)
                             .lineLimit(1)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
                             .background(Color.primary.opacity(0.1), in: Capsule())
                             .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
                     }
                     // Truncation that says so — never silently clipped.
                     if genres.count > 6 {
                         Text("+\(genres.count - 6)")
-                            .font(.caption2.weight(.bold))
+                            .font(.caption.weight(.bold))
                             .foregroundStyle(.secondary)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 5)
                             .background(Color.primary.opacity(0.07), in: Capsule())
                     }
                 }
             }
+            // Centered when the pills fit the width (the group centers in
+            // the expanded frame); still scrolls when they overflow.
+            .frame(maxWidth: .infinity, alignment: .center)
         }
-        .frame(height: 22, alignment: .leading)
+        .frame(height: 28, alignment: .center)
         .allowsHitTesting(false)
-        .mask(alignment: .leading) {
+        .mask(alignment: .trailing) {
             HStack(spacing: 0) {
+                LinearGradient(
+                    stops: [
+                        .init(color: .clear, location: 0),
+                        .init(color: .black, location: 0.08)
+                    ],
+                    startPoint: .leading, endPoint: .trailing
+                )
+                .frame(width: 24)
                 Rectangle().frame(maxWidth: .infinity)
                 LinearGradient(
                     stops: [
-                        .init(color: .black, location: 0),
+                        .init(color: .black, location: 0.92),
                         .init(color: .clear, location: 1)
                     ],
                     startPoint: .leading, endPoint: .trailing
@@ -880,49 +899,43 @@ private struct PageIndicator: View {
     }
 }
 
-// MARK: - Carousel Title Logo (v2.19)
+// MARK: - Carousel Title Logo (v2.19, Batch 23 item 5)
 //
-// The featured carousel's title slot: the plain `Text` is replaced with the
-// title's official TRANSPARENT artwork from TheTVDB — the series clearlogo
-// (artwork type 23, 800x310 transparent PNG) when present, else clearart
-// (type 22), English entries ranked first by the service (see
-// `TVDBMappingService.getLogoCandidates`). Rendering rules: transparency,
-// aspect ratio, and original appearance are preserved exactly (scaledToFit —
-// never cropped or stretched), and no border, background, or shadow is ever
-// added. While candidates resolve — and for any title with no TVDB logo at
-// all — the previous title text renders in its original style, so the slot
-// is never empty. Responsive sizing: v2.21 enlarged the logo boxes by ~40%
-// at the user's request — 336x90pt on a compact banner, 448x118pt on a
-// regular (iPad) banner.
+// The featured carousel's title slot: the title's official TRANSPARENT
+// artwork from TheTVDB — the series clearlogo (artwork type 23, 800x310
+// transparent PNG) when present, else clearart (type 22), English entries
+// ranked first by the service (see `TVDBMappingService.getLogoCandidates`).
+// Rendering rules: transparency, aspect ratio, and original appearance are
+// preserved exactly (scaledToFit — never cropped or stretched), and no
+// border, background, or shadow is ever added.
+//
+// Batch 23 (item 5) — LOGO ONLY: the old text-title fallback is GONE.
+// The text↔logo alternation while swiping was the reported
+// flicker/slow-load bug (every page change rendered the title text first,
+// then swapped to artwork — a guaranteed two-frame change per swipe). Now
+// the slot shows the logo when one exists and NOTHING when it doesn't:
+// one rendering strategy, no per-card switching. The fixed-height slot
+// keeps the layout below (pills, button, hint) rock-stable either way.
+// Responsive sizing: 336x90pt on a compact banner, 448x118pt on a regular
+// (iPad) banner.
 private struct CarouselTitleLogo: View {
     let media: Media
     /// iPad (regular width) gets the larger, streaming-hero-scale logo box.
     var isWide: Bool = false
 
-    /// `nil` = unresolved or no logo available (title text shows). Reset at
-    /// the top of every page change so a stale logo never lingers over the
-    /// new banner while its own candidate resolves.
+    /// `nil` = unresolved, no logo, or the art failed to decode — the slot
+    /// renders EMPTY (never text). Reset at the top of every page change so
+    /// a stale logo never lingers over the new banner while its own
+    /// candidate resolves.
     @State private var logoURL: String?
 
     /// v2.21 — ~40% larger logo boxes (user request).
     private var maxLogoWidth: CGFloat { isWide ? 448 : 336 }
     private var maxLogoHeight: CGFloat { isWide ? 118 : 90 }
     /// v2.20 — FIXED slot height, reserved on every slide no matter what
-    /// fills it. v2.19 sized this slot from the content (the fitted logo's
-    /// intrinsic height, or 1 vs 2 lines of title text), which made
-    /// everything below it — genre pills, Start Watching, the hint — shift
-    /// position from slide to slide. Now the slot is a constant-height
-    /// container: the artwork/text scales and centers INSIDE it, and the
-    /// rest of the overlay layout can never move. `+ 8` also guarantees a
-    /// two-line `.title` fallback (worst case) fits without clipping.
+    /// fills it. The slot is a constant-height container so everything
+    /// below it — genre pills, Start Watching, the hint — can never move.
     private var slotHeight: CGFloat { maxLogoHeight + 8 }
-
-    /// v2.21 — every page change shows the title TEXT first, then the logo
-    /// replaces it: the resolver's result is held back for at least this
-    /// long so a fast swipe (logo already prefetched and cached) still gives
-    /// a readable title moment instead of snapping straight to stylized
-    /// artwork. When no logo exists the title simply stays (last rung).
-    private static let minimumTitleWindow: TimeInterval = 0.45
 
     var body: some View {
         Group {
@@ -934,42 +947,28 @@ private struct CarouselTitleLogo: View {
                     .accessibilityLabel(media.title.displayTitle)
                     .transition(.opacity)
             } else {
-                // Fallback / transitional title text — the exact style the
-                // carousel used before logos, kept as the last rung of the
-                // candidate chain (and while the logo resolves).
-                Text(media.title.displayTitle)
-                    .font(.title.weight(.bold))
-                    .foregroundStyle(.primary)
-                    .multilineTextAlignment(.leading)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.7)
-                    .frame(maxWidth: maxLogoWidth, alignment: .leading)
-                    .transition(.opacity)
+                // No logo (yet or at all) — an empty reserved slot. The
+                // title stays reachable for VoiceOver; sighted users read
+                // the card's real metadata in the rows below.
+                Color.clear
+                    .frame(maxWidth: maxLogoWidth, maxHeight: maxLogoHeight)
+                    .accessibilityLabel(media.title.displayTitle)
+                    .accessibilityHidden(true)
             }
         }
         // THE fixed slot: constant height on every slide, every device size.
-        // Content (logo or text) is vertically centered within it; the outer
+        // Content (logo or nothing) is vertically centered within it; the outer
         // VStack's leading alignment keeps it anchored bottom-left.
         .frame(height: slotHeight)
-        // v2.21 — the title→logo swap (and the reset back to title on page
-        // change) is a soft 0.3s crossfade instead of a hard cut.
-        .animation(.easeInOut(duration: 0.3), value: logoURL)
+        // A resolved logo fades in softly; no text-swap animation remains.
+        .animation(.easeInOut(duration: 0.25), value: logoURL)
         .task(id: media.uniqueId) {
-            // Reset per page: the new title's text shows immediately, then
-            // its logo swaps in once a candidate actually decodes.
+            // Reset per page: the slot clears instantly (no stale logo over
+            // the new banner), then its own artwork fades in once a
+            // candidate actually decodes. No title-text step in between —
+            // that was the flicker.
             logoURL = nil
-            let started = Date()
-            let url = await CarouselLogoResolver.bestLogoURL(for: media)
-            // Hold the title through its minimum readable window before the
-            // logo takes over (cancel-aware — a fast swipe to the next page
-            // abandons this one mid-hold).
-            let elapsed = Date().timeIntervalSince(started)
-            if elapsed < Self.minimumTitleWindow {
-                let remaining = UInt64((Self.minimumTitleWindow - elapsed) * 1_000_000_000)
-                try? await Task.sleep(nanoseconds: remaining)
-            }
-            guard !Task.isCancelled else { return }
-            logoURL = url
+            logoURL = await CarouselLogoResolver.bestLogoURL(for: media)
         }
     }
 }
@@ -1806,22 +1805,24 @@ struct ScheduleView: View {
         isLoadingManga = true
         mangaLoadError = nil
         do {
-            let raw = try await AniListService.shared.mangaReleaseSchedule()
-            mangaReleases = raw.map { AniListProvider.shared.mapMangaMedia($0) }
-        } catch {
-            // AniList failed — fall back to Jikan/MAL for the manga
-            // schedule on ANY failure (v2.22: not just when AniList is
-            // officially "disabled" or rate-limited — a network error or
-            // 5xx leaves the page just as empty).
-            Logger.shared.log("[MangaSchedule] AniList failed (\(error.localizedDescription)), falling back to Jikan", type: "Info")
-            do {
-                let mangaList = try await MALDiscoveryService.shared.fetchList("top/manga",
-                    queryItems: [URLQueryItem(name: "filter", value: "bypopularity"), URLQueryItem(name: "limit", value: "25")])
-                mangaReleases = mangaList.map { MALDiscoveryService.shared.mapToMedia($0) }
-            } catch {
-                mangaLoadError = "Manga schedule is temporarily unavailable. AniList and Jikan are both down. Please try again shortly."
-                Logger.shared.log("[MangaSchedule] Jikan fallback also failed: \(error.localizedDescription)", type: "Error")
+            // Batch 23 — the release feed runs through the SAME unified
+            // chain as every other manga endpoint (in-flight dedup + disk
+            // cache + provider cooldowns). The old hand-rolled
+            // AniList→Jikan fallback fired one request PER CALLER — the
+            // .task + mode-change triggers launched three identical
+            // fetches at once (the duplicate-request storm in the log).
+            let list = try await UnifiedProviderSystem.shared.mangaReleaseSchedule()
+            if list.isEmpty {
+                throw ProviderChainError.allProvidersFailed(lastReason: nil)
             }
+            mangaReleases = list
+        } catch {
+            if ProviderManager.isCancellationError(error) { return }
+            // One honest error — the chain already tried every source with
+            // dedup and cooldown pacing; re-trying it by hand here would
+            // re-trigger exactly the request storm this fix removes.
+            mangaLoadError = "Manga releases are temporarily unavailable — every manga source is unreachable. Please try again shortly."
+            Logger.shared.log("[MangaSchedule] unified chain failed: \(error.localizedDescription)", type: "Error")
         }
         isLoadingManga = false
 
@@ -2194,6 +2195,14 @@ struct ScheduleView: View {
 
         var fetched: [UnifiedScheduleEntry] = []
         var fetchedFromBackup = false
+        // Batch 23 — distinguishes "a LIVE backup provider served the page"
+        // (MAL/AniList/AnimeSchedule — fresh, real data worth persisting)
+        // from "the DISK snapshot itself served the page" (re-saving it
+        // would just re-stamp stale data as fresh). The old flag conflated
+        // the two: when MAL served as backup nothing was persisted, so the
+        // day MAL ALSO died the snapshot was empty/stale and the page hit
+        // the hard error wall with real data nowhere to be found.
+        var servedFromDiskSnapshot = false
 
         // ── The unified provider chain (AniChart → AnimeSchedule → MAL →
         //    AniList), with the AniList in-memory cache checked first so a
@@ -2225,6 +2234,7 @@ struct ScheduleView: View {
                 if let cached = ScheduleFallbackService.shared.cachedSnapshot(from: startTs, to: endTs) {
                     fetched = cached.entries
                     fetchedFromBackup = true
+                    servedFromDiskSnapshot = true
                     let f = RelativeDateTimeFormatter()
                     sourceNotice = "Offline mode — showing the schedule saved \(f.localizedString(for: cached.storedAt, relativeTo: Date())) ago. Pull to refresh."
                 }
@@ -2250,8 +2260,12 @@ struct ScheduleView: View {
         }
 
         // Persist the last good schedule so future outages have real data
-        // to fall back on (any successful source counts).
-        if !entries.isEmpty, !fetchedFromBackup {
+        // to fall back on. Batch 23: a LIVE source counts — including a
+        // backup provider (the page just showed real MAL/AniList data, so
+        // that's strictly better data than whatever the snapshot held). Only
+        // the disk-snapshot-served case is excluded: re-saving it would
+        // re-stamp stale data as just-saved.
+        if !entries.isEmpty, !servedFromDiskSnapshot {
             ScheduleFallbackService.shared.storeSnapshot(entries, from: startTs, to: endTs)
         }
 

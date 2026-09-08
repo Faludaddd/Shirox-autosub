@@ -81,9 +81,12 @@ struct DataSourcesSettingsPage: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Provider System")
                         .font(.headline)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                     Text("One shared chain serves every screen — priority, health, cooldowns, caching and deduplication all live here.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
             }
@@ -124,9 +127,13 @@ struct DataSourcesSettingsPage: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title)
                         .font(.headline)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                     Text(subtitle)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 }
                 Spacer()
                 Button {
@@ -217,10 +224,12 @@ struct DataSourcesSettingsPage: View {
         let testingKind: MetaProviderKind?
         let onTest: (MetaProviderKind) async -> Void
 
-        /// Estimated per-card stride for the drag-reorder math. Cards vary
-        /// in height (metrics rows / test banners), so reordering snaps at
-        /// this granularity; the arrows give exact single-step control.
-        private let rowStride: CGFloat = 138
+        /// Estimated per-card stride for the drag-reorder math. Batch 23:
+        /// the reworked cards are slightly taller (separated identity /
+        /// health rows), so the stride follows. Cards vary in height
+        /// (metrics rows / test banners), so reordering snaps at this
+        /// granularity; the arrows give exact single-step control.
+        private let rowStride: CGFloat = 152
 
         @State private var draggedIndex: Int?
         @State private var dragOffset: CGFloat = 0
@@ -343,9 +352,11 @@ struct DataSourcesSettingsPage: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Provider Cache")
                         .font(.headline)
+                        .lineLimit(1)
                     Text("Cached provider responses keep repeat loads instant. Clearing never touches your downloads, library, or watch data.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
             }
@@ -385,14 +396,19 @@ struct DataSourcesSettingsPage: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.subheadline.weight(.medium))
+                    .lineLimit(1)
                 Text("\(detail) — \(ByteCountFormatter.string(fromByteCount: size, countStyle: .file))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.8)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
             Button("Clear", action: onClear)
                 .buttonStyle(.bordered)
                 .controlSize(.small)
+                .fixedSize()
         }
         .padding(.vertical, 2)
     }
@@ -448,11 +464,70 @@ struct ProviderDragHandle {
     let onDragEnded: (CGFloat) -> Void
 }
 
+// MARK: - Provider brand tile (Batch 23, item 2)
+
+/// A provider's recognizable identity tile: a two-letter monogram in the
+/// provider's brand color on a rounded square. Always renders (no network
+/// dependency — a logo URL would go dead exactly when its provider is
+/// down, which is when the user looks at this page), readable at a glance,
+/// and stable at every Dynamic Type size.
+private struct ProviderLogoTile: View {
+    let kind: MetaProviderKind
+
+    private var monogram: String {
+        switch kind {
+        case .tvdb:          return "TV"
+        case .mal:           return "M"
+        case .anilist:       return "AL"
+        case .kitsu:         return "K"
+        case .anidb:         return "DB"
+        case .mangabaka:     return "MB"
+        case .anichart:      return "AC"
+        case .animeschedule: return "AS"
+        }
+    }
+
+    private var brandColor: Color {
+        switch kind {
+        case .tvdb:          return Color(red: 0.10, green: 0.62, blue: 0.92)   // TVDB sky blue
+        case .mal:           return Color(red: 0.18, green: 0.32, blue: 0.64)   // MyAnimeList indigo
+        case .anilist:       return Color(red: 0.01, green: 0.60, blue: 1.00)   // AniList #0299FF-ish
+        case .kitsu:         return Color(red: 0.96, green: 0.33, blue: 0.25)   // Kitsu coral
+        case .anidb:         return Color(red: 0.42, green: 0.13, blue: 0.22)   // AniDB dark maroon
+        case .mangabaka:     return Color(red: 0.48, green: 0.31, blue: 0.92)   // MangaBaka violet
+        case .anichart:      return Color(red: 0.00, green: 0.68, blue: 0.63)   // AniChart teal
+        case .animeschedule: return Color(red: 0.20, green: 0.68, blue: 0.33)   // AnimeSchedule green
+        }
+    }
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(brandColor.opacity(0.18))
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .strokeBorder(brandColor.opacity(0.45), lineWidth: 1)
+            Text(monogram)
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundStyle(brandColor)
+                .minimumScaleFactor(0.6)
+                .lineLimit(1)
+        }
+        .frame(width: 34, height: 34)
+        .accessibilityHidden(true)
+    }
+}
+
 // MARK: - Provider card
 
-/// One provider's card: identity row (priority badge, name, live health),
-/// metrics row (last success, latency, cooldown), and actions (test,
-/// enable, reorder). All data comes from the real provider system.
+/// One provider's card, reworked in Batch 23 (item 2) so nothing can
+/// overlap at any Dynamic Type size:
+/// - Row 1: drag handle · brand tile · name + host stack · enable toggle.
+/// - Row 2: priority badge · health pill (cooldown chip when active).
+/// - Row 3: metrics (last success, latency) — single-line labels.
+/// - Row 4: actions (Test Provider, move up, move down).
+/// Every text is lineLimit(1) + minimumScaleFactor so rows keep a stable
+/// height — that height stability is also what keeps the drag-reorder
+/// math honest. All data comes from the real provider system.
 private struct ProviderCardView: View {
     @ObservedObject private var providers = UnifiedProviderSystem.shared
     let kind: MetaProviderKind
@@ -483,11 +558,10 @@ private struct ProviderCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            // Identity row.
+            // Row 1 — identity: handle, brand tile, name + host, toggle.
+            // The name/host stack takes the flexible space; the toggle is a
+            // fixed trailing element. Nothing else shares this line.
             HStack(spacing: 10) {
-                // v2.24 — drag handle: press-and-hold to lift the card,
-                // then drag vertically to reorder. Holding still first is
-                // what keeps ordinary scrolling untouched.
                 if let handle = dragHandle {
                     Image(systemName: "line.3.horizontal")
                         .font(.system(size: 13, weight: .semibold))
@@ -521,19 +595,14 @@ private struct ProviderCardView: View {
                         .accessibilityHint("Drag up or down to change priority")
                 }
 
-                // Priority badge (#1 = PRIMARY).
-                Text(priorityIndex == 0 ? "★" : "\(priorityIndex + 1)")
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(priorityIndex == 0 ? .white : .secondary)
-                    .frame(width: 26, height: 26)
-                    .background(
-                        priorityIndex == 0 ? Color.appAccent : Color.secondary.opacity(0.14),
-                        in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                ProviderLogoTile(kind: kind)
 
-                VStack(alignment: .leading, spacing: 1) {
+                VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
                         Text(kind.displayName)
                             .font(.subheadline.weight(.semibold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
                         if !enabled {
                             Text("Disabled")
                                 .font(.caption2.weight(.bold))
@@ -541,25 +610,17 @@ private struct ProviderCardView: View {
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
                                 .background(Color.orange.opacity(0.15), in: Capsule())
+                                .fixedSize()
                         }
                     }
                     Text("\(providers.priorityLabel(for: kind, domain: domain)) · \(kind.apiHost)")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .minimumScaleFactor(0.7)
                 }
-                Spacer()
-
-                // Health pill.
-                HStack(spacing: 5) {
-                    Image(systemName: health.symbolName)
-                        .font(.system(size: 9, weight: .bold))
-                    Text(health.label)
-                        .font(.caption2.weight(.semibold))
-                }
-                .foregroundStyle(healthColor)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(healthColor.opacity(0.12), in: Capsule())
+                Spacer(minLength: 4)
 
                 Toggle("", isOn: Binding(
                     get: { enabled },
@@ -570,29 +631,72 @@ private struct ProviderCardView: View {
                 .labelsHidden()
                 .scaleEffect(0.8)
                 .frame(width: 44)
+                .accessibilityLabel("\(kind.displayName) enabled")
             }
 
-            // Metrics: last success, latency, cooldown, test result.
-            HStack(spacing: 12) {
-                if let success = status?.lastSuccess {
-                    Label(
-                        RelativeDateTimeFormatter().localizedString(for: success, relativeTo: Date()),
-                        systemImage: "clock")
-                } else {
-                    Label("No requests yet", systemImage: "clock")
+            // Row 2 — priority + health on their own line, never competing
+            // with the identity row.
+            HStack(spacing: 8) {
+                // Priority badge (#1 = PRIMARY — tried first).
+                Text(priorityIndex == 0 ? "★" : "\(priorityIndex + 1)")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(priorityIndex == 0 ? .white : .secondary)
+                    .frame(width: 26, height: 26)
+                    .background(
+                        priorityIndex == 0 ? Color.appAccent : Color.secondary.opacity(0.14),
+                        in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .accessibilityLabel(priorityIndex == 0 ? "Primary source" : "Priority \(priorityIndex + 1)")
+
+                // Health pill — its own room to breathe.
+                HStack(spacing: 5) {
+                    Image(systemName: health.symbolName)
+                        .font(.system(size: 9, weight: .bold))
+                    Text(health.label)
+                        .font(.caption2.weight(.semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                 }
-                if let latency = status?.lastLatencyMs {
-                    Label("\(latency) ms", systemImage: "speedometer")
-                }
+                .foregroundStyle(healthColor)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(healthColor.opacity(0.12), in: Capsule())
+                .fixedSize(horizontal: true, vertical: true)
+
+                Spacer(minLength: 4)
+
+                // Cooldown chip — only while a cooldown is actually active.
                 if let until = status?.cooldownUntil, until > Date() {
                     Label(
                         Int(until.timeIntervalSinceNow) > 90
                             ? "cooldown \(Int(until.timeIntervalSinceNow) / 60)m"
                             : "cooldown \(Int(until.timeIntervalSinceNow.rounded(.up)))s",
                         systemImage: "hourglass")
+                        .font(.caption2.weight(.semibold))
                         .foregroundStyle(.orange)
+                        .lineLimit(1)
+                        .fixedSize()
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.orange.opacity(0.12), in: Capsule())
                 }
-                Spacer()
+            }
+
+            // Row 3 — metrics: single-line labels that shrink, never wrap.
+            HStack(spacing: 12) {
+                if let success = status?.lastSuccess {
+                    Label(
+                        RelativeDateTimeFormatter().localizedString(for: success, relativeTo: Date()),
+                        systemImage: "clock")
+                        .lineLimit(1)
+                } else {
+                    Label("No requests yet", systemImage: "clock")
+                        .lineLimit(1)
+                }
+                if let latency = status?.lastLatencyMs {
+                    Label("\(latency) ms", systemImage: "speedometer")
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
             }
             .font(.caption2)
             .foregroundStyle(.secondary)
@@ -602,13 +706,17 @@ private struct ProviderCardView: View {
                 HStack(spacing: 6) {
                     Image(systemName: result.ok ? "checkmark.circle.fill" : "xmark.circle.fill")
                         .foregroundStyle(result.ok ? .green : .red)
+                        .fixedSize()
                     Text(result.ok
                          ? "Online · \(result.latencyMs) ms"
                          : "Unavailable · \(result.message)")
                         .lineLimit(2)
+                        .minimumScaleFactor(0.7)
                     Spacer()
                     Text(RelativeDateTimeFormatter().localizedString(for: result.testedAt, relativeTo: Date()))
                         .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .fixedSize()
                 }
                 .font(.caption2.weight(.medium))
                 .padding(.horizontal, 10)
@@ -621,8 +729,10 @@ private struct ProviderCardView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.circle")
                         .foregroundStyle(.orange)
+                        .fixedSize()
                     Text(note)
                         .lineLimit(3)
+                        .minimumScaleFactor(0.7)
                     Spacer()
                 }
                 .font(.caption2)
@@ -633,7 +743,7 @@ private struct ProviderCardView: View {
                             in: RoundedRectangle(cornerRadius: 9, style: .continuous))
             }
 
-            // Actions.
+            // Row 4 — actions.
             HStack(spacing: 10) {
                 Button {
                     Task { await onTest() }
@@ -646,6 +756,8 @@ private struct ProviderCardView: View {
                             Image(systemName: "bolt.horizontal")
                         }
                         Text(isTesting ? "Testing…" : "Test Provider")
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                     }
                     .font(.caption.weight(.semibold))
                     .frame(maxWidth: .infinity)
@@ -661,6 +773,7 @@ private struct ProviderCardView: View {
                 .buttonStyle(.bordered)
                 .controlSize(.small)
                 .disabled(priorityIndex == 0)
+                .accessibilityLabel("Move \(kind.displayName) up")
 
                 Button(action: onMoveDown) {
                     Image(systemName: "arrow.down")
@@ -669,6 +782,7 @@ private struct ProviderCardView: View {
                 .buttonStyle(.bordered)
                 .controlSize(.small)
                 .disabled(priorityIndex >= providers.order(for: domain).count - 1)
+                .accessibilityLabel("Move \(kind.displayName) down")
             }
         }
         .padding(12)

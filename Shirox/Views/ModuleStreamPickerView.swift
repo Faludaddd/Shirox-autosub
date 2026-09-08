@@ -120,6 +120,45 @@ private final class ModuleStreamRowViewModel: ObservableObject {
         return await SeasonChainMapper.shared.resolveOffset(anchorAniListID: mediaId, anchorMALID: nil) ?? 0
     }
 
+    /// Batch 23 (item 9) — the module's REAL episode count, expressed in
+    /// the show's franchise numbering:
+    /// - A COMBINED multi-season list (one entry containing every season)
+    ///   already counts the whole franchise — use it directly. Such a list
+    ///   necessarily holds more episodes than the offset alone.
+    /// - A PER-SEASON entry (numbers restart at 1 for a later season, and
+    ///   the list is shorter than the franchise episodes that precede it)
+    ///   maps to `seasonOffset + count`.
+    ///
+    /// The count feeds a RAISE-ONLY reconciliation of the Continue
+    /// Watching card (never lowers — a per-season edge or a shorter mirror
+    /// must not shrink the ceiling the card already has).
+    private func reconcileContinueWatchingCeiling(episodes: [EpisodeLink], seasonOffset offset: Int) {
+        guard let aid = mediaId, !episodes.isEmpty else { return }
+        let isPerSeasonEntry = offset > 0 && episodes.count <= offset
+        let moduleCount = isPerSeasonEntry ? offset + episodes.count : episodes.count
+        guard moduleCount > 0 else { return }
+
+        let manager = ContinueWatchingManager.shared
+        guard let card = manager.items.first(where: { $0.aniListID == aid }),
+              (card.availableEpisodes ?? 0) < moduleCount else { return }
+
+        let raisedTotal: Int? = {
+            let t = max(moduleCount, card.totalEpisodes ?? 0)
+            return t > 0 ? t : nil
+        }()
+        manager.notifyNewEpisodesAvailable(
+            aniListID: aid,
+            moduleId: card.moduleId,
+            mediaTitle: card.mediaTitle,
+            availableEpisodes: moduleCount,
+            imageUrl: card.imageUrl,
+            totalEpisodes: raisedTotal,
+            isAiring: card.isAiring,
+            detailHref: card.detailHref
+        )
+        Logger.shared.log("[CW] module count \(moduleCount) raised the card's ceiling (was \(card.availableEpisodes ?? 0)) for \"\(card.mediaTitle)\"", type: "Info")
+    }
+
     func find() async {
         let keyword = searchTitle.trimmingCharacters(in: .whitespaces)
         guard !keyword.isEmpty else { return }
@@ -170,7 +209,16 @@ private final class ModuleStreamRowViewModel: ObservableObject {
             }
             availableCount = episodes.count
 
-            if let matched = matchEpisode(from: episodes, target: targetEpisodeNumber, seasonOffset: await seasonOffset()) {
+            // Batch 23 (item 9) — reconcile the Continue Watching card's
+            // ceiling with the module's REAL episode list, the moment that
+            // list exists. Raise-only: a module list that genuinely has
+            // MORE episodes than the stale AniList total raises the card
+            // (the reported "8/8 caught up when the module actually serves
+            // 9" bug); a shorter list never lowers it.
+            let offset = await seasonOffset()
+            reconcileContinueWatchingCeiling(episodes: episodes, seasonOffset: offset)
+
+            if let matched = matchEpisode(from: episodes, target: targetEpisodeNumber, seasonOffset: offset) {
                 state = .loadingStreams
                 selectedEpisodeHref = item.href
                 selectedEpisodeActualHref = matched.href
@@ -301,12 +349,14 @@ struct ModuleStreamPickerView: View {
     @State private var query: String = ""
     @State private var selectedModuleId: String? = nil
 
-    /// Anime modules only — the underlying filter. Manga modules are
-    /// excluded here at the data-source layer so they can never reach
-    /// any rendering code path. We also filter out local-playback and
-    /// Jellyfin pseudo-modules (they have their own entry points).
+    /// Anime modules only — the underlying filter. Batch 23 — uses the
+    /// ONE shared `isAnimeStreamModule` definition (same predicate as the
+    /// Settings module list, the stream picker and Auto Pick). Manga,
+    /// novel, local-playback and Jellyfin pseudo-modules are excluded here
+    /// at the data-source layer so they can never reach any rendering code
+    /// path (they have their own entry points).
     private var animeModules: [ModuleDefinition] {
-        moduleManager.modules.filter { !$0.isManga && !$0.isNovel && !$0.isLocalPlayback && !$0.isJellyfin }
+        moduleManager.modules.filter { $0.isAnimeStreamModule }
     }
 
     private var visibleModules: [ModuleDefinition] {

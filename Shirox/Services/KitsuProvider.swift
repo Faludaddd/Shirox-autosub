@@ -131,12 +131,16 @@ final class KitsuProvider {
 
     /// Paged browse for the See All chain. Kitsu pages via offset
     /// (page[limit] x page[offset]).
+    ///
+    /// Batch 23: `.trending` used `sort=followersCount` — Kitsu answers
+    /// that with HTTP 400 ("followers_count is not a valid sort criteria
+    /// for anime", verified live). The valid sort field is `userCount`.
     func browse(category: BrowseCategory, page: Int) async throws -> [Media] {
         let offset = max(0, (page - 1)) * 20
         let path: String
         switch category {
         case .trending:
-            path = "/anime?page[limit]=20&page[offset]=\(offset)&sort=followersCount&include=mappings&filter[status]=current,upcoming"
+            path = "/anime?page[limit]=20&page[offset]=\(offset)&sort=userCount&include=mappings&filter[status]=current,upcoming"
         case .seasonal:
             // Kitsu has no "current season" chart; sort by user count for
             // a stable popular-now list (the chain treats it as a fallback
@@ -146,6 +150,13 @@ final class KitsuProvider {
             path = "/anime?page[limit]=20&page[offset]=\(offset)&sort=userCount&include=mappings&filter[status]=current,finished"
         case .topRated:
             path = "/anime?page[limit]=20&page[offset]=\(offset)&sort=averageRating&include=mappings&filter[status]=finished"
+        case .recentlyCompleted:
+            // Kitsu exposes no finished-date sort — a completed list sorted
+            // by user count is the closest honest equivalent (the chain
+            // reaches Kitsu only after MAL/AniList failed).
+            path = "/anime?page[limit]=20&page[offset]=\(offset)&sort=userCount&include=mappings&filter[status]=finished"
+        case .upcoming:
+            path = "/anime?page[limit]=20&page[offset]=\(offset)&sort=userCount&include=mappings&filter[status]=upcoming,unreleased"
         }
         return try await fetchList(path: path)
     }
@@ -209,9 +220,33 @@ final class KitsuProvider {
                 studioNames: nil,
                 source: nil,
                 duration: nil,
-                airDateRange: nil))
+                airDateRange: nil,
+                countryOfOrigin: Self.inferredCountry(titles: attrs.titles)))
         }
         return media
+    }
+
+    // MARK: - Country inference (feeds the JP catalog filter)
+
+    /// Kitsu carries no country-of-origin field, and its `ja_jp` title
+    /// slot is unreliable (Chinese donghua titles get stuffed into it —
+    /// verified live: "斗罗大陆" sits in BOTH ja_jp and zh_cn). The honest
+    /// signal is the WRITING SYSTEM, the same technique the Jikan path
+    /// uses: a CJK title that contains NO kana is hanzi-only — Chinese
+    /// production → "CN". A title with kana is Japanese; a title with no
+    /// CJK at all is unknown (passes the catalog filter unchanged).
+    private static func inferredCountry(titles: [String: String]?) -> String? {
+        guard let titles,
+              let cjkTitle = titles["zh_cn"] ?? titles["ja_jp"],
+              !cjkTitle.isEmpty else { return nil }
+        let hasCJK = cjkTitle.contains { char in
+            char.unicodeScalars.contains { (0x4E00...0x9FFF).contains($0.value) }
+        }
+        guard hasCJK else { return nil }
+        let hasKana = cjkTitle.contains { char in
+            char.unicodeScalars.contains { (0x3040...0x30FF).contains($0.value) }
+        }
+        return hasKana ? nil : "CN"
     }
 
     private func mapStatus(_ raw: String?) -> String? {

@@ -102,6 +102,37 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.25",
+        date: "2026-09-08",
+        added: [
+            "A subtitle style switch — choose between Apple's default subtitle look and Shirox's custom styling. Find it in the player's subtitle menu and in Settings → Subtitles; the choice sticks across restarts. Apple mode renders embedded subtitles with the system's native appearance and gives external subtitle files the same clean default look; Shirox mode is the full custom styler you already know, with every appearance setting applying as before.",
+            "Manga Home now survives full outages the same way anime Home does: when every manga source is unreachable, the last successfully loaded shelves (kept up to 6 hours) come back with a clear note about their age instead of a blank error page. Pull to refresh retries the live sources.",
+            "Each provider on the Data Sources page now shows a recognizable brand tile (TVDB, MyAnimeList, AniList, Kitsu, AniDB, MangaBaka, AniChart, AnimeSchedule) so the list reads at a glance instead of as a wall of text."
+        ],
+        fixed: [
+            "The See All pages now show what their titles promise: 'Recently Completed' loads the previous season's finished shows and 'Upcoming' loads genuinely unreleased anime — both previously borrowed unrelated lists (all-time popular and trending), which is why the results felt random or off-topic. Every browse list is also now a Japanese-anime list: entries known to originate outside Japan are filtered out at every provider, so donghua no longer mixes into the shelves or See All grids.",
+            "Continue Watching's 'caught up' count: the episode list from your actual streaming source is now the authority for how many episodes exist. AniList's stored total can be stale — the reported case said 8 of 8 while the source really served 9 — so counts now reconcile upward against the real list and never get lowered by a stale sync.",
+            "Tapping an anime in Continue Watching (or long-pressing it and choosing 'View on AniList') no longer errors out when AniList is down: the page opens immediately with the title, poster, and episode info the card already carries, then fills in the rest from TVDB and the other sources. Previously it hit a hard error wall while Library taps worked fine.",
+            "The Schedule's saved-data fallback quietly rotted: while a backup source (like MyAnimeList) was serving the page, the saved copy was never refreshed — so on the day that source ALSO went down, the fallback was empty or stale and the page still failed. Every successful live load now refreshes the saved copy, so the last good data is genuinely the last good data.",
+            "The manga release schedule fired three identical requests at once (one per caller, all failing with the same timeout) — it now runs through the shared request system like every other feature, so there's exactly one deduplicated, paced, cached request no matter how many screens ask.",
+            "Kitsu's browse requests returned HTTP 400 errors — a wrong sort field in the app's own request, not a Kitsu outage. It now uses the correct field, so Kitsu genuinely serves as a working fallback for browse and See All.",
+            "The 'modules are installed but the app says no modules' confusion: the anime module list in Settings now only counts sources that can actually stream anime — the same list every watch flow uses. Novel, local-playback, and Jellyfin entries moved to their own clearly labeled section instead of inflating the anime count.",
+            "The carousel no longer flickers or feels slow while swiping: the title text is gone entirely — the logo shows when artwork is available, and the slot simply stays empty when it isn't, so every slide uses one consistent rendering instead of switching between text and artwork mid-swipe."
+        ],
+        changed: [
+            "Carousel genre pills (Action, Fantasy, …) are slightly larger and horizontally centered as a group — the same centered alignment as the Start Watching / Start Reading button below them — while still scrolling gracefully when a long genre list needs it.",
+            "The Data Sources page was rebuilt row by row: the provider's name, API host, priority, and health status each get their own space with the brand tile, drag handle, enable toggle, and test/move buttons arranged so nothing can overlap or wrap unexpectedly — even at the largest accessibility text sizes.",
+            "The Recently Completed and Upcoming shelves draw from the full provider chain (MyAnimeList, AniList, Kitsu) instead of AniList alone, so they stay filled through AniList outages — and they're part of the same saved-data fallback as the rest of Home."
+        ],
+        improved: [
+            "The provider chain's decision log now tells the whole story: every provider attempt is visible with its outcome — who was skipped and why (cooling down, not configured, doesn't serve that data) and who actually served the request and how fast. TVDB is genuinely tried first for search and details; it simply has no trending-chart endpoints, and that's now recorded instead of silent.",
+            "AnimeSchedule no longer wastes a spot in every schedule attempt when no API token is entered: it's skipped up front with a clear note, and it activates the moment you add your free token in Data Sources.",
+            "The subtitle menu hides the custom appearance controls while Apple's default look is selected, so the settings you see always match the settings that apply."
+        ],
+        removed: [],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "2.24",
         date: "2026-09-08",
         added: [

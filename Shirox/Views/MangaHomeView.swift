@@ -39,6 +39,34 @@ struct MangaHomeContent: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
+                        // Batch 23 — honest notice when the disk snapshot
+                        // (not a live provider) is serving the shelves.
+                        if let notice = vm.snapshotNotice {
+                            HStack(spacing: 8) {
+                                Image(systemName: "wifi.exclamationmark")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(.orange)
+                                Text(notice)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(3)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                Spacer(minLength: 0)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(Color.orange.opacity(0.08))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .strokeBorder(Color.orange.opacity(0.2), lineWidth: 1)
+                            )
+                            .padding(.horizontal, 16)
+                            .padding(.top, 8)
+                        }
+
                         // 1. HERO — manga featured carousel (same component as
                         //    anime, but fed manga Media items). `isManga: true`
                         //    flips the action button to "Read" and routes taps
@@ -69,7 +97,7 @@ struct MangaHomeContent: View {
                         Spacer().frame(height: 28)
                     }
                 }
-                .refreshable { await vm.load() }
+                .refreshable { await vm.reload() }
                 .coordinateSpace(name: "mangaHomeScroll")
                 .ignoresSafeArea(edges: .top)
             }
@@ -113,11 +141,28 @@ final class MangaHomeViewModel: ObservableObject {
     @Published var latest: [Media] = []
     @Published var isLoading = false
     @Published var error: String?
+    /// Batch 23 — set when the DISK snapshot (not a live provider) is
+    /// serving the shelves, so the page can say so honestly instead of
+    /// looking like fresh data.
+    @Published var snapshotNotice: String?
+
+    /// Pull-to-refresh entry point: clears the guard that `load()` uses
+    /// (skip when already populated) so a refresh genuinely re-fetches —
+    /// including when the SNAPSHOT served the last render (its notice's
+    /// "Pull to refresh" promise must actually work).
+    func reload() async {
+        trending = []
+        popular = []
+        topRated = []
+        latest = []
+        await load()
+    }
 
     func load() async {
         guard trending.isEmpty || popular.isEmpty else { return }
         isLoading = true
         error = nil
+        snapshotNotice = nil
 
         // v2.24 — Manga shelves run through the unified provider chain
         // (MangaBaka → MAL → AniList per the Data Sources priority).
@@ -140,14 +185,40 @@ final class MangaHomeViewModel: ObservableObject {
             latest = try await UnifiedProviderSystem.shared.mangaShelf(.latest)
         } catch { latest = [] }
 
+        // Batch 23 — snapshot fallback of last resort, the SAME contract
+        // anime Home has had since v2.23: when every manga provider is
+        // down, the last-good shelves (6h TTL) keep the page alive with
+        // REAL data + an honest "saved data" notice instead of the error
+        // wall (MangaBaka is Cloudflare-gated, MAL and AniList have
+        // outage windows — all three failing at once was a hard blank).
+        if trending.isEmpty, popular.isEmpty, topRated.isEmpty, latest.isEmpty {
+            if let snap = MangaSnapshotStore.loadShelves() {
+                trending = snap.trending ?? []
+                popular = snap.popular ?? []
+                topRated = snap.topRated ?? []
+                latest = snap.latest ?? []
+                if !trending.isEmpty || !popular.isEmpty || !topRated.isEmpty || !latest.isEmpty {
+                    let f = RelativeDateTimeFormatter()
+                    snapshotNotice = "Manga sources are unreachable — showing the shelves saved \(f.localizedString(for: snap.savedAt, relativeTo: Date())) ago. Pull to refresh."
+                }
+            }
+        }
+
         isLoading = false
-        if trending.isEmpty && popular.isEmpty && topRated.isEmpty && latest.isEmpty {
-            // Honest message when every provider in the chain is down.
+        if trending.isEmpty && popular.isEmpty && topRated.isEmpty && latest.isEmpty && snapshotNotice == nil {
+            // Honest message when every provider in the chain is down AND
+            // no fresh snapshot exists to bridge the outage.
             if AniListService.shared.isApiDisabled() || AniListService.shared.isRateLimited() {
                 error = "Manga data is temporarily unavailable — every manga source is unreachable. Please try again shortly."
             } else {
                 error = "Couldn't load manga. Check your connection and try again."
             }
+        }
+
+        // Persist the last-good shelves AFTER everything settles — a live
+        // provider served them, so the snapshot is real data.
+        if !trending.isEmpty, snapshotNotice == nil {
+            MangaSnapshotStore.saveShelves(trending: trending, popular: popular, topRated: topRated, latest: latest)
         }
 
         // Round 9 — fill in live chapter counts for AIRING manga posters.
@@ -156,37 +227,6 @@ final class MangaHomeViewModel: ObservableObject {
         // patched in progressively (MangaUpdates cross-reference, disk
         // cached — repeat loads are instant).
         await enrichAiringChapterCounts()
-    }
-
-    /// One Jikan top/manga shelf, correctly mapped to manga semantics.
-    /// `filter` nil = Jikan's default (highest rated).
-    private func jikanMangaShelf(filter: String?) async -> [Media] {
-        var query: [URLQueryItem] = [URLQueryItem(name: "limit", value: "25")]
-        if let filter {
-            query.append(URLQueryItem(name: "filter", value: filter))
-        }
-        do {
-            let list = try await MALDiscoveryService.shared.fetchList("top/manga", queryItems: query)
-            return list.map { MALDiscoveryService.shared.mapMangaToMedia($0) }
-        } catch {
-            Logger.shared.log("[MangaHome] Jikan shelf fallback failed: \(error.localizedDescription)", type: "Error")
-            return []
-        }
-    }
-
-    /// Newest manga from Jikan (`order_by=start_date&sort=desc`) — the
-    /// Jikan equivalent of AniList's "Latest Manga" shelf.
-    private func jikanLatestManga() async -> [Media] {
-        do {
-            let list = try await MALDiscoveryService.shared.fetchList("manga",
-                queryItems: [URLQueryItem(name: "order_by", value: "start_date"),
-                             URLQueryItem(name: "sort", value: "desc"),
-                             URLQueryItem(name: "limit", value: "25")])
-            return list.map { MALDiscoveryService.shared.mapMangaToMedia($0) }
-        } catch {
-            Logger.shared.log("[MangaHome] Jikan latest-manga fallback failed: \(error.localizedDescription)", type: "Error")
-            return []
-        }
     }
 
     /// Patches the poster status line of airing manga from "Airing" to
@@ -232,6 +272,47 @@ final class MangaHomeViewModel: ObservableObject {
         if let index = latest.firstIndex(where: { $0.id == mediaId }) {
             latest[index].episodes = count
         }
+    }
+}
+
+// MARK: - Manga shelf snapshot (offline fallback of last resort)
+
+/// Batch 23 — the manga twin of the anime Home's `SnapshotStore`: disk
+/// snapshot of the last-good manga shelves, 6-hour TTL, written on every
+/// successful live load, served only when the whole manga chain is down.
+/// A bridge over outages, not a permanent freeze.
+enum MangaSnapshotStore {
+    private static let ttl: TimeInterval = 6 * 3600
+
+    private static var fileURL: URL {
+        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        return caches.appendingPathComponent("manga-shelves-snapshot.json")
+    }
+
+    struct MangaShelfSnapshot: Codable {
+        let savedAt: Date
+        let trending: [Media]?
+        let popular: [Media]?
+        let topRated: [Media]?
+        let latest: [Media]?
+    }
+
+    static func saveShelves(trending: [Media], popular: [Media], topRated: [Media], latest: [Media]) {
+        guard !trending.isEmpty else { return }
+        let snapshot = MangaShelfSnapshot(savedAt: Date(),
+                                          trending: trending,
+                                          popular: popular.isEmpty ? nil : popular,
+                                          topRated: topRated.isEmpty ? nil : topRated,
+                                          latest: latest.isEmpty ? nil : latest)
+        guard let data = try? JSONEncoder().encode(snapshot) else { return }
+        try? data.write(to: fileURL, options: .atomic)
+    }
+
+    static func loadShelves() -> MangaShelfSnapshot? {
+        guard let data = try? Data(contentsOf: fileURL),
+              let snapshot = try? JSONDecoder().decode(MangaShelfSnapshot.self, from: data),
+              Date().timeIntervalSince(snapshot.savedAt) < ttl else { return nil }
+        return snapshot
     }
 }
 

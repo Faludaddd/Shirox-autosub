@@ -9,6 +9,43 @@ enum ContinueWatchingNavTarget {
     case anilist(ContinueWatchingItem)
 }
 
+/// Builds the preloaded `Media` a Continue Watching item already
+/// carries, so `AniListDetailView` can render the hero immediately and
+/// its TVDB/MAL field-level enrichment can run — even while AniList
+/// itself is down. Batch 23 (item 10): both the card tap and the
+/// long-press "View on AniList" previously passed `preloadedMedia: nil`,
+/// so a failing AniList detail fetch replaced the whole page with an
+/// error wall (the exact report: tapping a CW anime errors out, while
+/// Library taps work because THEY pass a preloaded Media).
+private func cwPreloadedMedia(for item: ContinueWatchingItem) -> Media? {
+    guard let aid = item.aniListID else { return nil }
+    let cover = item.imageUrl.isEmpty
+        ? MediaCoverImage(large: nil, extraLarge: nil)
+        : MediaCoverImage(large: item.imageUrl, extraLarge: nil)
+    return Media(
+        id: aid,
+        idMal: item.malID,
+        provider: .anilist,
+        title: MediaTitle(romaji: item.mediaTitle, english: nil, native: nil),
+        coverImage: cover,
+        bannerImage: nil,
+        description: nil,
+        episodes: item.totalEpisodes,
+        status: item.isAiring == true ? "RELEASING" : nil,
+        averageScore: nil,
+        genres: nil,
+        season: nil,
+        seasonYear: nil,
+        nextAiringEpisode: nil,
+        relations: nil,
+        type: "ANIME",
+        format: nil,
+        studioNames: nil,
+        source: nil,
+        duration: nil,
+        airDateRange: nil)
+}
+
 @ViewBuilder
 private func cwNavDestination(_ target: ContinueWatchingNavTarget) -> some View {
     switch target {
@@ -22,7 +59,7 @@ private func cwNavDestination(_ target: ContinueWatchingNavTarget) -> some View 
         }
     case .anilist(let item):
         if let aid = item.aniListID {
-            AniListDetailView(mediaId: aid, preloadedMedia: nil)
+            AniListDetailView(mediaId: aid, preloadedMedia: cwPreloadedMedia(for: item))
         }
     }
 }
@@ -76,9 +113,12 @@ struct ContinueWatchingSection: View {
     @ViewBuilder
     private func itemView(for item: ContinueWatchingItem) -> some View {
         if item.streamUrl.isEmpty, let aniListID = item.aniListID {
-            // AniList Up Next — navigate to detail to pick episode
+            // AniList Up Next — navigate to detail to pick episode.
+            // Batch 23 (item 10) — pass the item's own data as the
+            // preloaded Media so the page renders (and TVDB enrichment
+            // runs) even when the AniList detail fetch itself fails.
             NavigationLink {
-                AniListDetailView(mediaId: aniListID, preloadedMedia: nil, resumeEpisodeNumber: item.episodeNumber, resumeWatchedSeconds: item.watchedSeconds)
+                AniListDetailView(mediaId: aniListID, preloadedMedia: cwPreloadedMedia(for: item), resumeEpisodeNumber: item.episodeNumber, resumeWatchedSeconds: item.watchedSeconds)
             } label: {
                 ContinueWatchingCardDisplay(item: item)
             }

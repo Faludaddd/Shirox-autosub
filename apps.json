@@ -27,6 +27,13 @@
       },
       "versions": [
         {
+          "version": "2.25",
+          "date": "2026-09-08",
+          "localizedDescription": "v2.25 — See All pages show the lists their titles promise (Recently Completed and Upcoming are real now) and every browse list is a Japanese-anime list, so donghua no longer mixes in. Continue Watching reconciles its episode count against the streaming source's real list (no more stale '8 of 8 caught up') and tapping a card opens instantly even while AniList is down. The Schedule's saved-data fallback is actually kept fresh, the manga release schedule fires one shared request instead of three duplicates, and Kitsu browse works again (a wrong sort field in our own request was breaking it). Manga Home gains the same saved-data outage fallback as anime Home. A subtitle style switch (Apple default vs Shirox custom) lives in the player and Settings, the carousel shows logo-only titles (no text flicker) with larger centered genre pills, and the Data Sources page is rebuilt with brand tiles and clean non-overlapping rows. The anime module list in Settings now matches what the watch flow actually uses.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 12318378
+        },
+        {
           "version": "2.24",
           "date": "2026-09-07",
           "localizedDescription": "v2.24 — The provider system is rebuilt around one chain: TVDB → MAL → AniList → Kitsu → AniDB for anime, MangaBaka → MAL → AniList for manga, AniChart → AnimeSchedule → MAL → AniList for schedules, with health tracking, cooldowns, request deduplication and shared caching so a failing provider is skipped — never hammered. A new Data Sources page in Settings shows every provider with live health, real Test-Provider latency, drag-to-reorder priorities and cache controls. The update flow now downloads the real package in-app (DOWNLOAD NOW with progress and checksum verification) and manages the downloaded file (DELETE FILE / FIND FILE). Music has been removed completely and the app returns to its lean ~12 MB size.",
