@@ -1497,6 +1497,12 @@ struct ScheduleView: View {
     @State private var mangaReleases: [Media] = []
     @State private var isLoadingManga = false
     @State private var mangaLoadError: String?
+    /// Batch 24 — until-when a failed release-load round suppresses
+    /// PASSIVE re-fires (.task restarts from tab re-appears / navigation
+    /// pops). The v2.25 log showed the same chain re-run 6× in 30s; the
+    /// provider cooldowns held the network, but the churn was real.
+    /// Retry and pull-to-refresh force through — explicit user intent.
+    @State private var mangaBackoffUntil: Date?
 
     // All three preferences are bound to the persisted defaults edited in
     // `ScheduleSettingsPage` — changes there propagate live into the schedule
@@ -1544,7 +1550,7 @@ struct ScheduleView: View {
                     )
                 }
                 .task { await scheduleLoad() }
-                .refreshable { await scheduleLoad() }
+                .refreshable { await scheduleLoad(force: true) }
                 .onChange(of: mode) { _ in Task { await load() } }
                 .onChange(of: windowDays) { _ in Task { await load() } }
                 .onChange(of: useUTC) { _ in resetCalendarToToday() }
@@ -1583,9 +1589,9 @@ struct ScheduleView: View {
         }
     }
 
-    private func scheduleLoad() async {
+    private func scheduleLoad(force: Bool = false) async {
         if appMode.mode == .reading {
-            await loadMangaReleases()
+            await loadMangaReleases(force: force)
         } else {
             await load()
         }
@@ -1640,7 +1646,9 @@ struct ScheduleView: View {
             )
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button("Retry") { Task { await loadMangaReleases() } }
+                    // Forced — bypasses the failure back-off (explicit user
+                    // intent, unlike passive .task re-fires).
+                    Button("Retry") { Task { await loadMangaReleases(force: true) } }
                 }
             }
         } else if mangaReleases.isEmpty {
@@ -1801,7 +1809,13 @@ struct ScheduleView: View {
 
     // MARK: - Manga Releases Load
 
-    private func loadMangaReleases() async {
+    private func loadMangaReleases(force: Bool = false) async {
+        // Back-off — passive re-fires inside the window keep the standing
+        // error; the chain's cooldowns are still pacing the network side.
+        if !force, mangaReleases.isEmpty,
+           let until = mangaBackoffUntil, Date() < until {
+            return
+        }
         isLoadingManga = true
         mangaLoadError = nil
         do {
@@ -1816,12 +1830,14 @@ struct ScheduleView: View {
                 throw ProviderChainError.allProvidersFailed(lastReason: nil)
             }
             mangaReleases = list
+            mangaBackoffUntil = nil
         } catch {
             if ProviderManager.isCancellationError(error) { return }
             // One honest error — the chain already tried every source with
             // dedup and cooldown pacing; re-trying it by hand here would
             // re-trigger exactly the request storm this fix removes.
             mangaLoadError = "Manga releases are temporarily unavailable — every manga source is unreachable. Please try again shortly."
+            mangaBackoffUntil = Date().addingTimeInterval(30)
             Logger.shared.log("[MangaSchedule] unified chain failed: \(error.localizedDescription)", type: "Error")
         }
         isLoadingManga = false

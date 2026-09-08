@@ -1640,6 +1640,11 @@ enum BrowseCategory: String, CaseIterable, Hashable {
     // over the network when stale (see loadAllMappings).
     private var anilistMappingIndex: [Int: BulkMapping] = [:]
     private var malMappingIndex: [Int: BulkMapping] = [:]
+    /// Batch 24 — REVERSE index (TVDB id → mapping entry) so TVDB search
+    /// results (which carry only TVDB ids on the wire) can resolve their
+    /// AniList/MAL ids locally. Multi-season series share one TVDB id; the
+    /// season-1 entry is kept so a franchise hit lands on its first season.
+    private var tvdbMappingIndex: [Int: BulkMapping] = [:]
     private var bulkLoaded = false
     private var bulkLoadTask: Task<Void, Never>?
 
@@ -1871,14 +1876,39 @@ enum BrowseCategory: String, CaseIterable, Hashable {
     private func buildMappingIndices(from entries: [BulkMapping]) {
         var ani: [Int: BulkMapping] = [:]
         var mal: [Int: BulkMapping] = [:]
+        var tvdb: [Int: BulkMapping] = [:]
         ani.reserveCapacity(entries.count)
         mal.reserveCapacity(entries.count)
         for e in entries {
             if let a = e.anilist_id { ani[a] = e }
             if let m = e.mal_id { mal[m] = e }
+            // Reverse index — keep the LOWEST season for a shared TVDB id
+            // (season 1 is the natural franchise entry point for search
+            // navigation; later seasons overwrite only when no earlier
+            // entry exists).
+            if let t = e.tvdb_id {
+                if let existing = tvdb[t] {
+                    if (e.tvdb_season ?? .max) < (existing.tvdb_season ?? .max) {
+                        tvdb[t] = e
+                    }
+                } else {
+                    tvdb[t] = e
+                }
+            }
         }
         anilistMappingIndex = ani
         malMappingIndex = mal
+        tvdbMappingIndex = tvdb
+    }
+
+    /// Batch 24 — reverse lookup for TVDB-first search: a TVDB series id
+    /// resolves to the AniList/MAL ids of (season 1 of) the same series
+    /// through the anira snapshot — EXACT id-keyed resolution, never a
+    /// title guess. Returns (nil, nil) when the TVDB id isn't mapped.
+    func anilistOrMalId(forTvdbId tvdbId: Int) async -> (anilist: Int?, mal: Int?) {
+        await loadAllMappings()
+        guard let entry = tvdbMappingIndex[tvdbId] else { return (nil, nil) }
+        return (entry.anilist_id, entry.mal_id)
     }
 
     private var bulkFileURL: URL? {

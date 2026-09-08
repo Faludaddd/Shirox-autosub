@@ -33,7 +33,9 @@ struct MangaHomeContent: View {
                 )
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
-                        Button("Retry") { Task { await vm.load() } }
+                        // Forced — bypasses the failure back-off (explicit
+                        // user intent, unlike passive .task re-fires).
+                        Button("Retry") { Task { await vm.reload() } }
                     }
                 }
             } else {
@@ -146,6 +148,16 @@ final class MangaHomeViewModel: ObservableObject {
     /// looking like fresh data.
     @Published var snapshotNotice: String?
 
+    /// Batch 24 — when a full round fails and no snapshot exists, the view
+    /// model remembers WHEN. The guard in `load()` re-opens on failure
+    /// (empty shelves), so every re-fired `.task` (tab re-appear, mode
+    /// churn, navigation pops) re-ran all four chains — the multi-round
+    /// reload storm in the v2.25 log. Within the back-off window a
+    /// non-forced load shows the standing error instead. Explicit user
+    /// intent (Retry, pull-to-refresh) forces through.
+    private var lastFailedRoundAt: Date?
+    private let failureBackoff: TimeInterval = 30
+
     /// Pull-to-refresh entry point: clears the guard that `load()` uses
     /// (skip when already populated) so a refresh genuinely re-fetches —
     /// including when the SNAPSHOT served the last render (its notice's
@@ -155,11 +167,22 @@ final class MangaHomeViewModel: ObservableObject {
         popular = []
         topRated = []
         latest = []
-        await load()
+        await load(force: true)
     }
 
-    func load() async {
-        guard trending.isEmpty || popular.isEmpty else { return }
+    func load() async { await load(force: false) }
+
+    private func load(force: Bool) async {
+        // Back-off: a failed round within the window doesn't re-run the
+        // chain for passive re-fires — the circuit breakers hold the
+        // network side; this stops the visible churn + log storm.
+        if !force,
+           trending.isEmpty, popular.isEmpty, topRated.isEmpty, latest.isEmpty,
+           let failedAt = lastFailedRoundAt,
+           Date().timeIntervalSince(failedAt) < failureBackoff {
+            return
+        }
+        guard force || trending.isEmpty || popular.isEmpty else { return }
         isLoading = true
         error = nil
         snapshotNotice = nil
@@ -206,6 +229,9 @@ final class MangaHomeViewModel: ObservableObject {
 
         isLoading = false
         if trending.isEmpty && popular.isEmpty && topRated.isEmpty && latest.isEmpty && snapshotNotice == nil {
+            // Remember the failed round so passive re-fires don't re-run
+            // the chain immediately (forced loads still go through).
+            lastFailedRoundAt = Date()
             // Honest message when every provider in the chain is down AND
             // no fresh snapshot exists to bridge the outage.
             if AniListService.shared.isApiDisabled() || AniListService.shared.isRateLimited() {
@@ -213,6 +239,8 @@ final class MangaHomeViewModel: ObservableObject {
             } else {
                 error = "Couldn't load manga. Check your connection and try again."
             }
+        } else {
+            lastFailedRoundAt = nil
         }
 
         // Persist the last-good shelves AFTER everything settles — a live

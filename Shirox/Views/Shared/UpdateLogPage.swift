@@ -102,6 +102,24 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.26",
+        date: "2026-09-08",
+        added: [
+            "Kitsu now serves as a live backup source for manga too (it previously only backed up anime). The Manga tab and the Reading-mode Releases page keep real, current lists even while MyAnimeList and AniList are both having outages — previously those two going down at the same time left the Manga tab with nothing to show. Kitsu appears in Settings → Data Sources under the manga chain, where you can reorder or disable it like every other source."
+        ],
+        fixed: [
+            "TVDB — the top-priority source for anime search — failed on every single search with a data-reading error, so searches always fell through to slower backup sources (this is the 'The data couldn't be read because it isn't in the correct format' error in the logs). Its results now decode correctly and navigate to the right series pages.",
+            "The Kitsu backup source's lists were sorted BACKWARDS: instead of the most popular anime and manga, they showed obscure zero-follower titles (self-published doujinshi, obscure shorts). Every Kitsu-served list — shelves, See All pages, and the new manga lists — now leads with genuinely popular series like One Piece and Attack on Titan.",
+            "When every manga source is unreachable, the app used to re-run the whole request chain over and over — the log showed the same four shelves re-requested several times per second, and the Releases page reloading six times in half a minute. It now waits a short interval between failed attempts (retrying immediately is still one tap on Retry or a pull-to-refresh away), so the page settles on one clear message instead of churning."
+        ],
+        improved: [
+            "Manga search gained the same Kitsu backup, so it survives MyAnimeList and AniList outage windows as well."
+        ],
+        changed: [],
+        removed: [],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "2.25",
         date: "2026-09-08",
         added: [

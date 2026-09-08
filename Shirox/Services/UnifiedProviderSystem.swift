@@ -55,7 +55,14 @@ enum MetaProviderKind: String, Codable, CaseIterable, Identifiable, Hashable {
     /// Which domains the provider can serve.
     var domains: [ProviderDomain] {
         switch self {
-        case .tvdb, .mal, .anilist, .kitsu, .anidb: return [.anime]
+        case .tvdb, .anidb: return [.anime]
+        case .mal, .anilist: return [.anime, .manga]
+        // Batch 24 — Kitsu genuinely serves manga lists and search (its
+        // /manga JSON:api mirrors /anime, verified live, with MAL/AniList
+        // mappings for navigation). As the manga chain's final live
+        // fallback it keeps the Manga tab + Reading-mode releases working
+        // through MAL/Jikan + AniList outage windows.
+        case .kitsu: return [.anime, .manga]
         case .mangabaka: return [.manga]
         case .anichart, .animeschedule: return [.schedule]
         }
@@ -276,7 +283,9 @@ final class UnifiedProviderSystem: ObservableObject {
 
     /// The recommended (default) order for each domain.
     static let recommendedAnimeOrder: [MetaProviderKind] = [.tvdb, .mal, .anilist, .kitsu, .anidb]
-    static let recommendedMangaOrder: [MetaProviderKind] = [.mangabaka, .mal, .anilist]
+    /// Batch 24 — Kitsu appended as the manga chain's final fallback
+    /// (MangaBaka → MAL → AniList → Kitsu).
+    static let recommendedMangaOrder: [MetaProviderKind] = [.mangabaka, .mal, .anilist, .kitsu]
     static let recommendedScheduleOrder: [MetaProviderKind] = [.anichart, .animeschedule, .mal, .anilist]
 
     // MARK: Cooldown / backoff configuration
@@ -316,7 +325,9 @@ final class UnifiedProviderSystem: ObservableObject {
         }
 
         animeOrder = loadOrder(animeOrderKey, recommended: Self.recommendedAnimeOrder, all: [.tvdb, .mal, .anilist, .kitsu, .anidb])
-        mangaOrder = loadOrder(mangaOrderKey, recommended: Self.recommendedMangaOrder, all: [.mangabaka, .mal, .anilist])
+        // Users upgrading from v2.25 keep their saved order; `loadOrder`
+        // appends Kitsu (new to this domain) at the end automatically.
+        mangaOrder = loadOrder(mangaOrderKey, recommended: Self.recommendedMangaOrder, all: [.mangabaka, .mal, .anilist, .kitsu])
         scheduleOrder = loadOrder(scheduleOrderKey, recommended: Self.recommendedScheduleOrder, all: [.anichart, .animeschedule, .mal, .anilist])
 
         let savedEnabled = defaults.dictionary(forKey: enabledKey) as? [String: Bool] ?? [:]
@@ -767,6 +778,10 @@ final class UnifiedProviderSystem: ObservableObject {
                 return try await MALDiscoveryService.shared.searchManga(trimmed)
             case .anilist:
                 return try await AniListService.shared.searchManga(keyword: trimmed).map { AniListProvider.shared.mapMangaMedia($0) }
+            case .kitsu:
+                // Batch 24 — Kitsu serves manga search too, so the manga
+                // search chain survives MAL + AniList outage windows.
+                return try await KitsuProvider.shared.searchManga(query: trimmed)
             default:
                 return nil
             }
@@ -797,6 +812,10 @@ final class UnifiedProviderSystem: ObservableObject {
                 case .latest:    media = try await AniListService.shared.mangaLatest()
                 }
                 return media.map { AniListProvider.shared.mapMangaMedia($0) }
+            case .kitsu:
+                // Batch 24 — the live fallback that keeps the manga Home
+                // shelves rendering while MAL and AniList are both down.
+                return try await KitsuProvider.shared.mangaShelf(shelf)
             default:
                 return nil
             }
@@ -835,6 +854,11 @@ final class UnifiedProviderSystem: ObservableObject {
             case .anilist:
                 let media = try await AniListService.shared.mangaReleaseSchedule()
                 return media.map { AniListProvider.shared.mapMangaMedia($0) }
+            case .kitsu:
+                // Batch 24 — most-followed currently-releasing manga; the
+                // Reading-mode Releases tab keeps real data through MAL /
+                // AniList outage windows.
+                return try await KitsuProvider.shared.mangaReleaseSchedule()
             default:
                 return nil
             }

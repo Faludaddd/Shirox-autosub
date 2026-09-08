@@ -137,8 +137,14 @@ final class TVDBProvider {
         let poster: String?
         let image_url: String?
         let thumbnail: String?
-        let tvdb_id: Int?
-        let id: Int?
+        // TVDB v4's SEARCH endpoint returns string ids ("424536"; the `id`
+        // field is even prefixed: "series-424536") — only the /series/{id}
+        // endpoints return numeric ids. Typed as String to match the REAL
+        // wire format (Batch 24: an Int? here failed decoding on EVERY
+        // search — "The data couldn't be read because it isn't in the
+        // correct format", verified live against api4.thetvdb.com).
+        let tvdb_id: String?
+        let id: String?
         let type: String?
         let genres: [String]?
         let remote_ids: [RemoteID]?
@@ -146,12 +152,24 @@ final class TVDBProvider {
 
     private struct RemoteID: Decodable {
         let id: String?
-        let source: String?
+        /// The real field name on BOTH /search and /series/extended is
+        /// `sourceName` (verified live: "MyAnimeList", "AniList"-style
+        /// values when present, "TheMovieDB.com", "IMDB", …). The old
+        /// `source` never existed on the wire, so id extraction always
+        /// returned nil.
+        let sourceName: String?
     }
 
-    /// TVDB search for the SEARCH page. Only results that carry a MAL or
-    /// AniList remote id can navigate into the app's detail pages — the
+    /// TVDB search for the SEARCH page. Only results that resolve to a
+    /// MAL or AniList id can navigate into the app's detail pages — the
     /// rest are dropped rather than shown as dead ends.
+    ///
+    /// Batch 24 — TVDB's search results do NOT carry MAL/AniList remote
+    /// ids (verified live: anime entries list only EIDR/IMDB/TMDB/TVmaze
+    /// sources). Navigation now resolves through the anira mapping
+    /// snapshot in REVERSE (TVDB id → AniList/MAL id), so a TVDB hit
+    /// lands on the same series' detail page. Entries absent from the
+    /// mapping are dropped — never invented.
     func searchMedia(query: String) async throws -> [Media] {
         let token = try await authenticate()
         guard let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
@@ -168,7 +186,14 @@ final class TVDBProvider {
         let results = (envelope.data ?? []).filter { $0.type == nil || $0.type == "series" }
         var media: [Media] = []
         for result in results {
-            let ids = extractIds(result.remote_ids)
+            var ids = extractIds(result.remote_ids)
+            // TVDB search results carry no MAL/AniList remotes — resolve
+            // the series' TVDB id through the anira mapping in reverse.
+            if ids.anilist == nil, ids.mal == nil,
+               let tvdb = Int(result.tvdb_id ?? ""), tvdb > 0 {
+                let reversed = await TVDBMappingService.shared.anilistOrMalId(forTvdbId: tvdb)
+                ids = (reversed.anilist ?? ids.anilist, reversed.mal ?? ids.mal)
+            }
             // Only results with a real MAL or AniList id can navigate into
             // the app's detail pages — drop the rest (no dead-end rows).
             guard let navId = ids.anilist ?? ids.mal else { continue }
@@ -204,11 +229,11 @@ final class TVDBProvider {
         var anilist: Int?
         var mal: Int?
         for remote in remotes ?? [] {
-            let source = (remote.source ?? "").lowercased()
+            let source = (remote.sourceName ?? "").lowercased()
             let value = Int(remote.id ?? "")
             guard let value, value > 0 else { continue }
             if source.contains("anilist") { anilist = anilist ?? value }
-            if source.contains("mal") || source == "myanimelist" { mal = mal ?? value }
+            if source.contains("mal") || source.contains("myanimelist") { mal = mal ?? value }
         }
         return (anilist, mal)
     }

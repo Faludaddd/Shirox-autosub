@@ -27,6 +27,13 @@
       },
       "versions": [
         {
+          "version": "2.26",
+          "date": "2026-09-08",
+          "localizedDescription": "v2.26 — The Manga and Releases tabs keep working even while MyAnimeList and AniList are having problems: the Kitsu backup source now serves manga lists too, so there is always a live source answering. Search is faster and more reliable because the top source (TVDB) failed on every search before — its results now come through correctly. The backup source's lists showed obscure zero-follower titles by mistake (its sort order was backwards); lists now lead with genuinely popular series. And when all sources are unreachable, the app stops retrying in a loop and shows one clear message until you tap Retry.",
+          "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
+          "size": 12361390
+        },
+        {
           "version": "2.25",
           "date": "2026-09-08",
           "localizedDescription": "v2.25 — See All pages show the lists their titles promise (Recently Completed and Upcoming are real now) and every browse list is a Japanese-anime list, so donghua no longer mixes in. Continue Watching reconciles its episode count against the streaming source's real list (no more stale '8 of 8 caught up') and tapping a card opens instantly even while AniList is down. The Schedule's saved-data fallback is actually kept fresh, the manga release schedule fires one shared request instead of three duplicates, and Kitsu browse works again (a wrong sort field in our own request was breaking it). Manga Home gains the same saved-data outage fallback as anime Home. A subtitle style switch (Apple default vs Shirox custom) lives in the player and Settings, the carousel shows logo-only titles (no text flicker) with larger centered genre pills, and the Data Sources page is rebuilt with brand tiles and clean non-overlapping rows. The anime module list in Settings now matches what the watch flow actually uses.",
