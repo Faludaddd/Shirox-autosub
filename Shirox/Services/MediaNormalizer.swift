@@ -62,7 +62,7 @@ enum FranchiseNormalizer {
     }
 
     /// Range of an explicit season/part/cour/final-season marker, if any.
-    private static func explicitMarkerRange(in title: String) -> Range<String.SubSequence>? {
+    private static func explicitMarkerRange(in title: String) -> Range<String.Index>? {
         let patterns = [
             #"(?i)(-?\s*season\s+\d+)"#,          // Season 2
             #"(?i)(-?\s*\d{1,2}(st|nd|rd|th)\s+season)"#, // 2nd Season
@@ -82,7 +82,7 @@ enum FranchiseNormalizer {
     /// Range of a TRAILING sequel numeral ("...2" or "...II"), if any.
     /// Never matches a leading digit ("2.5 Dimensional Seduction") or a
     /// digit embedded mid-title ("Room 205") — only the final token.
-    private static func trailingSequelNumeral(in title: String) -> Range<String.SubSequence>? {
+    private static func trailingSequelNumeral(in title: String) -> Range<String.Index>? {
         let patterns = [
             #"\s+\d{1}\s*$"#,        // trailing single digit
             #"\s+(II|III|IV|V|VI|VII|VIII|IX|X)\s*$"# // trailing roman numeral (2+ chars)

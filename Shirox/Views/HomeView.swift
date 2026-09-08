@@ -2860,7 +2860,7 @@ private struct NotificationRow: View {
 /// `ContinueWatchingSection` replaces this prompt automatically (driven by
 /// HomeView's `@ObservedObject anilistAuth` + `@ObservedObject continueWatching`
 /// bindings).
-private struct ContinueWatchingSignInPrompt: View {
+struct ContinueWatchingSignInPrompt: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Section header — matches ContinueWatchingSection's header

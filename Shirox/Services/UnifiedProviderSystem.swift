@@ -1099,7 +1099,8 @@ final class UnifiedProviderSystem: ObservableObject {
 
         func mergeKey(_ e: UnifiedScheduleEntry) -> String {
             if let al = e.aniListMediaId { return "al\(al)" }
-            if let mal = e.sourceMediaId, mal > 0, mal < 800_000_000 { return "mal\(mal)" }
+            let mal = e.sourceMediaId
+            if mal > 0, mal < 800_000_000 { return "mal\(mal)" }
             return "t\(e.title.lowercased())"
         }
 
