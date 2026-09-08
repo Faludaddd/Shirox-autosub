@@ -314,7 +314,7 @@ struct PlayerSubtitleSettingsView: View {
                         colorDot(entry.color, name: entry.name)
                     }
                     #if !os(tvOS)
-                    ColorPicker(selection: $settings.foregroundColor, supportsOpacity: false)
+                    ColorPicker("Custom color", selection: $settings.foregroundColor, supportsOpacity: false)
                         .labelsHidden()
                         .frame(width: 30, height: 30)
                     #endif
