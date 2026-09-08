@@ -102,6 +102,37 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.28",
+        date: "2026-09-08",
+        added: [
+            "A dedicated DISCOVERY database now decides which anime appear in Trending, Popular, the genre categories, the Home carousel, See All pages and Surprise Me — Kitsu's own trending chart, real season query and genre taxonomy, with AniList and MAL as automatic backups. TVDB stays the metadata primary, resolving artwork and characters for the exact series discovery returns. The chain is configurable in Settings → Data Sources → Discovery.",
+            "Genre shelves on Home: Action, Fantasy, Romance, Drama, Comedy and Sci-Fi rows, each backed by the discovery database's real category data. Every row's See All opens its OWN genre page — the row is page 1 of the same query, so the page continues exactly what the row shows.",
+            "Characters are back on anime detail pages — and stronger than before. A full fallback chain (TVDB → MAL → AniList → Kitsu) fills the section from whichever source is alive, with cross-provider id resolution so the characters always belong to the same series. Character images, roles, voice actors with languages and photos all render when a source provides them; if every source fails the section shows a clean 'Characters unavailable' state with a retry instead of silently disappearing.",
+            "The Schedule page now survives a total schedule-source outage: when AniChart, AnimeSchedule, MAL and AniList are all unreachable, a new final live source builds this week's REAL timetable from the discovery database's currently-airing list joined with TVDB's actual air dates and broadcast times.",
+            "A completely redesigned Data Sources page: a dashboard of four large cards (Anime, Discovery, Manga, Schedule) showing the current primary, live status and full chain, each opening a dedicated priority screen with PRIMARY and FALLBACKS sections, plain-language descriptions, drag-to-reorder, on/off toggles, 'Make Primary', per-provider testing with real response times, a Test-All action and a one-tap reset to the recommended defaults.",
+            "The Manga carousel now shows the manga's real title — large, bold and readable over the artwork — plus a short synopsis and metadata pills, all from the same manga object as the cover.",
+            "A single shared metadata-pill component now styles every pill surface (both carousels, anime and manga detail pages): larger capsules with perfectly centered text, a centered pill group, consistent height and spacing, and a scrollable row that never clips or shrinks pills to unreadable sizes."
+        ],
+        fixed: [
+            "Surprise Me is now a true genre-based randomizer: it picks a random GENRE first (Action, Fantasy, Romance, Horror, Mystery and more), then a random anime that genuinely belongs to it from the discovery database — not the popular list. Consecutive presses explore different genres, and repeats within a session are avoided.",
+            "The Home carousel's data source is now the discovery database's real trending chart — every slide's poster, logo, synopsis, rating, genres and Start Watching button belong to one and the same anime.",
+            "Genre and metadata pills are filled with REAL data from the same item everywhere — Kitsu results now carry their actual genre categories (they were empty before, which is why pills went missing), and no value is ever invented.",
+            "'Recently Completed' and 'Upcoming' rows on Home opened the WRONG See All pages (the popular and trending lists). Every category row now routes to its own query.",
+            "TVDB character records lost their voice actors silently after TVDB changed its API format — the fix reads the new format, restoring actor names and photos.",
+            "The Kitsu+TVDB schedule source and the whole schedule chain are now actually connected and exercised end to end; provider failures cascade instead of stopping, and the page can never show a blank screen — a proper unavailable state covers the total-outage case."
+        ],
+        changed: [
+            "The Home carousel, shelves, category rows, genre pages and Surprise Me all run through the new discovery chain; genre metadata comes from the same database rather than being left empty.",
+            "Anime detail pages keep their metadata exactly where it came from — character fallbacks merge into the page instead of replacing it."
+        ],
+        improved: [
+            "The Schedule page caches each synthesized series' TVDB airing data for six hours, so repeat loads are instant.",
+            "Data Sources provider cards explain every source in plain language ('Main source for anime artwork, characters, staff…') — no API knowledge required to reorder your chain."
+        ],
+        removed: [],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "2.27",
         date: "2026-09-08",
         added: [

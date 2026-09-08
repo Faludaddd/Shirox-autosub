@@ -864,6 +864,94 @@ final class AniListService {
         return try await fetchPage(query: query, variables: variables)
     }
 
+    /// Batch 26 — anime in one GENRE (the discovery chain's AniList leg).
+    /// `genre_in` takes genre names; AniList's taxonomy is narrower than
+    /// Kitsu's (no "Historical" GENRE — it is a tag there), so a genre
+    /// AniList doesn't index returns empty and the chain hands to MAL.
+    func genreBrowse(genre: DiscoveryGenre, page: Int) async throws -> [AniListMedia] {
+        let mediaArgs = [
+            "type: ANIME",
+            "isAdult: false",
+            "countryOfOrigin: \"JP\"",
+            "genre_in: [\(Self.graphqlQuoted(genre.anilistName))]",
+            "sort: POPULARITY_DESC",
+        ].joined(separator: ", ")
+        let query = """
+        query ($page: Int) {
+          Page(page: $page, perPage: 20) {
+            media(\(mediaArgs)) {
+              id
+              idMal
+              title { romaji english native }
+              coverImage { large extraLarge }
+              bannerImage
+              description(asHtml: false)
+              episodes
+              duration
+              status
+              source
+              format
+              season
+              seasonYear
+              startDate { year month day }
+              endDate { year month day }
+              nextAiringEpisode { episode airingAt timeUntilAiring }
+              averageScore
+              popularity
+              genres
+              countryOfOrigin
+              studios { edges { isMain node { id name } } }
+            }
+          }
+        }
+        """
+        return try await fetchPage(query: query, variables: ["page": page])
+    }
+
+    /// Batch 26 — manga in one genre (the manga genre chain's AniList leg).
+    func mangaGenreBrowse(genre: DiscoveryGenre, page: Int) async throws -> [AniListMedia] {
+        let mediaArgs = [
+            "type: MANGA",
+            "isAdult: false",
+            "genre_in: [\(Self.graphqlQuoted(genre.anilistName))]",
+            "sort: POPULARITY_DESC",
+        ].joined(separator: ", ")
+        let query = """
+        query ($page: Int) {
+          Page(page: $page, perPage: 20) {
+            media(\(mediaArgs)) {
+              id
+              idMal
+              title { romaji english native }
+              coverImage { large extraLarge }
+              bannerImage
+              description(asHtml: false)
+              chapters
+              volumes
+              status
+              format
+              seasonYear
+              startDate { year month day }
+              averageScore
+              popularity
+              genres
+              countryOfOrigin
+            }
+          }
+        }
+        """
+        return try await fetchPage(query: query, variables: ["page": page])
+    }
+
+    /// Wraps a string in GraphQL quotes (genre names are plain words; the
+    /// escaping is for safety, not because any current name needs it).
+    private static func graphqlQuoted(_ s: String) -> String {
+        let escaped = s
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        return "\"\(escaped)\""
+    }
+
     /// Fetches the full anime detail for `id`. Wraps `detailDirect` with an
     /// in-flight de-dupe so rapid repeated calls for the same ID (e.g. user
     /// quickly browsing multiple anime pages, or the same page reopening)

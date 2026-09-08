@@ -154,8 +154,25 @@ struct HomeView: View {
                             AnimeSection(title: "Trending Now", items: vm.trending, category: .trending)
                             AnimeSection(title: "All-Time Popular", items: vm.popular, category: .popular)
                             AnimeSection(title: "Top Rated", items: vm.topRated, category: .topRated)
-                            AnimeSection(title: "Recently Completed", items: vm.recentlyCompleted, category: .popular)
-                            AnimeSection(title: "Upcoming", items: vm.upcoming, category: .trending)
+                            // Batch 26 — the two rows that previously
+                            // BORROWED other categories' See All pages
+                            // (.popular / .trending) now route to their OWN
+                            // categories: "Recently Completed" → the
+                            // recently-completed query, "Upcoming" → the
+                            // upcoming query. Every row's See All opens the
+                            // list its title promises.
+                            AnimeSection(title: "Recently Completed", items: vm.recentlyCompleted, category: .recentlyCompleted)
+                            AnimeSection(title: "Upcoming", items: vm.upcoming, category: .upcoming)
+                            // Batch 26 — GENRE shelves from the discovery
+                            // database's own category taxonomy. Each row is
+                            // page 1 of the SAME genre query its See All
+                            // page pages through (stable genre identifier —
+                            // never an array index, title or shared route).
+                            ForEach(DiscoveryService.homeShelfGenres) { genre in
+                                if let items = vm.genreShelves[genre.slug], !items.isEmpty {
+                                    AnimeSection(title: genre.displayName, items: items, genre: genre)
+                                }
+                            }
                         }
                         Spacer().frame(height: 28)
                     }
@@ -480,7 +497,7 @@ struct FeaturedCarousel: View {
                         // about the overlay — gradient, spacing, paddings, genre
                         // capsules, button, hint, animations — is unchanged.
                         VStack(alignment: .leading, spacing: 10) {
-                            CarouselTitleLogo(media: currentMedia, isWide: isIPad)
+                            CarouselTitleLogo(media: currentMedia, isWide: isIPad, isManga: isManga)
 
                             // v2.23 — Meta chips (rating / year / format) +
                             // genre pills, both in fixed-height reserved rows
@@ -493,6 +510,19 @@ struct FeaturedCarousel: View {
                             // off-screen.
                             carouselMetaRow(currentMedia)
                             carouselGenreRow(currentMedia)
+                            // Batch 26 — the manga hero ALSO shows a two-line
+                            // synopsis from the same object (the anime hero
+                            // relies on its logo + artwork; text titles on
+                            // manga slides carry the discovery context).
+                            if isManga, let desc = currentMedia.plainDescription, !desc.isEmpty {
+                                Text(desc)
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.leading)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 4)
+                            }
 
                             // v2.23 — Start Watching is CENTERED in the
                             // carousel content again (it went left-aligned
@@ -593,144 +623,48 @@ struct FeaturedCarousel: View {
         #endif
     }
 
-    // MARK: - v2.23 carousel info rows
+    // MARK: - v2.23 carousel info rows (Batch 26: the shared pill row)
     //
-    // Both rows have RESERVED heights so every slide lays out identically —
-    // the Start Watching button and the hint sit in the exact same spot no
-    // matter what metadata the current anime carries (v2.20's stability
-    // contract). All values come from the current Media object — image,
-    // logo, pills, rating, and button all describe the SAME slide.
+    // Both rows are FIXED-HEIGHT so every slide lays out identically —
+    // the Start Watching button and the hint sit in the exact same spot
+    // no matter what metadata the current anime carries. All values come
+    // from the current Media object — image, logo, pills, rating, and
+    // button all describe the SAME slide (one canonical object per
+    // slide; never a mix of fields from different anime).
 
-    /// Rating / year / format chips, 20pt tall, gradient-faded at the end.
+    /// Rating / format / year / episode chips — the shared
+    /// MetadataPillRow (larger pills, centered text, consistent height),
+    /// driven by the SAME media object as the slide's poster and logo.
     @ViewBuilder
     private func carouselMetaRow(_ media: Media) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                if let score = media.averageScore, score > 0 {
-                    HStack(spacing: 4) {
-                        Image(systemName: "star.fill")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(.yellow)
-                        Text(String(format: "%.1f", Double(score) / 10.0))
-                            .font(.caption2.weight(.bold))
-                            .monospacedDigit()
-                            .foregroundStyle(.primary)
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(Color.primary.opacity(0.1), in: Capsule())
-                    .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
-                }
-                if let year = media.seasonYear, year > 0 {
-                    Text(String(year))
-                        .font(.caption2.weight(.semibold))
-                        .monospacedDigit()
-                        .foregroundStyle(.primary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Color.primary.opacity(0.1), in: Capsule())
-                        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
-                }
-                if let format = media.format, !format.isEmpty, format != "MUSIC" {
-                    Text(format)
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.primary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Color.primary.opacity(0.1), in: Capsule())
-                        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
-                }
-                if let episodes = media.episodes, episodes > 0 {
-                    Text("\(episodes) ep\(episodes == 1 ? "" : "s")")
-                        .font(.caption2.weight(.semibold))
-                        .monospacedDigit()
-                        .foregroundStyle(.primary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Color.primary.opacity(0.1), in: Capsule())
-                        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
-                }
-            }
-        }
-        .frame(height: 20, alignment: .leading)
-        // Hit-testing off: the rows sit over the swipeable carousel — a
-        // scrollable strip there would eat sideways swipes. Content is
-        // short enough to fit or fade out gracefully within the row.
-        .allowsHitTesting(false)
-        .mask(alignment: .leading) {
-            HStack(spacing: 0) {
-                Rectangle().frame(maxWidth: .infinity)
-                LinearGradient(
-                    stops: [
-                        .init(color: .black, location: 0),
-                        .init(color: .clear, location: 1)
-                    ],
-                    startPoint: .leading, endPoint: .trailing
-                )
-                .frame(width: 24)
-            }
-        }
+        MetadataPillRow(
+            pills: isManga
+                ? MetadataPillRowBuilder.mangaMetaPills(for: media)
+                : MetadataPillRowBuilder.animeMetaPills(for: media),
+            height: 24,
+            alignment: .center,
+            edgeFades: false,
+            allowsHitTesting: false,
+            spacing: 6)
     }
 
-    /// Genre pills — up to 6, with a "+N" overflow chip. Batch 23 (item 1):
-    /// slightly larger than the meta chips above (caption weight, taller
-    /// capsules) and HORIZONTALLY CENTERED as a group — the same centered
-    /// alignment the Start Watching / Start Reading button below uses.
-    /// The row still scrolls when the pills genuinely overflow (long genre
-    /// lists) and hit-testing stays off so the strip can't eat swipes.
+    /// Genre pills — up to 6 real genres (from the discovery database's
+    /// own category metadata on the same Media) with an honest "+N"
+    /// overflow chip. Batch 26: the shared pill component — larger,
+    /// centered text, and the ENTIRE GROUP centered within the carousel's
+    /// content area (the row centers when the pills fit and scrolls when
+    /// they genuinely overflow; never shrunk, clipped or overlapping).
     @ViewBuilder
     private func carouselGenreRow(_ media: Media) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                if let genres = media.genres, !genres.isEmpty {
-                    ForEach(Array(genres.prefix(6).enumerated()), id: \.offset) { _, g in
-                        Text(g)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(Color.primary.opacity(0.1), in: Capsule())
-                            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
-                    }
-                    // Truncation that says so — never silently clipped.
-                    if genres.count > 6 {
-                        Text("+\(genres.count - 6)")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 5)
-                            .background(Color.primary.opacity(0.07), in: Capsule())
-                    }
-                }
-            }
-            // Centered when the pills fit the width (the group centers in
-            // the expanded frame); still scrolls when they overflow.
-            .frame(maxWidth: .infinity, alignment: .center)
-        }
-        .frame(height: 28, alignment: .center)
-        .allowsHitTesting(false)
-        .mask(alignment: .trailing) {
-            HStack(spacing: 0) {
-                LinearGradient(
-                    stops: [
-                        .init(color: .clear, location: 0),
-                        .init(color: .black, location: 0.08)
-                    ],
-                    startPoint: .leading, endPoint: .trailing
-                )
-                .frame(width: 24)
-                Rectangle().frame(maxWidth: .infinity)
-                LinearGradient(
-                    stops: [
-                        .init(color: .black, location: 0.92),
-                        .init(color: .clear, location: 1)
-                    ],
-                    startPoint: .leading, endPoint: .trailing
-                )
-                .frame(width: 24)
-            }
-        }
+        MetadataPillRow(
+            pills: isManga
+                ? MetadataPillRowBuilder.mangaGenrePills(for: media)
+                : MetadataPillRowBuilder.animeGenrePills(for: media),
+            height: 30,
+            alignment: .center,
+            edgeFades: true,
+            allowsHitTesting: false,
+            spacing: 8)
     }
 }
 
@@ -899,29 +833,34 @@ private struct PageIndicator: View {
     }
 }
 
-// MARK: - Carousel Title Logo (v2.19, Batch 23 item 5)
+// MARK: - Carousel Title Logo (v2.19, Batch 23 item 5; Batch 26 manga title)
 //
-// The featured carousel's title slot: the title's official TRANSPARENT
-// artwork from TheTVDB — the series clearlogo (artwork type 23, 800x310
-// transparent PNG) when present, else clearart (type 22), English entries
-// ranked first by the service (see `TVDBMappingService.getLogoCandidates`).
-// Rendering rules: transparency, aspect ratio, and original appearance are
+// The featured carousel's title slot. ANIME: the title's official
+// TRANSPARENT artwork from TheTVDB — the series clearlogo (artwork type
+// 23) when present, else clearart (type 22), English entries ranked
+// first by the service (see `TVDBMappingService.getLogoCandidates`).
+// Rendering rules: transparency, aspect ratio, and original appearance
 // preserved exactly (scaledToFit — never cropped or stretched), and no
 // border, background, or shadow is ever added.
 //
-// Batch 23 (item 5) — LOGO ONLY: the old text-title fallback is GONE.
-// The text↔logo alternation while swiping was the reported
-// flicker/slow-load bug (every page change rendered the title text first,
-// then swapped to artwork — a guaranteed two-frame change per swipe). Now
-// the slot shows the logo when one exists and NOTHING when it doesn't:
-// one rendering strategy, no per-card switching. The fixed-height slot
-// keeps the layout below (pills, button, hint) rock-stable either way.
+// MANGA (Batch 26): TVDB has no manga records — a logo can never resolve,
+// so the logo-only rule left the manga carousel with NO title at all.
+// The manga slot now shows the REAL title text (same object as cover,
+// synopsis, pills and Read button): bold, large, drop-shadowed for
+// legibility over any artwork, instant (no async step — no flicker).
+//
+// Batch 23 (item 5) — LOGO ONLY for anime: the old text-title fallback
+// is gone there (the text↔logo alternation was the flicker bug); the
+// fixed-height slot keeps the layout below rock-stable in both modes.
 // Responsive sizing: 336x90pt on a compact banner, 448x118pt on a regular
 // (iPad) banner.
 private struct CarouselTitleLogo: View {
     let media: Media
     /// iPad (regular width) gets the larger, streaming-hero-scale logo box.
     var isWide: Bool = false
+    /// Batch 26 — manga carousels show the real title TEXT (TVDB logos
+    /// don't exist for manga; the logo-only rule blanked the slot).
+    var isManga: Bool = false
 
     /// `nil` = unresolved, no logo, or the art failed to decode — the slot
     /// renders EMPTY (never text). Reset at the top of every page change so
@@ -939,7 +878,20 @@ private struct CarouselTitleLogo: View {
 
     var body: some View {
         Group {
-            if let logoURL {
+            if isManga {
+                // The manga title — REAL text from the SAME Media object as
+                // the cover/synopsis/pills/button. Bold and shadowed so it
+                // stays readable over any artwork; sync render (no async
+                // resolution, so no per-swipe flicker).
+                Text(media.title.displayTitle)
+                    .font(.system(size: isWide ? 34 : 28, weight: .heavy))
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.6)
+                    .shadow(color: .black.opacity(0.65), radius: 3, x: 0, y: 1)
+                    .frame(maxWidth: maxLogoWidth, maxHeight: maxLogoHeight, alignment: .bottomLeading)
+                    .transition(.opacity)
+            } else if let logoURL {
                 CachedAsyncImage(urlString: logoURL, contentMode: .fit)
                     .frame(maxWidth: maxLogoWidth, maxHeight: maxLogoHeight)
                     // VoiceOver still reads the title — the logo is decorative
@@ -966,7 +918,8 @@ private struct CarouselTitleLogo: View {
             // Reset per page: the slot clears instantly (no stale logo over
             // the new banner), then its own artwork fades in once a
             // candidate actually decodes. No title-text step in between —
-            // that was the flicker.
+            // that was the flicker. (Manga skips this entirely.)
+            guard !isManga else { return }
             logoURL = nil
             logoURL = await CarouselLogoResolver.bestLogoURL(for: media)
         }
@@ -1138,28 +1091,17 @@ private struct FeaturedCard: View, Equatable {
                     .lineLimit(2)
             }
 
-            HStack(spacing: 8) {
-                if let score = media.averageScore {
-                    Label(score.averageScoreOutOf10, systemImage: "star.fill")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.yellow)
-                        .lineLimit(1)
-                        .fixedSize(horizontal: true, vertical: false)
-                }
-                if let genres = media.genres, !genres.isEmpty {
-                    ForEach(genres.prefix(2), id: \.self) { genre in
-                        Text(genre)
-                            .font(.caption2.weight(.medium))
-                            .foregroundStyle(.primary)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .background(Color.primary.opacity(0.1), in: Capsule())
-                            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
-                            .lineLimit(1)
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            // Batch 26 — the shared pill row (rating + genres, same
+            // object as the poster/banner above).
+            MetadataPillRow(
+                pills: [MetadataPill.rating(media.averageScore)]
+                    + MetadataPillRowBuilder.animeGenrePills(for: media, limit: 2),
+                height: 26,
+                alignment: .leading,
+                edgeFades: false,
+                allowsHitTesting: true,
+                spacing: 6)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -1182,8 +1124,27 @@ private struct FeaturedCard: View, Equatable {
 private struct AnimeSection: View {
     let title: String
     let items: [Media]
-    let category: BrowseCategory
+    /// Batch 26 — the stable query identifier (category or genre). The
+    /// See All button routes by THIS, and the destination runs the SAME
+    /// query — the page is the row's list continued.
+    let query: BrowseQuery
     @Environment(\.horizontalSizeClass) private var sizeClass
+
+    /// Category convenience (standard shelves).
+    init(title: String, items: [Media], category: BrowseCategory) {
+        self.init(title: title, items: items, query: .category(category))
+    }
+
+    /// Genre convenience (genre shelves).
+    init(title: String, items: [Media], genre: DiscoveryGenre) {
+        self.init(title: title, items: items, query: .genre(genre))
+    }
+
+    private init(title: String, items: [Media], query: BrowseQuery) {
+        self.title = title
+        self.items = items
+        self.query = query
+    }
 
     private var cardWidth: CGFloat {
         #if os(iOS)
@@ -1201,7 +1162,7 @@ private struct AnimeSection: View {
                     .tracking(0.3)
                 Spacer()
                 NavigationLink {
-                    BrowseView(category: category)
+                    BrowseView(query: query)
                 } label: {
                     HStack(spacing: 3) {
                         Text("See all")
@@ -2238,6 +2199,8 @@ struct ScheduleView: View {
                         sourceNotice = "AniChart and AnimeSchedule are unreachable — showing this week's airing list from MyAnimeList."
                     case .anilist:
                         sourceNotice = "Showing this week's airing schedule from AniList."
+                    case .kitsu:
+                        sourceNotice = "AniChart, AnimeSchedule, MAL and AniList are all unreachable — showing this week's real air times from Kitsu + TVDB."
                     default:
                         break
                     }

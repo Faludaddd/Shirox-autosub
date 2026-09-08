@@ -601,7 +601,7 @@ struct SearchView: View {
         await MainActor.run { self.recommendations = mapped }
     }
 
-    // MARK: - Surprise Me (chain-based discovery)
+    // MARK: - Surprise Me (Batch 26 — the genre-based randomizer)
 
     /// uniqueIds of titles already shown by Surprise Me in this session.
     /// Tracked so pressing Surprise Me again never returns the same title
@@ -609,14 +609,16 @@ struct SearchView: View {
     @State private var surpriseShownIds: Set<String> = []
     @State private var surpriseDestination: Media?
     @State private var isSurpriseLoading = false
+    /// The genre the last pick was drawn from — shown under the button so
+    /// the genre-first behavior is visible ("Picked from Fantasy").
+    @State private var lastSurpriseGenre: String?
 
     @ViewBuilder
     private var surpriseMeSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Simple one-button Surprise Me — no category chips, no filters.
-            // Picks a random title from the live multi-provider pool
-            // (trending + popular + top rated). Tracks shown titles so the
-            // same one is never returned twice.
+            // Genre-first Surprise Me: a random GENRE is selected, then a
+            // random anime that genuinely belongs to it (the discovery
+            // database answers membership — never a popularity chart).
             Button {
                 surpriseMe()
             } label: {
@@ -644,84 +646,49 @@ struct SearchView: View {
             .disabled(isSurpriseLoading)
             .padding(.horizontal, 16)
 
-            // Shown count — lets the user know how many they've explored.
+            // Shown count + the genre the last pick came from.
             if !surpriseShownIds.isEmpty {
-                Text("\(surpriseShownIds.count) explored this session")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .frame(maxWidth: .infinity, alignment: .center)
+                VStack(spacing: 4) {
+                    Text("\(surpriseShownIds.count) explored this session")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                    if let genre = lastSurpriseGenre {
+                        Text("Picked from \(genre)")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
             }
         }
     }
 
-    /// Picks a random title from a POOL built through the multi-provider
-    /// chain (Batch 25). The pool blends trending + popular + top rated,
-    /// served by whichever database is live — Kitsu right now, MAL/AniList
-    /// when they recover — so Surprise Me keeps working through any single
-    /// provider's outage. It previously called AniList's genre API directly,
-    /// and every tap failed with "No anime found" while AniList was down.
+    /// The genre-based randomizer (Batch 26): random genre FIRST, then a
+    /// random anime from that genre. The genre comes from the live
+    /// taxonomy; the anime comes from the discovery database's genre
+    /// query (the SAME chain the genre shelves and genre See All pages
+    /// use — health-gated, cached, deduplicated). Pressing again picks a
+    /// FRESH genre + fresh anime (the service prefers genres that
+    /// haven't come up recently); already-shown titles are excluded.
     ///
-    /// The pool is cached for 10 minutes so repeated taps don't re-walk
-    /// the chain. Already-shown titles are excluded; exhausting the pool
-    /// resets the exclusion list automatically.
+    /// This replaces the v2.25 pool (trending+popular+topRated) — the
+    /// reported behavior was "selecting from popular anime" because that
+    /// is literally what the pool was.
     private func surpriseMe() {
         isSurpriseLoading = true
         Task {
-            let cacheKey = isMangaMode ? "manga" : "anime"
-            let now = Date()
-
-            let cacheFresh = SearchView.surpriseCache[cacheKey] != nil
-                && now.timeIntervalSince(SearchView.surpriseCacheTimestamp[cacheKey] ?? .distantPast) < 600
-
-            var pool: [Media] = []
-            if cacheFresh, let cached = SearchView.surpriseCache[cacheKey] {
-                pool = cached
+            let pick: DiscoveryService.SurprisePick?
+            if isMangaMode {
+                pick = await DiscoveryService.shared.randomManga(excluding: surpriseShownIds)
             } else {
-                // Fresh pool — each shelf request is the SAME deduplicated,
-                // cached, health-gated chain call the Home tab makes.
-                if isMangaMode {
-                    pool += (try? await UnifiedProviderSystem.shared.mangaShelf(.trending)) ?? []
-                    pool += (try? await UnifiedProviderSystem.shared.mangaShelf(.popular)) ?? []
-                } else {
-                    pool += (try? await UnifiedProviderSystem.shared.browse(category: .trending, page: 1)) ?? []
-                    pool += (try? await UnifiedProviderSystem.shared.browse(category: .popular, page: 1)) ?? []
-                    pool += (try? await UnifiedProviderSystem.shared.browse(category: .topRated, page: 1)) ?? []
-                }
-                // A title can chart on several lists — dedup once.
-                var seen = Set<String>()
-                pool = pool.filter { seen.insert($0.uniqueId).inserted }
-
-                // Cache even an empty pool briefly so a total outage doesn't
-                // re-walk the (negative-cached) chain on every tap.
-                SearchView.surpriseCache[cacheKey] = pool
-                SearchView.surpriseCacheTimestamp[cacheKey] = now
-            }
-
-            // Shuffle for true randomness.
-            pool.shuffle()
-
-            let pick: Media?
-            let unshown = pool.filter { !surpriseShownIds.contains($0.uniqueId) }
-            if let random = unshown.randomElement() {
-                surpriseShownIds.insert(random.uniqueId)
-                pick = random
-            } else if let first = pool.first {
-                // Pool exhausted — reset the exclusion list and refresh the
-                // pool on the next tap.
-                surpriseShownIds = [first.uniqueId]
-                pick = first
-                SearchView.surpriseCache[cacheKey] = nil
-                SearchView.surpriseCacheTimestamp[cacheKey] = .distantPast
-            } else {
-                // Empty pool — every source failed. Reset so the next tap
-                // (after the cache expires) starts fresh.
-                surpriseShownIds.removeAll()
-                pick = nil
+                pick = await DiscoveryService.shared.randomAnime(excluding: surpriseShownIds)
             }
             await MainActor.run {
                 isSurpriseLoading = false
                 if let pick {
-                    surpriseDestination = pick
+                    surpriseShownIds.insert(pick.media.uniqueId)
+                    lastSurpriseGenre = pick.genre.displayName
+                    surpriseDestination = pick.media
                 } else {
                     ToastManager.shared.show(
                         title: "Surprise Me",
@@ -733,14 +700,6 @@ struct SearchView: View {
             }
         }
     }
-
-    /// Static cache for the Surprise Me pool, keyed by media type ("anime"
-    /// or "manga"). Survives view re-creation and refreshes every 10
-    /// minutes (see `surpriseMe()`). The underlying shelf calls are chain
-    /// cached too, so even a cold 10-minute refresh costs at most one
-    /// request per list.
-    private static var surpriseCache: [String: [Media]] = [:]
-    private static var surpriseCacheTimestamp: [String: Date] = [:]
 
     private func emptyStateView(icon: String, title: String, subtitle: String) -> some View {
         VStack(spacing: 16) {

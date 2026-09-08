@@ -436,6 +436,37 @@ final class MALDiscoveryService {
         ])
     }
 
+    // MARK: - Genre browse (Batch 26 — the discovery chain's MAL leg)
+
+    /// Anime in one genre, via Jikan's genre filter (`genres` takes MAL's
+    /// genre ids — the public taxonomy constants carried on
+    /// DiscoveryGenre). Ordered by member count so a genre's big titles
+    /// lead. Serves as the discovery fallback when Kitsu and AniList are
+    /// both unreachable.
+    func genreBrowse(genre: DiscoveryGenre, page: Int) async throws -> [JikanAnime] {
+        try await fetchList("anime", queryItems: [
+            URLQueryItem(name: "genres", value: "\(genre.malGenreId)"),
+            URLQueryItem(name: "order_by", value: "members"),
+            URLQueryItem(name: "sort", value: "desc"),
+            URLQueryItem(name: "limit", value: "20"),
+            URLQueryItem(name: "page", value: "\(page)"),
+            URLQueryItem(name: "sfw", value: "true")
+        ])
+    }
+
+    /// Manga in one genre — same taxonomy ids, the /manga endpoint.
+    func mangaGenreBrowse(genre: DiscoveryGenre, page: Int) async throws -> [Media] {
+        let list = try await fetchList("manga", queryItems: [
+            URLQueryItem(name: "genres", value: "\(genre.malGenreId)"),
+            URLQueryItem(name: "order_by", value: "members"),
+            URLQueryItem(name: "sort", value: "desc"),
+            URLQueryItem(name: "limit", value: "20"),
+            URLQueryItem(name: "page", value: "\(page)"),
+            URLQueryItem(name: "sfw", value: "true")
+        ])
+        return list.map { mapMangaToMedia($0) }
+    }
+
     // MARK: - Manga (v2.24 unified provider chain adapters)
 
     /// Jikan manga search for the unified manga search chain

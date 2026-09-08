@@ -1119,45 +1119,19 @@ struct AniListDetailView: View {
                         .lineLimit(3)
                         .copyTitleContextMenu(media.title.displayTitle)
 
-                    HStack(spacing: 8) {
-                        if let score = media.averageScore {
-                            HStack(spacing: 4) {
-                                Image(systemName: "star.fill")
-                                    .font(.caption2.weight(.bold))
-                                    .foregroundStyle(.primary)
-                                Text(score.averageScoreOutOf10)
-                                    .font(.caption2.weight(.bold))
-                                    .foregroundStyle(.primary)
-                                    .lineLimit(1)
-                                    .fixedSize(horizontal: true, vertical: false)
-                            }
-                            .padding(.horizontal, 8).padding(.vertical, 3)
-                            .background(Color.primary.opacity(0.1), in: Capsule())
-                            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
-                        }
-
-                        if let status = media.statusDisplay {
-                            Text(status)
-                                .font(.caption2).fontWeight(.semibold)
-                                .foregroundStyle(.primary)
-                                .padding(.horizontal, 8).padding(.vertical, 3)
-                                .background(Color.primary.opacity(0.1), in: Capsule())
-                                .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
-                                .lineLimit(1)
-                                .fixedSize(horizontal: true, vertical: false)
-                        }
-
-                        if let year = media.seasonYear {
-                            Text(String(year))
-                                .font(.caption2.weight(.medium))
-                                .foregroundStyle(.primary)
-                                .padding(.horizontal, 8).padding(.vertical, 3)
-                                .background(Color.primary.opacity(0.1), in: Capsule())
-                                .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
-                                .lineLimit(1)
-                                .fixedSize(horizontal: true, vertical: false)
-                        }
-                    }
+                    // Batch 26 — the shared MetadataPillRow (rating /
+                    // status / year — real metadata from the SAME Media,
+                    // larger pills, centered text and group).
+                    MetadataPillRow(
+                        pills: [MetadataPill.rating(media.averageScore),
+                                MetadataPill.status(media),
+                                MetadataPill.year(media.seasonYear)]
+                            .compactMap { $0 },
+                        height: 26,
+                        alignment: .center,
+                        edgeFades: true,
+                        allowsHitTesting: true,
+                        spacing: 8)
                 }
                 Spacer()
             }
@@ -1170,23 +1144,23 @@ struct AniListDetailView: View {
     @ViewBuilder
     private func metadataSection(media: Media) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            if let genres = media.genres, !genres.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(genres.prefix(6), id: \.self) { genre in
-                            Text(genre)
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(.primary)
-                                .padding(.horizontal, 10).padding(.vertical, 4)
-                                .background(Color.primary.opacity(0.1), in: Capsule())
-                                .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity)
+            // Batch 26 — genre pills via the SHARED pill component: real
+            // genres from the same Media, larger capsules, text centered
+            // inside each pill, the GROUP centered in the section, and a
+            // horizontally scrolling row that never clips or shrinks to
+            // unreadable sizes.
+            let pills = MetadataPillRowBuilder.animeGenrePills(for: media, limit: 8)
+            if !pills.isEmpty {
+                MetadataPillRow(
+                    pills: pills,
+                    height: 30,
+                    alignment: .center,
+                    edgeFades: true,
+                    allowsHitTesting: true,
+                    spacing: 8)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity)
         .padding(.horizontal, 16)
         .padding(.bottom, 4)
     }

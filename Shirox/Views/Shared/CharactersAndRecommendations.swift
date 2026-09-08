@@ -15,9 +15,9 @@ import SwiftUI
 struct CharactersSection: View {
     let mediaId: Int
     let isManga: Bool
-    /// Optional MAL ID — when the parent already has it (from the AniList
-    /// detail fetch's `idMal` field), pass it in to avoid re-fetching the
-    /// full media detail just to read `idMal`. Used by `loadJikanCharacters()`.
+    /// Optional MAL ID — when the parent already has it (from the detail
+    /// fetch's `idMal` field), pass it in so the character chain resolves
+    /// the MAL leg without re-fetching the full detail.
     var malId: Int? = nil
     /// Optional preloaded characters — when the parent already has them
     /// (e.g. anime detail fetches them as part of the main query), pass
@@ -28,9 +28,10 @@ struct CharactersSection: View {
     @State private var didFetch = false
     @State private var isLoading = false
     @State private var selectedCharacter: AniListCharacterEdge?
-    /// When true, character data came from MAL/Jikan (for anime) which
-    /// provides anime-specific character images and descriptions.
-    @State private var usingJikanCharacters = false
+    /// Batch 26 — set when EVERY provider in the character chain failed:
+    /// the section shows its clean "unavailable" state instead of
+    /// silently vanishing.
+    @State private var charactersUnavailable = false
     /// Collapsed by default — the user taps the chevron to expand the
     /// character strip. Keeping it collapsed on first render avoids an
     /// overwhelming wall of character art on the detail page.
@@ -88,9 +89,44 @@ struct CharactersSection: View {
                     }
                 }
                 .padding(.top, 8)
+            } else if charactersUnavailable {
+                // Batch 26 — the clean UNAVAILABLE state: every provider in
+                // the chain (TVDB → MAL → AniList → Kitsu) failed. The
+                // section stays visible with an honest message instead of
+                // silently disappearing; one tap retries the whole chain.
+                VStack(alignment: .leading, spacing: 12) {
+                    sectionHeader
+                    if isExpanded {
+                        Button {
+                            Task { await loadCharacters() }
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "person.crop.circle.badge.exclamationmark")
+                                    .font(.system(size: 20))
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Characters unavailable right now")
+                                        .font(.subheadline.weight(.semibold))
+                                    Text("Every character source is unreachable. Tap to retry.")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.vertical, 20)
+                            .padding(.horizontal, 12)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(Color.secondary.opacity(0.06)))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.top, 8)
             }
-            // If not loading and displayCharacters is empty, render nothing —
-            // the anime genuinely has no character data on AniList.
+            // If not loading, not unavailable and displayCharacters is
+            // empty, the title genuinely has no character data anywhere —
+            // the section stays hidden for titles with no cast at all.
         }
         .navigationDestinationCompat(item: $selectedCharacter) { edge in
             CharacterDetailView(edge: edge)
@@ -173,79 +209,38 @@ struct CharactersSection: View {
     private func loadCharacters() async {
         didFetch = true
         isLoading = true
-        // For ANIME: use MAL/Jikan characters endpoint which shows
-        // anime-specific character artwork (not manga artwork) and
-        // includes about/description text. For MANGA: use AniList's
-        // mangaDetail query as before.
+        charactersUnavailable = false
+        // Batch 26 — anime characters run through the shared character
+        // chain (TVDB → MAL → AniList → Kitsu — `CharacterService`), with
+        // proper cross-provider id resolution. Manga keeps the AniList
+        // mangaDetail path (the manga pipeline's metadata primary is
+        // MangaBaka; character art comes from AniList when it's up).
         if !isManga {
-            await loadJikanCharacters()
+            // Build a canonical Media stub for the chain (ids + provider
+            // are what the chain resolves by — never the title). Provider
+            // awareness matters: a page whose media.id IS a MAL id passes
+            // matching malId — the stub then carries .mal so the chain's
+            // AniList/Kitsu legs resolve through the RIGHT key.
+            let stubIsMAL = (malId != nil && malId == mediaId)
+            let stub = Media(
+                id: mediaId, idMal: malId, provider: stubIsMAL ? .mal : .anilist,
+                title: MediaTitle(romaji: nil, english: nil, native: nil),
+                coverImage: MediaCoverImage(large: nil, extraLarge: nil),
+                bannerImage: nil, description: nil, episodes: nil,
+                status: nil, averageScore: nil, genres: nil,
+                season: nil, seasonYear: nil, nextAiringEpisode: nil,
+                relations: nil, type: "ANIME", format: nil,
+                studioNames: nil, source: nil, duration: nil, airDateRange: nil)
+            if let result = await CharacterService.shared.characters(for: stub, anilistEdges: nil, tvdbFields: nil) {
+                fetchedCharacters = result.edges
+            } else {
+                fetchedCharacters = []
+                charactersUnavailable = true
+            }
         } else {
             await loadAniListCharacters()
         }
         isLoading = false
-    }
-
-    /// Loads anime characters from MAL/Jikan — shows anime-specific
-    /// character images (not manga images) and includes about text.
-    private func loadJikanCharacters() async {
-        do {
-            // Use the MAL ID passed in from the parent (avoids re-fetching
-            // the full AniList detail just to read idMal). If not available,
-            // fall back to IDMappingService cache, then to a detail fetch
-            // only as a last resort.
-            var resolvedMalId = malId
-            if resolvedMalId == nil || resolvedMalId == 0 {
-                resolvedMalId = IDMappingService.shared.cachedMalId(forAnilistId: mediaId)
-            }
-            guard let finalMalId = resolvedMalId, finalMalId > 0 else {
-                // No MAL ID — fall back to AniList characters
-                await loadAniListCharacters()
-                return
-            }
-
-            let edges = try await MALDiscoveryService.shared.characters(malId: finalMalId)
-            // Convert Jikan edges to AniListCharacterEdge for display
-            fetchedCharacters = edges.compactMap { edge in
-                guard let char = edge.character else { return nil }
-                return AniListCharacterEdge(
-                    role: edge.role,
-                    node: AniListCharacter(
-                        id: char.mal_id,
-                        name: AniListCharacterName(
-                            full: char.name,
-                            native: char.name_kanji,
-                            alternative: nil,
-                            alternativeSpoiler: nil),
-                        image: AniListCharacterImage(
-                            large: char.images?.jpg?.image_url,
-                            medium: char.images?.jpg?.image_url),
-                        description: char.about,
-                        gender: nil,
-                        dateOfBirth: nil,
-                        age: nil,
-                        bloodType: nil,
-                        favourites: nil,
-                        siteUrl: nil),
-                    voiceActors: edge.voice_actors?.compactMap { va in
-                        guard let person = va.person else { return nil }
-                        return AniListVoiceActor(
-                            id: person.mal_id,
-                            name: AniListCharacterName(
-                                full: person.name,
-                                native: nil,
-                                alternative: nil,
-                                alternativeSpoiler: nil),
-                            language: va.language,
-                            image: AniListCharacterImage(
-                                large: person.images?.jpg?.image_url,
-                                medium: person.images?.jpg?.image_url))
-                    })
-            }
-            usingJikanCharacters = true
-        } catch {
-            // Jikan failed — fall back to AniList
-            await loadAniListCharacters()
-        }
     }
 
     /// Loads characters from AniList (used for manga, or as fallback for anime)
@@ -258,7 +253,6 @@ struct CharactersSection: View {
                 media = try await AniListService.shared.detail(id: mediaId)
             }
             fetchedCharacters = media.characters?.edges ?? []
-            usingJikanCharacters = false
         } catch {
             fetchedCharacters = []
         }

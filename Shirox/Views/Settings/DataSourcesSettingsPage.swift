@@ -1,22 +1,35 @@
 import SwiftUI
 
-// MARK: - Data Sources settings page (v2.24; Batch 25 rework — logo
-// marks, live dashboard, Search Database picker)
+// MARK: - Data Sources settings (Batch 26 — complete redesign)
 //
-// The provider control room: every anime/manga/schedule source in one
-// place, with REAL health, REAL priority ordering (drag or buttons),
-// REAL provider tests, and per-domain cache controls. Everything shown
-// here is measured from actual requests — no simulated statuses, no
-// placeholder buttons.
+// A hub-and-detail layout a normal user can actually navigate:
+//
+//   DATA SOURCES (home)                PROVIDER DETAIL (per domain)
+//   ┌───────────────────────┐          ┌─────────────────────────────┐
+//   │ Anime     TVDB  ●     │  tap →   │ ANIME DATABASE              │
+//   │ Discovery Kitsu ●     │  tap →   │ ① TVDB — description        │
+//   │ Manga     MangaBaka ● │  tap →   │ FALLBACKS                   │
+//   │ Schedule  AniChart ○  │  tap →   │ ② MAL ③ AniList ④ Kitsu ⑤… │
+//   └───────────────────────┘          │ drag · toggle · test · reset│
+//                                      └─────────────────────────────┘
+//
+// Every domain is a large interactive card showing the provider currently
+// first in its chain, its live status, the full chain and a chevron —
+// "What does my app use for anime/manga/schedules?" answers itself.
+// The detail screen separates PRIMARY from FALLBACKS, uses plain-language
+// descriptions (no API terminology), and offers drag reordering, toggles,
+// make-primary, per-provider tests with real response times, a TEST ALL
+// action, and a reset to the recommended defaults.
 
 struct DataSourcesSettingsPage: View {
     @ObservedObject private var providers = UnifiedProviderSystem.shared
 
     @State private var testingKind: MetaProviderKind?
+    @State private var isTestingAll = false
     @State private var animeCacheSize: Int64 = 0
     @State private var mangaCacheSize: Int64 = 0
     @State private var scheduleCacheSize: Int64 = 0
-    @State private var showResetConfirmation = false
+    @State private var discoveryCacheSize: Int64 = 0
 
     // User-configurable credentials (AnimeSchedule token / AniDB client).
     @State private var animescheduleToken = ""
@@ -26,24 +39,11 @@ struct DataSourcesSettingsPage: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 18) {
-                headerCard
+            VStack(spacing: 16) {
+                introCard
+                domainDashboard
                 searchDatabaseCard
-                providerDomainCard(
-                    domain: .anime,
-                    title: "Anime Providers",
-                    subtitle: "TVDB → MAL → AniList → Kitsu → AniDB",
-                    icon: "sparkles.tv")
-                providerDomainCard(
-                    domain: .manga,
-                    title: "Manga Providers",
-                    subtitle: "MangaBaka → MAL → AniList → Kitsu",
-                    icon: "text.book.closed.fill")
-                providerDomainCard(
-                    domain: .schedule,
-                    title: "Schedule Providers",
-                    subtitle: "AniChart → AnimeSchedule → MAL → AniList",
-                    icon: "calendar")
+                testAllCard
                 cacheCard
                 footnoteCard
             }
@@ -56,54 +56,27 @@ struct DataSourcesSettingsPage: View {
             refreshCacheSizes()
             loadCredentials()
         }
-        .alert("Reset to Recommended Order?", isPresented: $showResetConfirmation) {
-            Button("Reset All", role: .destructive) {
-                withAnimation {
-                    providers.resetAllOrders()
-                }
-                Haptics.success()
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Anime: TVDB → MAL → AniList → Kitsu → AniDB\nManga: MangaBaka → MAL → AniList → Kitsu\nSchedule: AniChart → AnimeSchedule → MAL → AniList\nAnime search: your Search Database (Kitsu by default) first")
-        }
     }
 
-    // MARK: - Header
+    // MARK: - Intro
 
-    private var headerCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 12) {
-                Image(systemName: "server.rack")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(Color.appAccent)
-                    .frame(width: 46, height: 46)
-                    .background(Color.appAccent.opacity(0.14),
-                                in: RoundedRectangle(cornerRadius: 13, style: .continuous))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Provider System")
-                        .font(.headline)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                    Text("One shared chain serves every screen — priority, health, cooldowns, caching and deduplication all live here.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer()
+    private var introCard: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "server.rack")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(Color.appAccent)
+                .frame(width: 46, height: 46)
+                .background(Color.appAccent.opacity(0.14),
+                            in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("What does the app use?")
+                    .font(.headline)
+                Text("Tap a category to see and reorder its sources. Priority is tried top to bottom; a failing source is skipped automatically.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            // Batch 25 — live per-domain dashboard: the first provider in
-            // each chain that is enabled, not cooling down, and not hard
-            // down. All real state, measured from actual requests.
-            VStack(spacing: 8) {
-                domainHealthRow(.anime, title: "Anime")
-                domainHealthRow(.manga, title: "Manga")
-                domainHealthRow(.schedule, title: "Schedule")
-            }
-            .padding(.vertical, 10)
-            .padding(.horizontal, 12)
-            .background(Color.secondary.opacity(0.06),
-                        in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            Spacer(minLength: 0)
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -111,66 +84,19 @@ struct DataSourcesSettingsPage: View {
                     in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    private func domainHealthRow(_ domain: ProviderDomain, title: String) -> some View {
-        let live = liveProvider(for: domain)
-        let dot: Color
-        let statusText: String
-        if let live {
-            switch providers.statuses[live]?.state {
-            case .degraded, .rateLimited:
-                dot = .orange
-                statusText = "slow — \(live.displayName) + fallbacks"
-            case .healthy:
-                dot = .green
-                statusText = "via \(live.displayName)"
-            default:
-                dot = .gray
-                statusText = "ready — \(live.displayName) first"
-            }
-        } else {
-            dot = .red
-            statusText = "all sources down"
-        }
-        return HStack(spacing: 8) {
-            Circle()
-                .fill(dot)
-                .frame(width: 7, height: 7)
-            Text(title)
-                .font(.subheadline.weight(.medium))
-            Spacer()
-            Text(statusText)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
+    // MARK: - Domain dashboard (the 4 large cards)
+
+    private var domainDashboard: some View {
+        VStack(spacing: 12) {
+            ProviderDomainCard(domain: .anime)
+            ProviderDomainCard(domain: .discovery)
+            ProviderDomainCard(domain: .manga)
+            ProviderDomainCard(domain: .schedule)
         }
     }
 
-    /// First provider in the domain's chain that is enabled, not in a
-    /// cooldown window, and not hard-down/unreachable. Unknown (nothing
-    /// measured yet) still counts — the chain is armed, just untested.
-    private func liveProvider(for domain: ProviderDomain) -> MetaProviderKind? {
-        let order = providers.order(for: domain)
-        for kind in order where providers.isEnabled(kind) {
-            if let st = providers.statuses[kind], st.state == .healthy, !st.isCoolingDown {
-                return kind
-            }
-        }
-        for kind in order where providers.isEnabled(kind) {
-            if let st = providers.statuses[kind], !st.isCoolingDown,
-               st.state != .unavailable, st.state != .offline {
-                return kind
-            }
-        }
-        return nil
-    }
+    // MARK: - Search Database card (Batch 25, kept)
 
-    // MARK: - Search Database card (Batch 25)
-
-    /// Pick which database powers anime search. Kitsu is the default and
-    /// the recommended choice — anime-only, poster-rich, and live through
-    /// the current AniList/MAL outage windows. Whichever is picked, the
-    /// rest of the chain still backs it up automatically.
     private var searchDatabaseCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
@@ -200,7 +126,7 @@ struct DataSourcesSettingsPage: View {
                 }
             }
 
-            Text("Kitsu (default) is an anime-only database with posters and proper series pages, and it stays live while AniList and MyAnimeList are having outages — TVDB-first search returned mixed TV listings instead. Whichever you pick, the other databases still back it up automatically. Manga search always tries MangaBaka first.")
+            Text("Kitsu (default) is an anime-only database with posters and proper series pages, and it stays live while AniList and MyAnimeList are having outages. Whichever you pick, the other databases still back it up automatically. Manga search always tries MangaBaka first.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -251,62 +177,48 @@ struct DataSourcesSettingsPage: View {
         .accessibilityLabel("\(kind.displayName) as search database\(isSelected ? ", selected" : "")")
     }
 
-    // MARK: - Provider domain card (the priority chain)
+    // MARK: - TEST ALL
 
-    private func providerDomainCard(
-        domain: ProviderDomain,
-        title: String,
-        subtitle: String,
-        icon: String
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+    private var testAllCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
-                Image(systemName: icon)
-                    .font(.system(size: 14, weight: .semibold))
+                Image(systemName: "stethoscope")
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Color.appAccent)
-                    .frame(width: 28, height: 28)
-                    .background(Color.secondary.opacity(0.12),
-                                in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .frame(width: 30, height: 30)
+                    .background(Color.appAccent.opacity(0.14),
+                                in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(title)
+                    Text("Provider Health")
                         .font(.headline)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                    Text(subtitle)
+                    Text("Runs one real request against every enabled provider and shows the measured status — nothing is simulated.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer()
+            }
+            Button {
+                Task { await testAll() }
+            } label: {
+                HStack(spacing: 8) {
+                    if isTestingAll {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    } else {
+                        Image(systemName: "bolt.fill")
+                    }
+                    Text(isTestingAll ? "Testing every provider…" : "Test All Providers")
+                        .font(.subheadline.weight(.semibold))
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                 }
-                Spacer()
-                Button {
-                    showResetConfirmation = true
-                } label: {
-                    Text("Reset Order")
-                        .font(.caption.weight(.semibold))
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
             }
-
-            providerFlow(domain: domain)
-
-            // v2.24 — the priority list: drag-and-drop reordering (press
-            // the handle, drag, drop) plus arrow buttons for precise
-            // single-step moves. Both commit the same persisted order the
-            // request chain reads.
-            ReorderableProviderList(
-                domain: domain,
-                testingKind: testingKind,
-                onTest: { kind in await runTest(kind) })
-
-            // Domain-specific credential rows.
-            if domain == .schedule {
-                AnimeScheduleTokenRow(token: $animescheduleToken)
-            }
-            if domain == .anime {
-                AniDBCredentialsRow(clientName: $anidbClientName, clientVersion: $anidbClientVersion)
-            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .disabled(isTestingAll)
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -314,174 +226,15 @@ struct DataSourcesSettingsPage: View {
                     in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    /// The visual chain: provider badges joined with arrows, in priority
-    /// order (disabled providers show struck-through).
-    private func providerFlow(domain: ProviderDomain) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(Array(providers.order(for: domain).enumerated()), id: \.element) { index, kind in
-                    HStack(spacing: 8) {
-                        if index > 0 {
-                            Image(systemName: "arrow.down")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(.tertiary)
-                        }
-                        HStack(spacing: 4) {
-                            ProviderLogoMark(kind: kind, size: 16)
-                            Text(kind.shortName)
-                                .font(.caption2.weight(.semibold))
-                        }
-                        .foregroundStyle(providers.isEnabled(kind) ? .primary : .secondary)
-                        .opacity(providers.isEnabled(kind) ? 1 : 0.4)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(
-                            Color.appAccent.opacity(providers.isEnabled(kind) ? 0.15 : 0.06),
-                            in: Capsule())
-                    }
-                }
-            }
-            .padding(.horizontal, 2)
+    private func testAll() async {
+        isTestingAll = true
+        for kind in MetaProviderKind.allCases where providers.isEnabled(kind) {
+            testingKind = kind
+            _ = await providers.testProvider(kind)
         }
-    }
-
-    private func runTest(_ kind: MetaProviderKind) async {
-        testingKind = kind
-        let result = await providers.testProvider(kind)
         testingKind = nil
-        if result.ok {
-            Haptics.success()
-        } else {
-            Haptics.error()
-        }
-    }
-
-    // MARK: - Drag-and-drop priority list (v2.24)
-
-    /// Long-press a card's handle (the three lines) to lift it, drag
-    /// vertically to reposition — the neighbors slide aside in real time
-    /// with a haptic tick at every slot crossing — and release to commit.
-    /// The committed order is persisted instantly and read by every
-    /// request chain in the app; the per-card arrow buttons remain for
-    /// precise single-step moves and accessibility.
-    private struct ReorderableProviderList: View {
-        @ObservedObject private var providers = UnifiedProviderSystem.shared
-        let domain: ProviderDomain
-        let testingKind: MetaProviderKind?
-        let onTest: (MetaProviderKind) async -> Void
-
-        /// Estimated per-card stride for the drag-reorder math. Batch 23:
-        /// the reworked cards are slightly taller (separated identity /
-        /// health rows), so the stride follows. Cards vary in height
-        /// (metrics rows / test banners), so reordering snaps at this
-        /// granularity; the arrows give exact single-step control.
-        private let rowStride: CGFloat = 152
-
-        @State private var draggedIndex: Int?
-        @State private var dragOffset: CGFloat = 0
-        @State private var lastHapticTarget: Int?
-
-        /// Slot the dragged card would land in if released right now.
-        private var targetIndex: Int? {
-            guard let from = draggedIndex else { return nil }
-            let count = providers.order(for: domain).count
-            let displacement = Int((dragOffset / rowStride).rounded(.awayFromZero))
-            return min(max(from + displacement, 0), count - 1)
-        }
-
-        /// Live shift applied to non-dragged cards so a gap opens where the
-        /// dragged card would land.
-        private func neighborShift(for index: Int) -> CGFloat {
-            guard let from = draggedIndex, let target = targetIndex, target != from else { return 0 }
-            if index == from { return 0 }
-            let lower = min(from, target)
-            let upper = max(from, target)
-            guard index >= lower, index <= upper else { return 0 }
-            // Cards between the origin and the gap slide one stride in the
-            // direction OPPOSITE the drag, opening the slot.
-            return from < target ? -rowStride : rowStride
-        }
-
-        var body: some View {
-            let order = providers.order(for: domain)
-            VStack(spacing: 8) {
-                ForEach(Array(order.enumerated()), id: \.element) { index, kind in
-                    ProviderCardView(
-                        kind: kind,
-                        domain: domain,
-                        priorityIndex: index,
-                        isTesting: testingKind == kind,
-                        onTest: { await onTest(kind) },
-                        onMoveUp: { move(kind: kind, delta: -1) },
-                        onMoveDown: { move(kind: kind, delta: 1) },
-                        dragHandle: ProviderDragHandle(
-                            isLifted: draggedIndex == index,
-                            onDragStarted: {
-                                draggedIndex = index
-                                dragOffset = 0
-                                lastHapticTarget = index
-                                Haptics.selection()
-                            },
-                            onDragChanged: { y in
-                                dragOffset = y
-                                if let t = targetIndex, t != lastHapticTarget {
-                                    Haptics.selection()
-                                    lastHapticTarget = t
-                                }
-                            },
-                            onDragEnded: { y in
-                                dragOffset = y
-                                commitDrop()
-                            }))
-                        .offset(y: index == draggedIndex
-                                ? dragOffset
-                                : neighborShift(for: index))
-                        .scaleEffect(index == draggedIndex ? 1.03 : 1)
-                        .zIndex(index == draggedIndex ? 10 : 0)
-                        .opacity(index == draggedIndex ? 0.96 : 1)
-                        .shadow(color: index == draggedIndex ? .black.opacity(0.18) : .clear,
-                                radius: 12, y: 5)
-                        .animation(draggedIndex == nil
-                                   ? .spring(response: 0.32, dampingFraction: 0.82)
-                                   : nil,
-                                   value: draggedIndex)
-                        .animation(draggedIndex == nil ? nil : .linear(duration: 0.12),
-                                   value: targetIndex)
-                }
-            }
-        }
-
-        /// Commits the drop: reorders the persisted chain order, then
-        /// clears the drag state so everything settles into place.
-        private func commitDrop() {
-            guard let from = draggedIndex, let target = targetIndex, target != from else {
-                draggedIndex = nil
-                dragOffset = 0
-                lastHapticTarget = nil
-                return
-            }
-            var order = providers.order(for: domain)
-            let kind = order[from]
-            order.remove(at: from)
-            order.insert(kind, at: target)
-            providers.setOrder(order, for: domain)
-            Haptics.success()
-            draggedIndex = nil
-            dragOffset = 0
-            lastHapticTarget = nil
-        }
-
-        private func move(kind: MetaProviderKind, delta: Int) {
-            var order = providers.order(for: domain)
-            guard let index = order.firstIndex(of: kind) else { return }
-            let target = index + delta
-            guard target >= 0, target < order.count else { return }
-            order.swapAt(index, target)
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                providers.setOrder(order, for: domain)
-            }
-            Haptics.selection()
-        }
+        isTestingAll = false
+        Haptics.success()
     }
 
     // MARK: - Cache controls
@@ -512,6 +265,10 @@ struct DataSourcesSettingsPage: View {
             }
             cacheRow(title: "Manga Cache", detail: "Manga shelves, search, MangaBaka details.", size: mangaCacheSize) {
                 providers.clearMangaCache()
+                refreshCacheSizes()
+            }
+            cacheRow(title: "Discovery Cache", detail: "Trending, genres, carousel and See All lists.", size: discoveryCacheSize) {
+                providers.clearDiscoveryCache()
                 refreshCacheSizes()
             }
             cacheRow(title: "Schedule Cache", detail: "Airing timetable responses.", size: scheduleCacheSize) {
@@ -563,6 +320,7 @@ struct DataSourcesSettingsPage: View {
         animeCacheSize = providers.cacheSize(domain: .anime)
         mangaCacheSize = providers.cacheSize(domain: .manga)
         scheduleCacheSize = providers.cacheSize(domain: .schedule)
+        discoveryCacheSize = providers.cacheSize(domain: .discovery)
     }
 
     private func loadCredentials() {
@@ -593,6 +351,597 @@ struct DataSourcesSettingsPage: View {
     }
 }
 
+// MARK: - Domain metadata (plain-language helpers)
+
+extension ProviderDomain {
+    /// The dashboard card title.
+    var title: String {
+        switch self {
+        case .anime: return "Anime"
+        case .manga: return "Manga"
+        case .schedule: return "Schedule"
+        case .discovery: return "Discovery"
+        }
+    }
+
+    /// One-line plain-language description of what this domain controls.
+    var subtitle: String {
+        switch self {
+        case .anime: return "Metadata for anime pages — artwork, characters, descriptions"
+        case .manga: return "Manga search, series details and covers"
+        case .schedule: return "The weekly airing timetable"
+        case .discovery: return "What appears in Trending, Popular, genres and the carousel"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .anime: return "sparkles.tv"
+        case .manga: return "text.book.closed.fill"
+        case .schedule: return "calendar"
+        case .discovery: return "safari.fill"
+        }
+    }
+
+    /// The question the detail page answers, in the user's words.
+    var question: String {
+        switch self {
+        case .anime: return "What does the app use for anime?"
+        case .manga: return "What does the app use for manga?"
+        case .schedule: return "What does the app use for the schedule?"
+        case .discovery: return "What decides which anime I see?"
+        }
+    }
+
+    /// The recommended chain, in display form.
+    var recommendedChain: [MetaProviderKind] {
+        switch self {
+        case .anime: return UnifiedProviderSystem.recommendedAnimeOrder
+        case .manga: return UnifiedProviderSystem.recommendedMangaOrder
+        case .schedule: return UnifiedProviderSystem.recommendedScheduleOrder + [.kitsu]
+        case .discovery: return UnifiedProviderSystem.recommendedDiscoveryOrder
+        }
+    }
+}
+
+extension MetaProviderKind {
+    /// Plain-language description for a provider in a domain — no API
+    /// terminology. Written so someone who has never heard of an API
+    /// understands what each source does.
+    func simpleDescription(domain: ProviderDomain) -> String {
+        switch (self, domain) {
+        case (.tvdb, _):
+            return "Main source for anime artwork, characters, staff, descriptions and metadata."
+        case (.mal, .anime):
+            return "Fallback source used when TVDB can't provide something."
+        case (.anilist, .anime):
+            return "Additional fallback source for missing anime information."
+        case (.kitsu, .anime):
+            return "Additional anime metadata fallback — also backs up search."
+        case (.anidb, _):
+            return "Final anime metadata fallback. Needs a registered client to activate."
+        case (.kitsu, .discovery):
+            return "The discovery database — decides which anime appear in Trending, Popular, genres, the Home carousel and Surprise Me."
+        case (.anilist, .discovery):
+            return "Backup discovery database for trending and genre lists."
+        case (.mal, .discovery):
+            return "Second backup for discovery lists."
+        case (.mangabaka, _):
+            return "Main source for manga — search, series details and covers."
+        case (.mal, .manga):
+            return "Fallback source used when MangaBaka can't provide something."
+        case (.anilist, .manga):
+            return "Additional fallback for missing manga information."
+        case (.kitsu, .manga):
+            return "Additional manga fallback — keeps the Manga tab working through outages."
+        case (.anichart, _):
+            return "Primary schedule source — AniList's weekly airing chart."
+        case (.animeschedule, _):
+            return "Weekly timetable backup. Add a free API token below to activate it."
+        case (.mal, .schedule):
+            return "Airing-list backup from MyAnimeList when AniChart is down."
+        case (.anilist, .schedule):
+            return "Schedule backup from AniList's airing calendar."
+        case (.kitsu, .schedule):
+            return "Last resort — builds this week's timetable from Kitsu's airing list joined with TVDB's real air times."
+        default:
+            return "Metadata source."
+        }
+    }
+}
+
+extension ProviderHealthState {
+    /// The user-facing status words. "Online" is only ever shown from a
+    /// REAL measured success; "Not Tested" is the honest default.
+    var friendlyLabel: String {
+        switch self {
+        case .healthy: return "Online"
+        case .degraded: return "Degraded"
+        case .rateLimited: return "Rate Limited"
+        case .unavailable: return "Temporarily Unavailable"
+        case .offline: return "Offline"
+        case .unknown: return "Not Tested"
+        }
+    }
+}
+
+// MARK: - Domain dashboard card (the large interactive card)
+
+/// One large card on the Data Sources home: the domain's CURRENT primary
+/// provider, its live status, the chain, and a chevron. Tapping opens the
+/// dedicated priority screen for that domain.
+private struct ProviderDomainCard: View {
+    @ObservedObject private var providers = UnifiedProviderSystem.shared
+    let domain: ProviderDomain
+
+    /// First enabled, healthy-enough provider in the domain's chain.
+    private var livePrimary: MetaProviderKind? {
+        let order = providers.order(for: domain).filter { providers.isEnabled($0) }
+        for kind in order {
+            if let st = providers.statuses[kind], st.state == .healthy, !st.isCoolingDown {
+                return kind
+            }
+        }
+        for kind in order {
+            if let st = providers.statuses[kind], !st.isCoolingDown,
+               st.state != .unavailable, st.state != .offline {
+                return kind
+            }
+        }
+        return order.first
+    }
+
+    private var statusColor: Color {
+        guard let primary = livePrimary, let st = providers.statuses[primary] else {
+            return .secondary.opacity(0.6)
+        }
+        switch st.state {
+        case .healthy: return .green
+        case .degraded, .rateLimited: return .orange
+        case .unavailable: return .red
+        case .offline: return .gray
+        case .unknown: return .secondary.opacity(0.6)
+        }
+    }
+
+    private var statusText: String {
+        guard let primary = livePrimary, let st = providers.statuses[primary] else {
+            return "Not Tested"
+        }
+        return st.state.friendlyLabel
+    }
+
+    var body: some View {
+        NavigationLink {
+            ProviderDomainDetailPage(domain: domain)
+        } label: {
+            HStack(spacing: 14) {
+                // The current primary's logo — instantly answers "which
+                // database does my app use for this?".
+                ProviderLogoMark(kind: livePrimary ?? domain.recommendedChain[0], size: 44)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text(domain.title)
+                            .font(.headline)
+                            .foregroundStyle(.primary)
+                        Text("PRIMARY")
+                            .font(.system(size: 9, weight: .heavy))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(Color.appAccent, in: Capsule())
+                    }
+                    Text(livePrimary?.displayName ?? domain.recommendedChain[0].displayName)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    // The chain, in order, as compact chips.
+                    Text(chainPreview)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
+                }
+                Spacer(minLength: 4)
+
+                VStack(spacing: 6) {
+                    Circle()
+                        .fill(statusColor)
+                        .frame(width: 9, height: 9)
+                    Text(statusText)
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .frame(width: 64)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color.secondary.opacity(0.07)))
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Opens the \(domain.title) sources screen")
+    }
+
+    private var chainPreview: String {
+        providers.order(for: domain)
+            .map { providers.isEnabled($0) ? $0.shortName : "\($0.shortName) (off)" }
+            .joined(separator: " → ")
+    }
+}
+
+// MARK: - Provider domain detail page (the priority screen)
+
+/// The dedicated per-domain screen: PRIMARY and FALLBACKS sections with
+/// plain-language descriptions, drag reordering, enable/disable,
+/// make-primary, per-provider testing with real response times, TEST ALL
+/// for the domain, and a reset to the recommended defaults.
+struct ProviderDomainDetailPage: View {
+    @ObservedObject private var providers = UnifiedProviderSystem.shared
+    let domain: ProviderDomain
+
+    @State private var testingKind: MetaProviderKind?
+    @State private var isTestingDomain = false
+    @State private var showResetConfirmation = false
+
+    // User-configurable credentials (moved onto the relevant domains).
+    @State private var animescheduleToken = ""
+    @State private var anidbClientName = ""
+    @State private var anidbClientVersion = ""
+    @State private var loadedCredentials = false
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                headerCard
+                testDomainCard
+                prioritySection
+                credentialsSection
+                howItWorksCard
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 28)
+        }
+        #if os(iOS)
+        .background(Color(UIColor.systemBackground))
+        #endif
+        .navigationTitle(domain.title + " Sources")
+        .inlineNavBar()
+        .onAppear { loadCredentials() }
+        .alert("Reset to Recommended?", isPresented: $showResetConfirmation) {
+            Button("Reset", role: .destructive) {
+                withAnimation {
+                    providers.resetOrder(for: domain)
+                }
+                Haptics.success()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The \(domain.title) chain returns to \(domain.recommendedChain.map(\.shortName).joined(separator: " → ")).")
+        }
+    }
+
+    // MARK: Header
+
+    private var headerCard: some View {
+        HStack(spacing: 12) {
+            Image(systemName: domain.icon)
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(Color.appAccent)
+                .frame(width: 44, height: 44)
+                .background(Color.appAccent.opacity(0.14),
+                            in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(domain.question)
+                    .font(.headline)
+                Text(domain.subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.secondary.opacity(0.08),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    // MARK: Test the whole domain
+
+    private var testDomainCard: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Test every \(domain.title.lowercased()) source")
+                    .font(.subheadline.weight(.semibold))
+                Text("Runs one real request per enabled provider in this chain and shows the measured status and response time.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            Button {
+                Task { await testDomain() }
+            } label: {
+                HStack(spacing: 6) {
+                    if isTestingDomain {
+                        ProgressView().scaleEffect(0.75)
+                    } else {
+                        Image(systemName: "bolt.fill")
+                    }
+                    Text(isTestingDomain ? "Testing…" : "Test All")
+                        .font(.subheadline.weight(.semibold))
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.regular)
+            .disabled(isTestingDomain)
+        }
+        .padding(12)
+        .background(Color.secondary.opacity(0.06),
+                    in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private func testDomain() async {
+        isTestingDomain = true
+        for kind in providers.order(for: domain) where providers.isEnabled(kind) {
+            testingKind = kind
+            _ = await providers.testProvider(kind)
+        }
+        testingKind = nil
+        isTestingDomain = false
+        Haptics.success()
+    }
+
+    // MARK: Priority list (PRIMARY + FALLBACKS)
+
+    @ViewBuilder
+    private var prioritySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Priority Order")
+                    .font(.headline)
+                Spacer()
+                Button {
+                    showResetConfirmation = true
+                } label: {
+                    Label("Reset", systemImage: "arrow.counterclockwise")
+                        .font(.caption.weight(.semibold))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+            .padding(.horizontal, 2)
+
+            // "PRIMARY — tried first" sits over the first card; the list
+            // itself renders the FALLBACKS divider after it. The labels
+            // are positional — whichever provider the user drags to the
+            // top lands under PRIMARY.
+            Text("PRIMARY — tried first")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 2)
+
+            ReorderableProviderList(
+                domain: domain,
+                testingKind: testingKind,
+                onTest: { kind in await runTest(kind) },
+                onMakePrimary: { kind in makePrimary(kind) })
+
+            Text("Drag the handle (≡) to reorder, or use the arrows. Turn a source off to remove it from the chain.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .padding(.horizontal, 2)
+                .padding(.top, 2)
+        }
+    }
+
+    private func runTest(_ kind: MetaProviderKind) async {
+        testingKind = kind
+        _ = await providers.testProvider(kind)
+        testingKind = nil
+    }
+
+    /// Promotes a provider to PRIMARY (position 0) — the touch-friendly
+    /// alternative to dragging all the way up.
+    private func makePrimary(_ kind: MetaProviderKind) {
+        var order = providers.order(for: domain)
+        guard let index = order.firstIndex(of: kind), index > 0 else { return }
+        order.remove(at: index)
+        order.insert(kind, at: 0)
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+            providers.setOrder(order, for: domain)
+        }
+        Haptics.success()
+    }
+
+    // MARK: Credentials (domain-scoped)
+
+    @ViewBuilder
+    private var credentialsSection: some View {
+        if domain == .schedule {
+            AnimeScheduleTokenRow(token: $animescheduleToken)
+        } else if domain == .anime {
+            AniDBCredentialsRow(clientName: $anidbClientName, clientVersion: $anidbClientVersion)
+        }
+    }
+
+    private func loadCredentials() {
+        guard !loadedCredentials else { return }
+        animescheduleToken = AnimeScheduleProvider.shared.apiToken
+        anidbClientName = AniDBProvider.shared.clientName
+        anidbClientVersion = AniDBProvider.shared.clientVersion
+        loadedCredentials = true
+    }
+
+    // MARK: Plain-language explainer
+
+    private var howItWorksCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(
+                "The app always tries the primary source first. If it's slow or down, the next one in the list takes over automatically — you never see a blank page because one source failed.",
+                systemImage: "arrow.down.circle")
+            Label(
+                "Turning a source off removes it from the chain everywhere in the app. You can also drag the handle or use the arrows to change the order.",
+                systemImage: "hand.draw")
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.secondary.opacity(0.05),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+}
+
+// MARK: - Drag-and-drop priority list (Batch 26 rework)
+
+/// The reorderable chain: long-press a card's handle (≡) to lift it, drag
+/// vertically — neighbors slide aside in real time with a haptic tick at
+/// every slot crossing — and release to commit. The committed order is
+/// persisted instantly and read by every request chain in the app; the
+/// arrow buttons and "Make Primary" remain for precise, accessible
+/// single-step control. The FALLBACKS divider renders after the first
+/// card (positional — whichever provider is first sits under PRIMARY).
+private struct ReorderableProviderList: View {
+    @ObservedObject private var providers = UnifiedProviderSystem.shared
+    let domain: ProviderDomain
+    let testingKind: MetaProviderKind?
+    let onTest: (MetaProviderKind) async -> Void
+    let onMakePrimary: (MetaProviderKind) -> Void
+
+    /// Estimated per-card stride for the drag-reorder math. Cards vary in
+    /// height (metrics/test banners), so reordering snaps at this
+    /// granularity; the arrows give exact single-step control.
+    private let rowStride: CGFloat = 176
+
+    @State private var draggedIndex: Int?
+    @State private var dragOffset: CGFloat = 0
+    @State private var lastHapticTarget: Int?
+
+    /// Slot the dragged card would land in if released right now.
+    private var targetIndex: Int? {
+        guard let from = draggedIndex else { return nil }
+        let count = providers.order(for: domain).count
+        let displacement = Int((dragOffset / rowStride).rounded(.awayFromZero))
+        return min(max(from + displacement, 0), count - 1)
+    }
+
+    /// Live shift applied to non-dragged cards so a gap opens where the
+    /// dragged card would land.
+    private func neighborShift(for index: Int) -> CGFloat {
+        guard let from = draggedIndex, let target = targetIndex, target != from else { return 0 }
+        if index == from { return 0 }
+        let lower = min(from, target)
+        let upper = max(from, target)
+        guard index >= lower, index <= upper else { return 0 }
+        return from < target ? -rowStride : rowStride
+    }
+
+    var body: some View {
+        let order = providers.order(for: domain)
+        VStack(spacing: 8) {
+            ForEach(Array(order.enumerated()), id: \.element) { index, kind in
+                // The FALLBACKS divider — positional, after the first card.
+                if index == 1 {
+                    Text("FALLBACKS — used when the sources above fail")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 2)
+                        .padding(.top, 2)
+                        .offset(y: neighborShift(for: index - 1))
+                        .zIndex(-1)
+                }
+                ProviderPriorityCard(
+                    kind: kind,
+                    domain: domain,
+                    priorityIndex: index,
+                    isTesting: testingKind == kind,
+                    onTest: { await onTest(kind) },
+                    onMoveUp: index > 0 ? { move(kind: kind, delta: -1) } : nil,
+                    onMoveDown: index < order.count - 1 ? { move(kind: kind, delta: 1) } : nil,
+                    onMakePrimary: index > 0 ? { onMakePrimary(kind) } : nil,
+                    dragHandle: ProviderDragHandle(
+                        isLifted: draggedIndex == index,
+                        onDragStarted: {
+                            draggedIndex = index
+                            dragOffset = 0
+                            lastHapticTarget = index
+                            Haptics.selection()
+                        },
+                        onDragChanged: { y in
+                            dragOffset = y
+                            if let t = targetIndex, t != lastHapticTarget {
+                                Haptics.selection()
+                                lastHapticTarget = t
+                            }
+                        },
+                        onDragEnded: { y in
+                            dragOffset = y
+                            commitDrop()
+                        }))
+                    .offset(y: index == draggedIndex
+                            ? dragOffset
+                            : neighborShift(for: index))
+                    .scaleEffect(index == draggedIndex ? 1.03 : 1)
+                    .zIndex(index == draggedIndex ? 10 : 0)
+                    .opacity(index == draggedIndex ? 0.96 : 1)
+                    .shadow(color: index == draggedIndex ? .black.opacity(0.18) : .clear,
+                            radius: 12, y: 5)
+                    .animation(draggedIndex == nil
+                               ? .spring(response: 0.32, dampingFraction: 0.82)
+                               : nil,
+                               value: draggedIndex)
+                    .animation(draggedIndex == nil ? nil : .linear(duration: 0.12),
+                               value: targetIndex)
+            }
+        }
+    }
+
+    /// Commits the drop: reorders the persisted chain order, then clears
+    /// the drag state so everything settles into place.
+    private func commitDrop() {
+        guard let from = draggedIndex, let target = targetIndex, target != from else {
+            draggedIndex = nil
+            dragOffset = 0
+            lastHapticTarget = nil
+            return
+        }
+        var order = providers.order(for: domain)
+        let kind = order[from]
+        order.remove(at: from)
+        order.insert(kind, at: target)
+        providers.setOrder(order, for: domain)
+        Haptics.success()
+        draggedIndex = nil
+        dragOffset = 0
+        lastHapticTarget = nil
+    }
+
+    private func move(kind: MetaProviderKind, delta: Int) {
+        var order = providers.order(for: domain)
+        guard let index = order.firstIndex(of: kind) else { return }
+        let target = index + delta
+        guard target >= 0, target < order.count else { return }
+        order.swapAt(index, target)
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            providers.setOrder(order, for: domain)
+        }
+        Haptics.selection()
+    }
+}
+
 // MARK: - Drag handle
 
 /// The reorder affordance injected into a provider card. The card renders
@@ -610,6 +959,256 @@ struct ProviderDragHandle {
     let onDragEnded: (CGFloat) -> Void
 }
 
+// MARK: - Provider priority card
+
+/// One provider's card in the priority list. Large touch-friendly controls,
+/// plain-language description, REAL health + latency, numbered priority
+/// badge (①-style), enable toggle, Make Primary, and Test.
+private struct ProviderPriorityCard: View {
+    @ObservedObject private var providers = UnifiedProviderSystem.shared
+    let kind: MetaProviderKind
+    let domain: ProviderDomain
+    let priorityIndex: Int
+    let isTesting: Bool
+    let onTest: () async -> Void
+    let onMoveUp: (() -> Void)?
+    let onMoveDown: (() -> Void)?
+    let onMakePrimary: (() -> Void)?
+    let dragHandle: ProviderDragHandle?
+
+    private var status: ProviderStatus? { providers.statuses[kind] }
+    private var health: ProviderHealthState { status?.state ?? .unknown }
+    private var testResult: ProviderTestResult? { providers.lastTestResults[kind] }
+    private var enabled: Bool { providers.isEnabled(kind) }
+    private var isPrimary: Bool { priorityIndex == 0 }
+
+    private var healthColor: Color {
+        switch health {
+        case .healthy: return .green
+        case .degraded: return .orange
+        case .rateLimited: return .yellow
+        case .unavailable: return .red
+        case .offline: return .gray
+        case .unknown: return .secondary.opacity(0.6)
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // Row 1 — identity: handle, brand tile, name + status, toggle.
+            HStack(spacing: 10) {
+                if let handle = dragHandle {
+                    Image(systemName: "line.3.horizontal")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(handle.isLifted ? Color.appAccent : Color.secondary)
+                        .frame(width: 28, height: 32)
+                        .contentShape(Rectangle())
+                        .gesture(
+                            LongPressGesture(minimumDuration: 0.25)
+                                .sequenced(before: DragGesture(minimumDistance: 0))
+                                .onChanged { value in
+                                    switch value {
+                                    case .first(true):
+                                        handle.onDragStarted()
+                                    case .second(true, let drag):
+                                        if let drag {
+                                            handle.onDragChanged(drag.translation.height)
+                                        }
+                                    default:
+                                        break
+                                    }
+                                }
+                                .onEnded { value in
+                                    switch value {
+                                    case .second(true, let drag):
+                                        handle.onDragEnded(drag?.translation.height ?? 0)
+                                    default:
+                                        handle.onDragEnded(0)
+                                    }
+                                })
+                        .accessibilityLabel("Reorder \(kind.displayName)")
+                        .accessibilityHint("Drag up or down to change priority")
+                }
+
+                ProviderLogoMark(kind: kind, size: 38)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text(kind.displayName)
+                            .font(.subheadline.weight(.bold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                        if !enabled {
+                            Text("Off")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(.orange)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.orange.opacity(0.15), in: Capsule())
+                                .fixedSize()
+                        }
+                    }
+                    // Status line: dot + label + measured latency.
+                    HStack(spacing: 5) {
+                        Circle().fill(healthColor)
+                            .frame(width: 7, height: 7)
+                        Text(health.friendlyLabel)
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        if let latency = status?.lastLatencyMs, health == .healthy {
+                            Text("· \(latency) ms")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                }
+                Spacer(minLength: 4)
+
+                Toggle("", isOn: Binding(
+                    get: { enabled },
+                    set: { newValue in
+                        _ = providers.setEnabled(kind, newValue)
+                        Haptics.selection()
+                    }))
+                .labelsHidden()
+                .scaleEffect(0.85)
+                .frame(width: 46)
+                .accessibilityLabel("\(kind.displayName) enabled")
+            }
+
+            // Row 2 — the plain-language description (what this source
+            // actually does, in words a non-technical user understands).
+            Text(kind.simpleDescription(domain: domain))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 2)
+
+            // Test result banner (latest REAL result).
+            if let result = testResult {
+                HStack(spacing: 6) {
+                    Image(systemName: result.ok ? "checkmark.circle.fill" : "xmark.circle.fill")
+                        .foregroundStyle(result.ok ? .green : .red)
+                        .fixedSize()
+                    Text(result.ok
+                         ? "Online · \(result.latencyMs) ms"
+                         : "\(result.message)")
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.7)
+                    Spacer()
+                    Text(RelativeDateTimeFormatter().localizedString(for: result.testedAt, relativeTo: Date()))
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .fixedSize()
+                }
+                .font(.caption2.weight(.medium))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(
+                    (result.ok ? Color.green : Color.red).opacity(0.08),
+                    in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            } else if let note = status?.note, enabled, !note.isEmpty {
+                // Honest requirement note (e.g. AniDB client registration).
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.circle")
+                        .foregroundStyle(.orange)
+                        .fixedSize()
+                    Text(note)
+                        .lineLimit(3)
+                        .minimumScaleFactor(0.7)
+                    Spacer()
+                }
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(Color.orange.opacity(0.08),
+                            in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            }
+
+            // Row 3 — actions: Test · Make Primary · arrows.
+            HStack(spacing: 10) {
+                Button {
+                    Task { await onTest() }
+                } label: {
+                    HStack(spacing: 5) {
+                        if isTesting {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                        } else {
+                            Image(systemName: "bolt.horizontal")
+                        }
+                        Text(isTesting ? "Testing…" : "Test")
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+                    .font(.caption.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .disabled(isTesting)
+
+                if let onMakePrimary = onMakePrimary, !isPrimary {
+                    Button(action: onMakePrimary) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "star")
+                                .font(.system(size: 10, weight: .bold))
+                            Text("Make Primary")
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
+                        }
+                        .font(.caption.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .accessibilityLabel("Make \(kind.displayName) the primary source")
+                }
+
+                if let onMoveUp = onMoveUp {
+                    Button(action: onMoveUp) {
+                        Image(systemName: "arrow.up")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .accessibilityLabel("Move \(kind.displayName) up")
+                }
+                if let onMoveDown = onMoveDown {
+                    Button(action: onMoveDown) {
+                        Image(systemName: "arrow.down")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .accessibilityLabel("Move \(kind.displayName) down")
+                }
+            }
+        }
+        .padding(12)
+        .background(
+            enabled
+                ? Color.secondary.opacity(0.05)
+                : Color.secondary.opacity(0.02),
+            in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+        .opacity(enabled ? 1 : 0.75)
+        .overlay(alignment: .topLeading) {
+            // The numbered priority badge: ① on the primary, ② ③ ④ … on
+            // fallbacks — the user's requested visual language.
+            Text(isPrimary ? "1" : "\(priorityIndex + 1)")
+                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                .foregroundStyle(.white)
+                .frame(width: 22, height: 22)
+                .background(isPrimary ? Color.appAccent : Color.secondary.opacity(0.55),
+                            in: Circle())
+                .offset(x: -6, y: -6)
+                .accessibilityLabel(isPrimary ? "Primary source" : "Priority \(priorityIndex + 1)")
+        }
+    }
+}
 // MARK: - Provider logo marks (Batch 25 rework)
 //
 // Hand-drawn SwiftUI brand marks — each provider gets its own instantly
@@ -829,284 +1428,6 @@ private struct ClockMark: View {
             .stroke(color, style: StrokeStyle(lineWidth: lw, lineCap: .round))
         }
         .frame(width: size, height: size)
-    }
-}
-
-// MARK: - Provider card
-
-/// One provider's card, reworked in Batch 23 (item 2) so nothing can
-/// overlap at any Dynamic Type size:
-/// - Row 1: drag handle · brand tile · name + host stack · enable toggle.
-/// - Row 2: priority badge · health pill (cooldown chip when active).
-/// - Row 3: metrics (last success, latency) — single-line labels.
-/// - Row 4: actions (Test Provider, move up, move down).
-/// Every text is lineLimit(1) + minimumScaleFactor so rows keep a stable
-/// height — that height stability is also what keeps the drag-reorder
-/// math honest. All data comes from the real provider system.
-private struct ProviderCardView: View {
-    @ObservedObject private var providers = UnifiedProviderSystem.shared
-    let kind: MetaProviderKind
-    let domain: ProviderDomain
-    let priorityIndex: Int
-    let isTesting: Bool
-    let onTest: () async -> Void
-    let onMoveUp: () -> Void
-    let onMoveDown: () -> Void
-    /// v2.24 — drag-to-reorder affordance (nil hides the handle).
-    let dragHandle: ProviderDragHandle?
-
-    private var status: ProviderStatus? { providers.statuses[kind] }
-    private var health: ProviderHealthState { status?.state ?? .unknown }
-    private var testResult: ProviderTestResult? { providers.lastTestResults[kind] }
-    private var enabled: Bool { providers.isEnabled(kind) }
-
-    private var healthColor: Color {
-        switch health {
-        case .healthy: return .green
-        case .degraded: return .orange
-        case .rateLimited: return .yellow
-        case .unavailable: return .red
-        case .offline: return .gray
-        case .unknown: return .secondary.opacity(0.6)
-        }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // Row 1 — identity: handle, brand tile, name + host, toggle.
-            // The name/host stack takes the flexible space; the toggle is a
-            // fixed trailing element. Nothing else shares this line.
-            HStack(spacing: 10) {
-                if let handle = dragHandle {
-                    Image(systemName: "line.3.horizontal")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(handle.isLifted ? Color.appAccent : Color.secondary)
-                        .frame(width: 24, height: 26)
-                        .contentShape(Rectangle())
-                        .gesture(
-                            LongPressGesture(minimumDuration: 0.25)
-                                .sequenced(before: DragGesture(minimumDistance: 0))
-                                .onChanged { value in
-                                    switch value {
-                                    case .first(true):
-                                        handle.onDragStarted()
-                                    case .second(true, let drag):
-                                        if let drag {
-                                            handle.onDragChanged(drag.translation.height)
-                                        }
-                                    default:
-                                        break
-                                    }
-                                }
-                                .onEnded { value in
-                                    switch value {
-                                    case .second(true, let drag):
-                                        handle.onDragEnded(drag?.translation.height ?? 0)
-                                    default:
-                                        handle.onDragEnded(0)
-                                    }
-                                })
-                        .accessibilityLabel("Reorder \(kind.displayName)")
-                        .accessibilityHint("Drag up or down to change priority")
-                }
-
-                ProviderLogoMark(kind: kind)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text(kind.displayName)
-                            .font(.subheadline.weight(.semibold))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.75)
-                        if !enabled {
-                            Text("Disabled")
-                                .font(.caption2.weight(.bold))
-                                .foregroundStyle(.orange)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.orange.opacity(0.15), in: Capsule())
-                                .fixedSize()
-                        }
-                    }
-                    Text("\(providers.priorityLabel(for: kind, domain: domain)) · \(kind.apiHost)")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .minimumScaleFactor(0.7)
-                }
-                Spacer(minLength: 4)
-
-                Toggle("", isOn: Binding(
-                    get: { enabled },
-                    set: { newValue in
-                        _ = providers.setEnabled(kind, newValue)
-                        Haptics.selection()
-                    }))
-                .labelsHidden()
-                .scaleEffect(0.8)
-                .frame(width: 44)
-                .accessibilityLabel("\(kind.displayName) enabled")
-            }
-
-            // Row 2 — priority + health on their own line, never competing
-            // with the identity row.
-            HStack(spacing: 8) {
-                // Priority badge (#1 = PRIMARY — tried first).
-                Text(priorityIndex == 0 ? "★" : "\(priorityIndex + 1)")
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(priorityIndex == 0 ? .white : .secondary)
-                    .frame(width: 26, height: 26)
-                    .background(
-                        priorityIndex == 0 ? Color.appAccent : Color.secondary.opacity(0.14),
-                        in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .accessibilityLabel(priorityIndex == 0 ? "Primary source" : "Priority \(priorityIndex + 1)")
-
-                // Health pill — its own room to breathe.
-                HStack(spacing: 5) {
-                    Image(systemName: health.symbolName)
-                        .font(.system(size: 9, weight: .bold))
-                    Text(health.label)
-                        .font(.caption2.weight(.semibold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                }
-                .foregroundStyle(healthColor)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(healthColor.opacity(0.12), in: Capsule())
-                .fixedSize(horizontal: true, vertical: true)
-
-                Spacer(minLength: 4)
-
-                // Cooldown chip — only while a cooldown is actually active.
-                if let until = status?.cooldownUntil, until > Date() {
-                    Label(
-                        Int(until.timeIntervalSinceNow) > 90
-                            ? "cooldown \(Int(until.timeIntervalSinceNow) / 60)m"
-                            : "cooldown \(Int(until.timeIntervalSinceNow.rounded(.up)))s",
-                        systemImage: "hourglass")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.orange)
-                        .lineLimit(1)
-                        .fixedSize()
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.orange.opacity(0.12), in: Capsule())
-                }
-            }
-
-            // Row 3 — metrics: single-line labels that shrink, never wrap.
-            HStack(spacing: 12) {
-                if let success = status?.lastSuccess {
-                    Label(
-                        RelativeDateTimeFormatter().localizedString(for: success, relativeTo: Date()),
-                        systemImage: "clock")
-                        .lineLimit(1)
-                } else {
-                    Label("No requests yet", systemImage: "clock")
-                        .lineLimit(1)
-                }
-                if let latency = status?.lastLatencyMs {
-                    Label("\(latency) ms", systemImage: "speedometer")
-                        .lineLimit(1)
-                }
-                Spacer(minLength: 0)
-            }
-            .font(.caption2)
-            .foregroundStyle(.secondary)
-
-            // Test result banner (latest REAL result).
-            if let result = testResult {
-                HStack(spacing: 6) {
-                    Image(systemName: result.ok ? "checkmark.circle.fill" : "xmark.circle.fill")
-                        .foregroundStyle(result.ok ? .green : .red)
-                        .fixedSize()
-                    Text(result.ok
-                         ? "Online · \(result.latencyMs) ms"
-                         : "Unavailable · \(result.message)")
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.7)
-                    Spacer()
-                    Text(RelativeDateTimeFormatter().localizedString(for: result.testedAt, relativeTo: Date()))
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
-                        .fixedSize()
-                }
-                .font(.caption2.weight(.medium))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
-                .background(
-                    (result.ok ? Color.green : Color.red).opacity(0.08),
-                    in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-            } else if let note = status?.note, enabled, !note.isEmpty {
-                // Honest requirement note (e.g. AniDB client registration).
-                HStack(spacing: 6) {
-                    Image(systemName: "exclamationmark.circle")
-                        .foregroundStyle(.orange)
-                        .fixedSize()
-                    Text(note)
-                        .lineLimit(3)
-                        .minimumScaleFactor(0.7)
-                    Spacer()
-                }
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
-                .background(Color.orange.opacity(0.08),
-                            in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-            }
-
-            // Row 4 — actions.
-            HStack(spacing: 10) {
-                Button {
-                    Task { await onTest() }
-                } label: {
-                    HStack(spacing: 5) {
-                        if isTesting {
-                            ProgressView()
-                                .scaleEffect(0.7)
-                        } else {
-                            Image(systemName: "bolt.horizontal")
-                        }
-                        Text(isTesting ? "Testing…" : "Test Provider")
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                    }
-                    .font(.caption.weight(.semibold))
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-                .disabled(isTesting)
-
-                Button(action: onMoveUp) {
-                    Image(systemName: "arrow.up")
-                        .font(.system(size: 12, weight: .semibold))
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .disabled(priorityIndex == 0)
-                .accessibilityLabel("Move \(kind.displayName) up")
-
-                Button(action: onMoveDown) {
-                    Image(systemName: "arrow.down")
-                        .font(.system(size: 12, weight: .semibold))
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .disabled(priorityIndex >= providers.order(for: domain).count - 1)
-                .accessibilityLabel("Move \(kind.displayName) down")
-            }
-        }
-        .padding(12)
-        .background(
-            enabled
-                ? Color.secondary.opacity(0.05)
-                : Color.secondary.opacity(0.02),
-            in: RoundedRectangle(cornerRadius: 13, style: .continuous))
-        .opacity(enabled ? 1 : 0.75)
     }
 }
 

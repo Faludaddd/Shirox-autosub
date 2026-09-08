@@ -1,13 +1,50 @@
 import SwiftUI
 
+/// Batch 26 — the STABLE identifier every browse surface routes by.
+/// A Home row, a grid tile and the See All page it opens all carry one
+/// of these; the destination page runs the exact query the identifier
+/// names. Never an array index, never a display title, never a route
+/// shared by multiple categories.
+enum BrowseQuery: Hashable {
+    /// The six standard charts (trending / seasonal / popular / …).
+    case category(BrowseCategory)
+    /// A genre page — keyed by the genre SLUG (the discovery database's
+    /// own category identifier).
+    case genre(DiscoveryGenre)
+
+    /// Page title for the See All destination.
+    var title: String {
+        switch self {
+        case .category(let category): return category.title
+        case .genre(let genre): return genre.displayName
+        }
+    }
+
+    /// The unified-chain browse call this query runs — the SAME one for
+    /// the Home shelf (page 1) and the See All grid (pages 1…N).
+    func load(page: Int) async throws -> [Media] {
+        switch self {
+        case .category(let category):
+            return try await UnifiedProviderSystem.shared.browse(category: category, page: page)
+        case .genre(let genre):
+            return try await UnifiedProviderSystem.shared.browse(genre: genre, page: page)
+        }
+    }
+}
+
 struct BrowseView: View {
-    let category: BrowseCategory
+    let query: BrowseQuery
     @StateObject private var vm: BrowseViewModel
     @Environment(\.horizontalSizeClass) private var sizeClass
 
+    init(query: BrowseQuery) {
+        self.query = query
+        _vm = StateObject(wrappedValue: BrowseViewModel(query: query))
+    }
+
+    /// Backward-compatible category initializer (existing callers).
     init(category: BrowseCategory) {
-        self.category = category
-        _vm = StateObject(wrappedValue: BrowseViewModel(category: category))
+        self.init(query: .category(category))
     }
 
     private var columnCount: Int {
@@ -71,7 +108,7 @@ struct BrowseView: View {
                 .refreshable { await vm.retry() }
             }
         }
-        .navigationTitle(category.title)
+        .navigationTitle(query.title)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.large)
         #endif

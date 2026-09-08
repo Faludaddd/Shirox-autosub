@@ -3,7 +3,11 @@ import Combine
 
 @MainActor
 final class BrowseViewModel: ObservableObject {
-    let category: BrowseCategory
+    /// Batch 26 — the STABLE query this page pages through. It arrives
+    /// from the Home row / grid tile that opened it (category OR genre —
+    /// always the identifier the row itself used, so the page's list is
+    /// the row's list continued, never another category's).
+    let query: BrowseQuery
 
     @Published var items: [Media] = []
     @Published var isLoading = false
@@ -13,8 +17,8 @@ final class BrowseViewModel: ObservableObject {
     private var currentPage = 0
     private var cancellables = Set<AnyCancellable>()
 
-    init(category: BrowseCategory) {
-        self.category = category
+    init(query: BrowseQuery) {
+        self.query = query
         ProviderManager.shared.$orderedProviders
             .map { $0.first?.providerType }
             .removeDuplicates { $0 == $1 }
@@ -26,17 +30,24 @@ final class BrowseViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
+    /// Backward-compatible category initializer.
+    init(category: BrowseCategory) {
+        self.init(query: .category(category))
+    }
+
     func loadMore() async {
         guard !isLoading, hasMore else { return }
         isLoading = true
         error = nil
         let nextPage = currentPage + 1
         do {
-            // v2.24 — See All pages run through the unified provider chain
-            // (TVDB → MAL → AniList → Kitsu) — the SAME chain, cache, and
-            // dedup the Home shelves use (the shelf IS page 1 of this
-            // browse), so opening See All right after Home costs nothing.
-            let newItems = try await UnifiedProviderSystem.shared.browse(category: self.category, page: nextPage)
+            // v2.24 / Batch 26 — See All pages run through the unified
+            // DISCOVERY chain — the SAME chain, cache, and dedup the Home
+            // shelves use (the shelf IS page 1 of this browse), so opening
+            // See All right after Home costs nothing, and PAGINATION
+            // CONTINUES THE SAME QUERY (the genre/category the row named,
+            // never another category's list).
+            let newItems = try await query.load(page: nextPage)
             var seen = Set(items.map(\.uniqueId))
             let deduped = newItems.filter { seen.insert($0.uniqueId).inserted }
             items.append(contentsOf: deduped)

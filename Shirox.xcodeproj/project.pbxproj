@@ -678,6 +678,10 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */ = {isa = PBXBui
                 EA699B91BC6B4BCF8B325D40 /* ToastSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ED5C58C75D046CCB3CEEE12 /* ToastSystem.swift */; };
                 F600445A08244B5095556D9D /* ToastSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ED5C58C75D046CCB3CEEE12 /* ToastSystem.swift */; };
                 895B393387144BA2B7146905 /* ToastSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ED5C58C75D046CCB3CEEE12 /* ToastSystem.swift */; };
+		366844F1B89D534618F6B1BB /* MetadataPillRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 487B6180E1663A605389FA55 /* MetadataPillRow.swift */; };
+		99845379B1FDC5993408FB0F /* MetadataPillRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 487B6180E1663A605389FA55 /* MetadataPillRow.swift */; };
+		4C2EE4514602405653E639E6 /* MetadataPillRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 487B6180E1663A605389FA55 /* MetadataPillRow.swift */; };
+		EC2901F3CDBA86689872E396 /* MetadataPillRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 487B6180E1663A605389FA55 /* MetadataPillRow.swift */; };
                 FB3055616FBE4A399FAA8A5D /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB9A6134C59C4A32B8003889 /* Haptics.swift */; };
                 A059508F65B7400595DF13C4 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB9A6134C59C4A32B8003889 /* Haptics.swift */; };
                 7F79015A0ABA4261AA83F778 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB9A6134C59C4A32B8003889 /* Haptics.swift */; };
@@ -778,6 +782,18 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */ = {isa = PBXBui
 		9727806D7AB9472B942DADDF /* UnifiedProviderSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EE1C02020534CC3ACFBDA82 /* UnifiedProviderSystem.swift */; };
 		0CD7D157FBC142E29D3B8C80 /* UnifiedProviderSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EE1C02020534CC3ACFBDA82 /* UnifiedProviderSystem.swift */; };
 		0D60C779068849A6A2F1FE01 /* UnifiedProviderSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EE1C02020534CC3ACFBDA82 /* UnifiedProviderSystem.swift */; };
+		BEDAA4D199678AD27A12743B /* CharacterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 623F4B3B8B0A01B4110A996E /* CharacterService.swift */; };
+		5E4577316315FE64E49230FE /* CharacterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 623F4B3B8B0A01B4110A996E /* CharacterService.swift */; };
+		4726090BC58DA246C1E2E740 /* CharacterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 623F4B3B8B0A01B4110A996E /* CharacterService.swift */; };
+		B95C102A08038B4C3FB8E082 /* CharacterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 623F4B3B8B0A01B4110A996E /* CharacterService.swift */; };
+		7BD992FAF791273F7D197180 /* KitsuTVDBTimetableService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57A8B6E2BAB5A3203C6082B6 /* KitsuTVDBTimetableService.swift */; };
+		F21D7E9C441DD0767B8663A8 /* KitsuTVDBTimetableService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57A8B6E2BAB5A3203C6082B6 /* KitsuTVDBTimetableService.swift */; };
+		E620FEBA7ECAA92F33F791C8 /* KitsuTVDBTimetableService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57A8B6E2BAB5A3203C6082B6 /* KitsuTVDBTimetableService.swift */; };
+		CA1D8B93F04008540E95C300 /* KitsuTVDBTimetableService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57A8B6E2BAB5A3203C6082B6 /* KitsuTVDBTimetableService.swift */; };
+		ECF92469546E4EA9B13C5225 /* DiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 787DB5DB440C0962E4829173 /* DiscoveryService.swift */; };
+		8EFBEAEAC00EEC727100E47D /* DiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 787DB5DB440C0962E4829173 /* DiscoveryService.swift */; };
+		72D1E8AE4231910B316CA554 /* DiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 787DB5DB440C0962E4829173 /* DiscoveryService.swift */; };
+		9857225A5B00092A9CA08294 /* DiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 787DB5DB440C0962E4829173 /* DiscoveryService.swift */; };
 		428E4CA25C0A426599BD0F72 /* DataSourcesSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1490E05108E643F9959205B8 /* DataSourcesSettingsPage.swift */; };
 		64C9B0B46E3949C8BC2B072A /* DataSourcesSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1490E05108E643F9959205B8 /* DataSourcesSettingsPage.swift */; };
 		CA904BD67DF8446FB1813485 /* DataSourcesSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1490E05108E643F9959205B8 /* DataSourcesSettingsPage.swift */; };
@@ -1043,6 +1059,7 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
                 EE6B60FF705A43CDBF491F0D /* UnifiedScheduleEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnifiedScheduleEntry.swift; sourceTree = "<group>"; };
                 A7FE0F3B7E784465BCA91A4F /* TransparentNavBarModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransparentNavBarModifier.swift; sourceTree = "<group>"; };
                 1ED5C58C75D046CCB3CEEE12 /* ToastSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToastSystem.swift; sourceTree = "<group>"; };
+                487B6180E1663A605389FA55 /* MetadataPillRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetadataPillRow.swift; sourceTree = "<group>"; };
                 CB9A6134C59C4A32B8003889 /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
                 7B960C6896464EEC9886FA2B /* CustomRefreshControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomRefreshControl.swift; sourceTree = "<group>"; };
                 ACCF2A92A85C4B4BA8E11E55 /* app-logo.png */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = image.png; path = app-logo.png; sourceTree = "<group>"; };
@@ -1069,6 +1086,9 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
 		142F2144A810425DB981F42B /* MangaBakaProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MangaBakaProvider.swift; sourceTree = "<group>"; };
 		1BAB5E8B3D5348289AB25239 /* ScheduleProviders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleProviders.swift; sourceTree = "<group>"; };
 		5EE1C02020534CC3ACFBDA82 /* UnifiedProviderSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnifiedProviderSystem.swift; sourceTree = "<group>"; };
+		623F4B3B8B0A01B4110A996E /* CharacterService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CharacterService.swift; sourceTree = "<group>"; };
+		57A8B6E2BAB5A3203C6082B6 /* KitsuTVDBTimetableService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KitsuTVDBTimetableService.swift; sourceTree = "<group>"; };
+		787DB5DB440C0962E4829173 /* DiscoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoveryService.swift; sourceTree = "<group>"; };
 		1490E05108E643F9959205B8 /* DataSourcesSettingsPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataSourcesSettingsPage.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -1261,6 +1281,9 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
 				142F2144A810425DB981F42B /* MangaBakaProvider.swift */,
 				1BAB5E8B3D5348289AB25239 /* ScheduleProviders.swift */,
 				5EE1C02020534CC3ACFBDA82 /* UnifiedProviderSystem.swift */,
+				623F4B3B8B0A01B4110A996E /* CharacterService.swift */,
+				57A8B6E2BAB5A3203C6082B6 /* KitsuTVDBTimetableService.swift */,
+				787DB5DB440C0962E4829173 /* DiscoveryService.swift */,
                         );
                         path = Services;
                         sourceTree = "<group>";
@@ -1377,6 +1400,7 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */,
                                 35CD557D45FF0C6287F6783D /* View+GlassChrome.swift */,
                                 A7FE0F3B7E784465BCA91A4F /* TransparentNavBarModifier.swift */,
                                 1ED5C58C75D046CCB3CEEE12 /* ToastSystem.swift */,
+                                487B6180E1663A605389FA55 /* MetadataPillRow.swift */,
                                 CB9A6134C59C4A32B8003889 /* Haptics.swift */,
                                 7B960C6896464EEC9886FA2B /* CustomRefreshControl.swift */,
                                 4E540997BA864448B082B725 /* SettingsSearchIndex.swift */,
@@ -1756,6 +1780,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 700DD5E4768C45EA97E32DF5 /* UnifiedScheduleEntry.swift in Sources */,
                                 11121E24D9F540198A8C76C8 /* TransparentNavBarModifier.swift in Sources */,
                                 895B393387144BA2B7146905 /* ToastSystem.swift in Sources */,
+                                366844F1B89D534618F6B1BB /* MetadataPillRow.swift in Sources */,
                                 57BF5714069E486B97AA8FBF /* Haptics.swift in Sources */,
                                 D13549A1608449AF9EBDE353 /* CustomRefreshControl.swift in Sources */,
                                 01A20920D09146A29404813E /* SettingsSearchIndex.swift in Sources */,
@@ -1780,6 +1805,9 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
 				70580AE3D2E9460B8807F590 /* MangaBakaProvider.swift in Sources */,
 				9F7247A7924B4A74AFD7B1C8 /* ScheduleProviders.swift in Sources */,
 				0D60C779068849A6A2F1FE01 /* UnifiedProviderSystem.swift in Sources */,
+				BEDAA4D199678AD27A12743B /* CharacterService.swift in Sources */,
+				7BD992FAF791273F7D197180 /* KitsuTVDBTimetableService.swift in Sources */,
+				ECF92469546E4EA9B13C5225 /* DiscoveryService.swift in Sources */,
 				D97B2063009A40478A165DEF /* DataSourcesSettingsPage.swift in Sources */,
 );
                         runOnlyForDeploymentPostprocessing = 0;
@@ -1991,6 +2019,7 @@ A17F1001000000000000000A /* ForcedUpdateView.swift in Sources */,
                                 B14FB924B9C2413BA3ABCF04 /* UnifiedScheduleEntry.swift in Sources */,
                                 C4D8EB22420F4C6DA18AA61B /* TransparentNavBarModifier.swift in Sources */,
                                 F600445A08244B5095556D9D /* ToastSystem.swift in Sources */,
+                                99845379B1FDC5993408FB0F /* MetadataPillRow.swift in Sources */,
                                 7F79015A0ABA4261AA83F778 /* Haptics.swift in Sources */,
                                 4ECDE91B709E40C4B7131936 /* CustomRefreshControl.swift in Sources */,
                                 2E0E8A3882B1417499E1D5FA /* SettingsSearchIndex.swift in Sources */,
@@ -2015,6 +2044,9 @@ A17F1001000000000000000A /* ForcedUpdateView.swift in Sources */,
 				FD70D2C4FBB842D6BE4FA21B /* MangaBakaProvider.swift in Sources */,
 				6A6820DE97FF408CB56642C0 /* ScheduleProviders.swift in Sources */,
 				0CD7D157FBC142E29D3B8C80 /* UnifiedProviderSystem.swift in Sources */,
+				5E4577316315FE64E49230FE /* CharacterService.swift in Sources */,
+				F21D7E9C441DD0767B8663A8 /* KitsuTVDBTimetableService.swift in Sources */,
+				8EFBEAEAC00EEC727100E47D /* DiscoveryService.swift in Sources */,
 				CA904BD67DF8446FB1813485 /* DataSourcesSettingsPage.swift in Sources */,
 );
                         runOnlyForDeploymentPostprocessing = 0;
@@ -2228,6 +2260,7 @@ A17F1001000000000000000B /* ForcedUpdateView.swift in Sources */,
                                 120D5A334EC34F5A911BA904 /* UnifiedScheduleEntry.swift in Sources */,
                                 0D4809DF63374C11B0FBC113 /* TransparentNavBarModifier.swift in Sources */,
                                 EA699B91BC6B4BCF8B325D40 /* ToastSystem.swift in Sources */,
+                                4C2EE4514602405653E639E6 /* MetadataPillRow.swift in Sources */,
                                 A059508F65B7400595DF13C4 /* Haptics.swift in Sources */,
                                 77C010496C1B48E08ACD3FEB /* CustomRefreshControl.swift in Sources */,
                                 CE8BECC8DB5A46128FE0F71F /* SettingsSearchIndex.swift in Sources */,
@@ -2252,6 +2285,9 @@ A17F1001000000000000000B /* ForcedUpdateView.swift in Sources */,
 				447050E960A84032915D63D0 /* MangaBakaProvider.swift in Sources */,
 				808A867595684E9F9E2983B9 /* ScheduleProviders.swift in Sources */,
 				9727806D7AB9472B942DADDF /* UnifiedProviderSystem.swift in Sources */,
+				4726090BC58DA246C1E2E740 /* CharacterService.swift in Sources */,
+				E620FEBA7ECAA92F33F791C8 /* KitsuTVDBTimetableService.swift in Sources */,
+				72D1E8AE4231910B316CA554 /* DiscoveryService.swift in Sources */,
 				64C9B0B46E3949C8BC2B072A /* DataSourcesSettingsPage.swift in Sources */,
 );
                         runOnlyForDeploymentPostprocessing = 0;
@@ -2465,6 +2501,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                 F58FADB80A5F4E56A917A770 /* UnifiedScheduleEntry.swift in Sources */,
                                 F86C8674D3574D5FADFA3C2C /* TransparentNavBarModifier.swift in Sources */,
                                 05EE7CC248EF4889882F5264 /* ToastSystem.swift in Sources */,
+                                EC2901F3CDBA86689872E396 /* MetadataPillRow.swift in Sources */,
                                 FB3055616FBE4A399FAA8A5D /* Haptics.swift in Sources */,
                                 32DA168EE48448DE9CB5FBB2 /* CustomRefreshControl.swift in Sources */,
                                 9FC65E10AF3F4044AA31F0E7 /* SettingsSearchIndex.swift in Sources */,
@@ -2489,6 +2526,9 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
 				8669A37F3CC4429E972C4170 /* MangaBakaProvider.swift in Sources */,
 				B2B8D5C672A84F978FC695C8 /* ScheduleProviders.swift in Sources */,
 				E4C20729B0574336A62FFBCF /* UnifiedProviderSystem.swift in Sources */,
+				B95C102A08038B4C3FB8E082 /* CharacterService.swift in Sources */,
+				CA1D8B93F04008540E95C300 /* KitsuTVDBTimetableService.swift in Sources */,
+				9857225A5B00092A9CA08294 /* DiscoveryService.swift in Sources */,
 				428E4CA25C0A426599BD0F72 /* DataSourcesSettingsPage.swift in Sources */,
 );
                         runOnlyForDeploymentPostprocessing = 0;
@@ -2512,7 +2552,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                 ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
                                 CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
                                 CODE_SIGN_STYLE = Automatic;
-                                CURRENT_PROJECT_VERSION = 162;
+                                CURRENT_PROJECT_VERSION = 163;
                                 ENABLE_PREVIEWS = YES;
                                 ENABLE_USER_SCRIPT_SANDBOXING = YES;
                                 GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -2530,7 +2570,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "@executable_path/Frameworks",
                                 );
                                 LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                                MARKETING_VERSION = 2.27;
+                                MARKETING_VERSION = 2.28;
                                 PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
                                 PRODUCT_NAME = "$(TARGET_NAME)";
                                 SDKROOT = appletvos;
@@ -2551,7 +2591,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                 ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
                                 CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
                                 CODE_SIGN_STYLE = Automatic;
-                                CURRENT_PROJECT_VERSION = 162;
+                                CURRENT_PROJECT_VERSION = 163;
                                 ENABLE_PREVIEWS = YES;
                                 ENABLE_USER_SCRIPT_SANDBOXING = YES;
                                 GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -2565,7 +2605,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "@executable_path/Frameworks",
                                 );
                                 LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                                MARKETING_VERSION = 2.27;
+                                MARKETING_VERSION = 2.28;
                                 PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
                                 PRODUCT_NAME = "$(TARGET_NAME)";
                                 SDKROOT = appletvos;
@@ -2672,7 +2712,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                 ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
                                 CODE_SIGN_IDENTITY = "Apple Development";
                                 CODE_SIGN_STYLE = Automatic;
-                                CURRENT_PROJECT_VERSION = 162;
+                                CURRENT_PROJECT_VERSION = 163;
                                 DEVELOPMENT_TEAM = JRMTH65Z3H;
                                 ENABLE_TESTABILITY = YES;
                                 INFOPLIST_FILE = Shirox/Info.plist;
@@ -2682,7 +2722,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "$(inherited)",
                                         "@executable_path/Frameworks",
                                 );
-                                MARKETING_VERSION = 2.27;
+                                MARKETING_VERSION = 2.28;
                                 PRODUCT_NAME = shirox;
                                 PROVISIONING_PROFILE_SPECIFIER = "";
                                 SDKROOT = iphoneos;
@@ -2718,7 +2758,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                         buildSettings = {
                                 ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
                                 COMBINE_HIDPI_IMAGES = YES;
-                                CURRENT_PROJECT_VERSION = 162;
+                                CURRENT_PROJECT_VERSION = 163;
                                 DEAD_CODE_STRIPPING = YES;
                                 INFOPLIST_FILE = Shirox/Info.plist;
                                 INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
@@ -2728,7 +2768,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "@executable_path/../Frameworks",
                                 );
                                 MACOSX_DEPLOYMENT_TARGET = 14.0;
-                                MARKETING_VERSION = 2.27;
+                                MARKETING_VERSION = 2.28;
                                 PRODUCT_NAME = shirox;
                                 SDKROOT = macosx;
                                 SUPPORTS_MACCATALYST = NO;
@@ -2745,7 +2785,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                 ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
                                 CODE_SIGN_IDENTITY = "Apple Development";
                                 CODE_SIGN_STYLE = Automatic;
-                                CURRENT_PROJECT_VERSION = 162;
+                                CURRENT_PROJECT_VERSION = 163;
                                 DEVELOPMENT_TEAM = JRMTH65Z3H;
                                 INFOPLIST_FILE = Shirox/Info.plist;
                                 INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
@@ -2754,7 +2794,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "$(inherited)",
                                         "@executable_path/Frameworks",
                                 );
-                                MARKETING_VERSION = 2.27;
+                                MARKETING_VERSION = 2.28;
                                 PRODUCT_NAME = shirox;
                                 PROVISIONING_PROFILE_SPECIFIER = "";
                                 SDKROOT = iphoneos;
@@ -2835,7 +2875,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                         buildSettings = {
                                 ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
                                 COMBINE_HIDPI_IMAGES = YES;
-                                CURRENT_PROJECT_VERSION = 162;
+                                CURRENT_PROJECT_VERSION = 163;
                                 DEAD_CODE_STRIPPING = YES;
                                 INFOPLIST_FILE = Shirox/Info.plist;
                                 INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
@@ -2845,7 +2885,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "@executable_path/../Frameworks",
                                 );
                                 MACOSX_DEPLOYMENT_TARGET = 14.0;
-                                MARKETING_VERSION = 2.27;
+                                MARKETING_VERSION = 2.28;
                                 PRODUCT_NAME = shirox;
                                 SDKROOT = macosx;
                                 SUPPORTS_MACCATALYST = NO;

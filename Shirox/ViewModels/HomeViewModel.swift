@@ -9,6 +9,10 @@ final class HomeViewModel: ObservableObject {
     @Published var topRated: [Media] = []
     @Published var recentlyCompleted: [Media] = []
     @Published var upcoming: [Media] = []
+    /// Batch 26 — genre shelves (Action / Fantasy / Romance / Drama /
+    /// Comedy / Sci-Fi), keyed by genre SLUG (the stable routing
+    /// identifier — the shelf and its See All page share ONE query).
+    @Published var genreShelves: [String: [Media]] = [:]
     @Published var isLoading = false
     @Published var error: String?
 
@@ -58,7 +62,8 @@ final class HomeViewModel: ObservableObject {
         async let r: Void = loadTopRated()
         async let rc: Void = loadRecentlyCompleted()
         async let u: Void = loadUpcoming()
-        _ = await (t, s, p, r, rc, u)
+        async let g: Void = loadGenreShelves()
+        _ = await (t, s, p, r, rc, u, g)
 
         // Persist the last-good shelves AFTER everything settles so the
         // snapshot captures the fully-populated page.
@@ -121,6 +126,27 @@ final class HomeViewModel: ObservableObject {
             upcoming = try await UnifiedProviderSystem.shared.upcoming()
         } catch {
             serveSnapshotIfAvailable(error: error, quiet: true)
+        }
+    }
+
+    /// Batch 26 — genre shelves through the SAME discovery chain the See
+    /// All genre pages use (the shelf IS page 1 of that query — one
+    /// shared, cached, health-gated request per genre). A failing genre
+    /// shelf stays empty (its row simply doesn't render) — the standard
+    /// shelves carry the page.
+    private func loadGenreShelves() async {
+        await withTaskGroup(of: (String, [Media]?).self) { group in
+            for genre in DiscoveryService.homeShelfGenres {
+                group.addTask {
+                    let list = try? await UnifiedProviderSystem.shared.browse(genre: genre, page: 1)
+                    return (genre.slug, list ?? [])
+                }
+            }
+            for await (slug, list) in group {
+                if let list, !list.isEmpty {
+                    genreShelves[slug] = list
+                }
+            }
         }
     }
 

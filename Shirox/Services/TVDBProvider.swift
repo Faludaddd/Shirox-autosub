@@ -48,8 +48,12 @@ struct TVDBEpisodeInfo: Codable, Equatable, Identifiable {
 struct TVDBCharacterInfo: Codable, Equatable, Identifiable {
     var id: String { "\(name)-\(person ?? "")" }
     var name: String?
+    /// The actor/voice actor's name (TVDB's series `characters` are
+    /// person-centric cast records — `personName` on the wire).
     var person: String?
+    /// The person's role on the series ("Actor" — TVDB's peopleType).
     var role: String?
+    /// TVDB's cast photo (the person's image).
     var image: String?
 }
 
@@ -107,6 +111,12 @@ final class TVDBProvider {
         token = decoded.data.token
         tokenExpiry = Date().addingTimeInterval(3600 * 24 * 25) // documented ~1 month
         return decoded.data.token
+    }
+
+    /// Shared bearer token for TVDB-dependent services (Batch 26 — the
+    /// Kitsu+TVDB schedule synthesis). One token per app, one login.
+    func bearerToken() async throws -> String {
+        try await authenticate()
     }
 
     // MARK: - Health check (used by Test Provider)
@@ -299,14 +309,19 @@ final class TVDBProvider {
             let runtime: Int?
         }
         struct CharacterRecord: Decodable {
+            // TVDB v4's CURRENT wire shape (verified live, Batch 26): the
+            // series `characters` list is a CAST list — character name,
+            // actor name (personName), actor photo (image), peopleType.
+            // The old `people: [{name, role, image}]` array no longer
+            // exists on the wire (it silently decoded to nil, which is why
+            // TVDB characters lost their voice actors).
             let name: String?
             let image: String?
-            let people: [PersonRecord]?
-            struct PersonRecord: Decodable {
-                let name: String?
-                let role: String?
-                let image: String?
-            }
+            let personName: String?
+            let peopleType: String?
+            let peopleId: Int?
+            let isFeatured: Bool?
+            let sort: Int?
         }
         struct ArtworkRecord: Decodable {
             let image: String?
@@ -381,11 +396,10 @@ final class TVDBProvider {
                     runtime: ep.runtime)
             }
             fields.characters = (series.characters ?? []).map { character in
-                let person = character.people?.first
-                return TVDBCharacterInfo(
+                TVDBCharacterInfo(
                     name: character.name,
-                    person: person?.name,
-                    role: person?.role,
+                    person: character.personName,
+                    role: character.peopleType,
                     image: character.image)
             }
             let ids = extractIds(series.remoteIds)

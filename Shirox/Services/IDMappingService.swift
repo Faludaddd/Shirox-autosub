@@ -155,6 +155,95 @@ final class IDMappingService: @unchecked Sendable {
         return id
     }
 
+    // MARK: - Kitsu id resolution (Batch 26 — the character chain's Kitsu leg)
+
+    /// anira's mapping entries also carry `kitsu_id` (verified live:
+    /// anilist 21 → kitsu 12). A dedicated cache keeps resolved ids so
+    /// the same mapping is never requested twice.
+    private var kitsuCache: [String: Int] {
+        get { UserDefaults.standard.dictionary(forKey: "kitsu_id_mappings_cache") as? [String: Int] ?? [:] }
+        set { UserDefaults.standard.set(newValue, forKey: "kitsu_id_mappings_cache") }
+    }
+
+    /// Resolves the Kitsu anime id for an AniList id (anira first — one
+    /// request; Kitsu's own mapping endpoint as the live fallback).
+    func kitsuId(forAnilistId anilistId: Int) async -> Int? {
+        let key = "anilist-\(anilistId)"
+        if let cached = kitsuCache[key] { return cached }
+        // 1. anira (carries kitsu_id on the same entry table).
+        if let url = URL(string: "https://api.anira.dev/mappings/\(anilistId)?mapping_key=anilist"),
+           let (data, _) = try? await URLSession.shared.data(from: url),
+           let mappings = try? JSONDecoder().decode([AniraKitsuMapping].self, from: data),
+           let kitsu = mappings.first?.kitsu_id, kitsu > 0 {
+            var c = kitsuCache
+            c[key] = kitsu
+            kitsuCache = c
+            return kitsu
+        }
+        // 2. Kitsu's own mappings (external site anilist/anime).
+        if let kitsu = await kitsuIdFromKitsu(site: "anilist/anime", externalId: "\(anilistId)") {
+            var c = kitsuCache
+            c[key] = kitsu
+            kitsuCache = c
+            return kitsu
+        }
+        return nil
+    }
+
+    /// Resolves the Kitsu anime id for a MAL id.
+    func kitsuId(forMALId malId: Int) async -> Int? {
+        let key = "mal-\(malId)"
+        if let cached = kitsuCache[key] { return cached }
+        if let url = URL(string: "https://api.anira.dev/mappings/\(malId)?mapping_key=myanimelist"),
+           let (data, _) = try? await URLSession.shared.data(from: url),
+           let mappings = try? JSONDecoder().decode([AniraKitsuMapping].self, from: data),
+           let kitsu = mappings.first?.kitsu_id, kitsu > 0 {
+            var c = kitsuCache
+            c[key] = kitsu
+            kitsuCache = c
+            return kitsu
+        }
+        if let kitsu = await kitsuIdFromKitsu(site: "myanimelist/anime", externalId: "\(malId)") {
+            var c = kitsuCache
+            c[key] = kitsu
+            kitsuCache = c
+            return kitsu
+        }
+        return nil
+    }
+
+    /// The anira fields needed for Kitsu resolution.
+    private struct AniraKitsuMapping: Decodable {
+        let kitsu_id: Int?
+    }
+
+    /// Kitsu's /mappings endpoint: the mapping record's `item`
+    /// relationship points at the anime — `include=item` returns it.
+    private func kitsuIdFromKitsu(site: String, externalId: String) async -> Int? {
+        var components = URLComponents(string: "https://kitsu.io/api/edge/mappings")!
+        components.queryItems = [
+            URLQueryItem(name: "filter[externalSite]", value: site),
+            URLQueryItem(name: "filter[externalId]", value: externalId),
+            URLQueryItem(name: "include", value: "item")
+        ]
+        guard let url = components.url else { return nil }
+        var req = URLRequest(url: url)
+        req.setValue("application/vnd.api+json", forHTTPHeaderField: "Accept")
+        req.timeoutInterval = 10
+        guard let (data, _) = try? await URLSession.shared.data(for: req) else { return nil }
+        struct Envelope: Decodable {
+            let included: [Included]?
+            struct Included: Decodable {
+                let id: String
+                let type: String
+            }
+        }
+        guard let env = try? JSONDecoder().decode(Envelope.self, from: data),
+              let item = env.included?.first(where: { $0.type == "anime" }),
+              let id = Int(item.id) else { return nil }
+        return id
+    }
+
     func malId(forAnilistId anilistId: Int) async -> Int? {
         let key = "anilist-\(anilistId)"
         if let cached = cache[key] { return cached }

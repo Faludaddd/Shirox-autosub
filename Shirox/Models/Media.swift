@@ -60,6 +60,17 @@ struct Media: Identifiable, Codable, Equatable, Hashable, Sendable {
     var volumes: Int? = nil        // Manga volume total
     var popularity: Int? = nil     // AniList popularity (user count)
     var countryOfOrigin: String? = nil  // "JP", "KR", "CN" etc.
+    // Batch 26 — cross-provider ids on the CANONICAL model. A Media object
+    // is the single source of truth for every surface (carousel, shelves,
+    // See All, search, detail, Surprise Me); carrying the other databases'
+    // ids on the SAME object means any provider can be asked for the SAME
+    // series without a title guess (character fallbacks, TVDB artwork,
+    // schedule synthesis). Kitsu list requests fill both from their
+    // `mappings` (thetvdb/series + kitsu id); anira mapping lookups fill
+    // them for AniList/MAL-sourced entries. Both decode as nil from every
+    // older cache, so nothing existing changes.
+    var tvdbId: Int? = nil         // TheTVDB series id (metadata primary)
+    var kitsuId: Int? = nil        // Kitsu anime/manga id (discovery primary)
 
     var uniqueId: String { "\(provider.rawValue)-\(id)" }
 

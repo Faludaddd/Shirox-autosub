@@ -17,8 +17,15 @@ final class AniListDetailViewModel: ObservableObject {
     /// `media` so `CharactersSection` / `RecommendationsSection` /
     /// `StaffSection` can render without a second network call.
     @Published var characters: [AniListCharacterEdge] = []
+    /// Batch 26 — which provider actually served the characters (honest
+    /// source notice under the section header when a fallback filled in).
+    @Published var charactersServedBy: CharacterService.CharacterSource?
     @Published var recommendations: [AniListRecommendation] = []
     @Published var staff: [AniListStaffEdge] = []
+
+    /// The TVDB detail fields from the page's enrichment pass — kept for
+    /// the character chain (TVDB is its first stop; the fetch is shared).
+    private var lastTVDBFields: TVDBDetailFields?
 
     // Stream picker state
     @Published var showStreamPicker = false
@@ -143,6 +150,23 @@ final class AniListDetailViewModel: ObservableObject {
         // the TVDB record is the SAME series; failures degrade silently to
         // the AniList/MAL data the page already has.
         await enrichWithTVDB(primaryId: fetchId, malId: media?.idMal)
+
+        // Batch 26 — the CHARACTERS fallback chain (TVDB → MAL → AniList
+        // → Kitsu → AniDB). AniList's detail query used to be the only
+        // character source, so its outage removed the section from every
+        // page; now whichever provider is alive fills the slot while the
+        // rest of the page's metadata stays exactly where it came from
+        // (never a whole-object replacement).
+        if characters.isEmpty {
+            if let media,
+               let result = await CharacterService.shared.characters(
+                    for: media,
+                    anilistEdges: nil,
+                    tvdbFields: lastTVDBFields) {
+                characters = result.edges
+                charactersServedBy = result.source
+            }
+        }
         isLoading = false
     }
 
@@ -156,6 +180,9 @@ final class AniListDetailViewModel: ObservableObject {
         guard let fields = await UnifiedProviderSystem.shared.tvdbDetailFields(
             anilistId: anilistId,
             malId: malId ?? (current.provider == .mal ? current.id : nil)) else { return }
+        // Keep the TVDB fields for the character chain (its first link —
+        // cast records live here; no second request).
+        lastTVDBFields = fields
 
         // TVDB is the PRIMARY source for these fields: its values WIN when
         // present; AniList/MAL values are the fallback that fills the gaps

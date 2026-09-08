@@ -933,36 +933,18 @@ struct AniListMangaDetailView: View {
                         .font(.title3.weight(.bold))
                         .lineLimit(3)
 
-                    HStack(spacing: 8) {
-                        if let score = media.averageScore {
-                            HStack(spacing: 4) {
-                                Image(systemName: "star.fill")
-                                    .font(.caption2.weight(.bold))
-                                Text(score.averageScoreOutOf10)
-                                    .font(.caption2.weight(.bold))
-                            }
-                            .foregroundStyle(.primary)
-                            .padding(.horizontal, 8).padding(.vertical, 3)
-                            .background(Color.primary.opacity(0.1), in: Capsule())
-                            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
-                        }
-                        if let status = media.statusDisplay {
-                            Text(status)
-                                .font(.caption2).fontWeight(.semibold)
-                                .foregroundStyle(.primary)
-                                .padding(.horizontal, 8).padding(.vertical, 3)
-                                .background(Color.primary.opacity(0.1), in: Capsule())
-                                .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
-                        }
-                        if let year = media.seasonYear {
-                            Text(String(year))
-                                .font(.caption2.weight(.medium))
-                                .foregroundStyle(.primary)
-                                .padding(.horizontal, 8).padding(.vertical, 3)
-                                .background(Color.primary.opacity(0.1), in: Capsule())
-                                .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
-                        }
-                    }
+                    // Batch 26 — the shared MetadataPillRow (rating /
+                    // status / year — real metadata from the SAME Media).
+                    MetadataPillRow(
+                        pills: [MetadataPill.rating(media.averageScore),
+                                MetadataPill.status(media),
+                                MetadataPill.year(media.seasonYear)]
+                            .compactMap { $0 },
+                        height: 26,
+                        alignment: .center,
+                        edgeFades: true,
+                        allowsHitTesting: true,
+                        spacing: 8)
                 }
                 Spacer()
             }
@@ -975,22 +957,20 @@ struct AniListMangaDetailView: View {
 
     @ViewBuilder
     private func metadataSection(media: Media) -> some View {
-        if let genres = media.genres, !genres.isEmpty {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(genres.prefix(6), id: \.self) { genre in
-                        Text(genre)
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.primary)
-                            .padding(.horizontal, 10).padding(.vertical, 4)
-                            .background(Color.primary.opacity(0.1), in: Capsule())
-                            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 16)
-            .padding(.bottom, 4)
+        // Batch 26 — genre pills via the SHARED pill component (same
+        // design language as the anime detail page; real genres from the
+        // same Media, group centered, never clipped or shrunk).
+        let pills = MetadataPillRowBuilder.mangaGenrePills(for: media, limit: 8)
+        if !pills.isEmpty {
+            MetadataPillRow(
+                pills: pills,
+                height: 30,
+                alignment: .center,
+                edgeFades: true,
+                allowsHitTesting: true,
+                spacing: 8)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 4)
         }
     }
 

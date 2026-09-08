@@ -56,13 +56,12 @@ enum MetaProviderKind: String, Codable, CaseIterable, Identifiable, Hashable {
     var domains: [ProviderDomain] {
         switch self {
         case .tvdb, .anidb: return [.anime]
-        case .mal, .anilist: return [.anime, .manga]
-        // Batch 24 — Kitsu genuinely serves manga lists and search (its
-        // /manga JSON:api mirrors /anime, verified live, with MAL/AniList
-        // mappings for navigation). As the manga chain's final live
-        // fallback it keeps the Manga tab + Reading-mode releases working
-        // through MAL/Jikan + AniList outage windows.
-        case .kitsu: return [.anime, .manga]
+        case .mal, .anilist: return [.anime, .manga, .discovery]
+        // Batch 26 — Kitsu is the DEDICATED DISCOVERY DATABASE (its own
+        // trending chart, real season query and genre/category taxonomy,
+        // plus cross-provider id mappings) and joins the schedule chain as
+        // the final live source through the Kitsu+TVDB timetable synthesis.
+        case .kitsu: return [.anime, .manga, .discovery, .schedule]
         case .mangabaka: return [.manga]
         case .anichart, .animeschedule: return [.schedule]
         }
@@ -71,6 +70,13 @@ enum MetaProviderKind: String, Codable, CaseIterable, Identifiable, Hashable {
 
 enum ProviderDomain: String, Codable, CaseIterable, Hashable {
     case anime, manga, schedule
+    /// Batch 26 — the dedicated discovery domain: which anime/manga appear
+    /// in Trending, Popular, genre categories, the Home carousel, See All
+    /// pages and Surprise Me. Separate from `.anime` (metadata) so the
+    /// discovery database can be configured independently — TVDB stays the
+    /// metadata primary while Kitsu decides what the discovery surfaces
+    /// show.
+    case discovery
 }
 
 // MARK: - Health
@@ -269,6 +275,8 @@ final class UnifiedProviderSystem: ObservableObject {
     @Published private(set) var animeOrder: [MetaProviderKind]
     @Published private(set) var mangaOrder: [MetaProviderKind]
     @Published private(set) var scheduleOrder: [MetaProviderKind]
+    /// Batch 26 — the DISCOVERY chain order (Kitsu → AniList → MAL).
+    @Published private(set) var discoveryOrder: [MetaProviderKind]
     @Published private(set) var lastTestResults: [MetaProviderKind: ProviderTestResult] = [:]
     /// Announces which provider served the most recent chain result,
     /// e.g. "MAL" — used for honest source notices.
@@ -282,6 +290,8 @@ final class UnifiedProviderSystem: ObservableObject {
     private let animeOrderKey = "providerOrder.anime.v1"
     private let mangaOrderKey = "providerOrder.manga.v1"
     private let scheduleOrderKey = "providerOrder.schedule.v1"
+    /// Batch 26 — persisted discovery chain order.
+    private let discoveryOrderKey = "providerOrder.discovery.v1"
     private let enabledKey = "providerEnabled.v1"
     /// Batch 25 — the database that powers SEARCH first (default Kitsu).
     private let searchPrimaryKey = "providerOrder.searchPrimary.v1"
@@ -292,6 +302,17 @@ final class UnifiedProviderSystem: ObservableObject {
     /// (MangaBaka → MAL → AniList → Kitsu).
     static let recommendedMangaOrder: [MetaProviderKind] = [.mangabaka, .mal, .anilist, .kitsu]
     static let recommendedScheduleOrder: [MetaProviderKind] = [.anichart, .animeschedule, .mal, .anilist]
+    /// Batch 26 — the DISCOVERY chain. Kitsu is the primary discovery
+    /// DATABASE (real trending chart, real season query, real genre
+    /// taxonomy, cross-provider ids on every result); AniList and MAL
+    /// serve the same browse categories as fallbacks. TVDB is not a
+    /// discovery source (no charts/categories) — it stays the metadata
+    /// primary, resolving artwork/characters for the series discovery
+    /// returns.
+    static let recommendedDiscoveryOrder: [MetaProviderKind] = [.kitsu, .anilist, .mal]
+
+    /// The providers that can serve the discovery domain.
+    static let discoveryCapableProviders: [MetaProviderKind] = [.kitsu, .anilist, .mal]
 
     /// The databases that can power anime search, in the order the Search
     /// Database picker shows them (Batch 25).
@@ -337,7 +358,11 @@ final class UnifiedProviderSystem: ObservableObject {
         // Users upgrading from v2.25 keep their saved order; `loadOrder`
         // appends Kitsu (new to this domain) at the end automatically.
         mangaOrder = loadOrder(mangaOrderKey, recommended: Self.recommendedMangaOrder, all: [.mangabaka, .mal, .anilist, .kitsu])
-        scheduleOrder = loadOrder(scheduleOrderKey, recommended: Self.recommendedScheduleOrder, all: [.anichart, .animeschedule, .mal, .anilist])
+        scheduleOrder = loadOrder(scheduleOrderKey, recommended: Self.recommendedScheduleOrder, all: [.anichart, .animeschedule, .mal, .anilist, .kitsu])
+        // Batch 26 — the discovery chain (Kitsu first; AniList/MAL as the
+        // fallbacks). Upgrading users with a saved schedule order keep it —
+        // Kitsu appends last automatically via loadOrder.
+        discoveryOrder = loadOrder(discoveryOrderKey, recommended: Self.recommendedDiscoveryOrder, all: Self.discoveryCapableProviders)
 
         let savedEnabled = defaults.dictionary(forKey: enabledKey) as? [String: Bool] ?? [:]
 
@@ -389,6 +414,7 @@ final class UnifiedProviderSystem: ObservableObject {
         case .anime: return animeOrder
         case .manga: return mangaOrder
         case .schedule: return scheduleOrder
+        case .discovery: return discoveryOrder
         }
     }
 
@@ -404,6 +430,9 @@ final class UnifiedProviderSystem: ObservableObject {
         case .schedule:
             scheduleOrder = newOrder
             key = scheduleOrderKey
+        case .discovery:
+            discoveryOrder = newOrder
+            key = discoveryOrderKey
         }
         UserDefaults.standard.set(newOrder.map(\.rawValue), forKey: key)
     }
@@ -412,7 +441,8 @@ final class UnifiedProviderSystem: ObservableObject {
         switch domain {
         case .anime: setOrder(Self.recommendedAnimeOrder, for: domain)
         case .manga: setOrder(Self.recommendedMangaOrder, for: domain)
-        case .schedule: setOrder(Self.recommendedScheduleOrder, for: domain)
+        case .schedule: setOrder(Self.recommendedScheduleOrder + [.kitsu], for: domain)
+        case .discovery: setOrder(Self.recommendedDiscoveryOrder, for: domain)
         }
     }
 
@@ -420,6 +450,7 @@ final class UnifiedProviderSystem: ObservableObject {
         resetOrder(for: .anime)
         resetOrder(for: .manga)
         resetOrder(for: .schedule)
+        resetOrder(for: .discovery)
     }
 
     // MARK: - Search database (Batch 25)
@@ -709,11 +740,15 @@ final class UnifiedProviderSystem: ObservableObject {
         throw ProviderChainError.allProvidersFailed(lastReason: lastReason)
     }
 
-    // MARK: - Anime discovery (Home shelves, Browse, See All)
+    // MARK: - Anime discovery (Home shelves, Browse, See All, carousel)
 
-    /// Home shelves and See All pages share ONE paged chain per category —
-    /// the home shelf IS page 1 of the same browse the See All grid pages
-    /// through, so both share cache + dedup for that page.
+    /// Home shelves, the Home carousel and See All pages share ONE paged
+    /// chain per category — the home shelf IS page 1 of the same browse
+    /// the See All grid pages through, so both share cache + dedup for
+    /// that page. Batch 26: the chain is the DEDICATED DISCOVERY domain
+    /// (Kitsu → AniList → MAL) — Kitsu's own trending chart and category
+    /// taxonomy decide what appears; TVDB remains the METADATA primary
+    /// and resolves artwork/characters for the same series by id.
     func trending() async throws -> [Media] { try await browse(category: .trending, page: 1) }
     func seasonal() async throws -> [Media] { try await browse(category: .seasonal, page: 1) }
     func popular() async throws -> [Media] { try await browse(category: .popular, page: 1) }
@@ -724,39 +759,91 @@ final class UnifiedProviderSystem: ObservableObject {
     /// Browse (See All) pagination through the same chain. Page-level cache
     /// keys keep the chain's dedup/cache benefits per page.
     ///
-    /// Batch 23 — every browse result is filtered to the app's Japanese-
-    /// anime catalog (same policy the carousel has had since v2.20): entries
-    /// KNOWN to originate outside Japan are dropped; unknown-origin entries
-    /// pass (the nil-passes rule). Each provider feeds that filter with its
-    /// own real signal — AniList filters at the source AND carries the
-    /// field, Jikan infers from production metadata (v2.23), Kitsu infers
-    /// from the title script (hanzi-without-kana = Chinese production).
+    /// Every browse result is filtered to the app's Japanese-anime catalog
+    /// (same policy the carousel has had since v2.20): entries KNOWN to
+    /// originate outside Japan are dropped; unknown-origin entries pass.
+    /// Each provider feeds that filter with its own real signal.
     func browse(category: BrowseCategory, page: Int) async throws -> [Media] {
         // NOTE: the closure's return type is annotated (`-> [Media]?`) and
         // `list` is explicitly typed — this generic + multi-statement trailing
         // closure shape exceeds the type checker's inference budget without
         // the anchors (CI: "generic parameter 'T' could not be inferred").
         let list: [Media] = try await runChain(
-            domain: .anime,
+            domain: .discovery,
             operation: "browse-\(category.rawValue)",
             cacheKey: "p\(page)",
             cacheTTL: 15 * 60) { kind -> [Media]? in
             switch kind {
-            case .tvdb, .anidb:
-                return nil // no chart endpoints
-            case .mal:
-                let list = try await MALDiscoveryService.shared.browse(category: category, page: page)
-                return list.map { MALDiscoveryService.shared.mapToMedia($0) }
+            case .kitsu:
+                return try await KitsuProvider.shared.browse(category: category, page: page)
             case .anilist:
                 let list = try await AniListService.shared.browse(category: category, page: page)
                 return list.map { AniListProvider.shared.mapMedia($0) }
-            case .kitsu:
-                return try await KitsuProvider.shared.browse(category: category, page: page)
+            case .mal:
+                let list = try await MALDiscoveryService.shared.browse(category: category, page: page)
+                return list.map { MALDiscoveryService.shared.mapToMedia($0) }
             default:
                 return nil
             }
         }.value
         return Self.japaneseCatalogOnly(list)
+    }
+
+    /// Batch 26 — GENRE browse: the anime belonging to one genre, through
+    /// the SAME discovery chain (Kitsu's category taxonomy → AniList's
+    /// genre_in → MAL's genre id). The Home genre shelf and its See All
+    /// page both call THIS (the shelf is page 1), so a row titled "Romance"
+    /// and its See All grid can only ever show Romance.
+    func browse(genre: DiscoveryGenre, page: Int) async throws -> [Media] {
+        let list: [Media] = try await runChain(
+            domain: .discovery,
+            operation: "genre-\(genre.slug)",
+            cacheKey: "p\(page)",
+            cacheTTL: 15 * 60) { kind -> [Media]? in
+            switch kind {
+            case .kitsu:
+                let list = try await KitsuProvider.shared.genreBrowse(genre: genre, page: page)
+                return list.isEmpty ? nil : list
+            case .anilist:
+                let list = try await AniListService.shared.genreBrowse(genre: genre, page: page)
+                // AniList's genre taxonomy is narrower than Kitsu's (e.g.
+                // no "Historical" GENRE) — an empty result means "not
+                // indexed here", which hands over to the next provider.
+                return list.isEmpty ? nil : list.map { AniListProvider.shared.mapMedia($0) }
+            case .mal:
+                let list = try await MALDiscoveryService.shared.genreBrowse(genre: genre, page: page)
+                return list.isEmpty ? nil : list.map { MALDiscoveryService.shared.mapToMedia($0) }
+            default:
+                return nil
+            }
+        }.value
+        return Self.japaneseCatalogOnly(list)
+    }
+
+    /// Batch 26 — manga genre browse through the manga domain's chain
+    /// (MangaBaka honestly doesn't serve genre charts — its public API is
+    /// search + detail; MAL/AniList/Kitsu do).
+    func mangaByGenre(genre: DiscoveryGenre, page: Int) async throws -> [Media] {
+        try await runChain(
+            domain: .manga,
+            operation: "manga-genre-\(genre.slug)",
+            cacheKey: "p\(page)",
+            cacheTTL: 15 * 60) { kind -> [Media]? in
+            switch kind {
+            case .mangabaka:
+                return nil // search + series detail only — no genre chart
+            case .mal:
+                let list = try await MALDiscoveryService.shared.mangaGenreBrowse(genre: genre, page: page)
+                return list.isEmpty ? nil : list
+            case .anilist:
+                let list = try await AniListService.shared.mangaGenreBrowse(genre: genre, page: page)
+                return list.isEmpty ? nil : list.map { AniListProvider.shared.mapMangaMedia($0) }
+            case .kitsu:
+                return try await KitsuProvider.shared.mangaGenreBrowse(genre: genre, page: page)
+            default:
+                return nil
+            }
+        }.value
     }
 
     /// The catalog filter shared by every anime browse/shelf surface:
@@ -939,7 +1026,14 @@ final class UnifiedProviderSystem: ObservableObject {
 
     // MARK: - Schedule
 
-    /// The full schedule chain: AniChart → AnimeSchedule → MAL → AniList.
+    /// The full schedule chain: AniChart → AnimeSchedule → MAL → AniList,
+    /// with the Kitsu+TVDB timetable synthesis as the final LIVE source
+    /// (Batch 26): when all four schedule providers are down — the exact
+    /// condition of the current AniList 403 + MAL 504 outage window — the
+    /// currently-airing list from the discovery database (Kitsu
+    /// status=current) is joined with each show's TVDB airing fields
+    /// (nextAired + airsTime + lastAired, id-mapped) to build a REAL
+    /// week timetable. The disk snapshot remains the last resort after it.
     /// Returns entries plus which provider served them (for the honest
     /// source notice). Cached for 5 minutes; every screen asking within
     /// the window SHARES one request (dedup).
@@ -959,6 +1053,10 @@ final class UnifiedProviderSystem: ObservableObject {
             case .anilist:
                 let items = try await AniListService.shared.airingSchedules(from: startTs, to: endTs)
                 return items.map { UnifiedScheduleEntry(item: $0) }
+            case .kitsu:
+                // Batch 26 — the synthesis fallback: discovery list + TVDB
+                // air times (both live while AniList and MAL are down).
+                return try await KitsuTVDBTimetableService.shared.entries(from: startTs, to: endTs)
             default:
                 return nil
             }
@@ -1022,6 +1120,7 @@ final class UnifiedProviderSystem: ObservableObject {
     func clearAnimeCache() { ProviderCacheStore.clear(domain: .anime) }
     func clearMangaCache() { ProviderCacheStore.clear(domain: .manga) }
     func clearScheduleCache() { ProviderCacheStore.clear(domain: .schedule) }
+    func clearDiscoveryCache() { ProviderCacheStore.clear(domain: .discovery) }
     func clearAllProviderCache() { ProviderCacheStore.clearAll() }
 
     func cacheSize(domain: ProviderDomain) -> Int64 {
