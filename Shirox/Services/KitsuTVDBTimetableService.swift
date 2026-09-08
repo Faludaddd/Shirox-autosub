@@ -4,9 +4,9 @@ import Foundation
 // final LIVE source)
 //
 // WHY THIS EXISTS: the prescribed schedule chain is AniChart →
-// AnimeSchedule → MAL → AniList — and during the current outage window
+// MAL → AniList — and during the current outage window
 // ALL FOUR are genuinely down (AniChart is AniList-backed 403,
-// AnimeSchedule requires a user API token, MAL/Jikan 504, AniList 403).
+// MAL/Jikan 504, AniList 403).
 // The chain logic was correct; the page went dark because no LIVE source
 // remained after them.
 //

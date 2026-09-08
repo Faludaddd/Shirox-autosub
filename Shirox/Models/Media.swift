@@ -71,10 +71,30 @@ struct Media: Identifiable, Codable, Equatable, Hashable, Sendable {
     // older cache, so nothing existing changes.
     var tvdbId: Int? = nil         // TheTVDB series id (metadata primary)
     var kitsuId: Int? = nil        // Kitsu anime/manga id (discovery primary)
+    // Batch 27 — the title's official logo artwork (a transparent PNG —
+    // TheTVDB "clear logo"/"clear art"). Resolved lazily by
+    // AnimeLogoService and cached here so every surface that shows a
+    // title (hero, detail header, character appearances) shares ONE
+    // resolution per series. nil = unresolved yet OR genuinely no logo —
+    // the caller falls back to `fallbackTitle` text (never a broken
+    // image box). Decodes as nil from every pre-2.29 cache.
+    var animeLogo: String? = nil
 
     var uniqueId: String { "\(provider.rawValue)-\(id)" }
 
     var isManga: Bool { type == "MANGA" }
+
+    // MARK: - Logo support (Batch 27)
+    //
+    // The three-part logo contract the hero/headers render through:
+    //   animeLogo  — the resolved logo image URL (nil until resolved)
+    //   logoURL    — the same URL, nil-safe accessor for call sites that
+    //                read it before resolution completes
+    //   fallbackTitle — the plain title text shown when no logo exists
+    //                   ANYWHERE in the provider chain (the final, always-
+    //                   available fallback — never a broken image box)
+    var logoURL: String? { animeLogo }
+    var fallbackTitle: String { title.displayTitle }
 
     func hash(into hasher: inout Hasher) { hasher.combine(uniqueId) }
     static func == (lhs: Media, rhs: Media) -> Bool { lhs.uniqueId == rhs.uniqueId }

@@ -682,6 +682,18 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */ = {isa = PBXBui
 		99845379B1FDC5993408FB0F /* MetadataPillRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 487B6180E1663A605389FA55 /* MetadataPillRow.swift */; };
 		4C2EE4514602405653E639E6 /* MetadataPillRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 487B6180E1663A605389FA55 /* MetadataPillRow.swift */; };
 		EC2901F3CDBA86689872E396 /* MetadataPillRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 487B6180E1663A605389FA55 /* MetadataPillRow.swift */; };
+		CB5EC3149DD03776FB94E449 /* CharacterPortrait.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FF7632428288FC0BC55D33A /* CharacterPortrait.swift */; };
+		3F8DA85F087325CD072FB2ED /* CharacterPortrait.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FF7632428288FC0BC55D33A /* CharacterPortrait.swift */; };
+		10BC63C8FD8F802F849EFA5E /* CharacterPortrait.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FF7632428288FC0BC55D33A /* CharacterPortrait.swift */; };
+		3B68DF5D5989C5DF3AF1AD58 /* CharacterPortrait.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FF7632428288FC0BC55D33A /* CharacterPortrait.swift */; };
+		30184DCC597C0BAF86C1F673 /* AppleHomeContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE94F57295DC32DA4514938E /* AppleHomeContent.swift */; };
+		09A3FD832C432105D9100005 /* AppleHomeContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE94F57295DC32DA4514938E /* AppleHomeContent.swift */; };
+		06364BC893631B068EDDEED4 /* AppleHomeContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE94F57295DC32DA4514938E /* AppleHomeContent.swift */; };
+		8F4A78588D154291F8B30330 /* AppleHomeContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE94F57295DC32DA4514938E /* AppleHomeContent.swift */; };
+		5A424D70662EFC40E1125C5A /* MediaCarousel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A932F6A725797CC0CD0CE4A /* MediaCarousel.swift */; };
+		B948544B1B990759A828D918 /* MediaCarousel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A932F6A725797CC0CD0CE4A /* MediaCarousel.swift */; };
+		03B0A35D0DF6739461F417DF /* MediaCarousel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A932F6A725797CC0CD0CE4A /* MediaCarousel.swift */; };
+		FC357250F01E1BE77E5B37C4 /* MediaCarousel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A932F6A725797CC0CD0CE4A /* MediaCarousel.swift */; };
                 FB3055616FBE4A399FAA8A5D /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB9A6134C59C4A32B8003889 /* Haptics.swift */; };
                 A059508F65B7400595DF13C4 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB9A6134C59C4A32B8003889 /* Haptics.swift */; };
                 7F79015A0ABA4261AA83F778 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB9A6134C59C4A32B8003889 /* Haptics.swift */; };
@@ -705,6 +717,10 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */ = {isa = PBXBui
                 73E828E8CEDC4F4FADE37960 /* AppModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 180EA8BB63D54E6BBFCE8E9A /* AppModeManager.swift */; };
                 BAAA0A4B15404C19805883A1 /* AppModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 180EA8BB63D54E6BBFCE8E9A /* AppModeManager.swift */; };
                 D9AE76341D1B4FF99675633F /* AppModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 180EA8BB63D54E6BBFCE8E9A /* AppModeManager.swift */; };
+		9DA3184CF9791D95AD3CD220 /* UIDesignMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F9FB352443C2544C64F2200 /* UIDesignMode.swift */; };
+		876867AD12751CC85ECA143F /* UIDesignMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F9FB352443C2544C64F2200 /* UIDesignMode.swift */; };
+		7B8C7936646922FE21EA7FC4 /* UIDesignMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F9FB352443C2544C64F2200 /* UIDesignMode.swift */; };
+		B5BC638900BFD0DB03526A9E /* UIDesignMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F9FB352443C2544C64F2200 /* UIDesignMode.swift */; };
                 9B9E10BF51174701A886E01E /* AppUpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB80077A4D92485BBE75B22E /* AppUpdateManager.swift */; };
                 99B13F351A134812AD75DA49 /* AppUpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB80077A4D92485BBE75B22E /* AppUpdateManager.swift */; };
                 AF2335D043404C4E97C5932A /* AppUpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB80077A4D92485BBE75B22E /* AppUpdateManager.swift */; };
@@ -762,6 +778,10 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */ = {isa = PBXBui
 		CAF7C6429D344C89857824F6 /* TVDBProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB34EFEE922491F892DADE3 /* TVDBProvider.swift */; };
 		3C1E2780E3414642A66DF068 /* TVDBProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB34EFEE922491F892DADE3 /* TVDBProvider.swift */; };
 		B33062947557401CA7F093E8 /* TVDBProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB34EFEE922491F892DADE3 /* TVDBProvider.swift */; };
+		4A1D8C6BBB9B6DE766982274 /* AnimeLogoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B9BAD38A50FF93DA27759E7 /* AnimeLogoService.swift */; };
+		CDC2AA2D96A19A2E912D5519 /* AnimeLogoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B9BAD38A50FF93DA27759E7 /* AnimeLogoService.swift */; };
+		96019253F6E7D943010E4F97 /* AnimeLogoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B9BAD38A50FF93DA27759E7 /* AnimeLogoService.swift */; };
+		DEB34BB69F239FFA65B931B1 /* AnimeLogoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B9BAD38A50FF93DA27759E7 /* AnimeLogoService.swift */; };
 		ECA4FF9876F141729684505F /* KitsuProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2BBD98CB78444EEB01BFB76 /* KitsuProvider.swift */; };
 		7A2AFDBBC83F4248AD131BFD /* KitsuProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2BBD98CB78444EEB01BFB76 /* KitsuProvider.swift */; };
 		DBA5B970FB154B4ABECCFE44 /* KitsuProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2BBD98CB78444EEB01BFB76 /* KitsuProvider.swift */; };
@@ -794,6 +814,10 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */ = {isa = PBXBui
 		8EFBEAEAC00EEC727100E47D /* DiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 787DB5DB440C0962E4829173 /* DiscoveryService.swift */; };
 		72D1E8AE4231910B316CA554 /* DiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 787DB5DB440C0962E4829173 /* DiscoveryService.swift */; };
 		9857225A5B00092A9CA08294 /* DiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 787DB5DB440C0962E4829173 /* DiscoveryService.swift */; };
+		3818E7F611B5E389D80B2BDD /* MediaNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BC087EE9207079BA4AE569E /* MediaNormalizer.swift */; };
+		C7FE61B972DA2C48C57591BF /* MediaNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BC087EE9207079BA4AE569E /* MediaNormalizer.swift */; };
+		3C1C0993803DE1CF8E98086F /* MediaNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BC087EE9207079BA4AE569E /* MediaNormalizer.swift */; };
+		CFDD26BCCCE08F19EDD11142 /* MediaNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BC087EE9207079BA4AE569E /* MediaNormalizer.swift */; };
 		428E4CA25C0A426599BD0F72 /* DataSourcesSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1490E05108E643F9959205B8 /* DataSourcesSettingsPage.swift */; };
 		64C9B0B46E3949C8BC2B072A /* DataSourcesSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1490E05108E643F9959205B8 /* DataSourcesSettingsPage.swift */; };
 		CA904BD67DF8446FB1813485 /* DataSourcesSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1490E05108E643F9959205B8 /* DataSourcesSettingsPage.swift */; };
@@ -1060,12 +1084,16 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
                 A7FE0F3B7E784465BCA91A4F /* TransparentNavBarModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransparentNavBarModifier.swift; sourceTree = "<group>"; };
                 1ED5C58C75D046CCB3CEEE12 /* ToastSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToastSystem.swift; sourceTree = "<group>"; };
                 487B6180E1663A605389FA55 /* MetadataPillRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetadataPillRow.swift; sourceTree = "<group>"; };
+                1FF7632428288FC0BC55D33A /* CharacterPortrait.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CharacterPortrait.swift; sourceTree = "<group>"; };
+                DE94F57295DC32DA4514938E /* AppleHomeContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleHomeContent.swift; sourceTree = "<group>"; };
+                0A932F6A725797CC0CD0CE4A /* MediaCarousel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaCarousel.swift; sourceTree = "<group>"; };
                 CB9A6134C59C4A32B8003889 /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
                 7B960C6896464EEC9886FA2B /* CustomRefreshControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomRefreshControl.swift; sourceTree = "<group>"; };
                 ACCF2A92A85C4B4BA8E11E55 /* app-logo.png */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = image.png; path = app-logo.png; sourceTree = "<group>"; };
                 4E540997BA864448B082B725 /* SettingsSearchIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSearchIndex.swift; sourceTree = "<group>"; };
                 9F913A366E28436E9B132B7B /* MangaHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MangaHomeView.swift; sourceTree = "<group>"; };
                 180EA8BB63D54E6BBFCE8E9A /* AppModeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModeManager.swift; sourceTree = "<group>"; };
+                4F9FB352443C2544C64F2200 /* UIDesignMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIDesignMode.swift; sourceTree = "<group>"; };
                 BB80077A4D92485BBE75B22E /* AppUpdateManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdateManager.swift; sourceTree = "<group>"; };
                 A70A5ACBBFA0410391A8C9F6 /* HistoryManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryManager.swift; sourceTree = "<group>"; };
                 2B7FE5D7DC524A62A71C54FB /* LibraryHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryHistoryView.swift; sourceTree = "<group>"; };
@@ -1081,6 +1109,7 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
                 2D3190485D774219690E87AD /* UpdateLogPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateLogPage.swift; sourceTree = "<group>"; };
                 DC272D4B21A0374FC3081540 /* StaffAndVideosSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffAndVideosSections.swift; sourceTree = "<group>"; };
 		1AB34EFEE922491F892DADE3 /* TVDBProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVDBProvider.swift; sourceTree = "<group>"; };
+		6B9BAD38A50FF93DA27759E7 /* AnimeLogoService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimeLogoService.swift; sourceTree = "<group>"; };
 		C2BBD98CB78444EEB01BFB76 /* KitsuProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KitsuProvider.swift; sourceTree = "<group>"; };
 		781091FCDF6A4833B4328100 /* AniDBProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniDBProvider.swift; sourceTree = "<group>"; };
 		142F2144A810425DB981F42B /* MangaBakaProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MangaBakaProvider.swift; sourceTree = "<group>"; };
@@ -1089,6 +1118,7 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
 		623F4B3B8B0A01B4110A996E /* CharacterService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CharacterService.swift; sourceTree = "<group>"; };
 		57A8B6E2BAB5A3203C6082B6 /* KitsuTVDBTimetableService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KitsuTVDBTimetableService.swift; sourceTree = "<group>"; };
 		787DB5DB440C0962E4829173 /* DiscoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoveryService.swift; sourceTree = "<group>"; };
+		0BC087EE9207079BA4AE569E /* MediaNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaNormalizer.swift; sourceTree = "<group>"; };
 		1490E05108E643F9959205B8 /* DataSourcesSettingsPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataSourcesSettingsPage.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -1272,10 +1302,12 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
                                 3EC52AC9B6624738B27DD4A7 /* PerShowPlaybackStore.swift */,
                                 2EBB2ADA20A14B00AF5D265F /* WesternScheduleService.swift */,
                                 180EA8BB63D54E6BBFCE8E9A /* AppModeManager.swift */,
+                                4F9FB352443C2544C64F2200 /* UIDesignMode.swift */,
                                 BB80077A4D92485BBE75B22E /* AppUpdateManager.swift */,
                                 A70A5ACBBFA0410391A8C9F6 /* HistoryManager.swift */,
                                 FB817FD6F25142E088911D9D /* MangaModuleManager.swift */,
 				1AB34EFEE922491F892DADE3 /* TVDBProvider.swift */,
+				6B9BAD38A50FF93DA27759E7 /* AnimeLogoService.swift */,
 				C2BBD98CB78444EEB01BFB76 /* KitsuProvider.swift */,
 				781091FCDF6A4833B4328100 /* AniDBProvider.swift */,
 				142F2144A810425DB981F42B /* MangaBakaProvider.swift */,
@@ -1284,6 +1316,7 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
 				623F4B3B8B0A01B4110A996E /* CharacterService.swift */,
 				57A8B6E2BAB5A3203C6082B6 /* KitsuTVDBTimetableService.swift */,
 				787DB5DB440C0962E4829173 /* DiscoveryService.swift */,
+				0BC087EE9207079BA4AE569E /* MediaNormalizer.swift */,
                         );
                         path = Services;
                         sourceTree = "<group>";
@@ -1401,6 +1434,9 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */,
                                 A7FE0F3B7E784465BCA91A4F /* TransparentNavBarModifier.swift */,
                                 1ED5C58C75D046CCB3CEEE12 /* ToastSystem.swift */,
                                 487B6180E1663A605389FA55 /* MetadataPillRow.swift */,
+                                1FF7632428288FC0BC55D33A /* CharacterPortrait.swift */,
+                                DE94F57295DC32DA4514938E /* AppleHomeContent.swift */,
+                                0A932F6A725797CC0CD0CE4A /* MediaCarousel.swift */,
                                 CB9A6134C59C4A32B8003889 /* Haptics.swift */,
                                 7B960C6896464EEC9886FA2B /* CustomRefreshControl.swift */,
                                 4E540997BA864448B082B725 /* SettingsSearchIndex.swift */,
@@ -1781,11 +1817,15 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 11121E24D9F540198A8C76C8 /* TransparentNavBarModifier.swift in Sources */,
                                 895B393387144BA2B7146905 /* ToastSystem.swift in Sources */,
                                 366844F1B89D534618F6B1BB /* MetadataPillRow.swift in Sources */,
+                                CB5EC3149DD03776FB94E449 /* CharacterPortrait.swift in Sources */,
+                                30184DCC597C0BAF86C1F673 /* AppleHomeContent.swift in Sources */,
+                                5A424D70662EFC40E1125C5A /* MediaCarousel.swift in Sources */,
                                 57BF5714069E486B97AA8FBF /* Haptics.swift in Sources */,
                                 D13549A1608449AF9EBDE353 /* CustomRefreshControl.swift in Sources */,
                                 01A20920D09146A29404813E /* SettingsSearchIndex.swift in Sources */,
                                 AE5D7AE099454F4DBFFA1406 /* MangaHomeView.swift in Sources */,
                                 D9AE76341D1B4FF99675633F /* AppModeManager.swift in Sources */,
+                                9DA3184CF9791D95AD3CD220 /* UIDesignMode.swift in Sources */,
                                 753C771E5776493EA7C838DF /* AppUpdateManager.swift in Sources */,
                                 6463DD5F742F4F18BB4A3665 /* HistoryManager.swift in Sources */,
                                 1D84E3B0273F4A46B71F2792 /* LibraryHistoryView.swift in Sources */,
@@ -1800,6 +1840,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 5703C0FFE4EE6FB06C424562 /* UpdateLogPage.swift in Sources */,
                                 485457D1871AC64945A3A565 /* StaffAndVideosSections.swift in Sources */,
 				B33062947557401CA7F093E8 /* TVDBProvider.swift in Sources */,
+				4A1D8C6BBB9B6DE766982274 /* AnimeLogoService.swift in Sources */,
 				CDF8655D3C2E49DABD9F42F7 /* KitsuProvider.swift in Sources */,
 				3D144AA73D984FB78F9FFF00 /* AniDBProvider.swift in Sources */,
 				70580AE3D2E9460B8807F590 /* MangaBakaProvider.swift in Sources */,
@@ -1808,6 +1849,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
 				BEDAA4D199678AD27A12743B /* CharacterService.swift in Sources */,
 				7BD992FAF791273F7D197180 /* KitsuTVDBTimetableService.swift in Sources */,
 				ECF92469546E4EA9B13C5225 /* DiscoveryService.swift in Sources */,
+				3818E7F611B5E389D80B2BDD /* MediaNormalizer.swift in Sources */,
 				D97B2063009A40478A165DEF /* DataSourcesSettingsPage.swift in Sources */,
 );
                         runOnlyForDeploymentPostprocessing = 0;
@@ -2020,11 +2062,15 @@ A17F1001000000000000000A /* ForcedUpdateView.swift in Sources */,
                                 C4D8EB22420F4C6DA18AA61B /* TransparentNavBarModifier.swift in Sources */,
                                 F600445A08244B5095556D9D /* ToastSystem.swift in Sources */,
                                 99845379B1FDC5993408FB0F /* MetadataPillRow.swift in Sources */,
+                                3F8DA85F087325CD072FB2ED /* CharacterPortrait.swift in Sources */,
+                                09A3FD832C432105D9100005 /* AppleHomeContent.swift in Sources */,
+                                B948544B1B990759A828D918 /* MediaCarousel.swift in Sources */,
                                 7F79015A0ABA4261AA83F778 /* Haptics.swift in Sources */,
                                 4ECDE91B709E40C4B7131936 /* CustomRefreshControl.swift in Sources */,
                                 2E0E8A3882B1417499E1D5FA /* SettingsSearchIndex.swift in Sources */,
                                 1CAC259234054464BCC1E60C /* MangaHomeView.swift in Sources */,
                                 BAAA0A4B15404C19805883A1 /* AppModeManager.swift in Sources */,
+                                876867AD12751CC85ECA143F /* UIDesignMode.swift in Sources */,
                                 AF2335D043404C4E97C5932A /* AppUpdateManager.swift in Sources */,
                                 C2E5D4EA9DF6453B98F51FBA /* HistoryManager.swift in Sources */,
                                 941EEFF3DBCD4FAC8BE6656D /* LibraryHistoryView.swift in Sources */,
@@ -2039,6 +2085,7 @@ A17F1001000000000000000A /* ForcedUpdateView.swift in Sources */,
                                 A66C21D9758B528ED76D9835 /* UpdateLogPage.swift in Sources */,
                                 C6CE1B5A31348C73AABA02CD /* StaffAndVideosSections.swift in Sources */,
 				3C1E2780E3414642A66DF068 /* TVDBProvider.swift in Sources */,
+				CDC2AA2D96A19A2E912D5519 /* AnimeLogoService.swift in Sources */,
 				DBA5B970FB154B4ABECCFE44 /* KitsuProvider.swift in Sources */,
 				5C9AFAC265A447119B89DBD6 /* AniDBProvider.swift in Sources */,
 				FD70D2C4FBB842D6BE4FA21B /* MangaBakaProvider.swift in Sources */,
@@ -2047,6 +2094,7 @@ A17F1001000000000000000A /* ForcedUpdateView.swift in Sources */,
 				5E4577316315FE64E49230FE /* CharacterService.swift in Sources */,
 				F21D7E9C441DD0767B8663A8 /* KitsuTVDBTimetableService.swift in Sources */,
 				8EFBEAEAC00EEC727100E47D /* DiscoveryService.swift in Sources */,
+				C7FE61B972DA2C48C57591BF /* MediaNormalizer.swift in Sources */,
 				CA904BD67DF8446FB1813485 /* DataSourcesSettingsPage.swift in Sources */,
 );
                         runOnlyForDeploymentPostprocessing = 0;
@@ -2261,11 +2309,15 @@ A17F1001000000000000000B /* ForcedUpdateView.swift in Sources */,
                                 0D4809DF63374C11B0FBC113 /* TransparentNavBarModifier.swift in Sources */,
                                 EA699B91BC6B4BCF8B325D40 /* ToastSystem.swift in Sources */,
                                 4C2EE4514602405653E639E6 /* MetadataPillRow.swift in Sources */,
+                                10BC63C8FD8F802F849EFA5E /* CharacterPortrait.swift in Sources */,
+                                06364BC893631B068EDDEED4 /* AppleHomeContent.swift in Sources */,
+                                03B0A35D0DF6739461F417DF /* MediaCarousel.swift in Sources */,
                                 A059508F65B7400595DF13C4 /* Haptics.swift in Sources */,
                                 77C010496C1B48E08ACD3FEB /* CustomRefreshControl.swift in Sources */,
                                 CE8BECC8DB5A46128FE0F71F /* SettingsSearchIndex.swift in Sources */,
                                 49018AF1B1824E1BBB4FBF2F /* MangaHomeView.swift in Sources */,
                                 73E828E8CEDC4F4FADE37960 /* AppModeManager.swift in Sources */,
+                                7B8C7936646922FE21EA7FC4 /* UIDesignMode.swift in Sources */,
                                 99B13F351A134812AD75DA49 /* AppUpdateManager.swift in Sources */,
                                 D847E8CD8DA6404781337E38 /* HistoryManager.swift in Sources */,
                                 EB13BA31A6924FC499DBBB5B /* LibraryHistoryView.swift in Sources */,
@@ -2280,6 +2332,7 @@ A17F1001000000000000000B /* ForcedUpdateView.swift in Sources */,
                                 C843276266E1B02BC14E77A1 /* UpdateLogPage.swift in Sources */,
                                 756F68CD2C046ACE7EC4FB28 /* StaffAndVideosSections.swift in Sources */,
 				CAF7C6429D344C89857824F6 /* TVDBProvider.swift in Sources */,
+				96019253F6E7D943010E4F97 /* AnimeLogoService.swift in Sources */,
 				7A2AFDBBC83F4248AD131BFD /* KitsuProvider.swift in Sources */,
 				E3413DFAB4A245EEBBB6A5CF /* AniDBProvider.swift in Sources */,
 				447050E960A84032915D63D0 /* MangaBakaProvider.swift in Sources */,
@@ -2288,6 +2341,7 @@ A17F1001000000000000000B /* ForcedUpdateView.swift in Sources */,
 				4726090BC58DA246C1E2E740 /* CharacterService.swift in Sources */,
 				E620FEBA7ECAA92F33F791C8 /* KitsuTVDBTimetableService.swift in Sources */,
 				72D1E8AE4231910B316CA554 /* DiscoveryService.swift in Sources */,
+				3C1C0993803DE1CF8E98086F /* MediaNormalizer.swift in Sources */,
 				64C9B0B46E3949C8BC2B072A /* DataSourcesSettingsPage.swift in Sources */,
 );
                         runOnlyForDeploymentPostprocessing = 0;
@@ -2502,11 +2556,15 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                 F86C8674D3574D5FADFA3C2C /* TransparentNavBarModifier.swift in Sources */,
                                 05EE7CC248EF4889882F5264 /* ToastSystem.swift in Sources */,
                                 EC2901F3CDBA86689872E396 /* MetadataPillRow.swift in Sources */,
+                                3B68DF5D5989C5DF3AF1AD58 /* CharacterPortrait.swift in Sources */,
+                                8F4A78588D154291F8B30330 /* AppleHomeContent.swift in Sources */,
+                                FC357250F01E1BE77E5B37C4 /* MediaCarousel.swift in Sources */,
                                 FB3055616FBE4A399FAA8A5D /* Haptics.swift in Sources */,
                                 32DA168EE48448DE9CB5FBB2 /* CustomRefreshControl.swift in Sources */,
                                 9FC65E10AF3F4044AA31F0E7 /* SettingsSearchIndex.swift in Sources */,
                                 9E2601C92E784D40961B5E9A /* MangaHomeView.swift in Sources */,
                                 9EE290864CBC47F394FC0115 /* AppModeManager.swift in Sources */,
+                                B5BC638900BFD0DB03526A9E /* UIDesignMode.swift in Sources */,
                                 9B9E10BF51174701A886E01E /* AppUpdateManager.swift in Sources */,
                                 D87FB5B29B0A4DE59A88A058 /* HistoryManager.swift in Sources */,
                                 A85A090582534E02B19833B9 /* LibraryHistoryView.swift in Sources */,
@@ -2521,6 +2579,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                 EB141EEBA4B687995F0CBDB7 /* UpdateLogPage.swift in Sources */,
                                 229BEF165B3FC43B3A3A3E37 /* StaffAndVideosSections.swift in Sources */,
 				51E375895C444F3ABED4609E /* TVDBProvider.swift in Sources */,
+				DEB34BB69F239FFA65B931B1 /* AnimeLogoService.swift in Sources */,
 				ECA4FF9876F141729684505F /* KitsuProvider.swift in Sources */,
 				504198A72CEE44D194D56738 /* AniDBProvider.swift in Sources */,
 				8669A37F3CC4429E972C4170 /* MangaBakaProvider.swift in Sources */,
@@ -2529,6 +2588,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
 				B95C102A08038B4C3FB8E082 /* CharacterService.swift in Sources */,
 				CA1D8B93F04008540E95C300 /* KitsuTVDBTimetableService.swift in Sources */,
 				9857225A5B00092A9CA08294 /* DiscoveryService.swift in Sources */,
+				CFDD26BCCCE08F19EDD11142 /* MediaNormalizer.swift in Sources */,
 				428E4CA25C0A426599BD0F72 /* DataSourcesSettingsPage.swift in Sources */,
 );
                         runOnlyForDeploymentPostprocessing = 0;
@@ -2552,7 +2612,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                 ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
                                 CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
                                 CODE_SIGN_STYLE = Automatic;
-                                CURRENT_PROJECT_VERSION = 163;
+                                CURRENT_PROJECT_VERSION = 164;
                                 ENABLE_PREVIEWS = YES;
                                 ENABLE_USER_SCRIPT_SANDBOXING = YES;
                                 GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -2570,7 +2630,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "@executable_path/Frameworks",
                                 );
                                 LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                                MARKETING_VERSION = 2.28;
+                                MARKETING_VERSION = 2.29;
                                 PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
                                 PRODUCT_NAME = "$(TARGET_NAME)";
                                 SDKROOT = appletvos;
@@ -2591,7 +2651,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                 ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
                                 CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
                                 CODE_SIGN_STYLE = Automatic;
-                                CURRENT_PROJECT_VERSION = 163;
+                                CURRENT_PROJECT_VERSION = 164;
                                 ENABLE_PREVIEWS = YES;
                                 ENABLE_USER_SCRIPT_SANDBOXING = YES;
                                 GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -2605,7 +2665,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "@executable_path/Frameworks",
                                 );
                                 LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                                MARKETING_VERSION = 2.28;
+                                MARKETING_VERSION = 2.29;
                                 PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
                                 PRODUCT_NAME = "$(TARGET_NAME)";
                                 SDKROOT = appletvos;
@@ -2712,7 +2772,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                 ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
                                 CODE_SIGN_IDENTITY = "Apple Development";
                                 CODE_SIGN_STYLE = Automatic;
-                                CURRENT_PROJECT_VERSION = 163;
+                                CURRENT_PROJECT_VERSION = 164;
                                 DEVELOPMENT_TEAM = JRMTH65Z3H;
                                 ENABLE_TESTABILITY = YES;
                                 INFOPLIST_FILE = Shirox/Info.plist;
@@ -2722,7 +2782,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "$(inherited)",
                                         "@executable_path/Frameworks",
                                 );
-                                MARKETING_VERSION = 2.28;
+                                MARKETING_VERSION = 2.29;
                                 PRODUCT_NAME = shirox;
                                 PROVISIONING_PROFILE_SPECIFIER = "";
                                 SDKROOT = iphoneos;
@@ -2758,7 +2818,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                         buildSettings = {
                                 ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
                                 COMBINE_HIDPI_IMAGES = YES;
-                                CURRENT_PROJECT_VERSION = 163;
+                                CURRENT_PROJECT_VERSION = 164;
                                 DEAD_CODE_STRIPPING = YES;
                                 INFOPLIST_FILE = Shirox/Info.plist;
                                 INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
@@ -2768,7 +2828,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "@executable_path/../Frameworks",
                                 );
                                 MACOSX_DEPLOYMENT_TARGET = 14.0;
-                                MARKETING_VERSION = 2.28;
+                                MARKETING_VERSION = 2.29;
                                 PRODUCT_NAME = shirox;
                                 SDKROOT = macosx;
                                 SUPPORTS_MACCATALYST = NO;
@@ -2785,7 +2845,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                 ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
                                 CODE_SIGN_IDENTITY = "Apple Development";
                                 CODE_SIGN_STYLE = Automatic;
-                                CURRENT_PROJECT_VERSION = 163;
+                                CURRENT_PROJECT_VERSION = 164;
                                 DEVELOPMENT_TEAM = JRMTH65Z3H;
                                 INFOPLIST_FILE = Shirox/Info.plist;
                                 INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
@@ -2794,7 +2854,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "$(inherited)",
                                         "@executable_path/Frameworks",
                                 );
-                                MARKETING_VERSION = 2.28;
+                                MARKETING_VERSION = 2.29;
                                 PRODUCT_NAME = shirox;
                                 PROVISIONING_PROFILE_SPECIFIER = "";
                                 SDKROOT = iphoneos;
@@ -2875,7 +2935,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                         buildSettings = {
                                 ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
                                 COMBINE_HIDPI_IMAGES = YES;
-                                CURRENT_PROJECT_VERSION = 163;
+                                CURRENT_PROJECT_VERSION = 164;
                                 DEAD_CODE_STRIPPING = YES;
                                 INFOPLIST_FILE = Shirox/Info.plist;
                                 INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
@@ -2885,7 +2945,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "@executable_path/../Frameworks",
                                 );
                                 MACOSX_DEPLOYMENT_TARGET = 14.0;
-                                MARKETING_VERSION = 2.28;
+                                MARKETING_VERSION = 2.29;
                                 PRODUCT_NAME = shirox;
                                 SDKROOT = macosx;
                                 SUPPORTS_MACCATALYST = NO;

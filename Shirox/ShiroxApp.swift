@@ -571,6 +571,13 @@ private struct RootTabView: View {
             await ContinueWatchingManager.shared.syncWithAniList()
             await ContinueWatchingManager.shared.syncWithMAL()
         }
+        .task {
+            // Batch 27 — background warm-up of the genre pools: the
+            // discovery cache fills once at launch (bounded, 4 at a
+            // time) so the first Surprise Me press of the session is
+            // instant instead of paying one network request.
+            await DiscoveryService.shared.warmGenrePools()
+        }
         .onReceive(NotificationCenter.default.publisher(for: .openSettingsTab)) { _ in
             #if targetEnvironment(macCatalyst)
             sidebarTab = .settings

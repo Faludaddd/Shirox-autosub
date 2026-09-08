@@ -74,7 +74,7 @@ struct MangaHomeContent: View {
                         //    flips the action button to "Read" and routes taps
                         //    to the manga detail page.
                         if !vm.trending.isEmpty {
-                            FeaturedCarousel(items: vm.trending, isManga: true)
+                            MediaCarousel(items: vm.trending, isManga: true, scrollSpace: "mangaHomeScroll")
                         }
 
                         // 2. CONTINUE READING — horizontal strip of in-progress

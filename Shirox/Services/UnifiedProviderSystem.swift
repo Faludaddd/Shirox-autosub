@@ -14,7 +14,12 @@ enum MetaProviderKind: String, Codable, CaseIterable, Identifiable, Hashable {
     case anidb
     case mangabaka
     case anichart
-    case animeschedule
+    /// Batch 27 — JIKAN as its own provider kind: the final general
+    /// fallback (MyAnimeList's public API). The .mal provider is also
+    /// Jikan-backed, but .jikan gives the chains a separate health
+    /// identity AND genuinely distinct endpoints where it matters
+    /// (schedule: /schedules vs the .mal leg's /seasons chart).
+    case jikan
 
     var id: String { rawValue }
 
@@ -27,7 +32,7 @@ enum MetaProviderKind: String, Codable, CaseIterable, Identifiable, Hashable {
         case .anidb:         return "AniDB"
         case .mangabaka:     return "MangaBaka"
         case .anichart:      return "AniChart"
-        case .animeschedule: return "AnimeSchedule"
+        case .jikan:         return "Jikan"
         }
     }
 
@@ -48,7 +53,7 @@ enum MetaProviderKind: String, Codable, CaseIterable, Identifiable, Hashable {
         case .anidb:         return "api.anidb.net"
         case .mangabaka:     return "api.mangabaka.org"
         case .anichart:      return "anichart.net"
-        case .animeschedule: return "animeschedule.net"
+        case .jikan:         return "api.jikan.moe"
         }
     }
 
@@ -63,7 +68,11 @@ enum MetaProviderKind: String, Codable, CaseIterable, Identifiable, Hashable {
         // the final live source through the Kitsu+TVDB timetable synthesis.
         case .kitsu: return [.anime, .manga, .discovery, .schedule]
         case .mangabaka: return [.manga]
-        case .anichart, .animeschedule: return [.schedule]
+        case .anichart: return [.schedule]
+        // Batch 27 — Jikan is the general fallback: schedule (its own
+        // /schedules timetable), manga (top/manga charts) and anime
+        // (search/characters through the Jikan client).
+        case .jikan: return [.schedule, .manga, .anime]
         }
     }
 }
@@ -297,11 +306,19 @@ final class UnifiedProviderSystem: ObservableObject {
     private let searchPrimaryKey = "providerOrder.searchPrimary.v1"
 
     /// The recommended (default) order for each domain.
-    static let recommendedAnimeOrder: [MetaProviderKind] = [.tvdb, .mal, .anilist, .kitsu, .anidb]
+    /// Batch 27 — Jikan appended as the anime chain's final general
+    /// fallback (TVDB → MAL → AniList → Kitsu → AniDB → Jikan).
+    static let recommendedAnimeOrder: [MetaProviderKind] = [.tvdb, .mal, .anilist, .kitsu, .anidb, .jikan]
     /// Batch 24 — Kitsu appended as the manga chain's final fallback
     /// (MangaBaka → MAL → AniList → Kitsu).
-    static let recommendedMangaOrder: [MetaProviderKind] = [.mangabaka, .mal, .anilist, .kitsu]
-    static let recommendedScheduleOrder: [MetaProviderKind] = [.anichart, .animeschedule, .mal, .anilist]
+    /// Batch 27 — Jikan appended as the manga chain's final fallback
+    /// (MangaBaka → MAL → AniList → Kitsu → Jikan; Kitsu stays ahead of
+    /// it — it is a genuinely independent database, not the same API).
+    static let recommendedMangaOrder: [MetaProviderKind] = [.mangabaka, .mal, .anilist, .kitsu, .jikan]
+    /// Batch 27 — AnimeSchedule REMOVED from the app entirely. The
+    /// schedule chain: AniChart → MAL → AniList → Jikan, with the
+    /// Kitsu+TVDB timetable synthesis as the final live source.
+    static let recommendedScheduleOrder: [MetaProviderKind] = [.anichart, .mal, .anilist, .jikan, .kitsu]
     /// Batch 26 — the DISCOVERY chain. Kitsu is the primary discovery
     /// DATABASE (real trending chart, real season query, real genre
     /// taxonomy, cross-provider ids on every result); AniList and MAL
@@ -354,11 +371,11 @@ final class UnifiedProviderSystem: ObservableObject {
             return ordered
         }
 
-        animeOrder = loadOrder(animeOrderKey, recommended: Self.recommendedAnimeOrder, all: [.tvdb, .mal, .anilist, .kitsu, .anidb])
+        animeOrder = loadOrder(animeOrderKey, recommended: Self.recommendedAnimeOrder, all: [.tvdb, .mal, .anilist, .kitsu, .anidb, .jikan])
         // Users upgrading from v2.25 keep their saved order; `loadOrder`
         // appends Kitsu (new to this domain) at the end automatically.
-        mangaOrder = loadOrder(mangaOrderKey, recommended: Self.recommendedMangaOrder, all: [.mangabaka, .mal, .anilist, .kitsu])
-        scheduleOrder = loadOrder(scheduleOrderKey, recommended: Self.recommendedScheduleOrder, all: [.anichart, .animeschedule, .mal, .anilist, .kitsu])
+        mangaOrder = loadOrder(mangaOrderKey, recommended: Self.recommendedMangaOrder, all: [.mangabaka, .mal, .anilist, .kitsu, .jikan])
+        scheduleOrder = loadOrder(scheduleOrderKey, recommended: Self.recommendedScheduleOrder, all: [.anichart, .mal, .anilist, .jikan, .kitsu])
         // Batch 26 — the discovery chain (Kitsu first; AniList/MAL as the
         // fallbacks). Upgrading users with a saved schedule order keep it —
         // Kitsu appends last automatically via loadOrder.
@@ -400,11 +417,6 @@ final class UnifiedProviderSystem: ObservableObject {
         // provider reports the honest reason and the chain moves on.
         statuses[.anidb]?.note = AniDBProvider.shared.isConfigured
             ? nil : "Requires a registered AniDB client identity (name + version) — fill it in below."
-        // AnimeSchedule requires the user's own free API token (their terms
-        // forbid shipping an app token). Without one it is SKIPPED by the
-        // chain (see activeChain) instead of being attempted and failing.
-        statuses[.animeschedule]?.note = AnimeScheduleProvider.shared.isConfigured
-            ? nil : "Optional — add a free API token from animeschedule.net below to activate this schedule source."
     }
 
     // MARK: - Ordering & enablement (Data Sources UI entry points)
@@ -441,7 +453,7 @@ final class UnifiedProviderSystem: ObservableObject {
         switch domain {
         case .anime: setOrder(Self.recommendedAnimeOrder, for: domain)
         case .manga: setOrder(Self.recommendedMangaOrder, for: domain)
-        case .schedule: setOrder(Self.recommendedScheduleOrder + [.kitsu], for: domain)
+        case .schedule: setOrder(Self.recommendedScheduleOrder, for: domain)
         case .discovery: setOrder(Self.recommendedDiscoveryOrder, for: domain)
         }
     }
@@ -521,10 +533,6 @@ final class UnifiedProviderSystem: ObservableObject {
             // AniDB without a registered client is skipped (honest
             // unavailability — its HTTP API rejects unknown clients).
             if kind == .anidb && !AniDBProvider.shared.isConfigured { return false }
-            // AnimeSchedule without the user's API token is skipped the
-            // same way — their API answers 401 without a token, so there
-            // is nothing to attempt until one is configured in settings.
-            if kind == .animeschedule && !AnimeScheduleProvider.shared.isConfigured { return false }
             return true
         }
     }
@@ -571,7 +579,6 @@ final class UnifiedProviderSystem: ObservableObject {
     private func shouldSkip(_ kind: MetaProviderKind) -> Bool {
         guard isEnabled(kind) else { return true }
         if kind == .anidb && !AniDBProvider.shared.isConfigured { return true }
-        if kind == .animeschedule && !AnimeScheduleProvider.shared.isConfigured { return true }
         guard let status = statuses[kind] else { return false }
         return status.isCoolingDown
     }
@@ -840,6 +847,9 @@ final class UnifiedProviderSystem: ObservableObject {
                 return list.isEmpty ? nil : list.map { AniListProvider.shared.mapMangaMedia($0) }
             case .kitsu:
                 return try await KitsuProvider.shared.mangaGenreBrowse(genre: genre, page: page)
+            case .jikan:
+                // Batch 27 — final general fallback.
+                return try await MALDiscoveryService.shared.mangaGenreBrowse(genre: genre, page: page)
             default:
                 return nil
             }
@@ -884,6 +894,11 @@ final class UnifiedProviderSystem: ObservableObject {
                 return try await KitsuProvider.shared.search(query: trimmed)
             case .anidb:
                 return nil // AniDB search is UDP-API-only; not available over HTTP
+            case .jikan:
+                // Batch 27 — the final general fallback: Jikan's own
+                // search (the same client the .mal provider uses, asked
+                // only when every provider above it failed).
+                return try await MALDiscoveryService.shared.search(trimmed).map { MALDiscoveryService.shared.mapToMedia($0) }
             default:
                 return nil
             }
@@ -939,6 +954,9 @@ final class UnifiedProviderSystem: ObservableObject {
                 // Batch 24 — Kitsu serves manga search too, so the manga
                 // search chain survives MAL + AniList outage windows.
                 return try await KitsuProvider.shared.searchManga(query: trimmed)
+            case .jikan:
+                // Batch 27 — final general fallback.
+                return try await MALDiscoveryService.shared.searchManga(trimmed)
             default:
                 return nil
             }
@@ -975,6 +993,9 @@ final class UnifiedProviderSystem: ObservableObject {
                 // Batch 24 — the live fallback that keeps the manga Home
                 // shelves rendering while MAL and AniList are both down.
                 return try await KitsuProvider.shared.mangaShelf(shelf)
+            case .jikan:
+                // Batch 27 — final general fallback (Jikan top/manga).
+                return try await MALDiscoveryService.shared.mangaShelf(shelf)
             default:
                 return nil
             }
@@ -1018,6 +1039,13 @@ final class UnifiedProviderSystem: ObservableObject {
                 // Reading-mode Releases tab keeps real data through MAL /
                 // AniList outage windows.
                 return try await KitsuProvider.shared.mangaReleaseSchedule()
+            case .jikan:
+                // Batch 27 — final general fallback (Jikan bypopularity).
+                let list = try await MALDiscoveryService.shared.fetchList("top/manga", queryItems: [
+                    URLQueryItem(name: "filter", value: "bypopularity"),
+                    URLQueryItem(name: "limit", value: "25")
+                ])
+                return list.map { MALDiscoveryService.shared.mapMangaToMedia($0) }
             default:
                 return nil
             }
@@ -1026,42 +1054,130 @@ final class UnifiedProviderSystem: ObservableObject {
 
     // MARK: - Schedule
 
-    /// The full schedule chain: AniChart → AnimeSchedule → MAL → AniList,
-    /// with the Kitsu+TVDB timetable synthesis as the final LIVE source
-    /// (Batch 26): when all four schedule providers are down — the exact
-    /// condition of the current AniList 403 + MAL 504 outage window — the
+    /// The full schedule chain (Batch 27): AniChart → MAL → AniList →
+    /// Jikan, with the Kitsu+TVDB timetable synthesis as the final LIVE
+    /// source: when every schedule provider is down — the exact condition
+    /// of the current AniList 403 + MAL 504 outage window — the
     /// currently-airing list from the discovery database (Kitsu
     /// status=current) is joined with each show's TVDB airing fields
     /// (nextAired + airsTime + lastAired, id-mapped) to build a REAL
     /// week timetable. The disk snapshot remains the last resort after it.
-    /// Returns entries plus which provider served them (for the honest
-    /// source notice). Cached for 5 minutes; every screen asking within
+    ///
+    /// This is a MERGE chain (Batch 27): a provider that returns a
+    /// PARTIAL window contributes its valid entries and the walk
+    /// continues — valid results are never thrown away. Returns entries
+    /// plus which provider served them (for the honest source notice).
+    /// Cached for 5 minutes; every screen asking within
     /// the window SHARES one request (dedup).
     func scheduleEntries(from startTs: Int, to endTs: Int) async throws -> (entries: [UnifiedScheduleEntry], source: MetaProviderKind?) {
-        let value = try await runChain(
-            domain: .schedule,
-            operation: "timetable",
-            cacheKey: "\(startTs)-\(endTs)",
-            cacheTTL: 5 * 60) { kind in
-            switch kind {
-            case .anichart:
-                return try await AniChartProvider.shared.entries(from: startTs, to: endTs)
-            case .animeschedule:
-                return try await AnimeScheduleProvider.shared.entries(from: startTs, to: endTs)
-            case .mal:
-                return try await ScheduleFallbackService.shared.jikanSchedule(from: startTs, to: endTs)
-            case .anilist:
-                let items = try await AniListService.shared.airingSchedules(from: startTs, to: endTs)
-                return items.map { UnifiedScheduleEntry(item: $0) }
-            case .kitsu:
-                // Batch 26 — the synthesis fallback: discovery list + TVDB
-                // air times (both live while AniList and MAL are down).
-                return try await KitsuTVDBTimetableService.shared.entries(from: startTs, to: endTs)
-            default:
-                return nil
+        // Batch 27 — the schedule chain is a MERGE chain, not
+        // first-wins: AniChart → MAL → AniList → Jikan → Kitsu+TVDB.
+        // A provider returning a PARTIAL week doesn't end the walk —
+        // its valid entries are kept and the next provider tops the
+        // page up (merged + deduped by anime). The walk stops early
+        // when a provider delivers a FULL window (>= 25 entries — a
+        // real airing week has dozens), so the common case is still
+        // ONE request served by ONE provider.
+        //
+        // Merge key: AniList id when both sides have it, else the MAL
+        // id, else the normalized title. AniChart/AniList entries win
+        // conflicts (they carry exact air times + episode numbers);
+        // within equal rank, the earlier chain position wins.
+        if let cached = ProviderCacheStore.read([UnifiedScheduleEntry].self,
+                                                key: "schedule|timetable|\(startTs)-\(endTs)",
+                                                domain: .schedule, ttl: 5 * 60) {
+            return (cached, lastServedBy ?? .anichart)
+        }
+
+        let chain = activeChain(for: .schedule)
+        guard !chain.isEmpty else { throw ProviderChainError.noProvidersEnabled }
+
+        var merged: [UnifiedScheduleEntry] = []
+        var seenKeys = Set<String>()
+        var servedBy: MetaProviderKind?
+        var lastReason: String?
+
+        func mergeKey(_ e: UnifiedScheduleEntry) -> String {
+            if let al = e.aniListMediaId { return "al\(al)" }
+            if let mal = e.sourceMediaId, mal > 0, mal < 800_000_000 { return "mal\(mal)" }
+            return "t\(e.title.lowercased())"
+        }
+
+        for kind in chain {
+            if Task.isCancelled { throw CancellationError() }
+            if shouldSkip(kind) { continue }
+            if isOperationFailureCached(kind, operation: "timetable") { continue }
+            do {
+                let started = Date()
+                let batch: [UnifiedScheduleEntry]?
+                switch kind {
+                case .anichart:
+                    batch = try await AniChartProvider.shared.entries(from: startTs, to: endTs)
+                case .mal:
+                    // Batch 27 — the .mal leg serves MAL's SEASON CHART
+                    // (Jikan /seasons) — a different endpoint than the
+                    // .jikan leg's /schedules timetable, so the two legs
+                    // fail and recover independently.
+                    batch = try await ScheduleFallbackService.shared.jikanSeasonSchedule(from: startTs, to: endTs)
+                case .anilist:
+                    let items = try await AniListService.shared.airingSchedules(from: startTs, to: endTs)
+                    batch = items.map { UnifiedScheduleEntry(item: $0) }
+                case .jikan:
+                    // Batch 27 — JIKAN IS A REAL FALLBACK (not just a
+                    // displayed option): the /schedules weekly timetable,
+                    // asked whenever the providers above it failed or
+                    // came back partial.
+                    batch = try await ScheduleFallbackService.shared.jikanSchedule(from: startTs, to: endTs)
+                case .kitsu:
+                    // The synthesis fallback: discovery list + TVDB air
+                    // times (both live while AniList and MAL are down).
+                    batch = try await KitsuTVDBTimetableService.shared.entries(from: startTs, to: endTs)
+                default:
+                    batch = nil
+                }
+                let latency = Int(Date().timeIntervalSince(started) * 1000)
+                if let batch, !batch.isEmpty {
+                    recordSuccess(kind, latencyMs: latency)
+                    if servedBy == nil { servedBy = kind }
+                    lastServedBy = kind
+                    var added = 0
+                    for entry in batch {
+                        let key = mergeKey(entry)
+                        guard seenKeys.insert(key).inserted else { continue }
+                        merged.append(entry)
+                        added += 1
+                    }
+                    Logger.shared.log(
+                        "[Providers] timetable: \(kind.displayName) contributed \(added) entries (\(latency) ms)",
+                        type: "Provider")
+                } else if batch != nil {
+                    // Genuinely empty for this window — a valid answer.
+                    recordSuccess(kind, latencyMs: latency)
+                }
+                // A FULL window ends the walk early.
+                if merged.count >= 25 { break }
+            } catch {
+                if ProviderManager.isCancellationError(error) { throw error }
+                lastReason = ProviderErrorMapper.brief(error)
+                recordFailure(kind, error: error)
+                recordOperationFailure(kind, operation: "timetable")
+                Logger.shared.log(
+                    "[Providers] \(kind.displayName) failed timetable: \(lastReason ?? "") — continuing the merge chain",
+                    type: "Provider")
             }
         }
-        return (value.value, value.servedBy)
+
+        guard !merged.isEmpty else {
+            throw ProviderChainError.allProvidersFailed(lastReason: lastReason)
+        }
+        merged.sort {
+            if $0.popularity != $1.popularity {
+                return $0.popularity > $1.popularity
+            }
+            return $0.airingAt < $1.airingAt
+        }
+        ProviderCacheStore.write(merged, key: "schedule|timetable|\(startTs)-\(endTs)", domain: .schedule)
+        return (merged, servedBy)
     }
 
     // MARK: - Test Provider (real requests, measured latency)
@@ -1085,8 +1201,12 @@ final class UnifiedProviderSystem: ObservableObject {
                 ok = try await AniDBProvider.shared.healthCheck()
             case .mangabaka:
                 ok = try await MangaBakaProvider.shared.healthCheck()
-            case .animeschedule:
-                ok = try await AnimeScheduleProvider.shared.healthCheck()
+            case .jikan:
+                // Real request with measured latency — the Jikan leg is
+                // tested against the /schedules timetable it serves.
+                let entries = try await ScheduleFallbackService.shared.jikanSchedule(from: Int(Date().timeIntervalSince1970),
+                                                                                     to: Int(Date().timeIntervalSince1970) + 7 * 86_400)
+                ok = !entries.isEmpty
             }
             let latency = Int(Date().timeIntervalSince(started) * 1000)
             let result = ProviderTestResult(

@@ -155,7 +155,68 @@ final class DiscoveryService {
         return id
     }
 
-    // MARK: - Surprise Me (genre-first randomizer)
+    // MARK: - Genre pool cache (Batch 27 — instant Surprise Me)
+    //
+    // One in-memory pool per genre (30-minute TTL), franchise-normalized
+    // so a pool never contains two seasons of the same show. Warmed at
+    // app launch in the background and re-used by every Surprise Me
+    // press: a warm pool answers with ZERO network — the button feels
+    // instant. Cold pools load through the discovery chain (which has
+    // its own disk cache) — one request, then warm.
+    private var genrePools: [String: (items: [Media], fetchedAt: Date)] = [:]
+    private var poolInFlight: [String: Task<[Media]?, Never>] = [:]
+    private let genrePoolTTL: TimeInterval = 30 * 60
+
+    /// The franchise-normalized pool for one genre — warm cache first,
+    /// one chain request (deduped) on a miss. nil only when the genre
+    /// genuinely can't be served by any provider.
+    func pool(for genre: DiscoveryGenre) async -> [Media]? {
+        if let cached = genrePools[genre.slug],
+           Date().timeIntervalSince(cached.fetchedAt) < genrePoolTTL,
+           !cached.items.isEmpty {
+            return cached.items
+        }
+        if let running = poolInFlight[genre.slug] {
+            return await running.value
+        }
+        let slug = genre.slug
+        let task = Task<[Media]?, Never> { [weak self] in
+            guard let list = try? await UnifiedProviderSystem.shared.browse(genre: genre, page: 1),
+                  !list.isEmpty else { return nil }
+            let normalized = MediaNormalizer.franchiseBasePool(from: list)
+            await MainActor.run {
+                self?.genrePools[slug] = (normalized, Date())
+            }
+            return normalized
+        }
+        poolInFlight[slug] = task
+        let result = await task.value
+        poolInFlight[slug] = nil
+        return result
+    }
+
+    /// Background launch warm-up: fills every genre pool (bounded
+    /// concurrency — 4 at a time) so the first Surprise Me press of the
+    /// session is already instant. Also warms the shared browse cache the
+    /// Home genre shelves read from.
+    func warmGenrePools() async {
+        let genres = DiscoveryGenre.catalog
+        var iterator = genres.makeIterator()
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<4 {
+                guard let genre = iterator.next() else { break }
+                group.addTask { _ = await self.pool(for: genre) }
+            }
+            while await group.next() != nil {
+                if Task.isCancelled { break }
+                if let genre = iterator.next() {
+                    group.addTask { _ = await self.pool(for: genre) }
+                }
+            }
+        }
+    }
+
+    // MARK: - Surprise Me (genre-first randomizer, instant)
 
     /// Result of one Surprise Me press: the genre that was selected and
     /// the anime drawn from it.
@@ -164,17 +225,19 @@ final class DiscoveryService {
         let media: Media
     }
 
-    /// The genre-based randomizer. Random GENRE first (from the live
-    /// taxonomy), then a random ANIME that genuinely belongs to that genre
-    /// (the discovery database answers membership — never a popularity
-    /// chart). `excluding` carries the uniqueIds already shown this
-    /// session so presses don't repeat.
-    ///
-    /// Fallback honesty: the genre query runs through the discovery
-    /// chain, so a failed primary database automatically hands over to the
-    /// configured fallback provider. If a chosen genre comes back empty
-    /// (possible for strict taxonomies), the next random genre is tried —
-    /// up to six genres per press before the honest nil.
+    /// THE FAST FLOW (Batch 27):
+    ///   1. Select a random valid genre.
+    ///   2. Get that genre's small pool from the WARM in-memory cache
+    ///      (pre-warmed at launch; a cold pool costs ONE chain request
+    ///      through the disk-cached discovery chain — never hundreds of
+    ///      anime, never every season, never full details).
+    ///   3. Randomly select ONE anime — franchise-normalized, so a pool
+    ///      never holds a sequel when the base show exists.
+    ///   4. Navigate immediately with the preloaded Media (the detail
+    ///      page renders from it instantly; richer metadata resolves
+    ///      AFTER the page is on screen).
+    /// No trending lists, no episode fetches, no waiting on providers
+    /// that aren't needed for the pick itself.
     func randomAnime(excluding: Set<String>) async -> SurprisePick? {
         var genres = DiscoveryGenre.catalog.shuffled()
         // Prefer genres that haven't been picked yet this session.
@@ -186,18 +249,18 @@ final class DiscoveryService {
             return false
         }
         for genre in genres.prefix(6) {
-            guard let list = try? await UnifiedProviderSystem.shared.browse(genre: genre, page: 1),
-                  !list.isEmpty else { continue }
-            let candidates = list.filter { !excluding.contains($0.uniqueId) }
-            let pool = candidates.isEmpty ? list : candidates
-            guard let pick = pool.randomElement() else { continue }
+            guard let pool = await pool(for: genre), !pool.isEmpty else { continue }
+            let fresh = pool.filter { !excluding.contains($0.uniqueId) }
+            let candidates = fresh.isEmpty ? pool : fresh
+            guard let pick = candidates.randomElement() else { continue }
             rememberGenre(genre.slug)
             return SurprisePick(genre: genre, media: pick)
         }
         return nil
     }
 
-    /// Manga variant — same genre-first flow over the manga genre chain.
+    /// Manga variant — same instant genre-first flow over the manga
+    /// genre chain (franchise-normalized the same way).
     func randomManga(excluding: Set<String>) async -> SurprisePick? {
         var genres = DiscoveryGenre.catalog.shuffled()
         let recent = UserDefaults.standard.stringArray(forKey: "surprise.recentMangaGenres") ?? []
@@ -210,16 +273,17 @@ final class DiscoveryService {
         for genre in genres.prefix(6) {
             guard let list = try? await UnifiedProviderSystem.shared.mangaByGenre(genre: genre, page: 1),
                   !list.isEmpty else { continue }
-            let candidates = list.filter { !excluding.contains($0.uniqueId) }
-            let pool = candidates.isEmpty ? list : candidates
-            guard let pick = pool.randomElement() else { continue }
+            let normalized = MediaNormalizer.franchiseBasePool(from: list)
+            let fresh = normalized.filter { !excluding.contains($0.uniqueId) }
+            let candidates = fresh.isEmpty ? normalized : fresh
+            guard let pick = candidates.randomElement() else { continue }
             rememberGenre(genre.slug, manga: true)
             return SurprisePick(genre: genre, media: pick)
         }
         return nil
     }
 
-    /// Remembers the last few genres so consecutive presses explore
+        /// Remembers the last few genres so consecutive presses explore
     /// different corners of the taxonomy (soft preference, not a rule).
     private func rememberGenre(_ slug: String, manga: Bool = false) {
         let key = manga ? "surprise.recentMangaGenres" : "surprise.recentGenres"

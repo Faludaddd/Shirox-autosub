@@ -7,8 +7,8 @@ import SwiftUI
 // format / status / year / episode-count / rating chips.
 //
 // Design contract (the pill spec):
-// • Slightly larger than the old chips — 13pt semibold text in a 30pt
-//   capsule with 13pt horizontal padding.
+// • Slightly larger again (Batch 27): 14pt semibold text in a 32pt
+//   capsule with 14pt horizontal padding (was 13pt / 30pt).
 // • The text is centered BOTH horizontally and vertically inside the
 //   pill: the capsule frame fixes the height, fixedSize keeps the
 //   content from being squeezed, and the HStack centers the content.
@@ -51,12 +51,12 @@ struct MetadataPillView: View {
         HStack(spacing: 4) {
             if let icon = pill.icon {
                 Image(systemName: icon)
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(pill.iconColor ?? .primary)
                     .accessibilityHidden(true)
             }
             Text(pill.text)
-                .font(.system(size: 13, weight: pill.isOverflow ? .semibold : .semibold))
+                .font(.system(size: 14, weight: pill.isOverflow ? .semibold : .semibold))
                 .foregroundStyle(pill.isOverflow ? .secondary : .primary)
                 .lineLimit(1)
                 // Emergency guard only — the pill grows with its text; it
@@ -68,7 +68,7 @@ struct MetadataPillView: View {
         // Fixed height + symmetric padding: every pill in a group is
         // exactly the same height and the content is vertically centered.
         .frame(height: height)
-        .padding(.horizontal, 13)
+        .padding(.horizontal, 14)
         .frame(minHeight: height)
         .background(
             Capsule().fill(pill.isOverflow
@@ -104,7 +104,7 @@ struct MetadataPillRow: View {
     let pills: [MetadataPill]
     /// Fixed capsule height (consistent within a row by construction —
     /// every pill in the row gets this height).
-    var height: CGFloat = 30
+    var height: CGFloat = 32
     /// Group alignment inside the row. `.center` (default) centers the
     /// whole group; `.leading` keeps detail-page sections flush with
     /// their headers.

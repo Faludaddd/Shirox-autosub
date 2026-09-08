@@ -7,6 +7,10 @@ struct HomeView: View {
     @ObservedObject private var appMode = AppModeManager.shared
     @ObservedObject private var anilistAuth = AniListAuthManager.shared
     @StateObject private var profileVM = ProfileViewModel()
+    /// Batch 27 — the Apple/Shirox presentation switch. SHIROX = the
+    /// custom streaming design (restored original hero/sections);
+    /// APPLE = the standard native iOS presentation of the SAME data.
+    @ObservedObject private var designMode = UIDesignModeManager.shared
     @State private var cwNavTarget: ContinueWatchingNavTarget?
     @State private var readerContext: ReaderContext?
     @State private var navigateToNotifications = false
@@ -45,13 +49,15 @@ struct HomeView: View {
                     animeHomeContent
                 }
             }
-            // No title bar in Reading Mode — the manga home uses the same
-            // transparent, full-bleed layout as the anime home. The
-            // mode-toggle icon in the toolbar is the only chrome.
-            .navigationTitle("")
+            // Batch 27 — the chrome follows the UI mode:
+            //   SHIROX → transparent, full-bleed, no title (the custom
+            //            streaming look — the mode icon is the only chrome)
+            //   APPLE  → the standard navigation bar with a real title
+            //            (native presentation, native materials)
+            .navigationTitle(designMode.isApple && appMode.mode == .anime ? "Discover" : "")
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            .modifier(TransparentNavBarModifier())
+            .navigationBarTitleDisplayMode(designMode.isApple ? .large : .inline)
+            .modifier(DesignModeNavBarModifier())
             .toolbar {
                 // Mode-toggle icon — the ONLY way to switch between Anime and
                 // Reading Mode. No back button. The icon reflects the
@@ -133,10 +139,32 @@ struct HomeView: View {
                     }
                 }
             } else {
-                ScrollView {
+                // Batch 27 — the presentation switch. Both branches show
+                // the SAME features from the same view model; only the
+                // rendering differs (custom vs native).
+                if designMode.isApple {
+                    AppleHomeContent(
+                        vm: vm,
+                        continueWatching: continueWatching,
+                        anilistAuth: anilistAuth,
+                        cwNavTarget: $cwNavTarget,
+                        browseCategoriesGridLayout: $browseCategoriesGridLayout)
+                } else {
+                    shiroxAnimeHomeContent
+                }
+            }
+        }
+    }
+
+    // MARK: - Shirox Anime Home (the custom presentation)
+
+    @ViewBuilder
+    private var shiroxAnimeHomeContent: some View {
+        Group {
+            ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
                         if !vm.trending.isEmpty {
-                            FeaturedCarousel(items: vm.trending)
+                            MediaCarousel(items: vm.trending)
                         }
                         #if os(iOS)
                         if !continueWatching.items.isEmpty {
@@ -206,7 +234,6 @@ struct HomeView: View {
                 .ignoresSafeArea(edges: .top)
             }
         }
-    }
 
     // MARK: - Browse Categories Grid (#120 correction)
     //
@@ -309,817 +336,6 @@ struct HomeView: View {
     }
 }
 
-// MARK: - Featured Carousel (full width, indicator below)
-
-struct FeaturedCarousel: View {
-    let items: [Media]
-    /// `true` when the carousel is being shown in Reading Mode. Drives the
-    /// action button label ("Read" vs "Watch") and the navigation destination
-    /// (`AniListMangaDetailView` vs `AniListDetailView`) so the carousel's
-    /// wording and behavior always match the active mode.
-    var isManga: Bool = false
-    // `selectedTab` starts in the *middle* rotation of a `displayCount * 3`
-    // page window so the user can swipe freely in both directions. A bounded
-    // window (previously 2000) keeps the TabView cheap; an edge-reset in
-    // `onChange(of: selectedTab)` silently bounces the selection back to the
-    // middle rotation when the user swipes into the first/last rotation, so the
-    // carousel still *feels* infinite without materialising thousands of pages.
-    @State private var selectedTab = 0
-    @State private var containerWidth: CGFloat = 0
-    @State private var stretchAmount: CGFloat = 0
-    @State private var hasInteracted = false
-    @State private var didSetup = false
-    @Environment(\.horizontalSizeClass) private var sizeClass
-
-    private var realItems: [Media] {
-        // Filter out short films, specials, and other obscure content that
-        // shouldn't appear in the featured carousel. Only include TV series
-        // and movies with meaningful popularity scores.
-        items.filter { media in
-            // Exclude titles with "Short Film" or "Short" in the name
-            let title = media.title.displayTitle.lowercased()
-            if title.contains("short film") || title.contains("short movie") { return false }
-            // Exclude MUSIC format
-            if let format = media.format, format == "MUSIC" { return false }
-            // Exclude titles with very low popularity (likely obscure)
-            if let pop = media.popularity, pop < 1000 { return false }
-            // v2.20 — donghua filter. AniList's trending mix includes Chinese
-            // animation (e.g. "Renegade Immortal") and other non-Japanese
-            // entries; the featured carousel is for the app's Japanese-anime
-            // catalog, so anything with a known non-JP country of origin is
-            // dropped. Titles with no country data pass through (the field is
-            // new to the trending query — old cached entries decode it as nil).
-            if let country = media.countryOfOrigin, country != "JP" { return false }
-            // v2.20 — validity: every carousel slide needs a displayable title
-            // and at least one artwork URL, or the banner/logo pipelines have
-            // nothing to work with and the slide renders as a blank hero.
-            if media.title.displayTitle.isEmpty || media.title.displayTitle == "Unknown" { return false }
-            if (media.coverImage.best ?? media.bannerImage) == nil { return false }
-            return true
-        }.prefix(8).map { $0 }
-    }
-    private var displayCount: Int { realItems.count }
-
-    /// Three rotations of `displayCount` — enough headroom in both swipe
-    /// directions for the edge-reset to fire before the user ever sees a hard
-    /// stop. Falls back to a single rotation when there's only one item.
-    private var pageCount: Int { max(displayCount * 3, displayCount) }
-
-    private var currentIndex: Int {
-        guard displayCount > 0 else { return 0 }
-        return selectedTab % displayCount
-    }
-
-    private var platformBackground: Color {
-        #if os(iOS)
-        Color(UIColor.systemBackground)
-        #elseif os(tvOS)
-        Color.clear
-        #else
-        Color(NSColor.windowBackgroundColor)
-        #endif
-    }
-
-    var body: some View {
-        #if os(iOS) && !targetEnvironment(macCatalyst)
-        let isIPad = sizeClass == .regular
-        let effectiveWidth = containerWidth > 0 ? containerWidth : UIScreen.main.bounds.width
-        let imageHeight: CGFloat = isIPad
-            ? effectiveWidth * (9.0 / 16.0)
-            : UIScreen.main.bounds.height - 140
-
-        let displayItems = realItems
-        // `displayItems` is `items.prefix(8)`, so it is empty exactly when `items` is — the old
-        // `displayItems.isEmpty ? items[0] : …` indexed the empty array in precisely the case it
-        // was guarding against. SwiftUI can still evaluate this body once with an emptied
-        // `items` while the parent's `if !vm.trending.isEmpty` is being torn down, which crashed
-        // the Home tab whenever trending went from populated to empty (failed refresh, offline).
-        let currentMedia = displayItems.indices.contains(currentIndex) ? displayItems[currentIndex] : nil
-
-        VStack(spacing: 0) {
-            ZStack {
-                // Pull-down sensor: sibling of TabView so re-evaluation never cascades into
-                // TabView layout. Preference fires max(0,scrollY); stretchAmount only changes
-                // when the user is pulling down — stable (= 0) during normal scroll and swipes.
-                GeometryReader { proxy in
-                    Color.clear.preference(key: CarouselStretchKey.self,
-                                           value: max(0, proxy.frame(in: .named("homeScroll")).minY))
-                }
-
-                // iPad fanart background behind the cards (tvdbFirstPaint: the
-                // ambient backdrop holds the loading tint rather than provider
-                // art while TVDB resolves — same TVDB-first policy as the cards).
-                if isIPad, !displayItems.isEmpty {
-                    TVDBPosterImage(media: displayItems[currentIndex], type: .fanart, tvdbFirstPaint: true)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-
-                // TabView: completely stable — fixed height, zero scroll dependency.
-                // Images live inside FeaturedCard so they move naturally with swipe gestures.
-                // The page count is `displayCount * 3` (bounded, was 2000) — see
-                // `pageCount` / the edge-reset in `onChange(of: selectedTab)` for how
-                // the infinite-wrap illusion is preserved with far fewer materialised pages.
-                TabView(selection: $selectedTab) {
-                    ForEach(0..<pageCount, id: \.self) { index in
-                        if !displayItems.isEmpty {
-                            // `.equatable()` is applied directly to `FeaturedCard`
-                            // (which conforms to Equatable) so the wrapper can
-                            // short-circuit body re-evaluation; `.tag` is applied
-                            // *after* so TabView selection always propagates.
-                            FeaturedCard(media: displayItems[index % displayCount], isWide: isIPad)
-                                .equatable()
-                                .allowsHitTesting(false)
-                                .tag(index)
-                        }
-                    }
-                }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-                .frame(maxWidth: .infinity)
-                .frame(height: imageHeight)
-            }
-            .frame(height: imageHeight)
-            // Elastic stretch: render-only transforms — layout size never changes so
-            // UIScrollView's bounce is never disrupted.
-            // scaleEffect grows the image from the top anchor.
-            // offset cancels the bounce displacement so the top edge stays pinned at screen y=0.
-            .scaleEffect(1 + stretchAmount / imageHeight, anchor: .top)
-            .offset(y: -stretchAmount)
-            .onPreferenceChange(CarouselStretchKey.self) { y in stretchAmount = y }
-            .background(
-                GeometryReader { geo in
-                    Color.clear
-                        .onAppear { containerWidth = geo.size.width }
-                        .onChangeOf(geo.size.width) { w in containerWidth = w }
-                }
-            )
-            .mask(alignment: .bottom) { Rectangle().frame(height: imageHeight + 2000) }
-            .background {
-                // Hidden preloader — triggers image fetch for all items into NSCache
-                ForEach(displayItems.indices, id: \.self) { i in
-                    TVDBPosterImage(media: displayItems[i], type: .fanart, tvdbFirstPaint: true)
-                        .frame(width: 1, height: 1)
-                        .opacity(0)
-                        .allowsHitTesting(false)
-                    TVDBPosterImage(media: displayItems[i], type: .poster, tvdbFirstPaint: true)
-                        .frame(width: 1, height: 1)
-                        .opacity(0)
-                        .allowsHitTesting(false)
-                    // v2.19 — logo prefetch: resolves each title's TVDB clearlogo
-                    // (sharing the poster/fanart fetch above via the service's
-                    // in-flight dedup) and warms Kingfisher, so the visible logo
-                    // paints the instant its page becomes current.
-                    CarouselLogoPrefetcher(media: displayItems[i])
-                        .frame(width: 1, height: 1)
-                        .opacity(0)
-                        .allowsHitTesting(false)
-                }
-            }
-            .overlay(alignment: .bottom) {
-                ZStack(alignment: .bottom) {
-                    LinearGradient(
-                        stops: [
-                            .init(color: .clear, location: 0),
-                            .init(color: platformBackground.opacity(0.5), location: 0.38),
-                            .init(color: platformBackground.opacity(0.88), location: 0.68),
-                            .init(color: platformBackground, location: 1.0)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(height: 360)
-                    .allowsHitTesting(false)
-
-                    if let currentMedia {
-                        // v2.19 — the plain title text is replaced by the TVDB
-                        // transparent clearlogo (CarouselTitleLogo below), anchored
-                        // in the banner's bottom-left area like official streaming
-                        // heroes, so the stack is leading-aligned. Everything else
-                        // about the overlay — gradient, spacing, paddings, genre
-                        // capsules, button, hint, animations — is unchanged.
-                        VStack(alignment: .leading, spacing: 10) {
-                            CarouselTitleLogo(media: currentMedia, isWide: isIPad, isManga: isManga)
-
-                            // v2.23 — Meta chips (rating / year / format) +
-                            // genre pills, both in fixed-height reserved rows
-                            // so the Start Watching button below NEVER shifts
-                            // between slides (v2.20's position-stability
-                            // guarantee, preserved). The pills show the anime's
-                            // REAL metadata — up to 6 genres with a "+N"
-                            // overflow chip when the list is longer, in a
-                            // horizontally scrollable row that never runs
-                            // off-screen.
-                            carouselMetaRow(currentMedia)
-                            carouselGenreRow(currentMedia)
-                            // Batch 26 — the manga hero ALSO shows a two-line
-                            // synopsis from the same object (the anime hero
-                            // relies on its logo + artwork; text titles on
-                            // manga slides carry the discovery context).
-                            if isManga, let desc = currentMedia.plainDescription, !desc.isEmpty {
-                                Text(desc)
-                                    .font(.footnote)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(2)
-                                    .multilineTextAlignment(.leading)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.horizontal, 4)
-                            }
-
-                            // v2.23 — Start Watching is CENTERED in the
-                            // carousel content again (it went left-aligned
-                            // with v2.19's bottom-left logo anchor). It sits
-                            // in its own centering container so it never
-                            // shifts with title length, poster size, or
-                            // screen size — the same spot on every slide.
-                            VStack(spacing: 10) {
-                                NavigationLink {
-                                    if isManga {
-                                        AniListMangaDetailView(mediaId: currentMedia.id, preloadedMedia: currentMedia)
-                                    } else {
-                                        AniListDetailView(mediaId: currentMedia.id, preloadedMedia: currentMedia)
-                                    }
-                                } label: {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: isManga ? "book.fill" : "play.fill").font(.caption.weight(.bold))
-                                        Text(isManga ? "Start Reading" : "Start Watching")
-                                            .font(.subheadline.weight(.semibold))
-                                            .lineLimit(1)
-                                            .minimumScaleFactor(0.7)
-                                    }
-                                    .foregroundStyle(.primary)
-                                    .frame(height: 38)
-                                    .padding(.horizontal, 16)
-                                    .background(.ultraThinMaterial, in: Capsule())
-                                    .overlay(Capsule().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
-                                }
-                                .buttonStyle(.plain)
-
-                                // "Slide to browse" hint — fades out after the first swipe.
-                                if !hasInteracted {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: "chevron.compact.left")
-                                            .font(.subheadline.weight(.bold))
-                                        Text("Slide to browse")
-                                            .font(.caption.weight(.semibold))
-                                        Image(systemName: "chevron.compact.right")
-                                            .font(.subheadline.weight(.bold))
-                                    }
-                                    .foregroundStyle(.secondary)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 6)
-                                    .background(.ultraThinMaterial, in: Capsule())
-                                    .overlay(Capsule().strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
-                                    .transition(.opacity.combined(with: .move(edge: .bottom)))
-                                }
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 18)
-                        .animation(.easeOut(duration: 0.35), value: hasInteracted)
-                    }
-                }
-            }
-
-            PageIndicator(numberOfPages: displayCount, currentPage: currentIndex)
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.vertical, 10)
-        }
-        .onAppear {
-            if displayCount > 0 {
-                // Start in the middle rotation so the user can swipe in both
-                // directions before the edge-reset kicks in.
-                selectedTab = displayCount
-            }
-            // Defer enabling the swipe detector until the next runloop tick so
-            // the initial `selectedTab` assignment above (which shifts from 0
-            // to `displayCount`) isn't mistaken for a user swipe and instantly
-            // dismiss the hint.
-            DispatchQueue.main.async { didSetup = true }
-        }
-        .onChange(of: selectedTab) { _ in
-            guard didSetup else { return }
-            // First swipe dismisses the "Slide to browse" hint.
-            if !hasInteracted { hasInteracted = true }
-            // Infinite-wrap edge reset: when the user swipes into the first or
-            // last rotation of the `displayCount * 3` window, silently jump
-            // back to the equivalent slot in the middle rotation. Dispatched
-            // async with animations disabled so the reset is invisible — the
-            // visual page (`selectedTab % displayCount`) is unchanged, so no
-            // content shifts. This is what lets a bounded TabView feel infinite.
-            guard displayCount > 1 else { return }
-            if selectedTab < displayCount || selectedTab >= displayCount * 2 {
-                let middleSlot = displayCount + (selectedTab % displayCount)
-                guard selectedTab != middleSlot else { return }
-                DispatchQueue.main.async {
-                    var transaction = Transaction()
-                    transaction.disablesAnimations = true
-                    withTransaction(transaction) { selectedTab = middleSlot }
-                }
-            }
-        }
-        #elseif !os(tvOS)
-        MacFeaturedCarousel(items: realItems)
-        #endif
-    }
-
-    // MARK: - v2.23 carousel info rows (Batch 26: the shared pill row)
-    //
-    // Both rows are FIXED-HEIGHT so every slide lays out identically —
-    // the Start Watching button and the hint sit in the exact same spot
-    // no matter what metadata the current anime carries. All values come
-    // from the current Media object — image, logo, pills, rating, and
-    // button all describe the SAME slide (one canonical object per
-    // slide; never a mix of fields from different anime).
-
-    /// Rating / format / year / episode chips — the shared
-    /// MetadataPillRow (larger pills, centered text, consistent height),
-    /// driven by the SAME media object as the slide's poster and logo.
-    @ViewBuilder
-    private func carouselMetaRow(_ media: Media) -> some View {
-        MetadataPillRow(
-            pills: isManga
-                ? MetadataPillRowBuilder.mangaMetaPills(for: media)
-                : MetadataPillRowBuilder.animeMetaPills(for: media),
-            height: 24,
-            alignment: .center,
-            edgeFades: false,
-            allowsHitTesting: false,
-            spacing: 6)
-    }
-
-    /// Genre pills — up to 6 real genres (from the discovery database's
-    /// own category metadata on the same Media) with an honest "+N"
-    /// overflow chip. Batch 26: the shared pill component — larger,
-    /// centered text, and the ENTIRE GROUP centered within the carousel's
-    /// content area (the row centers when the pills fit and scrolls when
-    /// they genuinely overflow; never shrunk, clipped or overlapping).
-    @ViewBuilder
-    private func carouselGenreRow(_ media: Media) -> some View {
-        MetadataPillRow(
-            pills: isManga
-                ? MetadataPillRowBuilder.mangaGenrePills(for: media)
-                : MetadataPillRowBuilder.animeGenrePills(for: media),
-            height: 30,
-            alignment: .center,
-            edgeFades: true,
-            allowsHitTesting: false,
-            spacing: 8)
-    }
-}
-
-// MARK: - macOS Featured Carousel (lightweight, no TabView with 2000 items)
-
-#if os(macOS) || targetEnvironment(macCatalyst)
-private struct MacFeaturedCarousel: View {
-    let items: [Media]
-    @State private var currentIndex = 0
-    @State private var timer: Timer?
-
-    private var displayItems: [Media] { Array(items.prefix(8)) }
-
-    private var platformBackground: Color {
-        #if os(iOS)
-        Color(UIColor.systemBackground)
-        #else
-        Color(NSColor.windowBackgroundColor)
-        #endif
-    }
-
-    var body: some View {
-        GeometryReader { geo in
-            let cardHeight = geo.size.width * (9.0 / 16.0)
-            ZStack(alignment: .bottom) {
-                if !displayItems.isEmpty {
-                    let media = displayItems[currentIndex]
-                    ZStack(alignment: .bottomLeading) {
-                        // Banner background
-                        Group {
-                            if let bannerUrl = media.bannerImage {
-                                CachedAsyncImage(urlString: bannerUrl)
-                            } else {
-                                LinearGradient(
-                                    colors: [Color.gray.opacity(0.6), Color.gray.opacity(0.3)],
-                                    startPoint: .top, endPoint: .bottom
-                                )
-                            }
-                        }
-                        .frame(width: geo.size.width, height: cardHeight)
-                        .clipped()
-
-                        // Gradient overlay
-                        LinearGradient(
-                            colors: [.clear, .black.opacity(0.6), .black.opacity(0.95)],
-                            startPoint: .top, endPoint: .bottom
-                        )
-                        .frame(width: geo.size.width, height: cardHeight)
-
-                        // Cover + text + watch button
-                        HStack(alignment: .bottom, spacing: 12) {
-                            CachedAsyncImage(urlString: media.coverImage.best ?? "")
-                                .frame(width: 80, height: 120)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                                .shadow(radius: 4)
-
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(media.title.displayTitle)
-                                    .font(.title2).fontWeight(.bold)
-                                    .foregroundStyle(.white)
-                                    .lineLimit(2)
-
-                                if let desc = media.plainDescription, !desc.isEmpty {
-                                    Text(desc)
-                                        .font(.caption)
-                                        .foregroundStyle(.white.opacity(0.8))
-                                        .lineLimit(2)
-                                }
-
-                                HStack(spacing: 8) {
-                                    if let score = media.averageScore {
-                                        Label(score.averageScoreOutOf10, systemImage: "star.fill")
-                                            .font(.caption.weight(.semibold))
-                                            .foregroundStyle(.yellow)
-                                            .lineLimit(1)
-                                            .fixedSize(horizontal: true, vertical: false)
-                                    }
-                                    if let genres = media.genres, !genres.isEmpty {
-                                        ForEach(genres.prefix(2), id: \.self) { genre in
-                                            Text(genre)
-                                                .font(.caption2.weight(.medium))
-                                                .foregroundStyle(.white)
-                                                .padding(.horizontal, 7)
-                                                .padding(.vertical, 3)
-                                                .background(Color.white.opacity(0.15), in: Capsule())
-                                                .lineLimit(1)
-                                                .fixedSize(horizontal: true, vertical: false)
-                                        }
-                                    }
-                                }
-
-                                NavigationLink {
-                                    if isManga {
-                                        AniListMangaDetailView(mediaId: media.id, preloadedMedia: media)
-                                    } else {
-                                        AniListDetailView(mediaId: media.id, preloadedMedia: media)
-                                    }
-                                } label: {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: isManga ? "book.fill" : "play.fill").font(.footnote.weight(.semibold))
-                                        Text(isManga ? "Start Reading" : "Start Watching").fontWeight(.semibold)
-                                            .lineLimit(1)
-                                    }
-                                    .foregroundStyle(platformBackground)
-                                    .frame(height: 36)
-                                    .padding(.horizontal, 14)
-                                    .background(Color.primary, in: RoundedRectangle(cornerRadius: 10))
-                                }
-                                .buttonStyle(.plain)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .padding(.leading, 16)
-                        .padding(.trailing, 16)
-                        .padding(.bottom, 14)
-                    }
-                    .frame(width: geo.size.width, height: cardHeight)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .transition(.opacity)
-                    .id(currentIndex)
-                }
-
-                PageIndicator(numberOfPages: displayItems.count, currentPage: currentIndex)
-                    .padding(.bottom, 6)
-            }
-            .frame(width: geo.size.width, height: cardHeight)
-        }
-        .frame(maxWidth: .infinity)
-        .aspectRatio(16/9, contentMode: .fit)
-        .onAppear { startTimer() }
-        .onDisappear { stopTimer() }
-    }
-
-    private func startTimer() {
-        guard displayItems.count > 1 else { return }
-        timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
-            withAnimation(.easeInOut(duration: 0.4)) {
-                currentIndex = (currentIndex + 1) % displayItems.count
-            }
-        }
-    }
-
-    private func stopTimer() {
-        timer?.invalidate()
-        timer = nil
-    }
-}
-#endif
-
-// MARK: - Page Indicator (animated pill style)
-
-private struct PageIndicator: View {
-    let numberOfPages: Int
-    let currentPage: Int
-
-    var body: some View {
-        HStack(spacing: 4) {
-            ForEach(0..<numberOfPages, id: \.self) { index in
-                Capsule()
-                    .fill(index == currentPage ? Color.primary : Color.primary.opacity(0.25))
-                    .frame(width: index == currentPage ? 20 : 5, height: 5)
-                    .animation(.easeInOut(duration: 0.25), value: currentPage)
-            }
-        }
-    }
-}
-
-// MARK: - Carousel Title Logo (v2.19, Batch 23 item 5; Batch 26 manga title)
-//
-// The featured carousel's title slot. ANIME: the title's official
-// TRANSPARENT artwork from TheTVDB — the series clearlogo (artwork type
-// 23) when present, else clearart (type 22), English entries ranked
-// first by the service (see `TVDBMappingService.getLogoCandidates`).
-// Rendering rules: transparency, aspect ratio, and original appearance
-// preserved exactly (scaledToFit — never cropped or stretched), and no
-// border, background, or shadow is ever added.
-//
-// MANGA (Batch 26): TVDB has no manga records — a logo can never resolve,
-// so the logo-only rule left the manga carousel with NO title at all.
-// The manga slot now shows the REAL title text (same object as cover,
-// synopsis, pills and Read button): bold, large, drop-shadowed for
-// legibility over any artwork, instant (no async step — no flicker).
-//
-// Batch 23 (item 5) — LOGO ONLY for anime: the old text-title fallback
-// is gone there (the text↔logo alternation was the flicker bug); the
-// fixed-height slot keeps the layout below rock-stable in both modes.
-// Responsive sizing: 336x90pt on a compact banner, 448x118pt on a regular
-// (iPad) banner.
-private struct CarouselTitleLogo: View {
-    let media: Media
-    /// iPad (regular width) gets the larger, streaming-hero-scale logo box.
-    var isWide: Bool = false
-    /// Batch 26 — manga carousels show the real title TEXT (TVDB logos
-    /// don't exist for manga; the logo-only rule blanked the slot).
-    var isManga: Bool = false
-
-    /// `nil` = unresolved, no logo, or the art failed to decode — the slot
-    /// renders EMPTY (never text). Reset at the top of every page change so
-    /// a stale logo never lingers over the new banner while its own
-    /// candidate resolves.
-    @State private var logoURL: String?
-
-    /// v2.21 — ~40% larger logo boxes (user request).
-    private var maxLogoWidth: CGFloat { isWide ? 448 : 336 }
-    private var maxLogoHeight: CGFloat { isWide ? 118 : 90 }
-    /// v2.20 — FIXED slot height, reserved on every slide no matter what
-    /// fills it. The slot is a constant-height container so everything
-    /// below it — genre pills, Start Watching, the hint — can never move.
-    private var slotHeight: CGFloat { maxLogoHeight + 8 }
-
-    var body: some View {
-        Group {
-            if isManga {
-                // The manga title — REAL text from the SAME Media object as
-                // the cover/synopsis/pills/button. Bold and shadowed so it
-                // stays readable over any artwork; sync render (no async
-                // resolution, so no per-swipe flicker).
-                Text(media.title.displayTitle)
-                    .font(.system(size: isWide ? 34 : 28, weight: .heavy))
-                    .foregroundStyle(.white)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.6)
-                    .shadow(color: .black.opacity(0.65), radius: 3, x: 0, y: 1)
-                    .frame(maxWidth: maxLogoWidth, maxHeight: maxLogoHeight, alignment: .bottomLeading)
-                    .transition(.opacity)
-            } else if let logoURL {
-                CachedAsyncImage(urlString: logoURL, contentMode: .fit)
-                    .frame(maxWidth: maxLogoWidth, maxHeight: maxLogoHeight)
-                    // VoiceOver still reads the title — the logo is decorative
-                    // art for the same string.
-                    .accessibilityLabel(media.title.displayTitle)
-                    .transition(.opacity)
-            } else {
-                // No logo (yet or at all) — an empty reserved slot. The
-                // title stays reachable for VoiceOver; sighted users read
-                // the card's real metadata in the rows below.
-                Color.clear
-                    .frame(maxWidth: maxLogoWidth, maxHeight: maxLogoHeight)
-                    .accessibilityLabel(media.title.displayTitle)
-                    .accessibilityHidden(true)
-            }
-        }
-        // THE fixed slot: constant height on every slide, every device size.
-        // Content (logo or nothing) is vertically centered within it; the outer
-        // VStack's leading alignment keeps it anchored bottom-left.
-        .frame(height: slotHeight)
-        // A resolved logo fades in softly; no text-swap animation remains.
-        .animation(.easeInOut(duration: 0.25), value: logoURL)
-        .task(id: media.uniqueId) {
-            // Reset per page: the slot clears instantly (no stale logo over
-            // the new banner), then its own artwork fades in once a
-            // candidate actually decodes. No title-text step in between —
-            // that was the flicker. (Manga skips this entirely.)
-            guard !isManga else { return }
-            logoURL = nil
-            logoURL = await CarouselLogoResolver.bestLogoURL(for: media)
-        }
-    }
-}
-
-/// Invisible offscreen warmer: resolves (and Kingfisher-caches) a title's
-/// best logo so the visible `CarouselTitleLogo` paints the moment its page
-/// becomes current. 1x1, opacity 0, no hit testing — the same trick the
-/// poster/fanart preloader uses.
-private struct CarouselLogoPrefetcher: View {
-    let media: Media
-
-    var body: some View {
-        Color.clear
-            .accessibilityHidden(true)
-            .task(id: media.uniqueId) {
-                _ = await CarouselLogoResolver.bestLogoURL(for: media)
-            }
-    }
-}
-
-/// The candidate walk shared by the visible logo view and the prefetcher:
-/// fetch the ordered TVDB logo candidates, then preload each in turn until
-/// one decodes — that winner is what the carousel shows. A `nil` result (no
-/// TVDB mapping, TVDB has no logo artwork, or every candidate failed to
-/// load) means the caller falls back to plain title text.
-private enum CarouselLogoResolver {
-    @MainActor
-    static func bestLogoURL(for media: Media) async -> String? {
-        let candidates = await TVDBMappingService.shared.getLogoCandidates(for: media.id, provider: media.provider, malId: media.idMal)
-        for url in candidates {
-            if Task.isCancelled { return nil }
-            if await CachedAsyncImage.preload(urlString: url) {
-                return url
-            }
-        }
-        return nil
-    }
-}
-
-// MARK: - Featured Card (platform‑specific layout)
-
-private struct FeaturedCard: View, Equatable {
-    let media: Media
-    var isWide: Bool = false
-
-    private var aspectRatio: CGFloat {
-        #if os(iOS) && !targetEnvironment(macCatalyst)
-        return 2.0 / 3.0
-        #else
-        return 16.0 / 9.0
-        #endif
-    }
-
-    static func == (lhs: FeaturedCard, rhs: FeaturedCard) -> Bool {
-        // `Media.==` is keyed on `uniqueId`, so two cards render identically
-        // whenever they point at the same title + wide flag. Used by
-        // `.equatable()` in the carousel's ForEach to skip diffing the heavy
-        // image/gradient tree on every TabView re-evaluation.
-        lhs.media == rhs.media && lhs.isWide == rhs.isWide
-    }
-
-    var body: some View {
-        Group {
-            #if os(iOS) && !targetEnvironment(macCatalyst)
-            if isWide {
-                // iPad: fanart with horizontal parallax
-                Color.clear
-                    .overlay(
-                        ZStack {
-                            GeometryReader { geo in
-                                let minX = geo.frame(in: .global).minX
-                                let screenW = geo.size.width > 0 ? geo.size.width : 1
-                                let extra: CGFloat = 80
-                                let px = -(extra / 2) - minX * (extra / (2 * screenW))
-                                TVDBPosterImage(media: media, type: .fanart, tvdbFirstPaint: true)
-                                    .frame(width: geo.size.width + extra, height: geo.size.height)
-                                    .offset(x: px)
-                                    .clipped()
-                            }
-                            LinearGradient(
-                                stops: [
-                                    .init(color: .clear, location: 0),
-                                    .init(color: .black.opacity(0.4), location: 0.5),
-                                    .init(color: .black.opacity(0.92), location: 1)
-                                ],
-                                startPoint: .top, endPoint: .bottom
-                            )
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        }
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                // iPhone: portrait with horizontal parallax. TVDB posters (typically
-                // 680×1000 or larger) are higher-resolution than AniList's extraLarge
-                // cover (~460×645), so the carousel paints visibly sharper at full
-                // screen scale; v2.21 makes TVDB the visible source (the poster holds
-                // the loading tint while TVDB resolves instead of painting the
-                // provider's art first — AniList art appears only when TVDB has
-                // nothing for the title). A 100pt buffer rides along so the parallax
-                // swipe reveals image instead of hard edges; centered via -(buffer/2).
-                GeometryReader { geo in
-                    let pageOffset = geo.frame(in: .global).minX
-                    let buffer: CGFloat = 100
-                    TVDBPosterImage(media: media, tvdbFirstPaint: true)
-                        .frame(width: geo.size.width + buffer, height: geo.size.height)
-                        .offset(x: -(buffer / 2) - pageOffset * 0.25)
-                }
-                .clipped()
-            }
-            #else
-            // macOS: banner background + poster overlay
-            Color.clear
-                .aspectRatio(aspectRatio, contentMode: .fit)
-                .overlay(
-                    ZStack(alignment: .bottomLeading) {
-                        bannerBackground
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .clipped()
-
-                        LinearGradient(
-                            colors: [.clear, .black.opacity(0.6), .black.opacity(0.95)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                        CachedAsyncImage(urlString: media.coverImage.best ?? "")
-                            .frame(width: 80, height: 120)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .shadow(radius: 4)
-                            .padding(.leading, 16)
-                            .padding(.bottom, 12)
-
-                        textContent
-                            .padding(.leading, 16 + 80 + 8)
-                            .padding(.trailing, 16)
-                            .padding(.bottom, 12)
-                    }
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-            #endif
-        }
-    }
-
-    // MARK: - Banner Background (macOS only)
-    @ViewBuilder
-    private var bannerBackground: some View {
-        if let bannerUrlString = media.bannerImage {
-            CachedAsyncImage(urlString: bannerUrlString)
-        } else {
-            gradientPlaceholder
-        }
-    }
-
-    // MARK: - Text Content (shared)
-    private var textContent: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(media.title.displayTitle)
-                .font(.title2).fontWeight(.bold)
-                .foregroundStyle(.white)
-                .lineLimit(2)
-
-            if let desc = media.plainDescription, !desc.isEmpty {
-                Text(desc)
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.8))
-                    .lineLimit(2)
-            }
-
-            // Batch 26 — the shared pill row (rating + genres, same
-            // object as the poster/banner above).
-            MetadataPillRow(
-                pills: [MetadataPill.rating(media.averageScore)]
-                    .compactMap { $0 }
-                    + MetadataPillRowBuilder.animeGenrePills(for: media, limit: 2),
-                height: 26,
-                alignment: .leading,
-                edgeFades: false,
-                allowsHitTesting: true,
-                spacing: 6)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    @ViewBuilder
-    private var coverFallback: some View {
-        TVDBPosterImage(media: media)
-    }
-
-    private var gradientPlaceholder: some View {
-        LinearGradient(
-            colors: [Color.gray.opacity(0.6), Color.gray.opacity(0.3)],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-    }
-}
-
 // MARK: - Anime Section
 
 private struct AnimeSection: View {
@@ -1158,9 +374,17 @@ private struct AnimeSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .center) {
-                Text(title)
-                    .font(.title2.weight(.heavy))
-                    .tracking(0.3)
+                // The ORIGINAL ShiroX section header: heavy tracked title
+                // over a short accent underline, with the quiet "See all"
+                // capsule on the trailing edge.
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(title)
+                        .font(.title2.weight(.heavy))
+                        .tracking(0.3)
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color.appAccent.opacity(0.9))
+                        .frame(width: 36, height: 3)
+                }
                 Spacer()
                 NavigationLink {
                     BrowseView(query: query)
@@ -1172,14 +396,10 @@ private struct AnimeSection: View {
                         Image(systemName: "chevron.right")
                             .font(.caption.weight(.semibold))
                     }
-                    .foregroundStyle(.primary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(.ultraThinMaterial, in: Capsule())
-                    .overlay(
-                        Capsule()
-                            .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
-                    )
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.primary.opacity(0.07), in: Capsule())
                 }
                 .buttonStyle(.plain)
             }
@@ -1199,12 +419,6 @@ private struct AnimeSection: View {
     }
 }
 
-// MARK: - Carousel Stretch Preference
-
-private struct CarouselStretchKey: PreferenceKey {
-    nonisolated(unsafe) static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
-}
 
 // MARK: - Anime Section Card (self-contained, per-card gesture isolation)
 //
@@ -1268,18 +482,14 @@ private struct AnimeSectionCard: View {
 
 private struct HomePressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        // Adds a subtle accent-tinted glow while the card is pressed so the
-        // "Selected category grid cards" feel responsive — gated by the user's
-        // global Glow preference (Settings → Appearance → Glow).
-        let glowOn: Bool = configuration.isPressed && Color.glowEnabled
-        return configuration.label
+        // The ORIGINAL press feedback: quick 0.94 scale + slight dim,
+        // easeOut 0.12 (restored — the spring + glow drifted from the
+        // reference design; the glow preference now only feeds the
+        // category grid tiles).
+        configuration.label
             .scaleEffect(configuration.isPressed ? 0.94 : 1.0)
             .opacity(configuration.isPressed ? 0.88 : 1.0)
-            .shadow(
-                color: glowOn ? Color.appAccent.opacity(Color.glowOpacity(0.6)) : .clear,
-                radius: glowOn ? Color.glowRadiusSelection : 0
-            )
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: configuration.isPressed)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 
@@ -2148,14 +1358,18 @@ struct ScheduleView: View {
     /// the preload completed during the 3.5s splash, `ScheduleView` renders
     /// instantly with no spinner.
     ///
-    /// v2.24 — The unified schedule chain: AniChart (AniList's own airing
-    /// chart backend) → AnimeSchedule → MAL (Jikan) → AniList, all through
-    /// the centralized provider system (health-gated, deduped, cached —
+    /// Batch 27 — The unified schedule chain: AniChart → MAL → AniList →
+    /// Jikan, then the Kitsu+TVDB synthesized timetable — all through the
+    /// centralized provider system (health-gated, merge-partial, cached —
     /// every screen shares one request). The disk snapshot of the last
     /// good schedule (≤ 48h) is the final fallback. The page only shows
     /// the error state when EVERY source failed; while a backup source
     /// serves data a slim notice explains where it came from. Successful
     /// loads (any source) refresh the snapshot.
+    ///
+    /// STALE-WHILE-REFRESH (Batch 27): a fresh-enough disk snapshot
+    /// renders IMMEDIATELY (no spinner) while the live chain refreshes in
+    /// the background — the UI never blocks on data it already has.
     private func load() async {
         isLoading = true
         loadError = nil
@@ -2173,7 +1387,7 @@ struct ScheduleView: View {
 
         var fetched: [UnifiedScheduleEntry] = []
         // Batch 23 — distinguishes "a LIVE backup provider served the page"
-        // (MAL/AniList/AnimeSchedule — fresh, real data worth persisting)
+        // (MAL/AniList/Jikan — fresh, real data worth persisting)
         // from "the DISK snapshot itself served the page" (re-saving it
         // would just re-stamp stale data as fresh). The old flag conflated
         // the two: when MAL served as backup nothing was persisted, so the
@@ -2181,35 +1395,48 @@ struct ScheduleView: View {
         // the hard error wall with real data nowhere to be found.
         var servedFromDiskSnapshot = false
 
-        // ── The unified provider chain (AniChart → AnimeSchedule → MAL →
-        //    AniList), with the AniList in-memory cache checked first so a
-        //    completed splash preload still renders instantly. ──────────
+        // ── Stale-while-refresh (Batch 27): render a fresh-enough disk
+        //    snapshot INSTANTLY, then refresh from the live chain in the
+        //    background — the UI never blocks on data it already has.
+        //    (The 3s "too fresh to re-fetch" guard keeps pull-to-refresh
+        //    and the live refresh from double-firing.)
         if let cached = AniListService.shared.cachedAiringSchedules(from: startTs, to: endTs) {
             fetched = cached.map { UnifiedScheduleEntry(item: $0) }
         } else {
+            if let snapshot = ScheduleFallbackService.shared.cachedSnapshot(from: startTs, to: endTs) {
+                // Instant render from the snapshot; the live refresh
+                // continues below and replaces it when real data lands.
+                fetched = snapshot.entries
+                let f = RelativeDateTimeFormatter()
+                sourceNotice = "Showing the schedule saved \(f.localizedString(for: snapshot.storedAt, relativeTo: Date())) ago — refreshing…"
+            }
             do {
                 let result = try await UnifiedProviderSystem.shared.scheduleEntries(from: startTs, to: endTs)
                 fetched = result.entries
+                sourceNotice = nil
                 // Honest source notice when a backup (non-primary) source
-                // served the schedule.
+                // served the schedule (Batch 27 chain notices —
+                // AnimeSchedule is gone; Jikan is the real 4th leg).
                 if let source = result.source, source != .anichart {
                     switch source {
-                    case .animeschedule:
-                        sourceNotice = "AniChart is unreachable — showing this week's timetable from AnimeSchedule."
                     case .mal:
-                        sourceNotice = "AniChart and AnimeSchedule are unreachable — showing this week's airing list from MyAnimeList."
+                        sourceNotice = "AniChart is unreachable — showing this week's season chart from MyAnimeList."
                     case .anilist:
                         sourceNotice = "Showing this week's airing schedule from AniList."
+                    case .jikan:
+                        sourceNotice = "AniChart, MAL and AniList are unreachable — showing this week's airing timetable from Jikan."
                     case .kitsu:
-                        sourceNotice = "AniChart, AnimeSchedule, MAL and AniList are all unreachable — showing this week's real air times from Kitsu + TVDB."
+                        sourceNotice = "AniChart, MAL, AniList and Jikan are all unreachable — showing this week's real air times from Kitsu + TVDB."
                     default:
                         break
                     }
                 }
             } catch {
-                Logger.shared.log("[Schedule] provider chain failed (\(error.localizedDescription)) — trying offline snapshot", type: "Provider")
-                // ── Final fallback: disk snapshot of the last good schedule. ─
-                if let cached = ScheduleFallbackService.shared.cachedSnapshot(from: startTs, to: endTs) {
+                Logger.shared.log("[Schedule] provider chain failed (\(error.localizedDescription)) — falling back to the offline snapshot", type: "Provider")
+                // ── Final fallback: the disk snapshot (already served
+                //    instantly above if it existed).
+                if fetched.isEmpty,
+                   let cached = ScheduleFallbackService.shared.cachedSnapshot(from: startTs, to: endTs) {
                     fetched = cached.entries
                     servedFromDiskSnapshot = true
                     let f = RelativeDateTimeFormatter()

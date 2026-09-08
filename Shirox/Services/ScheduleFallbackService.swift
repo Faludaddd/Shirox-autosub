@@ -161,6 +161,108 @@ final class ScheduleFallbackService {
         return byMALId.values.sorted { $0.airingAt < $1.airingAt }
     }
 
+    // MARK: - MAL season chart (Batch 27 — the .mal schedule leg)
+    //
+    // MyAnimeList's SEASON CHART (Jikan /seasons/{year}/{season}) — a
+    // genuinely different endpoint from the /schedules timetable the
+    // .jikan chain leg uses: the two fail and recover independently.
+    // Entries carry broadcast slots, mapped to the window days the same
+    // way /schedules entries are.
+
+    /// Fetches the current season chart from MAL (via Jikan's /seasons
+    /// endpoint) and maps it into unified entries for the window.
+    /// Throws only when every request failed; an empty result means the
+    /// season list had nothing matching the window.
+    func jikanSeasonSchedule(from: Int, to: Int) async throws -> [UnifiedScheduleEntry] {
+        // Pacing (shared limit with the weekday fetches).
+        let elapsed = Date().timeIntervalSince(lastRequestAt)
+        if elapsed < minRequestSpacing {
+            try? await Task.sleep(nanoseconds: UInt64((minRequestSpacing - elapsed) * 1_000_000_000))
+        }
+        lastRequestAt = Date()
+
+        let urls = [
+            URL(string: "https://api.jikan.moe/v4/seasons/now?limit=25&sfw=true"),
+            URL(string: "https://api.jikan.moe/v4/seasons/upcoming?limit=25&sfw=true")
+        ]
+        var raws: [JikanScheduleEntry] = []
+        var lastError: Error?
+        for url in urls.compactMap({ $0 }) {
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 12
+            do {
+                let (data, response) = try await session.data(for: request)
+                guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+                    throw URLError(.badServerResponse)
+                }
+                let root = try JSONDecoder().decode(JikanScheduleRoot.self, from: data)
+                raws.append(contentsOf: root.data ?? [])
+            } catch {
+                lastError = error
+            }
+        }
+        // Every season endpoint failed — this source is down.
+        if raws.isEmpty, let lastError { throw lastError }
+
+        let cal = Calendar.current
+        let tokyo = TimeZone(identifier: "Asia/Tokyo") ?? .current
+        var byMALId: [Int: UnifiedScheduleEntry] = [:]
+        let fromDate = Date(timeIntervalSince1970: TimeInterval(from))
+        let weekdayNames = ["sunday", "monday", "tuesday", "wednesday",
+                            "thursday", "friday", "saturday"]
+
+        for raw in raws {
+            guard let malId = raw.mal_id,
+                  let title = raw.title, !title.isEmpty else { continue }
+            // Broadcast day ("Sundays") + time ("17:00" JST) -> the next
+            // matching weekday inside the window; unknown broadcast -> the
+            // window start day at noon JST.
+            var targetDay = cal.startOfDay(for: fromDate)
+            if let dayName = raw.broadcast?.day?.lowercased(),
+               let idx = weekdayNames.firstIndex(of: dayName) {
+                for _ in 0..<8 {
+                    if cal.component(.weekday, from: targetDay) == idx + 1 { break }
+                    targetDay = cal.date(byAdding: .day, value: 1, to: targetDay) ?? targetDay
+                }
+            }
+            let hourMinute: (Int, Int)
+            if let time = raw.broadcast?.time, let parsed = Self.parseClock(time) {
+                hourMinute = parsed
+            } else {
+                hourMinute = (12, 0)
+            }
+            var comps = cal.dateComponents([.year, .month, .day], from: targetDay)
+            comps.hour = hourMinute.0
+            comps.minute = hourMinute.1
+            comps.timeZone = tokyo
+            guard let airDate = cal.date(from: comps) else { continue }
+            let airingAt = Int(airDate.timeIntervalSince1970)
+            guard airingAt >= from, airingAt <= to else { continue }
+
+            let entryId = 910_000_000 + malId * 1000
+            let popularity = raw.members ?? Int((raw.score ?? 0) * 100)
+            let genres = raw.genres?.compactMap { $0.name }.filter { !$0.isEmpty }
+            let entry = UnifiedScheduleEntry(
+                id: entryId,
+                source: .anime,
+                sourceMediaId: malId,
+                aniListMediaId: IDMappingService.shared.cachedAnilistId(forMALId: malId),
+                title: title,
+                airingAt: airingAt,
+                episode: 0,
+                season: nil,
+                coverImage: raw.images?.jpg?.large_image_url ?? raw.images?.jpg?.image_url,
+                format: raw.type,
+                isStreamingRelease: false,
+                genres: (genres?.isEmpty ?? true) ? nil : genres,
+                popularity: popularity)
+            if byMALId[malId] == nil {
+                byMALId[malId] = entry
+            }
+        }
+        return byMALId.values.sorted { $0.airingAt < $1.airingAt }
+    }
+
     // MARK: - Disk snapshot (last-resort offline cache)
 
     private struct Snapshot: Codable {
@@ -237,7 +339,7 @@ final class ScheduleFallbackService {
         struct JikanImagesBox: Decodable { let jpg: JikanJpgBox? }
         struct JikanJpgBox: Decodable { let large_image_url: String?; let image_url: String? }
         struct JikanGenreLite: Decodable { let name: String? }
-        struct JikanBroadcastBox: Decodable { let time: String? }
+        struct JikanBroadcastBox: Decodable { let time: String?; let day: String? }
     }
 
     private func fetchWeekday(_ weekday: String) async throws -> [JikanScheduleItem] {

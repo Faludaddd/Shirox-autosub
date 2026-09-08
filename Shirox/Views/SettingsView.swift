@@ -981,6 +981,22 @@ struct AppearanceSettingsPage: View {
 
     var body: some View {
         Form {
+            Section {
+                Picker("UI Design", selection: Binding(
+                    get: { UIDesignModeManager.shared.mode },
+                    set: { UIDesignModeManager.shared.mode = $0 })) {
+                    ForEach(UIDesignModeManager.Mode.allCases) { mode in
+                        Text(mode.label).tag(mode)
+                    }
+                }
+                .tint(.appAccent)
+            } header: {
+                Text("UI Design")
+            } footer: {
+                Text(UIDesignModeManager.shared.mode.description)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Section("Theme") {
                 Picker("Appearance", selection: $appearanceMode) {
                     Text("System").tag("system")

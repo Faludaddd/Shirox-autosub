@@ -115,7 +115,7 @@ enum SettingsSearchIndex {
 
         // Sources & Modules
         .init("Sources", aliases: ["anilist account", "mal account", "provider"], category: "Sources", page: .sources, anchor: "sources", icon: "person.crop.circle.badge.checkmark"),
-        .init("Data Sources", aliases: ["provider order", "tvdb", "kitsu", "anidb", "mangabaka", "anichart", "animeschedule", "provider priority", "provider health", "fallback", "test provider", "provider cache"], category: "Data Sources", page: .dataSources, anchor: "dataSources", icon: "server.rack"),
+        .init("Data Sources", aliases: ["provider order", "tvdb", "kitsu", "anidb", "mangabaka", "anichart", "jikan", "provider priority", "provider health", "fallback", "test provider", "provider cache"], category: "Data Sources", page: .dataSources, anchor: "dataSources", icon: "server.rack"),
         .init("Test Provider", aliases: ["provider test", "ping provider", "check provider status"], category: "Data Sources", page: .dataSources, anchor: "dataSources", icon: "bolt.horizontal"),
         .init("Modules", aliases: ["streaming modules", "module list", "installed modules"], category: "Modules", page: .modules, anchor: "modules", icon: "puzzlepiece.extension.fill"),
         .init("Module Store", aliases: ["browse modules", "install module", "cufiy", "sora modules"], category: "Modules", page: .modules, anchor: "moduleStore", icon: "bag.fill"),

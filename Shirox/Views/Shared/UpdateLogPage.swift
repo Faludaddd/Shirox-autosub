@@ -102,13 +102,46 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.29",
+        date: "2026-09-08",
+        added: [
+            "A UI Design switch in Settings \u{2192} Appearance: Shirox (the custom streaming design) or Apple (the genuine native iOS presentation \u{2014} a standard navigation bar with a title, a plain system hero, standard cards and layout conventions). Both modes are the SAME app with the SAME features \u{2014} every shelf, Continue Watching, See All, Surprise Me, context menus and navigation work identically; only the presentation layer changes.",
+            "Official anime LOGO support in the shared model (animeLogo / logoURL / fallbackTitle): the hero resolves the title's real transparent logo artwork through the provider chain, preserves its aspect ratio exactly (never stretched or cropped), bounds it to a fixed slot, keeps it legible on both light and dark backgrounds, and falls back to the title TEXT when no logo exists anywhere \u{2014} never a broken image box.",
+            "Jikan is now a real provider with its own chain position: the final general fallback for the schedule (its weekly timetable), manga (top charts) and anime (search) \u{2014} it activates whenever the providers above it fail, return partial data, or lack a field.",
+            "Genre pools are pre-cached at launch (bounded, in the background): Surprise Me answers from the warm pool with ZERO network requests, and franchise normalization means a pool never contains two seasons of the same show \u{2014} the button is instant again.",
+            "The Schedule page now uses stale-while-refresh: a fresh-enough saved schedule renders immediately while the live chain refreshes in the background \u{2014} the page never blocks on data it already has.",
+            "Character pages gained a 'More from this anime' strip (the real cast of the series you came from, through the same character chain) and their full profile loads through Jikan when AniList is down \u{2014} native names, descriptions and favourites survive outages."
+        ],
+        fixed: [
+            "The Home page is RESTORED to the original Shirox design: the centered hero info stack (pills, title, synopsis), the original Watch button (130\u{d7}42, primary fill, corner radius 12), the original capsule page indicator in the accent color, section headers with the accent underline bar, and the original press feedback \u{2014} all on the current data systems.",
+            "Anime hero titles have their TEXT fallback back: titles with no logo artwork anywhere render as bold, shadowed text instead of a blank slot.",
+            "Every character portrait in the app renders through ONE shared card \u{2014} the same 2:3 aspect ratio, the same 110\u{d7}165 size, the same corner radius and crop behavior on the character strip, detail pages, animeography rows, voice-actor cards and cast strips.",
+            "The schedule chain is rebuilt as a MERGE chain: AniChart \u{2192} MAL (its season chart) \u{2192} AniList \u{2192} Jikan (its weekly timetable) \u{2192} Kitsu+TVDB. A provider returning a partial week no longer discards results \u{2014} valid entries are kept and the next provider tops the page up; a full window still ends the walk after one request.",
+            "Surprise Me never returns a random season of a franchise: pools are franchise-normalized (Season 2, Part II, trailing sequel numerals collapse to the base show).",
+            "Carousel data normalization is structural and shared: every slide is a real object with valid title and artwork, duplicate ids and duplicate franchises collapse, non-Japanese entries drop out of anime rows when the origin is known, and music-video/short-film junk never appears."
+        ],
+        changed: [
+            "ONE carousel system renders both the anime and the manga heroes \u{2014} the same design language, the same navigation controls, the same metadata treatment, correctly adapted per mode (Read button, manga pill vocabulary, real title text).",
+            "The schedule chain's honest source notices reflect the new chain (no removed provider is mentioned).",
+            "Metadata pills are slightly larger again (14pt text in 32pt capsules) and remain perfectly centered as a group."
+        ],
+        improved: [
+            "The manga carousel's pull-down stretch now works (its scroll space is wired, not the anime page's).",
+            "Apple-mode home hero uses the system page-dots TabView with standard materials \u{2014} the native look with zero custom chrome."
+        ],
+        removed: [
+            "AnimeSchedule is gone from the app ENTIRELY \u{2014} provider, models, UI, settings entries, credential row and every reference. The schedule chain needs no account tokens anymore; every remaining schedule source is a public API."
+        ],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "2.28",
         date: "2026-09-08",
         added: [
             "A dedicated DISCOVERY database now decides which anime appear in Trending, Popular, the genre categories, the Home carousel, See All pages and Surprise Me — Kitsu's own trending chart, real season query and genre taxonomy, with AniList and MAL as automatic backups. TVDB stays the metadata primary, resolving artwork and characters for the exact series discovery returns. The chain is configurable in Settings → Data Sources → Discovery.",
             "Genre shelves on Home: Action, Fantasy, Romance, Drama, Comedy and Sci-Fi rows, each backed by the discovery database's real category data. Every row's See All opens its OWN genre page — the row is page 1 of the same query, so the page continues exactly what the row shows.",
             "Characters are back on anime detail pages — and stronger than before. A full fallback chain (TVDB → MAL → AniList → Kitsu) fills the section from whichever source is alive, with cross-provider id resolution so the characters always belong to the same series. Character images, roles, voice actors with languages and photos all render when a source provides them; if every source fails the section shows a clean 'Characters unavailable' state with a retry instead of silently disappearing.",
-            "The Schedule page now survives a total schedule-source outage: when AniChart, AnimeSchedule, MAL and AniList are all unreachable, a new final live source builds this week's REAL timetable from the discovery database's currently-airing list joined with TVDB's actual air dates and broadcast times.",
+            "The Schedule page now survives a total schedule-source outage: when AniChart, MAL and AniList are all unreachable, a new final live source builds this week's REAL timetable from the discovery database's currently-airing list joined with TVDB's actual air dates and broadcast times.",
             "A completely redesigned Data Sources page: a dashboard of four large cards (Anime, Discovery, Manga, Schedule) showing the current primary, live status and full chain, each opening a dedicated priority screen with PRIMARY and FALLBACKS sections, plain-language descriptions, drag-to-reorder, on/off toggles, 'Make Primary', per-provider testing with real response times, a Test-All action and a one-tap reset to the recommended defaults.",
             "The Manga carousel now shows the manga's real title — large, bold and readable over the artwork — plus a short synopsis and metadata pills, all from the same manga object as the cover.",
             "A single shared metadata-pill component now styles every pill surface (both carousels, anime and manga detail pages): larger capsules with perfectly centered text, a centered pill group, consistent height and spacing, and a scrollable row that never clips or shrinks pills to unreadable sizes."
@@ -182,7 +215,7 @@ private let logEntries: [UpdateLogEntry] = [
         added: [
             "A subtitle style switch — choose between Apple's default subtitle look and Shirox's custom styling. Find it in the player's subtitle menu and in Settings → Subtitles; the choice sticks across restarts. Apple mode renders embedded subtitles with the system's native appearance and gives external subtitle files the same clean default look; Shirox mode is the full custom styler you already know, with every appearance setting applying as before.",
             "Manga Home now survives full outages the same way anime Home does: when every manga source is unreachable, the last successfully loaded shelves (kept up to 6 hours) come back with a clear note about their age instead of a blank error page. Pull to refresh retries the live sources.",
-            "Each provider on the Data Sources page now shows a recognizable brand tile (TVDB, MyAnimeList, AniList, Kitsu, AniDB, MangaBaka, AniChart, AnimeSchedule) so the list reads at a glance instead of as a wall of text."
+            "Each provider on the Data Sources page now shows a recognizable brand tile (TVDB, MyAnimeList, AniList, Kitsu, AniDB, MangaBaka, AniChart) so the list reads at a glance instead of as a wall of text."
         ],
         fixed: [
             "The See All pages now show what their titles promise: 'Recently Completed' loads the previous season's finished shows and 'Upcoming' loads genuinely unreleased anime — both previously borrowed unrelated lists (all-time popular and trending), which is why the results felt random or off-topic. Every browse list is also now a Japanese-anime list: entries known to originate outside Japan are filtered out at every provider, so donghua no longer mixes into the shelves or See All grids.",
@@ -201,7 +234,7 @@ private let logEntries: [UpdateLogEntry] = [
         ],
         improved: [
             "The provider chain's decision log now tells the whole story: every provider attempt is visible with its outcome — who was skipped and why (cooling down, not configured, doesn't serve that data) and who actually served the request and how fast. TVDB is genuinely tried first for search and details; it simply has no trending-chart endpoints, and that's now recorded instead of silent.",
-            "AnimeSchedule no longer wastes a spot in every schedule attempt when no API token is entered: it's skipped up front with a clear note, and it activates the moment you add your free token in Data Sources.",
+            "Providers that need credentials are skipped up front with a clear note instead of wasting a spot in every attempt, and they activate the moment you add their credentials in Data Sources.",
             "The subtitle menu hides the custom appearance controls while Apple's default look is selected, so the settings you see always match the settings that apply."
         ],
         removed: [],
@@ -213,12 +246,12 @@ private let logEntries: [UpdateLogEntry] = [
         added: [
             "A new Data Sources page in Settings: the control room for every provider. Each provider shows its name, API host, live health (Online / Degraded / Rate Limited / Unavailable / Offline), its position in the chain (PRIMARY or FALLBACK #n), the last successful request, measured latency, and current cooldown. Toggle any provider on or off, run a REAL test (a lightweight request with measured response time — 'Online · 142 ms' or the honest failure reason), and clear the anime / manga / schedule caches with their exact on-disk sizes.",
             "Drag-and-drop priority ordering: press and hold a provider card's handle, drag it to a new position — the neighbors slide aside live with a haptic tick at every slot — and drop to commit. The order is saved instantly and every request the app makes follows it. 'Reset Order' restores the recommended chain (TVDB → MAL → AniList → Kitsu → AniDB). The arrow buttons remain for precise single-step moves.",
-            "The whole provider chain is rebuilt around one system: TVDB (artwork, seasons, episodes, characters, staff, ratings — the app's own TVDB key, so it works out of the box), Kitsu, and AniDB join MAL and AniList for anime; MangaBaka is the new manga primary; AniChart and AnimeSchedule lead the schedule chain. Everything flows through one central manager with per-domain priority, field-level fallback (the next provider fills only the missing fields — it never replaces the whole record), shared caching, and in-flight deduplication.",
+            "The whole provider chain is rebuilt around one system: TVDB (artwork, seasons, episodes, characters, staff, ratings — the app's own TVDB key, so it works out of the box), Kitsu, and AniDB join MAL and AniList for anime; MangaBaka is the new manga primary; AniChart leads the schedule chain. Everything flows through one central manager with per-domain priority, field-level fallback (the next provider fills only the missing fields — it never replaces the whole record), shared caching, and in-flight deduplication.",
             "DOWNLOAD NOW: the update popup downloads the real package inside the app — live progress, transfer speed, total size — then verifies it byte-for-byte against the release's SHA-256 checksum. It never claims the download finished unless the file actually exists on disk. Afterward, DELETE FILE removes the package (with a small confirmation) and lets you re-download, and FIND FILE opens the Files interface at the app's Documents folder with the exact path spelled out — only shown when the location is actually known."
         ],
         fixed: [
             "Provider failure storms are gone at the root: one failing provider now gets an exponential cooldown (60s → 2 min → 4 min, capped at 10 minutes) that every screen respects, the identical request is deduplicated while in flight (two screens asking for the same shelf share ONE request), failures are negatively cached for 45 seconds, and a provider that returns a rate limit pauses for 90 seconds instead of being re-asked. No more request storms, duplicate API calls, or endless provider-switching loops.",
-            "The Manga page can no longer go blank when its provider fails: MangaBaka → MAL → AniList chain with field-level fallback, and every state (loading / content / empty / error-with-retry) renders the page itself. The Schedule page is the same — AniChart → AnimeSchedule → MAL → AniList, cached timetable, and a proper 'Schedule Temporarily Unavailable' card only when everything is genuinely down.",
+            "The Manga page can no longer go blank when its provider fails: MangaBaka → MAL → AniList chain with field-level fallback, and every state (loading / content / empty / error-with-retry) renders the page itself. The Schedule page is the same — AniChart → MAL → AniList, cached timetable, and a proper 'Schedule Temporarily Unavailable' card only when everything is genuinely down.",
             "Update detection was hardened end-to-end: version comparison is fully semantic (2.2 and 2.2.0 are equal, 2.10 is newer than 2.9, prefixes and suffixes normalize), a failed version check never assumes an update exists, and stale cache can't produce a false popup. When you're already on the latest version, nothing appears."
         ],
         changed: [

@@ -129,7 +129,7 @@ struct CharactersSection: View {
             // the section stays hidden for titles with no cast at all.
         }
         .navigationDestinationCompat(item: $selectedCharacter) { edge in
-            CharacterDetailView(edge: edge)
+            CharacterDetailView(edge: edge, sourceMediaId: mediaId, sourceIsManga: isManga)
         }
         .task {
             // Self-fetch when preloaded is nil OR empty. The parent VM
@@ -173,37 +173,13 @@ struct CharactersSection: View {
 
     @ViewBuilder
     private func characterCard(_ edge: AniListCharacterEdge) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            // Fixed 100×150 frame with aspectRatio + fill + clipped so all
-            // character images render at the same size regardless of the
-            // source image's actual dimensions.
-            CachedAsyncImage(urlString: edge.node.image?.large ?? edge.node.image?.medium ?? "")
-                .aspectRatio(contentMode: .fill)
-                .frame(width: 100, height: 150)
-                .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5)
-                )
-                .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 2)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(edge.node.name?.full ?? "Unknown")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(width: 100, alignment: .leading)
-
-                if let role = edge.role, !role.isEmpty {
-                    Text(role.capitalized)
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
-        }
+        // Batch 27 — the ONE shared portrait card: fixed 2:3, one size
+        // (110×165), one radius, same fixed text zone — identical on
+        // every character surface in the app.
+        CharacterPortraitCard(
+            imageURL: edge.node.image?.large ?? edge.node.image?.medium,
+            name: edge.node.name?.full ?? "Unknown",
+            subtitle: edge.role.map { $0.capitalized })
     }
 
     private func loadCharacters() async {
@@ -269,10 +245,20 @@ struct CharactersSection: View {
 
 struct CharacterDetailView: View {
     let edge: AniListCharacterEdge
+    /// Batch 27 — the anime/manga the user came FROM: powers the
+    /// "More from this anime" strip (real cast of the SAME series, from
+    /// the character chain — provider data, not a guess).
+    var sourceMediaId: Int? = nil
+    var sourceIsManga: Bool = false
 
     @Environment(\.dismiss) private var dismiss
     @State private var character: AniListCharacter?
     @State private var isLoading = false
+    /// Batch 27 — the full Jikan character profile (about, native name,
+    /// favourites): fills the page through AniList outages.
+    @State private var jikanProfile: MALDiscoveryService.JikanCharacter?
+    /// Batch 27 — cast of the source series ("More from this anime").
+    @State private var relatedCast: [AniListCharacterEdge] = []
     /// Animeography — all anime this character appears in (from Jikan)
     @State private var animeography: [MALDiscoveryService.JikanCharacterAnimeEntry] = []
     @State private var isLoadingAnimeography = false
@@ -331,6 +317,8 @@ struct CharacterDetailView: View {
                 // Animeography — all anime this character appears in
                 animeographySection
                     .padding(.top, 16)
+                relatedCastSection
+                    .padding(.top, 16)
                 Spacer().frame(height: 32)
             }
         }
@@ -343,6 +331,7 @@ struct CharacterDetailView: View {
         #endif
         .task { await loadFullCharacter() }
         .task { await loadAnimeography() }
+        .task { await loadRelatedCast() }
     }
 
     // MARK: - Hero
@@ -453,6 +442,12 @@ struct CharacterDetailView: View {
 
     private var infoItems: [(String, String)] {
         var items: [(String, String)] = []
+        // Batch 27 — the Jikan full profile fills gaps through AniList
+        // outages (native name, favourites) without replacing edge data.
+        if let native = jikanProfile?.name_kanji, !native.isEmpty,
+           displayCharacter.name?.native == nil {
+            items.append(("Native Name", native))
+        }
         if let gender = displayCharacter.gender, !gender.isEmpty {
             items.append(("Gender", gender.capitalized))
         }
@@ -558,36 +553,48 @@ struct CharacterDetailView: View {
         NavigationLink {
             VoiceActorDetailView(voiceActor: va)
         } label: {
-            VStack(alignment: .leading, spacing: 6) {
-                CachedAsyncImage(urlString: va.image?.large ?? va.image?.medium ?? "")
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 90, height: 135)
-                    .clipped()
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5)
-                    )
-                    .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 2)
+            CharacterPortraitCard(
+                imageURL: va.image?.large ?? va.image?.medium,
+                name: va.name?.full ?? "Unknown",
+                subtitle: va.language.map { $0.capitalized })
+        }
+        .buttonStyle(.plain)
+    }
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(va.name?.full ?? "Unknown")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(width: 90, alignment: .leading)
+    // MARK: - More from this anime (Batch 27)
 
-                    if let lang = va.language, !lang.isEmpty {
-                        Text(lang.capitalized)
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+    /// The cast of the series the user came from — REAL provider data
+    /// through the same character chain, excluding this character. Each
+    /// card navigates to that character's own page (full navigation:
+    /// Character → Anime → Character, no dead ends).
+    @ViewBuilder
+    private var relatedCastSection: some View {
+        if !relatedCast.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("More from this \(sourceIsManga ? "series" : "anime")")
+                    .font(.headline)
+                    .padding(.horizontal, 16)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(relatedCast) { castEdge in
+                            NavigationLink {
+                                CharacterDetailView(
+                                    edge: castEdge,
+                                    sourceMediaId: sourceMediaId,
+                                    sourceIsManga: sourceIsManga)
+                            } label: {
+                                CharacterPortraitCard(
+                                    imageURL: castEdge.node.image?.large ?? castEdge.node.image?.medium,
+                                    name: castEdge.node.name?.full ?? "Unknown",
+                                    subtitle: castEdge.role.map { $0.capitalized })
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
+                    .padding(.horizontal, 16)
                 }
             }
         }
-        .buttonStyle(.plain)
     }
 
     // MARK: - Load
@@ -657,9 +664,50 @@ struct CharacterDetailView: View {
     /// fall back to whatever the edge already had.
     private func loadFullCharacter() async {
         guard character == nil else { return }
-        isLoading = true
         character = edge.node
-        isLoading = false
+        // Batch 27 — the FULL profile: Jikan's complete character record
+        // (native name, full about, favourites) enriches the page even
+        // while AniList's own character query is down. Field-level: the
+        // edge's own data (image, role, VAs) is never replaced, only
+        // gaps filled.
+        let charId = edge.node.id
+        guard charId > 0 else { return }
+        if let full = try? await MALDiscoveryService.shared.character(characterId: charId) {
+            jikanProfile = full
+        }
+    }
+
+    /// Batch 27 — the cast of the series the user navigated from (same
+    /// character chain the detail page uses; this character excluded).
+    /// The Media stub carries the provider ids the chain needs (anilist
+    /// id primary, MAL/TVDB ids when the parent page knew them).
+    private func loadRelatedCast() async {
+        guard let mediaId = sourceMediaId, mediaId > 0, relatedCast.isEmpty else { return }
+        let stub = Media(
+            id: mediaId,
+            idMal: nil,
+            provider: .anilist,
+            title: MediaTitle(romaji: "", english: nil, native: nil),
+            coverImage: MediaCoverImage(large: nil, extraLarge: nil),
+            bannerImage: nil,
+            description: nil,
+            episodes: nil,
+            status: nil,
+            averageScore: nil,
+            genres: nil,
+            season: nil,
+            seasonYear: nil,
+            nextAiringEpisode: nil,
+            relations: nil,
+            type: sourceIsManga ? "MANGA" : "ANIME",
+            format: nil,
+            studioNames: nil,
+            source: nil,
+            duration: nil,
+            airDateRange: nil)
+        guard let result = await CharacterService.shared.characters(
+            for: stub, anilistEdges: nil, tvdbFields: nil) else { return }
+        relatedCast = result.edges.filter { $0.node.id != edge.node.id }
     }
 
     // MARK: - Animeography (all anime this character appears in)
@@ -711,13 +759,13 @@ struct CharacterDetailView: View {
                                         VStack(alignment: .leading, spacing: 4) {
                                             CachedAsyncImage(urlString: anime.images?.jpg?.large_image_url ?? anime.images?.jpg?.image_url ?? "")
                                                 .aspectRatio(2/3, contentMode: .fill)
-                                                .frame(width: 80, height: 120)
-                                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                                .frame(width: CharacterPortraitCard.cardWidth, height: CharacterPortraitCard.cardHeight)
+                                                .clipShape(RoundedRectangle(cornerRadius: 12))
                                             Text(anime.title ?? "Unknown")
                                                 .font(.caption.weight(.semibold))
                                                 .foregroundStyle(.primary)
                                                 .lineLimit(2)
-                                                .frame(width: 80, alignment: .leading)
+                                                .frame(width: CharacterPortraitCard.cardWidth, alignment: .leading)
                                             if let role = animeography[idx].role, !role.isEmpty {
                                                 Text(role)
                                                     .font(.system(size: 10, weight: .medium))
@@ -1110,13 +1158,13 @@ struct VoiceActorDetailView: View {
                                             VStack(alignment: .leading, spacing: 4) {
                                                 CachedAsyncImage(urlString: anime.images?.jpg?.large_image_url ?? anime.images?.jpg?.image_url ?? "")
                                                     .aspectRatio(2/3, contentMode: .fill)
-                                                    .frame(width: 80, height: 120)
-                                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                                    .frame(width: CharacterPortraitCard.cardWidth, height: CharacterPortraitCard.cardHeight)
+                                                    .clipShape(RoundedRectangle(cornerRadius: 12))
                                                 Text(anime.title ?? "Unknown")
                                                     .font(.caption.weight(.semibold))
                                                     .foregroundStyle(.primary)
                                                     .lineLimit(2)
-                                                    .frame(width: 80, alignment: .leading)
+                                                    .frame(width: CharacterPortraitCard.cardWidth, alignment: .leading)
                                                 if let char = animeRoles[idx].character {
                                                     Text(char.name ?? "")
                                                         .font(.system(size: 10, weight: .medium))
