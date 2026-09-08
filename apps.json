@@ -31,7 +31,7 @@
           "date": "2026-09-08",
           "localizedDescription": "v2.27 — Search gets a different database: Kitsu (anime-only, with posters and proper series pages) now answers searches first instead of the old mixed TV listings, and you can pick a different one anytime in Settings → Data Sources — which is now a redesigned page with a live status dashboard and drawn provider logos. The Surprise Me button works again: it was tied to one database that is currently down, and now uses every live source. The in-player Subtitles panel is a fully custom design with a live preview and six one-tap style presets, and subtitles start on a distinct Shirox look by default instead of a plain copy of Apple's.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 0
+          "size": 12461958
         },
         {
           "version": "2.26",
