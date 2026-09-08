@@ -1095,6 +1095,7 @@ private struct FeaturedCard: View, Equatable {
             // object as the poster/banner above).
             MetadataPillRow(
                 pills: [MetadataPill.rating(media.averageScore)]
+                    .compactMap { $0 }
                     + MetadataPillRowBuilder.animeGenrePills(for: media, limit: 2),
                 height: 26,
                 alignment: .leading,

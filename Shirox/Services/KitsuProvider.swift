@@ -95,12 +95,12 @@ final class KitsuProvider {
     private struct Relationships: Decodable {
         let mappings: MappingRef?
         let categories: CategoryRef?
+        struct Link: Decodable {
+            let id: String?
+            let type: String?
+        }
         struct MappingRef: Decodable {
             let data: [Link]?
-            struct Link: Decodable {
-                let id: String?
-                let type: String?
-            }
         }
         struct CategoryRef: Decodable {
             let data: [Link]?
@@ -145,7 +145,7 @@ final class KitsuProvider {
                       let idString = mapping.attributes?.externalId else { continue }
                 // thetvdb/series mappings carry "72454/1" (id/season) —
                 // split off any season suffix before parsing.
-                let rawId = site.contains("thetvdb") ? idString.split("/").first.map(String.init) ?? idString : idString
+                let rawId = site.contains("thetvdb") ? idString.split(separator: "/").first.map(String.init) ?? idString : idString
                 guard let id = Int(rawId), id > 0 else { continue }
                 if site.contains("myanimelist") { ids.mal = ids.mal ?? id }
                 if site.contains("anilist") { ids.anilist = ids.anilist ?? id }
@@ -536,8 +536,8 @@ final class KitsuProvider {
                 duration: nil,
                 airDateRange: nil,
                 volumes: isManga ? attrs.volumeCount : nil,
-                countryOfOrigin: Self.inferredCountry(titles: attrs.titles),
                 popularity: attrs.userCount,
+                countryOfOrigin: Self.inferredCountry(titles: attrs.titles),
                 tvdbId: isManga ? nil : mapping.tvdb,
                 kitsuId: Int(resource.id)))
         }

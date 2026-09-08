@@ -31,7 +31,7 @@ final class BrowseViewModel: ObservableObject {
     }
 
     /// Backward-compatible category initializer.
-    init(category: BrowseCategory) {
+    convenience init(category: BrowseCategory) {
         self.init(query: .category(category))
     }
 
