@@ -31,7 +31,7 @@
           "date": "2026-09-08",
           "localizedDescription": "v2.26 — The Manga and Releases tabs keep working even while MyAnimeList and AniList are having problems: the Kitsu backup source now serves manga lists too, so there is always a live source answering. Search is faster and more reliable because the top source (TVDB) failed on every search before — its results now come through correctly. The backup source's lists showed obscure zero-follower titles by mistake (its sort order was backwards); lists now lead with genuinely popular series. And when all sources are unreachable, the app stops retrying in a loop and shows one clear message until you tap Retry.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 12361390
+          "size": 12374366
         },
         {
           "version": "2.25",
