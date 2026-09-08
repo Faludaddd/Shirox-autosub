@@ -112,10 +112,10 @@ private let logEntries: [UpdateLogEntry] = [
             "The Kitsu backup source's lists were sorted BACKWARDS: instead of the most popular anime and manga, they showed obscure zero-follower titles (self-published doujinshi, obscure shorts). Every Kitsu-served list — shelves, See All pages, and the new manga lists — now leads with genuinely popular series like One Piece and Attack on Titan.",
             "When every manga source is unreachable, the app used to re-run the whole request chain over and over — the log showed the same four shelves re-requested several times per second, and the Releases page reloading six times in half a minute. It now waits a short interval between failed attempts (retrying immediately is still one tap on Retry or a pull-to-refresh away), so the page settles on one clear message instead of churning."
         ],
+        changed: [],
         improved: [
             "Manga search gained the same Kitsu backup, so it survives MyAnimeList and AniList outage windows as well."
         ],
-        changed: [],
         removed: [],
         other: []
     ),
