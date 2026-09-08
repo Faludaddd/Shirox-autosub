@@ -33,8 +33,9 @@ final class KitsuTVDBTimetableService {
 
     /// How many currently-airing shows are considered (most-followed
     /// first — the same honest popularity ordering every discovery list
-    /// uses).
-    private let showBudget = 25
+    /// uses). NOTE: Kitsu's max page[limit] is 20 (verified live: 25
+    /// answers HTTP 400), so this stays at 20.
+    private let showBudget = 20
     /// Parallel TVDB fetches. Verified live: 8 parallel extended requests
     /// all answer in under a second; 6 keeps comfortable headroom.
     private let concurrency = 6

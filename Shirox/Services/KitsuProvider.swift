@@ -175,8 +175,48 @@ final class KitsuProvider {
 
     // MARK: - Lists (discovery)
 
+    /// Kitsu's REAL trending chart — the same list kitsu.io's own homepage
+    /// shows. Two-step fetch (verified live): the chart endpoint IGNORES
+    /// the `include` parameter (mappings/categories come back empty, which
+    /// previously dropped every item), so the chart's ordered ids are
+    /// hydrated through one `/anime?filter[id]=…&include=mappings,categories`
+    /// request. Results are re-sorted into the chart's order.
     func trending() async throws -> [Media] {
-        try await fetchList(path: "/trending/anime?limit=20&include=mappings,categories")
+        try await fetchTrendingChart()
+    }
+
+    /// The trending chart + hydration (shared by `trending()` and
+    /// `browse(.trending, page: 1)`).
+    private func fetchTrendingChart() async throws -> [Media] {
+        guard let url = URL(string: "\(base)/trending/anime?limit=20") else { return [] }
+        var req = URLRequest(url: url)
+        req.setValue("application/vnd.api+json", forHTTPHeaderField: "Accept")
+        let (data, response) = try await Self.session.data(for: req)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw ProviderChainError.allProvidersFailed(lastReason: "Kitsu trending request failed (HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0))")
+        }
+        struct ChartEnvelope: Decodable {
+            struct Datum: Decodable { let id: String }
+            let data: [Datum]
+        }
+        guard let chart = try? JSONDecoder().decode(ChartEnvelope.self, from: data) else { return [] }
+        let orderedIds = chart.data.compactMap(\.id)
+        guard !orderedIds.isEmpty else { return [] }
+        // Hydrate: one request for all chart ids with mappings+categories.
+        // (Ids are numeric + commas — URL-safe; the bracket query keys ride
+        // raw exactly like every other Kitsu path in this provider.)
+        let joined = orderedIds.joined(separator: ",")
+        guard let hydrateURL = URL(string: "\(base)/anime?filter[id]=\(joined)&page[limit]=20&include=mappings,categories") else { return [] }
+        var hydrateReq = URLRequest(url: hydrateURL)
+        hydrateReq.setValue("application/vnd.api+json", forHTTPHeaderField: "Accept")
+        let (hydrateData, hydrateResponse) = try await Self.session.data(for: hydrateReq)
+        guard let http = hydrateResponse as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw ProviderChainError.allProvidersFailed(lastReason: "Kitsu trending hydration failed (HTTP \((hydrateResponse as? HTTPURLResponse)?.statusCode ?? 0))")
+        }
+        guard let hydrated = try? decodeListData(hydrateData) else { return [] }
+        // Re-sort into the chart's order (filter[id] doesn't preserve it).
+        let byKitsuId = Dictionary(uniqueKeysWithValues: hydrated.compactMap { m in m.kitsuId.map { ($0, m) } })
+        return orderedIds.compactMap { Int($0).flatMap { byKitsuId[$0] } }
     }
 
     /// Paged browse for the See All chain. Kitsu pages via offset
@@ -196,11 +236,11 @@ final class KitsuProvider {
         switch category {
         case .trending:
             if page <= 1 {
-                // The real chart — what "trending" promises.
-                path = "/trending/anime?limit=20&include=mappings,categories"
-            } else {
-                path = "/anime?page[limit]=20&page[offset]=\(offset)&sort=-userCount&include=mappings,categories&filter[status]=current,upcoming"
+                // The REAL chart — what "trending" promises (two-step
+                // fetch with hydration; see `trending()`).
+                return try await fetchTrendingChart()
             }
+            path = "/anime?page[limit]=20&page[offset]=\(offset)&sort=-userCount&include=mappings,categories&filter[status]=current,upcoming"
         case .seasonal:
             let (season, year) = AniListSeason.current()
             path = "/anime?page[limit]=20&page[offset]=\(offset)&sort=-userCount&include=mappings,categories&filter[status]=current&filter[season]=\(season.rawValue.lowercased())&filter[seasonYear]=\(year)"
