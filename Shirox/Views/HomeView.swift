@@ -2194,7 +2194,6 @@ struct ScheduleView: View {
         let endTs = startTs + max(windowDays, 1) * 86_400
 
         var fetched: [UnifiedScheduleEntry] = []
-        var fetchedFromBackup = false
         // Batch 23 — distinguishes "a LIVE backup provider served the page"
         // (MAL/AniList/AnimeSchedule — fresh, real data worth persisting)
         // from "the DISK snapshot itself served the page" (re-saving it
@@ -2216,7 +2215,6 @@ struct ScheduleView: View {
                 // Honest source notice when a backup (non-primary) source
                 // served the schedule.
                 if let source = result.source, source != .anichart {
-                    fetchedFromBackup = true
                     switch source {
                     case .animeschedule:
                         sourceNotice = "AniChart is unreachable — showing this week's timetable from AnimeSchedule."
@@ -2233,7 +2231,6 @@ struct ScheduleView: View {
                 // ── Final fallback: disk snapshot of the last good schedule. ─
                 if let cached = ScheduleFallbackService.shared.cachedSnapshot(from: startTs, to: endTs) {
                     fetched = cached.entries
-                    fetchedFromBackup = true
                     servedFromDiskSnapshot = true
                     let f = RelativeDateTimeFormatter()
                     sourceNotice = "Offline mode — showing the schedule saved \(f.localizedString(for: cached.storedAt, relativeTo: Date())) ago. Pull to refresh."

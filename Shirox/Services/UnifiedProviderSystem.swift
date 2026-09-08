@@ -661,11 +661,15 @@ final class UnifiedProviderSystem: ObservableObject {
     /// field, Jikan infers from production metadata (v2.23), Kitsu infers
     /// from the title script (hanzi-without-kana = Chinese production).
     func browse(category: BrowseCategory, page: Int) async throws -> [Media] {
-        let list = try await runChain(
+        // NOTE: the closure's return type is annotated (`-> [Media]?`) and
+        // `list` is explicitly typed — this generic + multi-statement trailing
+        // closure shape exceeds the type checker's inference budget without
+        // the anchors (CI: "generic parameter 'T' could not be inferred").
+        let list: [Media] = try await runChain(
             domain: .anime,
             operation: "browse-\(category.rawValue)",
             cacheKey: "p\(page)",
-            cacheTTL: 15 * 60) { kind in
+            cacheTTL: 15 * 60) { kind -> [Media]? in
             switch kind {
             case .tvdb, .anidb:
                 return nil // no chart endpoints
