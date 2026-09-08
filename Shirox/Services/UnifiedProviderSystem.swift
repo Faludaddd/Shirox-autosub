@@ -273,6 +273,9 @@ final class UnifiedProviderSystem: ObservableObject {
     /// Announces which provider served the most recent chain result,
     /// e.g. "MAL" — used for honest source notices.
     @Published private(set) var lastServedBy: MetaProviderKind?
+    /// Which provider served the most recent SEARCH (Batch 25). Search
+    /// results show an honest "via Kitsu" badge from this.
+    @Published private(set) var lastSearchServedBy: MetaProviderKind?
 
     // MARK: Persistence keys
 
@@ -280,6 +283,8 @@ final class UnifiedProviderSystem: ObservableObject {
     private let mangaOrderKey = "providerOrder.manga.v1"
     private let scheduleOrderKey = "providerOrder.schedule.v1"
     private let enabledKey = "providerEnabled.v1"
+    /// Batch 25 — the database that powers SEARCH first (default Kitsu).
+    private let searchPrimaryKey = "providerOrder.searchPrimary.v1"
 
     /// The recommended (default) order for each domain.
     static let recommendedAnimeOrder: [MetaProviderKind] = [.tvdb, .mal, .anilist, .kitsu, .anidb]
@@ -287,6 +292,10 @@ final class UnifiedProviderSystem: ObservableObject {
     /// (MangaBaka → MAL → AniList → Kitsu).
     static let recommendedMangaOrder: [MetaProviderKind] = [.mangabaka, .mal, .anilist, .kitsu]
     static let recommendedScheduleOrder: [MetaProviderKind] = [.anichart, .animeschedule, .mal, .anilist]
+
+    /// The databases that can power anime search, in the order the Search
+    /// Database picker shows them (Batch 25).
+    static let searchCapableProviders: [MetaProviderKind] = [.kitsu, .tvdb, .mal, .anilist]
 
     // MARK: Cooldown / backoff configuration
 
@@ -331,6 +340,20 @@ final class UnifiedProviderSystem: ObservableObject {
         scheduleOrder = loadOrder(scheduleOrderKey, recommended: Self.recommendedScheduleOrder, all: [.anichart, .animeschedule, .mal, .anilist])
 
         let savedEnabled = defaults.dictionary(forKey: enabledKey) as? [String: Bool] ?? [:]
+
+        // Batch 25 — the search database. nil = the recommended default
+        // (Kitsu — anime-native with posters and series pages, live while
+        // AniList/MAL have outage windows). Any saved value is validated
+        // against the search-capable set so a stale/renamed provider can
+        // never strand the setting.
+        if let savedPrimary = defaults.string(forKey: searchPrimaryKey),
+           let kind = MetaProviderKind(rawValue: savedPrimary),
+           Self.searchCapableProviders.contains(kind) {
+            searchPrimary = kind
+        } else {
+            searchPrimary = nil
+        }
+
         var initial: [MetaProviderKind: ProviderStatus] = [:]
         for kind in MetaProviderKind.allCases {
             let enabled = savedEnabled[kind.rawValue] ?? true
@@ -397,6 +420,37 @@ final class UnifiedProviderSystem: ObservableObject {
         resetOrder(for: .anime)
         resetOrder(for: .manga)
         resetOrder(for: .schedule)
+    }
+
+    // MARK: - Search database (Batch 25)
+
+    /// The database search tries FIRST. nil = recommended (Kitsu). Set
+    /// from the Data Sources page; validated on load, persisted, and
+    /// published so the picker and the results badge stay in sync.
+    @Published var searchPrimary: MetaProviderKind? {
+        didSet {
+            if let kind = searchPrimary {
+                UserDefaults.standard.set(kind.rawValue, forKey: searchPrimaryKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: searchPrimaryKey)
+            }
+        }
+    }
+
+    var effectiveSearchPrimary: MetaProviderKind { searchPrimary ?? .kitsu }
+
+    /// The chain search actually walks: the anime domain's normal
+    /// (enabled + health-gated) order with the chosen search database
+    /// promoted to the front. Fallbacks stay behind it — picking a
+    /// database changes who answers first, never the safety net under it.
+    private func searchChainOverride() -> [MetaProviderKind] {
+        var chain = activeChain(for: .anime)
+        let primary = effectiveSearchPrimary
+        if let idx = chain.firstIndex(of: primary) {
+            chain.remove(at: idx)
+            chain.insert(primary, at: 0)
+        }
+        return chain
     }
 
     func isEnabled(_ kind: MetaProviderKind) -> Bool {
@@ -521,11 +575,16 @@ final class UnifiedProviderSystem: ObservableObject {
     /// the next provider without recording a failure. Only thrown errors
     /// affect health. Concurrent callers with the same cache key SHARE one
     /// chain execution (the awaited task IS the chain run).
+    ///
+    /// `chainOverride` (Batch 25) replaces the domain's default order —
+    /// used by search to promote the user's chosen database to the front
+    /// while keeping every health/cooldown gate.
     private func runChain<T>(
         domain: ProviderDomain,
         operation: String,
         cacheKey: String?,
         cacheTTL: TimeInterval,
+        chainOverride: [MetaProviderKind]? = nil,
         _ fetch: @escaping (MetaProviderKind) async throws -> T?
     ) async throws -> (value: T, servedBy: MetaProviderKind) where T: Encodable & Decodable {
         let fullKey = cacheKey.map { "\(domain.rawValue)|\(operation)|\($0)" }
@@ -555,7 +614,7 @@ final class UnifiedProviderSystem: ObservableObject {
             do {
                 let (value, servedBy) = try await self.runChainOnce(
                     domain: domain, operation: operation, fullKey: fullKey,
-                    cacheTTL: cacheTTL, fetch)
+                    cacheTTL: cacheTTL, chainOverride: chainOverride, fetch)
                 return AnyMediaBox(wrapped: value, servedBy: servedBy, error: nil)
             } catch {
                 return AnyMediaBox(wrapped: nil, servedBy: nil, error: error)
@@ -591,9 +650,10 @@ final class UnifiedProviderSystem: ObservableObject {
         operation: String,
         fullKey: String?,
         cacheTTL: TimeInterval,
+        chainOverride: [MetaProviderKind]? = nil,
         _ fetch: (MetaProviderKind) async throws -> T?
     ) async throws -> (value: T, servedBy: MetaProviderKind) where T: Encodable & Decodable {
-        let chain = activeChain(for: domain)
+        let chain = chainOverride ?? activeChain(for: domain)
         guard !chain.isEmpty else { throw ProviderChainError.noProvidersEnabled }
 
         var lastReason: String?
@@ -715,11 +775,17 @@ final class UnifiedProviderSystem: ObservableObject {
     func searchAnime(_ query: String) async throws -> [Media] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return [] }
-        return try await runChain(
+        // Batch 25 — search walks its own chain: the chosen search database
+        // first (Kitsu by default — anime-native, poster-rich, and live
+        // through the current AniList/Jikan outage windows; the TVDB-first
+        // browse order is untouched), then the usual fallbacks with every
+        // health gate intact.
+        let result = try await runChain(
             domain: .anime,
             operation: "search",
             cacheKey: trimmed.lowercased(),
-            cacheTTL: 30 * 60) { kind in
+            cacheTTL: 30 * 60,
+            chainOverride: searchChainOverride()) { kind -> [Media]? in
             switch kind {
             case .tvdb:
                 return try await TVDBProvider.shared.searchMedia(query: trimmed)
@@ -734,7 +800,9 @@ final class UnifiedProviderSystem: ObservableObject {
             default:
                 return nil
             }
-        }.value
+        }
+        lastSearchServedBy = result.servedBy
+        return result.value
     }
 
     // MARK: - TVDB-first detail enrichment (field-level fallback)
@@ -766,11 +834,13 @@ final class UnifiedProviderSystem: ObservableObject {
     func searchManga(_ query: String) async throws -> [Media] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return [] }
-        return try await runChain(
+        // Manga search keeps its own order (MangaBaka first — a dedicated
+        // manga database with the best coverage; Kitsu backs it up).
+        let result = try await runChain(
             domain: .manga,
             operation: "search",
             cacheKey: trimmed.lowercased(),
-            cacheTTL: 30 * 60) { kind in
+            cacheTTL: 30 * 60) { kind -> [Media]? in
             switch kind {
             case .mangabaka:
                 return try await MangaBakaProvider.shared.searchMedia(query: trimmed)
@@ -785,7 +855,9 @@ final class UnifiedProviderSystem: ObservableObject {
             default:
                 return nil
             }
-        }.value
+        }
+        lastSearchServedBy = result.servedBy
+        return result.value
     }
 
     /// Manga home shelves. MangaBaka has no chart endpoints (its public API

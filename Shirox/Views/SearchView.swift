@@ -353,6 +353,30 @@ struct SearchView: View {
     // MARK: - Results Grid
     private var resultsView: some View {
         ScrollView {
+            // Batch 25 — honest source reporting: which database actually
+            // answered, plus the note when a fallback replaced filters.
+            if let notice = vm.notice {
+                Label(notice, systemImage: "exclamationmark.bubble")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+            }
+            if let servedBy = vm.servedByName, !vm.aniListResults.isEmpty {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(Color.appAccent.opacity(0.75))
+                        .frame(width: 6, height: 6)
+                    Text("Results from \(servedBy)")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, vm.notice == nil ? 10 : 2)
+            }
             LazyVGrid(columns: columns, spacing: 12) {
                 if !vm.aniListResults.isEmpty {
                     ForEach(vm.aniListResults) { media in
@@ -481,7 +505,7 @@ struct SearchView: View {
                         .foregroundStyle(.secondary)
                     Text(isMangaMode ? "Search Manga" : "Search Anime")
                         .font(.headline)
-                    Text(isMangaMode ? "Find any manga via AniList" : "Find any anime via AniList")
+                    Text(isMangaMode ? "Find any manga across your sources" : "Find any anime across your sources")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -535,77 +559,54 @@ struct SearchView: View {
     @State private var recommendations: [Media] = []
 
     private func loadRecommendations() async {
-        let type = isMangaMode ? "MANGA" : "ANIME"
-        // Get user's library genres for content-based matching
-        guard let userId = AniListAuthManager.shared.userId else {
-            // No login — fall back to trending
-            await loadTrendingFallback(type: type)
-            return
-        }
-        do {
-            let library = try await AniListLibraryService.shared.fetchAllLists(
-                userId: userId, type: isMangaMode ? .manga : .anime)
-            // Collect genres from watching/reading + completed entries
+        // Batch 25 — the pool is chain-served (any live database) instead of
+        // AniList-only, so the empty state's "Recommended for You" rail no
+        // longer goes blank during AniList outage windows. Logged-in users
+        // still get genre-matched picks whenever AniList is healthy.
+        if let userId = AniListAuthManager.shared.userId,
+           let library = try? await AniListLibraryService.shared.fetchAllLists(
+               userId: userId, type: isMangaMode ? .manga : .anime) {
+            // Collect genres from watching/reading + completed entries.
             var genreSet: Set<String> = []
             for entry in library.prefix(20) {
                 if let genres = entry.media.genres {
                     genreSet.formUnion(genres.prefix(3))
                 }
             }
-            guard !genreSet.isEmpty else {
-                await loadTrendingFallback(type: type)
-                return
+            if !genreSet.isEmpty {
+                // Search for titles matching top genres.
+                let topGenres = Array(genreSet.shuffled().prefix(3))
+                let query = topGenres.joined(separator: " ")
+                let results = (try? await AniListService.shared.search(keyword: query)) ?? []
+                if !results.isEmpty {
+                    let mapped = results.prefix(12).map { AniListProvider.shared.mapMedia($0) }
+                    await MainActor.run { self.recommendations = Array(mapped) }
+                    return
+                }
             }
-            // Search for titles matching top genres
-            let topGenres = Array(genreSet.prefix(3))
-            let query = topGenres.joined(separator: " ")
-            let results = try await AniListService.shared.search(keyword: query)
-            let mapped = results.prefix(12).map { AniListProvider.shared.mapMedia($0) }
-            await MainActor.run {
-                self.recommendations = Array(mapped)
-            }
-        } catch {
-            await loadTrendingFallback(type: type)
         }
+        await loadTrendingFallback()
     }
 
-    private func loadTrendingFallback(type: String) async {
-        let results = (try? await AniListService.shared.trending()) ?? []
-        let mapped = results.prefix(12).map { AniListProvider.shared.mapMedia($0) }
-        await MainActor.run {
-            self.recommendations = Array(mapped)
+    private func loadTrendingFallback() async {
+        // Chain-served: whichever database is live (Kitsu now, MAL/AniList
+        // when they recover) fills the rail — never blank during an outage.
+        let list: [Media]
+        if isMangaMode {
+            list = (try? await UnifiedProviderSystem.shared.mangaShelf(.trending)) ?? []
+        } else {
+            list = (try? await UnifiedProviderSystem.shared.browse(category: .trending, page: 1)) ?? []
         }
+        let mapped = Array(list.shuffled().prefix(12))
+        await MainActor.run { self.recommendations = mapped }
     }
 
-    // MARK: - Surprise Me (category-based discovery)
+    // MARK: - Surprise Me (chain-based discovery)
 
-    /// Categories the user can pick from. These map to AniList genres.
-    private let surpriseCategories: [(label: String, genre: String, icon: String)] = [
-        ("Action", "Action", "bolt.fill"),
-        ("Adventure", "Adventure", "mountain.2.fill"),
-        ("Comedy", "Comedy", "face.smiling.fill"),
-        ("Romance", "Romance", "heart.fill"),
-        ("Fantasy", "Fantasy", "wand.and.stars"),
-        ("Horror", "Horror", "ghost.fill"),
-        ("Mystery", "Mystery", "questionmark.circle.fill"),
-        ("Sci-Fi", "Sci-Fi", "rocket.fill"),
-        ("Sports", "Sports", "figure.run"),
-        ("Thriller", "Thriller", "exclamationmark.triangle.fill"),
-        ("Drama", "Drama", "theatermasks.fill"),
-        ("Slice of Life", "Slice of Life", "cup.and.saucer.fill"),
-        ("Supernatural", "Supernatural", "sparkles"),
-        ("Isekai", "Isekai", "arrow.triangle.swap"),
-        ("Shounen", "Shounen", "flame.fill"),
-        ("Seinen", "Seinen", "shield.fill"),
-        ("School", "School", "graduationcap.fill"),
-        ("Historical", "Historical", "clock.fill")
-    ]
-
-    /// Genres the user has selected for Surprise Me. Multi-select.
-    /// IDs of anime already shown by Surprise Me in this session. Tracked
-    /// so pressing Surprise Me again never returns the same anime twice.
-    /// Reset when the user clears their selection or exhausts the pool.
-    @State private var surpriseShownIds: Set<Int> = []
+    /// uniqueIds of titles already shown by Surprise Me in this session.
+    /// Tracked so pressing Surprise Me again never returns the same title
+    /// twice. Reset automatically when the pool is exhausted.
+    @State private var surpriseShownIds: Set<String> = []
     @State private var surpriseDestination: Media?
     @State private var isSurpriseLoading = false
 
@@ -613,8 +614,9 @@ struct SearchView: View {
     private var surpriseMeSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Simple one-button Surprise Me — no category chips, no filters.
-            // Picks a random anime from trending/popular on AniList.
-            // Tracks shown IDs so the same anime is never returned twice.
+            // Picks a random title from the live multi-provider pool
+            // (trending + popular + top rated). Tracks shown titles so the
+            // same one is never returned twice.
             Button {
                 surpriseMe()
             } label: {
@@ -652,90 +654,78 @@ struct SearchView: View {
         }
     }
 
-    /// Picks a random anime using a GENRE-BASED pool instead of category-based.
-    /// Was previously fetching trending + popular + top rated (3 fixed
-    /// categories, ~60 titles total — exhausted quickly). Now picks 3-4
-    /// random genres from a curated list and fetches up to 50 titles per
-    /// genre via `browseByGenre`, giving a pool of 150-200 titles.
+    /// Picks a random title from a POOL built through the multi-provider
+    /// chain (Batch 25). The pool blends trending + popular + top rated,
+    /// served by whichever database is live — Kitsu right now, MAL/AniList
+    /// when they recover — so Surprise Me keeps working through any single
+    /// provider's outage. It previously called AniList's genre API directly,
+    /// and every tap failed with "No anime found" while AniList was down.
     ///
-    /// The pool is cached for 10 minutes so repeated taps don't re-fetch.
-    /// If the pool is exhausted (user saw everything), we pick a new random
-    /// set of genres and refresh automatically.
+    /// The pool is cached for 10 minutes so repeated taps don't re-walk
+    /// the chain. Already-shown titles are excluded; exhausting the pool
+    /// resets the exclusion list automatically.
     private func surpriseMe() {
         isSurpriseLoading = true
         Task {
-            let now = Date()
             let cacheKey = isMangaMode ? "manga" : "anime"
+            let now = Date()
 
-            // Use cache if it's fresh (< 10 min old) and has unused items.
-            let useCache = SearchView.surpriseCache[cacheKey] != nil
+            let cacheFresh = SearchView.surpriseCache[cacheKey] != nil
                 && now.timeIntervalSince(SearchView.surpriseCacheTimestamp[cacheKey] ?? .distantPast) < 600
 
-            var results: [AniListMedia] = []
-            if useCache, let cached = SearchView.surpriseCache[cacheKey] {
-                results = cached
+            var pool: [Media] = []
+            if cacheFresh, let cached = SearchView.surpriseCache[cacheKey] {
+                pool = cached
             } else {
-                // Fresh fetch — pick 3-4 random genres and fetch a large pool.
-                // This gives a MUCH larger result pool than the old category approach
-                // (~150-200 titles vs ~60), so the user won't exhaust it quickly.
-                let type = isMangaMode ? "MANGA" : "ANIME"
-                let genres = isMangaMode ? SearchView.mangaGenres : SearchView.animeGenres
-                let shuffledGenres = genres.shuffled()
-                let selectedGenres = Array(shuffledGenres.prefix(4))
-
-                // Fetch each genre's top 50 titles. We use multiple genres
-                // (OR semantics) so the pool is diverse. If a genre fails,
-                // we skip it and continue with the others.
-                for genre in selectedGenres {
-                    if let batch = try? await AniListService.shared.browseByGenre(
-                        page: 1, type: type, genres: [genre], perPage: 50) {
-                        results.append(contentsOf: batch)
-                    }
+                // Fresh pool — each shelf request is the SAME deduplicated,
+                // cached, health-gated chain call the Home tab makes.
+                if isMangaMode {
+                    pool += (try? await UnifiedProviderSystem.shared.mangaShelf(.trending)) ?? []
+                    pool += (try? await UnifiedProviderSystem.shared.mangaShelf(.popular)) ?? []
+                } else {
+                    pool += (try? await UnifiedProviderSystem.shared.browse(category: .trending, page: 1)) ?? []
+                    pool += (try? await UnifiedProviderSystem.shared.browse(category: .popular, page: 1)) ?? []
+                    pool += (try? await UnifiedProviderSystem.shared.browse(category: .topRated, page: 1)) ?? []
                 }
+                // A title can chart on several lists — dedup once.
+                var seen = Set<String>()
+                pool = pool.filter { seen.insert($0.uniqueId).inserted }
 
-                // Deduplicate by ID (a title can match multiple genres).
-                var seen = Set<Int>()
-                results = results.filter { seen.insert($0.id).inserted }
-
-                // Cache the result — even if it's empty (so we don't keep
-                // retrying a failing API on every tap; the cache will
-                // expire after 10 min and retry).
-                SearchView.surpriseCache[cacheKey] = results
+                // Cache even an empty pool briefly so a total outage doesn't
+                // re-walk the (negative-cached) chain on every tap.
+                SearchView.surpriseCache[cacheKey] = pool
                 SearchView.surpriseCacheTimestamp[cacheKey] = now
             }
 
-            // Shuffle for true randomness
-            results.shuffle()
+            // Shuffle for true randomness.
+            pool.shuffle()
 
-            let pick: AniListMedia?
-            if results.isEmpty {
-                // API failure with no cache — reset exclusion list so next
-                // attempt starts fresh on the next call (after cache expires).
+            let pick: Media?
+            let unshown = pool.filter { !surpriseShownIds.contains($0.uniqueId) }
+            if let random = unshown.randomElement() {
+                surpriseShownIds.insert(random.uniqueId)
+                pick = random
+            } else if let first = pool.first {
+                // Pool exhausted — reset the exclusion list and refresh the
+                // pool on the next tap.
+                surpriseShownIds = [first.uniqueId]
+                pick = first
+                SearchView.surpriseCache[cacheKey] = nil
+                SearchView.surpriseCacheTimestamp[cacheKey] = .distantPast
+            } else {
+                // Empty pool — every source failed. Reset so the next tap
+                // (after the cache expires) starts fresh.
                 surpriseShownIds.removeAll()
                 pick = nil
-            } else {
-                // Exclude already-shown
-                let pool = results.filter { !surpriseShownIds.contains($0.id) }
-                if let random = pool.randomElement() {
-                    pick = random
-                    surpriseShownIds.insert(random.id)
-                } else {
-                    // Pool exhausted — reset exclusion and pick from full set.
-                    // Also clear the cache so the next tap fetches fresh genres.
-                    surpriseShownIds = [results[0].id]
-                    pick = results[0]
-                    SearchView.surpriseCache[cacheKey] = nil
-                    SearchView.surpriseCacheTimestamp[cacheKey] = .distantPast
-                }
             }
             await MainActor.run {
                 isSurpriseLoading = false
                 if let pick {
-                    surpriseDestination = AniListProvider.shared.mapMedia(pick)
+                    surpriseDestination = pick
                 } else {
                     ToastManager.shared.show(
                         title: "Surprise Me",
-                        message: "No anime found. Try again.",
+                        message: "Every source is unreachable right now. Try again in a moment.",
                         icon: "shuffle.circle",
                         iconColor: .orange
                     )
@@ -744,26 +734,13 @@ struct SearchView: View {
         }
     }
 
-    /// Static cache for Surprise Me results, keyed by media type ("anime" or
-    /// "manga"). Survives view re-creation. Refreshed every 10 minutes (see
-    /// `surpriseMe()`). Prevents repeated AniList API calls from triggering
-    /// rate-limiting after a few uses.
-    private static var surpriseCache: [String: [AniListMedia]] = [:]
+    /// Static cache for the Surprise Me pool, keyed by media type ("anime"
+    /// or "manga"). Survives view re-creation and refreshes every 10
+    /// minutes (see `surpriseMe()`). The underlying shelf calls are chain
+    /// cached too, so even a cold 10-minute refresh costs at most one
+    /// request per list.
+    private static var surpriseCache: [String: [Media]] = [:]
     private static var surpriseCacheTimestamp: [String: Date] = [:]
-
-    /// Curated genre lists for Surprise Me. Using a diverse set of genres
-    /// ensures the random pool is large and varied.
-    private static let animeGenres: [String] = [
-        "Action", "Adventure", "Comedy", "Drama", "Fantasy", "Sci-Fi",
-        "Mystery", "Romance", "Thriller", "Sports", "Supernatural",
-        "Slice of Life", "Psychological", "Horror", "Mecha", "Music"
-    ]
-
-    private static let mangaGenres: [String] = [
-        "Action", "Adventure", "Comedy", "Drama", "Fantasy", "Sci-Fi",
-        "Mystery", "Romance", "Thriller", "Supernatural",
-        "Slice of Life", "Psychological", "Horror", "Award Winning"
-    ]
 
     private func emptyStateView(icon: String, title: String, subtitle: String) -> some View {
         VStack(spacing: 16) {

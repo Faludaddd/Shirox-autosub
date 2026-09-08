@@ -5,22 +5,45 @@ import SwiftUI
 /// v2.15 — one renderer for the in-player overlay AND the Settings preview,
 /// so the preview can never drift from what actually plays. All styling is
 /// read live from `SubtitleSettingsManager`.
+///
+/// Batch 25 — the renderer consumes a `SubtitleStyle` VALUE. The settings
+/// initializer resolves the manager into that value; preset previews pass
+/// a style directly. Both paths go through this one `body`, so a preset
+/// preview can never drift from playback.
 struct SubtitleCaptionText: View {
     let text: String
-    @ObservedObject var settings: SubtitleSettingsManager
+    let style: SubtitleStyle
+    /// True → Apple's default caption look (System renderer mode).
+    var applePreset: Bool = false
     /// Hard cap for the caption width (points). When nil, the caller's
     /// container is expected to constrain width via `frame(maxWidth:)`.
     var maxWidthCap: CGFloat? = nil
+
+    /// Live-settings initializer (the player overlay + WYSIWYG previews).
+    init(text: String, settings: SubtitleSettingsManager, maxWidthCap: CGFloat? = nil) {
+        self.text = text
+        self.style = settings.currentStyle
+        self.applePreset = settings.useSystemRenderer
+        self.maxWidthCap = maxWidthCap
+    }
+
+    /// Style-value initializer (preset preview cards, sample renders).
+    init(text: String, style: SubtitleStyle, maxWidthCap: CGFloat? = nil) {
+        self.text = text
+        self.style = style
+        self.applePreset = false
+        self.maxWidthCap = maxWidthCap
+    }
 
     /// Outline color: auto-contrast with the text color so the caption stays
     /// legible on any background (white text → black outline and vice versa).
     private var outlineColor: Color {
         #if os(iOS) || os(tvOS)
-        let ui = UIColor(settings.foregroundColor)
+        let ui = UIColor(style.foregroundColor)
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         ui.getRed(&r, green: &g, blue: &b, alpha: &a)
         #else
-        let ns = NSColor(settings.foregroundColor).usingColorSpace(.deviceRGB) ?? .white
+        let ns = NSColor(style.foregroundColor).usingColorSpace(.deviceRGB) ?? .white
         let r = ns.redComponent
         let g = ns.greenComponent
         let b = ns.blueComponent
@@ -31,13 +54,13 @@ struct SubtitleCaptionText: View {
     /// Outline width scales with font size so big text keeps a proportional
     /// rim, capped so it never swallows the glyphs.
     private var outlineWidth: CGFloat {
-        let raw = CGFloat(settings.resolvedStrokeWidth) * max(1, settings.fontSize / 24.0)
+        let raw = CGFloat(style.resolvedStrokeWidth) * max(1, style.fontSize / 24.0)
         return min(raw, 6)
     }
 
     /// Line spacing in points, derived from the multiplier and the font size.
     private var lineSpacingPoints: CGFloat {
-        CGFloat((settings.lineSpacingMultiplier - 1.0) * settings.fontSize * 0.5)
+        CGFloat((style.lineSpacingMultiplier - 1.0) * style.fontSize * 0.5)
     }
 
     var body: some View {
@@ -45,7 +68,7 @@ struct SubtitleCaptionText: View {
         // Apple's DEFAULT subtitle look (white text on a semi-transparent
         // black plate, system font, centered — no custom knobs). Custom
         // mode is the full styling set below, unchanged.
-        if settings.useSystemRenderer {
+        if applePreset {
             Text(text)
                 .font(.system(size: 26, weight: .regular))
                 .foregroundStyle(.white)
@@ -61,22 +84,22 @@ struct SubtitleCaptionText: View {
                 .frame(maxWidth: maxWidthCap, alignment: .center)
         } else {
         let stroke = outlineWidth
-        let strokeColor = SubtitleSettingsManager.color(fromName: settings.strokeColorName)
-        let useAutoOutline = settings.resolvedStrokeWidth <= 0
+        let strokeColor = SubtitleSettingsManager.color(fromName: style.strokeColorName)
+        let useAutoOutline = style.resolvedStrokeWidth <= 0
 
         Text(text)
-            .font(.system(size: settings.fontSize,
-                          weight: settings.boldText ? .bold : .regular,
-                          design: settings.fontDesign))
-            .foregroundStyle(settings.foregroundColor.opacity(settings.textOpacity))
+            .font(.system(size: style.fontSize,
+                          weight: style.bold ? .bold : .regular,
+                          design: style.fontDesign))
+            .foregroundStyle(style.foregroundColor.opacity(style.textOpacity))
             .multilineTextAlignment(.center)
             .lineSpacing(lineSpacingPoints)
             .lineLimit(nil)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 12)
-            .padding(.vertical, settings.backgroundEnabled ? 6 : 0)
+            .padding(.vertical, style.backgroundEnabled ? 6 : 0)
             .background(
-                settings.backgroundEnabled
+                style.backgroundEnabled
                     ? RoundedRectangle(cornerRadius: 6, style: .continuous)
                         .fill(Color.black.opacity(0.6))
                     : nil
@@ -87,12 +110,12 @@ struct SubtitleCaptionText: View {
             ))
             // Soft glow — the baseline look every existing install has
             // (`shadowRadius`, default 2).
-            .shadow(color: .black.opacity(0.35), radius: max(CGFloat(settings.shadowRadius), 0))
+            .shadow(color: .black.opacity(0.35), radius: max(CGFloat(style.shadowRadius), 0))
             // Directional drop shadow — v2.15 addition (`shadowOffset`, 0 = off).
-            .shadow(color: .black.opacity(settings.shadowOffset > 0 ? 0.5 : 0),
-                    radius: CGFloat(max(settings.shadowOffset, 0)),
+            .shadow(color: .black.opacity(style.shadowOffset > 0 ? 0.5 : 0),
+                    radius: CGFloat(max(style.shadowOffset, 0)),
                     x: 0,
-                    y: CGFloat(max(settings.shadowOffset / 2.0, 0)))
+                    y: CGFloat(max(style.shadowOffset / 2.0, 0)))
             .frame(maxWidth: maxWidthCap, alignment: .center)
         }
     }

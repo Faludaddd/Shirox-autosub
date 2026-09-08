@@ -11,6 +11,13 @@ final class SearchViewModel: ObservableObject {
     @Published var hasSearched = false
     @Published var filters: AniListService.SearchFilters = .empty
 
+    // Batch 25 — honest source reporting on the results screen.
+    /// Which database actually served the current results ("Kitsu", …).
+    @Published var servedByName: String?
+    /// Set when a fallback changed what the user asked for (e.g. genre
+    /// filters need AniList, which is down — unfiltered results shown).
+    @Published var notice: String?
+
     private(set) var isUsingModule = false
     private var searchTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
@@ -49,6 +56,8 @@ final class SearchViewModel: ObservableObject {
         errorMessage = nil
         moduleResults = []
         aniListResults = []
+        notice = nil
+        servedByName = nil
         searchTask = Task {
             // Cache hit short-circuits the network entirely. A fresh hit also
             // suppresses the loading spinner so re-issued searches feel instant.
@@ -106,20 +115,31 @@ final class SearchViewModel: ObservableObject {
                     }
                 } else {
                     // Provider path. v2.24 — plain text searches run through
-                    // the UnifiedProviderSystem chains (anime: TVDB → MAL →
-                    // AniList → Kitsu; manga: MangaBaka → MAL → AniList) —
-                    // one shared, health-gated, deduplicated, cached chain.
+                    // the UnifiedProviderSystem chains; Batch 25 — the
+                    // chosen search database answers first (Kitsu by
+                    // default) with the badge below the results naming it.
                     // AniList's FILTER search (genre/format/year filters)
                     // only exists on AniList, so filtered queries keep their
-                    // direct AniList call — the chain has no equivalent.
+                    // direct AniList call — but when AniList is down, an
+                    // unfiltered chain search replaces the error wall.
                     let res: [Media]
                     if isMangaMode {
                         // Manga mode: the manga chain keeps anime results
-                        // out of Reading Mode.
+                        // out of Reading Mode (MangaBaka first, Kitsu
+                        // backing it up).
                         res = try await UnifiedProviderSystem.shared.searchManga(q)
                     } else if !filters.isEmpty {
-                        let aniListMedia = try await AniListService.shared.search(keyword: q, filters: filters)
-                        res = aniListMedia.map { AniListProvider.shared.mapMedia($0) }
+                        do {
+                            let aniListMedia = try await AniListService.shared.search(keyword: q, filters: filters)
+                            res = aniListMedia.map { AniListProvider.shared.mapMedia($0) }
+                        } catch {
+                            if Task.isCancelled { throw error }
+                            // Genre/format/year filters are AniList-only. If
+                            // AniList is unreachable, show unfiltered chain
+                            // results with an honest note instead of failing.
+                            res = try await UnifiedProviderSystem.shared.searchAnime(q)
+                            notice = "Filters need AniList, which is unreachable right now — showing unfiltered results."
+                        }
                     } else {
                         res = try await UnifiedProviderSystem.shared.searchAnime(q)
                     }
@@ -128,6 +148,7 @@ final class SearchViewModel: ObservableObject {
                         let deduped = res.filter { seen.insert($0.uniqueId).inserted }
                         aniListResults = deduped
                         moduleResults = []
+                        servedByName = UnifiedProviderSystem.shared.lastSearchServedBy?.displayName
                         resultCache[key] = CacheEntry(
                             moduleResults: [],
                             aniListResults: deduped,
@@ -137,11 +158,9 @@ final class SearchViewModel: ObservableObject {
                 }
             } catch {
                 if !Task.isCancelled {
-                    if isMangaMode && (AniListService.shared.isApiDisabled() || AniListService.shared.isRateLimited()) {
-                        errorMessage = "Manga search is temporarily unavailable. AniList and Jikan are both down. Please try again shortly."
-                    } else {
-                        errorMessage = error.localizedDescription
-                    }
+                    // The chain's own error already carries the real last
+                    // reason (e.g. the provider's own 403/504 body text).
+                    errorMessage = error.localizedDescription
                 }
             }
             if !Task.isCancelled {
@@ -193,7 +212,11 @@ final class SearchViewModel: ObservableObject {
         if usingModule {
             source = "module:" + (ModuleManager.shared.activeModule?.id ?? "?")
         } else {
-            source = "provider:" + (ProviderManager.shared.orderedProviders.first?.providerType.rawValue ?? "?")
+            // Batch 25 — the search database is part of the identity: pick
+            // a different database in Data Sources and a fresh search runs
+            // instead of replaying the previous database's cached results.
+            let primary = UnifiedProviderSystem.shared.searchPrimary?.rawValue ?? "kitsu"
+            source = "provider:" + (ProviderManager.shared.orderedProviders.first?.providerType.rawValue ?? "?") + ":" + primary
         }
         let mode = isMangaMode ? "manga" : "anime"
         return "\(source)|\(mode)|\(query.lowercased())|\(filters.effectiveSort)|\(filters.year ?? 0)|\(filters.season ?? "")|\(filters.format ?? "")|\(filters.status ?? "")|\(filters.genres.joined(separator: ","))|\(filters.studio ?? "")|\(filters.source ?? "")|\(filters.minEpisodes ?? 0)|\(filters.maxEpisodes ?? 0)"
@@ -216,6 +239,8 @@ final class SearchViewModel: ObservableObject {
         isLoading = false
         errorMessage = nil
         hasSearched = false
+        notice = nil
+        servedByName = nil
     }
 
     var hasResults: Bool { !moduleResults.isEmpty || !aniListResults.isEmpty }

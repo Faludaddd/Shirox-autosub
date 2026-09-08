@@ -102,6 +102,32 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.27",
+        date: "2026-09-08",
+        added: [
+            "A real Search Database setting — Settings → Data Sources now lets you pick which database answers your searches first. It defaults to Kitsu, an anime-only database with posters and proper series pages that is fully live right now, so searches finally return clean anime results instead of mixed TV listings.",
+            "Search results now say which database they came from (a small 'Results from Kitsu' line above the grid), so it is always visible who answered.",
+            "A redesigned Data Sources page: every source now has its own drawn logo mark (AniList's bars, TVDB's screen, Kitsu's ember, MangaBaka's open book…), a live dashboard shows at a glance whether Anime, Manga, and Schedule each have a working source, and the new Search Database picker sits right at the top.",
+            "A fully custom in-player Subtitles panel — a dark live-preview stage that shows exactly how your captions will look while you adjust them, six one-tap style presets (Shirox, Classic, Minimal, Bold, Boxed, Fansub) each drawn in its own real style, and restyled appearance controls. It replaces the plain system form."
+        ],
+        fixed: [
+            "The Surprise Me button works again — it was wired to a single database (AniList) that is currently having an outage, so every tap said 'No anime found.' It now picks from the same multi-source pool as the Home tab and keeps working as long as ANY source is live.",
+            "Searches with filters (genre, format, year) no longer fail outright while AniList is down — they show unfiltered results with a clear note instead of an error page.",
+            "Fresh installs (and anyone who never changed subtitle settings) now get a distinct 'Shirox' subtitle look by default — bold rounded white text with a crisp outline — instead of one so plain it was indistinguishable from Apple's default. Existing custom setups are untouched.",
+            "The Search page's 'Recommended for You' rail no longer goes blank during an AniList outage — it fills from whichever source is live.",
+            "The Data Sources page's manga chain label was out of date — it was missing the Kitsu backup source added in v2.26."
+        ],
+        changed: [
+            "Anime search now runs on Kitsu first by default (previously TVDB, whose results mixed in non-anime TV shows). Every other database still backs it up automatically, and the picker in Data Sources can change it at any time.",
+            "The subtitle appearance now switches instantly between presets, and hand-tuning any control clearly marks the style as Custom."
+        ],
+        improved: [
+            "Picking a different Search Database immediately re-runs any pending search with the new database — no stale results from the previous one."
+        ],
+        removed: [],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "2.26",
         date: "2026-09-08",
         added: [

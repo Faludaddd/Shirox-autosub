@@ -14,6 +14,96 @@ import Combine
 ///
 /// Legacy keys (`subtitle.*`) are preserved so existing installs keep their
 /// in-player settings; the placebo keys are migrated once (see `migrateLegacy`).
+/// A complete, snapshot-able subtitle APPEARANCE (Batch 25).
+///
+/// Value type so preset previews can render REAL mini-captions through
+/// the SAME `SubtitleCaptionText` renderer the player uses — a preview can
+/// never drift from what actually plays. Applying a preset writes every
+/// field atomically through `SubtitleSettingsManager.apply(_:)`.
+/// Layout knobs (position, delay, max width) are deliberately NOT part of
+/// a style: presets restyle the caption, they never move it.
+struct SubtitleStyle: Equatable {
+    var fontSize: Double
+    var bold: Bool
+    /// "default" / "rounded" / "serif" / "monospaced"
+    var fontDesignName: String
+    var foregroundColor: Color
+    var textOpacity: Double
+    /// "none" / "black" / "white" / "yellow" / …
+    var strokeColorName: String
+    var strokeWidth: Double
+    var backgroundEnabled: Bool
+    var shadowRadius: Double
+    var shadowOffset: Double
+    var lineSpacingMultiplier: Double
+}
+
+extension SubtitleStyle {
+    /// The named preset catalog. Order = display order in the pickers.
+    /// "Shirox" is the fresh-install default look: bold rounded white with
+    /// a crisp black rim — visibly the app's own, unlike Apple's plain
+    /// caption (that visual indistinctness is exactly why the custom UI
+    /// read as "not done" before Batch 25).
+    static let presets: [(name: String, style: SubtitleStyle)] = [
+        ("Shirox", SubtitleStyle(
+            fontSize: 26, bold: true, fontDesignName: "rounded",
+            foregroundColor: .white, textOpacity: 1,
+            strokeColorName: "black", strokeWidth: 1,
+            backgroundEnabled: false,
+            shadowRadius: 2, shadowOffset: 0, lineSpacingMultiplier: 1)),
+        ("Classic", SubtitleStyle(
+            fontSize: 30, bold: false, fontDesignName: "default",
+            foregroundColor: .white, textOpacity: 1,
+            strokeColorName: "black", strokeWidth: 1,
+            backgroundEnabled: false,
+            shadowRadius: 2, shadowOffset: 0, lineSpacingMultiplier: 1)),
+        ("Minimal", SubtitleStyle(
+            fontSize: 24, bold: false, fontDesignName: "default",
+            foregroundColor: .white, textOpacity: 1,
+            strokeColorName: "none", strokeWidth: 0,
+            backgroundEnabled: false,
+            shadowRadius: 0, shadowOffset: 0, lineSpacingMultiplier: 1)),
+        ("Bold", SubtitleStyle(
+            fontSize: 34, bold: true, fontDesignName: "default",
+            foregroundColor: .yellow, textOpacity: 1,
+            strokeColorName: "black", strokeWidth: 1.5,
+            backgroundEnabled: true,
+            shadowRadius: 2, shadowOffset: 0, lineSpacingMultiplier: 1)),
+        ("Boxed", SubtitleStyle(
+            fontSize: 26, bold: false, fontDesignName: "default",
+            foregroundColor: .white, textOpacity: 1,
+            strokeColorName: "none", strokeWidth: 0,
+            backgroundEnabled: true,
+            shadowRadius: 2, shadowOffset: 0, lineSpacingMultiplier: 1)),
+        ("Fansub", SubtitleStyle(
+            fontSize: 28, bold: true, fontDesignName: "default",
+            foregroundColor: .yellow, textOpacity: 1,
+            strokeColorName: "black", strokeWidth: 2,
+            backgroundEnabled: false,
+            shadowRadius: 1, shadowOffset: 0, lineSpacingMultiplier: 1))
+    ]
+
+    static func preset(named name: String) -> SubtitleStyle? {
+        presets.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }?.style
+    }
+
+    /// Mirrors `SubtitleSettingsManager.fontDesign` (same name → design).
+    var fontDesign: Font.Design {
+        switch fontDesignName.lowercased() {
+        case "rounded":    return .rounded
+        case "serif":      return .serif
+        case "monospaced": return .monospaced
+        default:           return .default
+        }
+    }
+
+    /// Mirrors `SubtitleSettingsManager.resolvedStrokeWidth`: "none" stroke
+    /// color disables the outline regardless of the width value.
+    var resolvedStrokeWidth: Double {
+        strokeColorName.lowercased() == "none" ? 0 : strokeWidth
+    }
+}
+
 @MainActor
 final class SubtitleSettingsManager: ObservableObject {
     static let shared = SubtitleSettingsManager()
@@ -46,6 +136,8 @@ final class SubtitleSettingsManager: ObservableObject {
         static let verticalOffset    = "subtitle.verticalOffset"
         // Batch 23 (item 7) — subtitle renderer choice.
         static let useSystemRenderer = "subtitle.useSystemRenderer"
+        // Batch 25 — name of the applied style preset ("" = fully custom).
+        static let presetName = "subtitle.presetName"
     }
 
     // MARK: - Published Properties
@@ -125,6 +217,56 @@ final class SubtitleSettingsManager: ObservableObject {
         didSet { UserDefaults.standard.set(useSystemRenderer, forKey: Keys.useSystemRenderer) }
     }
 
+    // MARK: - Preset tracking (Batch 25)
+
+    /// Name of the applied preset, or "" when the knobs have been touched
+    /// by hand (the pickers show that state as a custom style). Presets
+    /// themselves are pure `SubtitleStyle` values (see above); this string
+    /// only remembers which one is active for the checkmark UI.
+    @Published var presetName: String {
+        didSet { UserDefaults.standard.set(presetName, forKey: Keys.presetName) }
+    }
+
+    /// The live appearance as a value — exactly what `SubtitleCaptionText`
+    /// renders, so preset previews and the player share one source of truth.
+    var currentStyle: SubtitleStyle {
+        SubtitleStyle(
+            fontSize: fontSize,
+            bold: boldText,
+            fontDesignName: fontDesignName,
+            foregroundColor: foregroundColor,
+            textOpacity: textOpacity,
+            strokeColorName: strokeColorName,
+            strokeWidth: strokeWidth,
+            backgroundEnabled: backgroundEnabled,
+            shadowRadius: shadowRadius,
+            shadowOffset: shadowOffset,
+            lineSpacingMultiplier: lineSpacingMultiplier)
+    }
+
+    /// Writes a whole style at once (used by every preset tap). Pass a
+    /// preset name to track it for the checkmark; pass nil/"" for custom.
+    func apply(_ style: SubtitleStyle, presetName name: String? = nil) {
+        foregroundColor = style.foregroundColor
+        fontSize = style.fontSize
+        boldText = style.bold
+        fontDesignName = style.fontDesignName
+        textOpacity = style.textOpacity
+        strokeColorName = style.strokeColorName
+        strokeWidth = style.strokeWidth
+        backgroundEnabled = style.backgroundEnabled
+        shadowRadius = style.shadowRadius
+        shadowOffset = style.shadowOffset
+        lineSpacingMultiplier = style.lineSpacingMultiplier
+        presetName = name ?? ""
+    }
+
+    /// Applies a catalog preset by name (no-op for unknown names).
+    func applyPreset(named name: String) {
+        guard let style = SubtitleStyle.preset(named: name) else { return }
+        apply(style, presetName: name)
+    }
+
     // MARK: - Init
 
     private init() {
@@ -132,21 +274,27 @@ final class SubtitleSettingsManager: ObservableObject {
         // previously saved values always take precedence.
         UserDefaults.standard.register(defaults: [
             Keys.enabled:           true,
-            Keys.fontSize:          24.0,
+            // Batch 25 — fresh installs (and anyone who never customized)
+            // start on the distinctive "Shirox" look instead of a plain
+            // white caption that read as identical to Apple's default.
+            // Previously-written values always win, so customized setups
+            // are untouched.
+            Keys.fontSize:          26.0,
             Keys.shadowRadius:      2.0,
             Keys.backgroundEnabled: false,
             Keys.bottomPadding:     60.0,
             Keys.delay:             0.0,
-            Keys.boldText:          false,
-            Keys.strokeColor:       "none",
-            Keys.strokeWidth:       0.0,
-            Keys.fontDesign:        "default",
+            Keys.boldText:          true,
+            Keys.strokeColor:       "black",
+            Keys.strokeWidth:       1.0,
+            Keys.fontDesign:        "rounded",
             Keys.textOpacity:       1.0,
             Keys.lineSpacing:       1.0,
             Keys.maxWidthPercent:   90.0,
             Keys.shadowOffset:      0.0,
             Keys.verticalOffset:    0.0,
-            Keys.useSystemRenderer: false
+            Keys.useSystemRenderer: false,
+            Keys.presetName:        "Shirox"
         ])
 
         SubtitleSettingsManager.migrateLegacy()
@@ -169,6 +317,7 @@ final class SubtitleSettingsManager: ObservableObject {
         shadowOffset      = d.double(forKey: Keys.shadowOffset)
         verticalOffset    = d.double(forKey: Keys.verticalOffset)
         useSystemRenderer = d.bool(forKey: Keys.useSystemRenderer)
+        presetName        = d.string(forKey: Keys.presetName) ?? ""
     }
 
     /// One-time port of the old (disconnected) Settings-page keys onto the

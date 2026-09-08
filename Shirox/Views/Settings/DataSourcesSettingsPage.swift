@@ -1,6 +1,7 @@
 import SwiftUI
 
-// MARK: - Data Sources settings page (v2.24)
+// MARK: - Data Sources settings page (v2.24; Batch 25 rework — logo
+// marks, live dashboard, Search Database picker)
 //
 // The provider control room: every anime/manga/schedule source in one
 // place, with REAL health, REAL priority ordering (drag or buttons),
@@ -27,6 +28,7 @@ struct DataSourcesSettingsPage: View {
         ScrollView {
             VStack(spacing: 18) {
                 headerCard
+                searchDatabaseCard
                 providerDomainCard(
                     domain: .anime,
                     title: "Anime Providers",
@@ -35,7 +37,7 @@ struct DataSourcesSettingsPage: View {
                 providerDomainCard(
                     domain: .manga,
                     title: "Manga Providers",
-                    subtitle: "MangaBaka → MAL → AniList",
+                    subtitle: "MangaBaka → MAL → AniList → Kitsu",
                     icon: "text.book.closed.fill")
                 providerDomainCard(
                     domain: .schedule,
@@ -63,7 +65,7 @@ struct DataSourcesSettingsPage: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Anime: TVDB → MAL → AniList → Kitsu → AniDB\nManga: MangaBaka → MAL → AniList\nSchedule: AniChart → AnimeSchedule → MAL → AniList")
+            Text("Anime: TVDB → MAL → AniList → Kitsu → AniDB\nManga: MangaBaka → MAL → AniList → Kitsu\nSchedule: AniChart → AnimeSchedule → MAL → AniList\nAnime search: your Search Database (Kitsu by default) first")
         }
     }
 
@@ -90,22 +92,163 @@ struct DataSourcesSettingsPage: View {
                 }
                 Spacer()
             }
-            if let servedBy = providers.lastServedBy {
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(Color.green)
-                        .frame(width: 7, height: 7)
-                    Text("Currently serving: \(servedBy.displayName)")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                }
+            // Batch 25 — live per-domain dashboard: the first provider in
+            // each chain that is enabled, not cooling down, and not hard
+            // down. All real state, measured from actual requests.
+            VStack(spacing: 8) {
+                domainHealthRow(.anime, title: "Anime")
+                domainHealthRow(.manga, title: "Manga")
+                domainHealthRow(.schedule, title: "Schedule")
             }
+            .padding(.vertical, 10)
+            .padding(.horizontal, 12)
+            .background(Color.secondary.opacity(0.06),
+                        in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.secondary.opacity(0.08),
                     in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func domainHealthRow(_ domain: ProviderDomain, title: String) -> some View {
+        let live = liveProvider(for: domain)
+        let dot: Color
+        let statusText: String
+        if let live {
+            switch providers.statuses[live]?.state {
+            case .degraded, .rateLimited:
+                dot = .orange
+                statusText = "slow — \(live.displayName) + fallbacks"
+            case .healthy:
+                dot = .green
+                statusText = "via \(live.displayName)"
+            default:
+                dot = .gray
+                statusText = "ready — \(live.displayName) first"
+            }
+        } else {
+            dot = .red
+            statusText = "all sources down"
+        }
+        return HStack(spacing: 8) {
+            Circle()
+                .fill(dot)
+                .frame(width: 7, height: 7)
+            Text(title)
+                .font(.subheadline.weight(.medium))
+            Spacer()
+            Text(statusText)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+    }
+
+    /// First provider in the domain's chain that is enabled, not in a
+    /// cooldown window, and not hard-down/unreachable. Unknown (nothing
+    /// measured yet) still counts — the chain is armed, just untested.
+    private func liveProvider(for domain: ProviderDomain) -> MetaProviderKind? {
+        let order = providers.order(for: domain)
+        for kind in order where providers.isEnabled(kind) {
+            if let st = providers.statuses[kind], st.state == .healthy, !st.isCoolingDown {
+                return kind
+            }
+        }
+        for kind in order where providers.isEnabled(kind) {
+            if let st = providers.statuses[kind], !st.isCoolingDown,
+               st.state != .unavailable, st.state != .offline {
+                return kind
+            }
+        }
+        return nil
+    }
+
+    // MARK: - Search Database card (Batch 25)
+
+    /// Pick which database powers anime search. Kitsu is the default and
+    /// the recommended choice — anime-only, poster-rich, and live through
+    /// the current AniList/MAL outage windows. Whichever is picked, the
+    /// rest of the chain still backs it up automatically.
+    private var searchDatabaseCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass.circle.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Color.appAccent)
+                    .frame(width: 30, height: 30)
+                    .background(Color.appAccent.opacity(0.14),
+                                in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Search Database")
+                        .font(.headline)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    Text("The database that answers every anime search first")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                Spacer()
+            }
+
+            HStack(spacing: 8) {
+                ForEach(UnifiedProviderSystem.searchCapableProviders, id: \.rawValue) { kind in
+                    searchDatabaseOption(kind)
+                }
+            }
+
+            Text("Kitsu (default) is an anime-only database with posters and proper series pages, and it stays live while AniList and MyAnimeList are having outages — TVDB-first search returned mixed TV listings instead. Whichever you pick, the other databases still back it up automatically. Manga search always tries MangaBaka first.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.secondary.opacity(0.08),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func searchDatabaseOption(_ kind: MetaProviderKind) -> some View {
+        let isSelected = providers.effectiveSearchPrimary == kind
+        let isEnabled = providers.isEnabled(kind)
+        return Button {
+            providers.searchPrimary = kind
+            Haptics.light()
+        } label: {
+            VStack(spacing: 6) {
+                ProviderLogoMark(kind: kind, size: 36)
+                Text(kind.shortName)
+                    .font(.caption2.weight(isSelected ? .bold : .semibold))
+                    .foregroundStyle(isSelected ? Color.appAccent : .primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Color.appAccent)
+                } else {
+                    Image(systemName: "circle")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary.opacity(0.5))
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 9)
+            .opacity(isEnabled ? 1 : 0.4)
+            .background(
+                isSelected ? Color.appAccent.opacity(0.12) : Color.secondary.opacity(0.06),
+                in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(isSelected ? Color.appAccent.opacity(0.6) : Color.clear,
+                                  lineWidth: 1.5))
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .accessibilityLabel("\(kind.displayName) as search database\(isSelected ? ", selected" : "")")
     }
 
     // MARK: - Provider domain card (the priority chain)
@@ -183,15 +326,18 @@ struct DataSourcesSettingsPage: View {
                                 .font(.system(size: 10, weight: .bold))
                                 .foregroundStyle(.tertiary)
                         }
-                        Text(kind.shortName)
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(providers.isEnabled(kind) ? .primary : .secondary)
-                            .opacity(providers.isEnabled(kind) ? 1 : 0.4)
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 5)
-                            .background(
-                                Color.appAccent.opacity(providers.isEnabled(kind) ? 0.15 : 0.06),
-                                in: Capsule())
+                        HStack(spacing: 4) {
+                            ProviderLogoMark(kind: kind, size: 16)
+                            Text(kind.shortName)
+                                .font(.caption2.weight(.semibold))
+                        }
+                        .foregroundStyle(providers.isEnabled(kind) ? .primary : .secondary)
+                        .opacity(providers.isEnabled(kind) ? 1 : 0.4)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            Color.appAccent.opacity(providers.isEnabled(kind) ? 0.15 : 0.06),
+                            in: Capsule())
                     }
                 }
             }
@@ -464,28 +610,20 @@ struct ProviderDragHandle {
     let onDragEnded: (CGFloat) -> Void
 }
 
-// MARK: - Provider brand tile (Batch 23, item 2)
+// MARK: - Provider logo marks (Batch 25 rework)
+//
+// Hand-drawn SwiftUI brand marks — each provider gets its own instantly
+// recognizable SHAPE (AniList's three bars, TVDB's screen, Kitsu's ember,
+// MangaBaka's open book, AniDB's database cylinder, …) in its brand color,
+// not a generic two-letter monogram. Zero network dependency: a logo URL
+// would die exactly when its provider is down — which is when the user
+// looks at this page. Stable at every Dynamic Type size via the `size`
+// parameter (34pt in card rows, 16pt in the chain chips, 36pt in the
+// Search Database picker).
 
-/// A provider's recognizable identity tile: a two-letter monogram in the
-/// provider's brand color on a rounded square. Always renders (no network
-/// dependency — a logo URL would go dead exactly when its provider is
-/// down, which is when the user looks at this page), readable at a glance,
-/// and stable at every Dynamic Type size.
-private struct ProviderLogoTile: View {
+private struct ProviderLogoMark: View {
     let kind: MetaProviderKind
-
-    private var monogram: String {
-        switch kind {
-        case .tvdb:          return "TV"
-        case .mal:           return "M"
-        case .anilist:       return "AL"
-        case .kitsu:         return "K"
-        case .anidb:         return "DB"
-        case .mangabaka:     return "MB"
-        case .anichart:      return "AC"
-        case .animeschedule: return "AS"
-        }
-    }
+    var size: CGFloat = 34
 
     private var brandColor: Color {
         switch kind {
@@ -502,18 +640,195 @@ private struct ProviderLogoTile: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .fill(brandColor.opacity(0.18))
-            RoundedRectangle(cornerRadius: 9, style: .continuous)
+            RoundedRectangle(cornerRadius: size * 0.26, style: .continuous)
+                .fill(brandColor.opacity(0.16))
+            RoundedRectangle(cornerRadius: size * 0.26, style: .continuous)
                 .strokeBorder(brandColor.opacity(0.45), lineWidth: 1)
-            Text(monogram)
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(brandColor)
-                .minimumScaleFactor(0.6)
-                .lineLimit(1)
+            mark
         }
-        .frame(width: 34, height: 34)
+        .frame(width: size, height: size)
         .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private var mark: some View {
+        switch kind {
+        case .anilist:       AniListBarsMark(color: brandColor, size: size)
+        case .mal:           MALWordMark(color: brandColor, size: size)
+        case .kitsu:         KitsuEmberMark(color: brandColor, size: size)
+        case .tvdb:          TVScreenMark(color: brandColor, size: size)
+        case .mangabaka:     BookMark(color: brandColor, size: size)
+        case .anidb:         DatabaseCylinderMark(color: brandColor, size: size)
+        case .anichart:      ChartBarsMark(color: brandColor, size: size)
+        case .animeschedule: ClockMark(color: brandColor, size: size)
+        }
+    }
+}
+
+/// AniList — the three ascending bars of its wordmark.
+private struct AniListBarsMark: View {
+    let color: Color
+    let size: CGFloat
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: size * 0.07) {
+            Capsule().fill(color.opacity(0.6))
+                .frame(width: size * 0.10, height: size * 0.20)
+            Capsule().fill(color)
+                .frame(width: size * 0.10, height: size * 0.44)
+            Capsule().fill(color.opacity(0.8))
+                .frame(width: size * 0.10, height: size * 0.32)
+        }
+        .frame(width: size, height: size)
+    }
+}
+
+/// MyAnimeList — a wordmark tile (its own logo is literally "MAL").
+private struct MALWordMark: View {
+    let color: Color
+    let size: CGFloat
+
+    var body: some View {
+        Text("MAL")
+            .font(.system(size: size * 0.30, weight: .heavy, design: .rounded))
+            .foregroundStyle(.white)
+            .padding(.horizontal, size * 0.11)
+            .padding(.vertical, size * 0.04)
+            .background(color, in: RoundedRectangle(cornerRadius: size * 0.14, style: .continuous))
+            .minimumScaleFactor(0.6)
+            .lineLimit(1)
+    }
+}
+
+/// Kitsu — a stylized ember/flame.
+private struct KitsuEmberMark: View {
+    let color: Color
+    let size: CGFloat
+
+    var body: some View {
+        Path { p in
+            let w = size * 0.34
+            let h = size * 0.44
+            let cx = size * 0.5
+            let top = size * 0.27
+            let bottom = top + h
+            p.move(to: CGPoint(x: cx, y: top))
+            p.addCurve(to: CGPoint(x: cx + w * 0.5, y: bottom - w * 0.25),
+                       control1: CGPoint(x: cx + w * 0.30, y: top + h * 0.30),
+                       control2: CGPoint(x: cx + w * 0.5, y: bottom - w * 0.85))
+            p.addCurve(to: CGPoint(x: cx - w * 0.5, y: bottom - w * 0.25),
+                       control1: CGPoint(x: cx + w * 0.5, y: bottom),
+                       control2: CGPoint(x: cx - w * 0.5, y: bottom))
+            p.addCurve(to: CGPoint(x: cx, y: top),
+                       control1: CGPoint(x: cx - w * 0.5, y: bottom - w * 0.85),
+                       control2: CGPoint(x: cx - w * 0.30, y: top + h * 0.30))
+            p.closeSubpath()
+        }
+        .fill(color)
+        .frame(width: size, height: size)
+    }
+}
+
+/// TVDB — a TV screen on a stand.
+private struct TVScreenMark: View {
+    let color: Color
+    let size: CGFloat
+
+    var body: some View {
+        VStack(spacing: size * 0.04) {
+            RoundedRectangle(cornerRadius: size * 0.06, style: .continuous)
+                .strokeBorder(color, lineWidth: max(1.2, size * 0.05))
+                .frame(width: size * 0.46, height: size * 0.30)
+            VStack(spacing: size * 0.015) {
+                Rectangle()
+                    .fill(color)
+                    .frame(width: size * 0.045, height: size * 0.06)
+                Capsule()
+                    .fill(color)
+                    .frame(width: size * 0.22, height: size * 0.035)
+            }
+        }
+        .frame(width: size, height: size)
+    }
+}
+
+/// MangaBaka — an open book.
+private struct BookMark: View {
+    let color: Color
+    let size: CGFloat
+
+    var body: some View {
+        HStack(spacing: size * 0.012) {
+            RoundedRectangle(cornerRadius: size * 0.04, style: .continuous)
+                .fill(color.opacity(0.85))
+                .frame(width: size * 0.185, height: size * 0.28)
+                .rotationEffect(.degrees(-8))
+            RoundedRectangle(cornerRadius: size * 0.04, style: .continuous)
+                .fill(color.opacity(0.85))
+                .frame(width: size * 0.185, height: size * 0.28)
+                .rotationEffect(.degrees(8))
+        }
+        .frame(width: size, height: size)
+    }
+}
+
+/// AniDB — the classic database cylinder.
+private struct DatabaseCylinderMark: View {
+    let color: Color
+    let size: CGFloat
+
+    var body: some View {
+        let w = size * 0.30
+        let capH = size * 0.10
+        return VStack(spacing: 0) {
+            Capsule().fill(color).frame(width: w, height: capH)
+            Rectangle().fill(color).frame(width: w, height: size * 0.20)
+            Capsule().fill(color).frame(width: w, height: capH)
+        }
+        .frame(width: size, height: size)
+    }
+}
+
+/// AniChart — rising chart bars.
+private struct ChartBarsMark: View {
+    let color: Color
+    let size: CGFloat
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: size * 0.055) {
+            Capsule().fill(color.opacity(0.6))
+                .frame(width: size * 0.085, height: size * 0.16)
+            Capsule().fill(color.opacity(0.85))
+                .frame(width: size * 0.085, height: size * 0.25)
+            Capsule().fill(color)
+                .frame(width: size * 0.085, height: size * 0.36)
+        }
+        .frame(width: size, height: size)
+    }
+}
+
+/// AnimeSchedule — a clock face.
+private struct ClockMark: View {
+    let color: Color
+    let size: CGFloat
+
+    var body: some View {
+        let r = size * 0.17
+        let c = size * 0.5
+        let lw = max(1.2, size * 0.055)
+        return ZStack {
+            Circle()
+                .strokeBorder(color, lineWidth: lw)
+                .frame(width: r * 2, height: r * 2)
+            Path { p in
+                p.move(to: CGPoint(x: c, y: c))
+                p.addLine(to: CGPoint(x: c, y: c - r * 0.68))
+                p.move(to: CGPoint(x: c, y: c))
+                p.addLine(to: CGPoint(x: c + r * 0.52, y: c + r * 0.18))
+            }
+            .stroke(color, style: StrokeStyle(lineWidth: lw, lineCap: .round))
+        }
+        .frame(width: size, height: size)
     }
 }
 
@@ -595,7 +910,7 @@ private struct ProviderCardView: View {
                         .accessibilityHint("Drag up or down to change priority")
                 }
 
-                ProviderLogoTile(kind: kind)
+                ProviderLogoMark(kind: kind)
 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {

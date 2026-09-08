@@ -4073,57 +4073,33 @@ struct SubtitleSettingsPage: View {
         .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    // MARK: - Quick Presets Card
+    // MARK: - Quick Presets Card (Batch 25 — visual preset carousel)
 
+    /// Six one-tap styles. Each tile renders the preset's name through the
+    /// REAL `SubtitleCaptionText` in that preset's own style — the tiles
+    /// cannot lie about what applying them does.
     private var quickPresetsCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("Quick Presets", systemImage: "wand.and.stars")
+            Label("Style Presets", systemImage: "wand.and.stars")
                 .font(.headline)
 
-            Text("Tap a preset to apply a full subtitle style instantly. These now actually change what the player shows.")
+            Text("Tap a style to apply it instantly — every tile is a live render of that style.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            HStack(spacing: 8) {
-                presetButton(title: "Minimal") {
-                    settings.foregroundColor = .white
-                    settings.strokeColorName = "none"
-                    settings.strokeWidth = 0
-                    settings.backgroundEnabled = false
-                    settings.fontSize = 24
-                    settings.boldText = false
-                    settings.shadowRadius = 0
-                    settings.shadowOffset = 0
-                    settings.textOpacity = 1
-                    settings.lineSpacingMultiplier = 1
-                    settings.fontDesignName = "default"
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(SubtitleStyle.presets, id: \.name) { preset in
+                        presetTile(preset)
+                    }
                 }
-                presetButton(title: "Bold") {
-                    settings.foregroundColor = .yellow
-                    settings.strokeColorName = "black"
-                    settings.strokeWidth = 1.5
-                    settings.backgroundEnabled = true
-                    settings.fontSize = 34
-                    settings.boldText = true
-                    settings.shadowRadius = 2
-                    settings.shadowOffset = 0
-                    settings.textOpacity = 1
-                    settings.lineSpacingMultiplier = 1
-                    settings.fontDesignName = "default"
-                }
-                presetButton(title: "Classic") {
-                    settings.foregroundColor = .white
-                    settings.strokeColorName = "black"
-                    settings.strokeWidth = 1.0
-                    settings.backgroundEnabled = false
-                    settings.fontSize = 30
-                    settings.boldText = false
-                    settings.shadowRadius = 2
-                    settings.shadowOffset = 0
-                    settings.textOpacity = 1
-                    settings.lineSpacingMultiplier = 1
-                    settings.fontDesignName = "default"
-                }
+                .padding(.vertical, 2)
+            }
+
+            if settings.presetName.isEmpty {
+                Text("Custom — the appearance controls below are tuned by hand.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -4131,15 +4107,39 @@ struct SubtitleSettingsPage: View {
         .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    private func presetButton(title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
+    private func presetTile(_ preset: (name: String, style: SubtitleStyle)) -> some View {
+        let isSelected = settings.presetName.caseInsensitiveCompare(preset.name) == .orderedSame
+        return Button {
+            settings.applyPreset(named: preset.name)
+            Haptics.light()
+        } label: {
+            VStack(spacing: 6) {
+                ZStack(alignment: .topTrailing) {
+                    ZStack {
+                        LinearGradient(
+                            colors: [Color.black, Color(white: 0.18)],
+                            startPoint: .top, endPoint: .bottom)
+                        // The preset's own look, rendering its own name.
+                        SubtitleCaptionText(text: preset.name, style: preset.style)
+                            .padding(.horizontal, 6)
+                    }
+                    .frame(width: 108, height: 58)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    if isSelected {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(Color.appAccent)
+                            .background(Circle().fill(.thinMaterial))
+                            .offset(x: 4, y: -4)
+                    }
+                }
+                Text(preset.name)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(isSelected ? Color.appAccent : .primary)
+                    .lineLimit(1)
+            }
         }
-        .buttonStyle(.bordered)
-        .tint(.appAccent)
+        .buttonStyle(.plain)
     }
 
     // MARK: - Live Preview Card
