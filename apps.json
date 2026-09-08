@@ -31,7 +31,7 @@
           "date": "2026-09-08",
           "localizedDescription": "v2.28 — A real discovery architecture. A dedicated discovery database (Kitsu, with AniList and MAL as automatic backups) now decides what appears in Trending, Popular, the genre categories, the Home carousel, See All pages and Surprise Me, while TVDB stays the metadata primary resolving artwork and characters for the exact series it returns. Surprise Me is a true genre randomizer: a random genre first, then a random anime that genuinely belongs to it. Characters are back on anime pages through a full TVDB → MAL → AniList → Kitsu fallback chain with correct cross-provider id mapping. The Schedule page finally survives the current total outage of AniChart, AnimeSchedule, MAL and AniList — a new live source builds the week's real timetable from Kitsu's airing list joined with TVDB's actual air times. The Manga carousel shows its real title, and every pill surface (both carousels, anime and manga details) uses one shared polished pill component — larger, centered, never clipped. Settings → Data Sources is a completely new design: four large cards (Anime, Discovery, Manga, Schedule) opening dedicated priority screens with plain-language descriptions, drag-to-reorder, Make Primary, real provider tests with response times, Test All, and one-tap reset.",
           "downloadURL": "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa",
-          "size": 0
+          "size": 12566863
         },
         {
           "version": "2.27",
