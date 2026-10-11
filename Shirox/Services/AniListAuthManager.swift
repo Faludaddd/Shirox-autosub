@@ -167,6 +167,26 @@ final class AniListAuthManager: NSObject, ObservableObject {
 
     // MARK: - Viewer
 
+    /// Restores a backed-up session: writes the token, user id and score format, and refetches
+    /// the profile so the account chip fills in. Used by the backup import (Accounts section).
+    /// A nil field leaves whatever is on this device alone rather than signing the user out.
+    func restoreAccount(token: String?, userId restoredUserId: Int?, scoreFormat: String?) {
+        if let token, !token.isEmpty {
+            saveToken(token)
+            isLoggedIn = true
+            needsReauthentication = false
+        }
+        if let restoredUserId {
+            userId = restoredUserId
+            UserDefaults.standard.set(restoredUserId, forKey: "anilist_user_id")
+        }
+        if let scoreFormat, let format = ScoreFormat(rawValue: scoreFormat) {
+            self.scoreFormat = format
+            UserDefaults.standard.set(scoreFormat, forKey: "anilist_score_format")
+        }
+        if isLoggedIn { Task { await fetchViewer() } }
+    }
+
     func fetchViewer() async {
         guard let token = accessToken else { return }
         let query = """

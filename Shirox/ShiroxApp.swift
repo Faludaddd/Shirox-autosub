@@ -214,6 +214,15 @@ struct ShiroxApp: App {
 #endif
     @StateObject private var moduleManager = ModuleManager.shared
     @Environment(\.scenePhase) private var scenePhase
+    /// v2.31: shown on every cold start — the system launch screen is blank, so without
+    /// this the app opens on nothing and then snaps to content.
+    @State private var showSplash = true
+    /// v2.31: first-run setup. Driven by plain state rather than a binding computed from
+    /// the stored flag — SwiftUI calls a presentation binding's setter with `false`
+    /// whenever the cover isn't showing, and a setter that wrote "finished" on that
+    /// marked onboarding complete before it had ever been seen.
+    @State private var showOnboarding = false
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
 
     // Appearance settings — applied globally via .preferredColorScheme and .tint
     @AppStorage("appearanceMode") private var appearanceMode = "system"
@@ -268,6 +277,12 @@ struct ShiroxApp: App {
         PendingWriteQueue.shared.register(sink: LibraryWriteSink())
         // v2.31: seed the SyncTargets set from the old dualSync Bool, once per install.
         SyncTargets.migrateIfNeeded()
+        // v2.31: anyone who already has the app set up has effectively finished onboarding;
+        // don't interrupt an existing install to tell it how to do what it is already doing.
+        if !UserDefaults.standard.bool(forKey: "hasCompletedOnboarding"),
+           !ModuleManager.shared.modules.isEmpty {
+            UserDefaults.standard.set(true, forKey: "hasCompletedOnboarding")
+        }
         LocalLibraryManager.shared.syncFromContinueWatching()
         HostBlocklist.shared.loadIfNeeded()
         EpisodeNotificationManager.shared.registerDelegate()
@@ -292,6 +307,21 @@ struct ShiroxApp: App {
                 // tree without needing a full rebuild.
                 .overlay {
                     ToastContainerView()
+                }
+                // v2.31: first run — the app ships with no sources, so every tab is empty until
+                // one is connected. Onboarding says so and wires up the two things that fix it.
+                .fullScreenCoverCompat(isPresented: $showOnboarding) {
+                    OnboardingView()
+                        .environmentObject(moduleManager)
+                }
+                .overlay {
+                    if showSplash { SplashView(isPresented: $showSplash) }
+                }
+                .onChangeOf(showSplash) { stillShowing in
+                    // Decide once, after the splash hands over: presenting a cover underneath
+                    // it would just be revealed by the fade instead of arriving on its own.
+                    guard !stillShowing else { return }
+                    showOnboarding = !hasCompletedOnboarding
                 }
                 .task {
                     // Update check — fire on launch, then periodically while

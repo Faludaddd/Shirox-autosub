@@ -109,6 +109,32 @@ final class MALAuthManager: NSObject, ObservableObject {
 
     // MARK: - Login
 
+    /// Restores a backed-up session: writes the Keychain tokens and expiry, and replays the
+    /// cached profile so the account chip fills in without a network round-trip. Used by the
+    /// backup import (Accounts section). A nil field leaves whatever is on this device alone
+    /// rather than signing the user out.
+    func restoreAccount(accessToken: String?, refreshToken: String?,
+                        expiry: Double?, profile: Data?) {
+        if let accessToken, !accessToken.isEmpty {
+            keychainWrite(key: accessTokenKey, value: accessToken)
+            isLoggedIn = true
+        }
+        if let refreshToken, !refreshToken.isEmpty {
+            keychainWrite(key: refreshTokenKey, value: refreshToken)
+        }
+        if let expiry {
+            UserDefaults.standard.set(expiry, forKey: tokenExpiryKey)
+        }
+        if let profile {
+            UserDefaults.standard.set(profile, forKey: profileKey)
+            if let cached = try? JSONDecoder().decode(CachedProfile.self, from: profile) {
+                userId = cached.id
+                username = cached.name
+                avatarURL = cached.avatarURL
+            }
+        }
+    }
+
     func login(presentationAnchor: ASPresentationAnchor) {
         presentationAnchorWindow = presentationAnchor
         let verifier = generateCodeVerifier()

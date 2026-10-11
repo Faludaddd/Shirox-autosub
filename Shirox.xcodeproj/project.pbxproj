@@ -905,6 +905,30 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */ = {isa = PBXBui
                 1D7E00496481B46D86C0E530 /* SyncTargets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FCF5D4BE28837126DC12CF1 /* SyncTargets.swift */; };
                 72D3BC415BD6D3245B2A21AC /* SyncTargets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FCF5D4BE28837126DC12CF1 /* SyncTargets.swift */; };
                 D10DC173D3EB3959398A5A65 /* SyncTargets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FCF5D4BE28837126DC12CF1 /* SyncTargets.swift */; };
+                8C05679AB18C4F1B7FE6F20F /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 875DABFCB1AA2F12927CBF15 /* OnboardingView.swift */; };
+                A777152CAA7E1D14E576A0B0 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 875DABFCB1AA2F12927CBF15 /* OnboardingView.swift */; };
+                26D3860BEED0ADECE2046E84 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 875DABFCB1AA2F12927CBF15 /* OnboardingView.swift */; };
+                902D889F8D7C01345DCEE675 /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2628D0A47B424887DAD5F27 /* SplashView.swift */; };
+                7D09BA6270A3E50926CE5656 /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2628D0A47B424887DAD5F27 /* SplashView.swift */; };
+                8AB299F2652685D5CA1BD203 /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2628D0A47B424887DAD5F27 /* SplashView.swift */; };
+                28205746E58C1568AB680211 /* BackupEnvelope.swift in Sources */ = {isa = PBXBuildFile; fileRef = C33B7F2A91BC5E1669C2357B /* BackupEnvelope.swift */; };
+                09901E99B5F43E1B4DE0CF72 /* BackupEnvelope.swift in Sources */ = {isa = PBXBuildFile; fileRef = C33B7F2A91BC5E1669C2357B /* BackupEnvelope.swift */; };
+                AFD35E31974EAD888A0AFD28 /* BackupEnvelope.swift in Sources */ = {isa = PBXBuildFile; fileRef = C33B7F2A91BC5E1669C2357B /* BackupEnvelope.swift */; };
+                D142AB480EDE6D03F2A32219 /* BackupManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3ED19F54EEF7ACE57A2305C /* BackupManager.swift */; };
+                D3D0A152D30CB909560B9CEC /* BackupManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3ED19F54EEF7ACE57A2305C /* BackupManager.swift */; };
+                C54EA81C3DD36AF3CC117B53 /* BackupManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3ED19F54EEF7ACE57A2305C /* BackupManager.swift */; };
+                8A46F19DF6B0B8C2E655236E /* BackupSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = F82667189FAE7DF5EA6EC972 /* BackupSections.swift */; };
+                ED045516917060449D6EB5B0 /* BackupSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = F82667189FAE7DF5EA6EC972 /* BackupSections.swift */; };
+                97446E8C1AEEAF0AB05A1FA9 /* BackupSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = F82667189FAE7DF5EA6EC972 /* BackupSections.swift */; };
+                1894D58CA9E0D87F2E05C86E /* BackupAccountsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACE835409264EC5D7A0A37E9 /* BackupAccountsSection.swift */; };
+                0D64759EFB70A4942B4D0E40 /* BackupAccountsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACE835409264EC5D7A0A37E9 /* BackupAccountsSection.swift */; };
+                F8B7E8F1DD1D086051683703 /* BackupAccountsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACE835409264EC5D7A0A37E9 /* BackupAccountsSection.swift */; };
+                B4CDCD4A8883D7C04A7CE336 /* ModuleCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45FB1CBCC2BBFC796878D71 /* ModuleCheck.swift */; };
+                311AA59EC1E5C63AA013E38C /* ModuleCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45FB1CBCC2BBFC796878D71 /* ModuleCheck.swift */; };
+                377FB9012EEC8C4F84AD43CF /* ModuleCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45FB1CBCC2BBFC796878D71 /* ModuleCheck.swift */; };
+                2574425F6B22B4EFA5A86F68 /* BackupSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9C13EC9284BDE33426F544 /* BackupSettingsView.swift */; };
+                36C5577AAF572DAABAF75403 /* BackupSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9C13EC9284BDE33426F544 /* BackupSettingsView.swift */; };
+                2263F4A7A5462D335E8E79E4 /* BackupSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9C13EC9284BDE33426F544 /* BackupSettingsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1230,6 +1254,14 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
                 A6D4488D593D0B711FA06E32 /* LibrarySyncService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibrarySyncService.swift; sourceTree = "<group>"; };
                 9970B31153A18CDD095323FB /* LibrarySyncPlanner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibrarySyncPlanner.swift; sourceTree = "<group>"; };
                 1FCF5D4BE28837126DC12CF1 /* SyncTargets.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncTargets.swift; sourceTree = "<group>"; };
+                875DABFCB1AA2F12927CBF15 /* OnboardingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+                F2628D0A47B424887DAD5F27 /* SplashView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SplashView.swift; sourceTree = "<group>"; };
+                C33B7F2A91BC5E1669C2357B /* BackupEnvelope.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BackupEnvelope.swift; sourceTree = "<group>"; };
+                A3ED19F54EEF7ACE57A2305C /* BackupManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BackupManager.swift; sourceTree = "<group>"; };
+                F82667189FAE7DF5EA6EC972 /* BackupSections.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BackupSections.swift; sourceTree = "<group>"; };
+                ACE835409264EC5D7A0A37E9 /* BackupAccountsSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BackupAccountsSection.swift; sourceTree = "<group>"; };
+                B45FB1CBCC2BBFC796878D71 /* ModuleCheck.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ModuleCheck.swift; sourceTree = "<group>"; };
+                AA9C13EC9284BDE33426F544 /* BackupSettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BackupSettingsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1295,6 +1327,7 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
                 1279E4782FCA397700C9BA56 /* Models */ = {
                         isa = PBXGroup;
                         children = (
+                                C33B7F2A91BC5E1669C2357B /* BackupEnvelope.swift */,
                                 1279E4652FCA397700C9BA56 /* AniListActivity.swift */,
                                 1279E4662FCA397700C9BA56 /* AniListMedia.swift */,
                                 1279E4672FCA397700C9BA56 /* AniListNotification.swift */,
@@ -1338,6 +1371,10 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
                 1279E49F2FCA397700C9BA56 /* Services */ = {
                         isa = PBXGroup;
                         children = (
+                                A3ED19F54EEF7ACE57A2305C /* BackupManager.swift */,
+                                F82667189FAE7DF5EA6EC972 /* BackupSections.swift */,
+                                ACE835409264EC5D7A0A37E9 /* BackupAccountsSection.swift */,
+                                B45FB1CBCC2BBFC796878D71 /* ModuleCheck.swift */,
                                 E61C24FD91CE887F9588F162 /* LibraryListMemory.swift */,
                                 A6D4488D593D0B711FA06E32 /* LibrarySyncService.swift */,
                                 9970B31153A18CDD095323FB /* LibrarySyncPlanner.swift */,
@@ -1593,6 +1630,8 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */,
                 1279E4E72FCA397700C9BA56 /* Views */ = {
                         isa = PBXGroup;
                         children = (
+                                AA9C13EC9284BDE33426F544 /* BackupSettingsView.swift */,
+                                D5F8DE36F46927AA442E5C1B /* Onboarding */,
                                 7CCA69C05976C635B7D9796C /* UpcomingCalendarView.swift */,
                                 1279E4AE2FCA397700C9BA56 /* Downloads */,
                                 1279E4B02FCA397700C9BA56 /* Library */,
@@ -1743,6 +1782,15 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */,
                         sourceTree = "<group>";
                 };
 C44D2451545353874948DF1F
+                D5F8DE36F46927AA442E5C1B /* Onboarding */ = {
+                        isa = PBXGroup;
+                        children = (
+                                875DABFCB1AA2F12927CBF15 /* OnboardingView.swift */,
+                                F2628D0A47B424887DAD5F27 /* SplashView.swift */,
+                        );
+                        path = Onboarding;
+                        sourceTree = "<group>";
+                };
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -1949,6 +1997,14 @@ C44D2451545353874948DF1F
                         isa = PBXSourcesBuildPhase;
                         buildActionMask = 2147483647;
                         files = (
+                                AFD35E31974EAD888A0AFD28 /* BackupEnvelope.swift in Sources */,
+                                C54EA81C3DD36AF3CC117B53 /* BackupManager.swift in Sources */,
+                                97446E8C1AEEAF0AB05A1FA9 /* BackupSections.swift in Sources */,
+                                F8B7E8F1DD1D086051683703 /* BackupAccountsSection.swift in Sources */,
+                                377FB9012EEC8C4F84AD43CF /* ModuleCheck.swift in Sources */,
+                                2263F4A7A5462D335E8E79E4 /* BackupSettingsView.swift in Sources */,
+                                26D3860BEED0ADECE2046E84 /* OnboardingView.swift in Sources */,
+                                8AB299F2652685D5CA1BD203 /* SplashView.swift in Sources */,
                                                                 F5A6B7C8D9E10000000000A4 /* AnimatedSplashView.swift in Sources */,
 B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 D1A2B3C4E5F60718293A4B5C /* SeasonChainMathTests.swift in Sources */,
@@ -2026,6 +2082,14 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                         isa = PBXSourcesBuildPhase;
                         buildActionMask = 2147483647;
                         files = (
+                                09901E99B5F43E1B4DE0CF72 /* BackupEnvelope.swift in Sources */,
+                                D3D0A152D30CB909560B9CEC /* BackupManager.swift in Sources */,
+                                ED045516917060449D6EB5B0 /* BackupSections.swift in Sources */,
+                                0D64759EFB70A4942B4D0E40 /* BackupAccountsSection.swift in Sources */,
+                                311AA59EC1E5C63AA013E38C /* ModuleCheck.swift in Sources */,
+                                36C5577AAF572DAABAF75403 /* BackupSettingsView.swift in Sources */,
+                                A777152CAA7E1D14E576A0B0 /* OnboardingView.swift in Sources */,
+                                7D09BA6270A3E50926CE5656 /* SplashView.swift in Sources */,
                                 8D6DC81DF20E6467EBB9BA32 /* LibrarySyncPlanner.swift in Sources */,
                                 94B697176EF98978DE15DF49 /* LibrarySyncService.swift in Sources */,
                                 D10DC173D3EB3959398A5A65 /* SyncTargets.swift in Sources */,
@@ -2297,6 +2361,14 @@ A17F1001000000000000000A /* ForcedUpdateView.swift in Sources */,
                         isa = PBXSourcesBuildPhase;
                         buildActionMask = 2147483647;
                         files = (
+                                28205746E58C1568AB680211 /* BackupEnvelope.swift in Sources */,
+                                D142AB480EDE6D03F2A32219 /* BackupManager.swift in Sources */,
+                                8A46F19DF6B0B8C2E655236E /* BackupSections.swift in Sources */,
+                                1894D58CA9E0D87F2E05C86E /* BackupAccountsSection.swift in Sources */,
+                                B4CDCD4A8883D7C04A7CE336 /* ModuleCheck.swift in Sources */,
+                                2574425F6B22B4EFA5A86F68 /* BackupSettingsView.swift in Sources */,
+                                8C05679AB18C4F1B7FE6F20F /* OnboardingView.swift in Sources */,
+                                902D889F8D7C01345DCEE675 /* SplashView.swift in Sources */,
                                 074D937EBB3DF5A34CCD9F10 /* LibrarySyncPlanner.swift in Sources */,
                                 3FCE9A2E8111478BC412C937 /* LibrarySyncService.swift in Sources */,
                                 72D3BC415BD6D3245B2A21AC /* SyncTargets.swift in Sources */,

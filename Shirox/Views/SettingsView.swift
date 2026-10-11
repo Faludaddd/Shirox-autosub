@@ -166,11 +166,13 @@ struct SettingsView: View {
                 } label: {
                     SettingsCategoryRow(icon: "internaldrive.fill", title: "Storage", subtitle: "Downloads, caches, per-category clearing")
                 }
+                #if !os(tvOS)
                 NavigationLink {
                     BackupRestoreSettingsPage()
                 } label: {
-                    SettingsCategoryRow(icon: "externaldrive.badge.timemachine", title: "Backup & Restore", subtitle: "Export/import preferences")
+                    SettingsCategoryRow(icon: "externaldrive.badge.timemachine", title: "Backup & Restore", subtitle: "Backup file, restore data, accounts opt-in")
                 }
+                #endif
                 NavigationLink {
                     LoggerSettingsPage()
                 } label: {
@@ -5522,174 +5524,12 @@ struct TrackersSettingsPage: View {
 
 // MARK: - Backup & Restore Settings Page
 
-struct BackupRestoreSettingsPage: View {
-    @State private var showShareSheet = false
-    @State private var backupFileURL: URL?
-    @State private var showImporter = false
-    @State private var statusMessage: String?
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                // Hero card
-                VStack(spacing: 10) {
-                    Image(systemName: "externaldrive.badge.timemachine")
-                        .font(.system(size: 40))
-                        .foregroundStyle(Color.appAccent)
-                    Text("Backup & Restore")
-                        .font(.title2.bold())
-                    Text("Export your app preferences to a JSON file, or restore from a previous backup. Only String, Int, Double, and Bool values are included.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-
-                // Export card
-                VStack(alignment: .leading, spacing: 14) {
-                    Label("Export", systemImage: "arrow.up.doc")
-                        .font(.headline)
-                    Text("Creates a JSON backup of all serializable preferences (String/Int/Double/Bool) from UserDefaults and opens the system share sheet.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Button {
-                        exportBackup()
-                    } label: {
-                        Label("Export Backup", systemImage: "square.and.arrow.up")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(.appAccent)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding()
-                .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-
-                // Import card
-                VStack(alignment: .leading, spacing: 14) {
-                    Label("Import", systemImage: "arrow.down.doc")
-                        .font(.headline)
-                    Text("Restore preferences from a previously-exported JSON backup. Existing values for matching keys will be overwritten.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Button {
-                        showImporter = true
-                    } label: {
-                        Label("Import Backup", systemImage: "square.and.arrow.down")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(.appAccent)
-                    if let msg = statusMessage {
-                        Text(msg)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding()
-                .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            }
-            .padding()
-        }
-        .navigationTitle("Backup & Restore")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showShareSheet) {
-            if let url = backupFileURL {
-                ShareSheet(items: [url])
-                    // #100 — Frosted-glass backdrop so the sheet picks up the
-                    // content underneath instead of sitting on a flat card.
-                    .background(.ultraThinMaterial)
-            }
-        }
-        #endif
-        .fileImporter(
-            isPresented: $showImporter,
-            allowedContentTypes: [.json]
-        ) { result in
-            switch result {
-            case .success(let url):
-                importBackup(from: url)
-            case .failure:
-                statusMessage = "Could not import backup file."
-            }
-        }
-    }
-
-    private func exportBackup() {
-        let defaults = UserDefaults.standard
-        var serializable: [String: Any] = [:]
-        for (key, value) in defaults.dictionaryRepresentation() {
-            // Filter to serializable types only — Bool must be checked before
-            // Int/Double because NSNumber booleans also bridge to those types.
-            if let v = value as? Bool {
-                serializable[key] = v
-            } else if let v = value as? Int {
-                serializable[key] = v
-            } else if let v = value as? Double {
-                serializable[key] = v
-            } else if let v = value as? String {
-                serializable[key] = v
-            } else {
-                continue
-            }
-        }
-
-        guard JSONSerialization.isValidJSONObject(serializable) else {
-            statusMessage = "Cannot serialize preferences."
-            return
-        }
-
-        do {
-            let data = try JSONSerialization.data(withJSONObject: serializable, options: [.prettyPrinted, .sortedKeys])
-            let timestamp = Int(Date().timeIntervalSince1970)
-            let url = FileManager.default.temporaryDirectory
-                .appendingPathComponent("ShiroxBackup-\(timestamp).json")
-            try data.write(to: url)
-            backupFileURL = url
-            statusMessage = "Backup created — tap share to save it."
-            #if os(iOS)
-            showShareSheet = true
-            #endif
-        } catch {
-            statusMessage = "Export failed: \(error.localizedDescription)"
-        }
-    }
-
-    private func importBackup(from url: URL) {
-        let accessing = url.startAccessingSecurityScopedResource()
-        defer {
-            if accessing { url.stopAccessingSecurityScopedResource() }
-        }
-        do {
-            let data = try Data(contentsOf: url)
-            guard let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                statusMessage = "Invalid backup file."
-                return
-            }
-            let defaults = UserDefaults.standard
-            var restored = 0
-            for (key, value) in dict {
-                // Same Bool-first ordering as export.
-                if let v = value as? Bool {
-                    defaults.set(v, forKey: key); restored += 1
-                } else if let v = value as? Int {
-                    defaults.set(v, forKey: key); restored += 1
-                } else if let v = value as? Double {
-                    defaults.set(v, forKey: key); restored += 1
-                } else if let v = value as? String {
-                    defaults.set(v, forKey: key); restored += 1
-                }
-            }
-            statusMessage = "Restored \(restored) preference\(restored == 1 ? "" : "s")."
-        } catch {
-            statusMessage = "Import failed: \(error.localizedDescription)"
-        }
-    }
-}
+// v2.31: the original's full Backup & Restore replaced the fork's earlier
+// preferences-only page. Kept as a thin alias so the Settings nav entry and the
+// search index (page: .backup) keep working unchanged.
+#if !os(tvOS)
+typealias BackupRestoreSettingsPage = BackupSettingsView
+#endif
 
 // MARK: - Logger Settings Page
 

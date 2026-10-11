@@ -103,6 +103,33 @@ final class ModuleManager: ObservableObject {
 
     // MARK: - Remove Module
 
+    /// Reinstalls a set of modules from their manifest URLs (backup restore): clears the
+    /// installed set, re-fetches each manifest, and re-selects the module that was active.
+    /// Returns the URLs that could not be reinstalled, so the import can name them.
+    func restoreModules(jsonUrls: [String], activeId: String?) async -> [String] {
+        modules = []
+        activeModule = nil
+        saveToStorage()
+
+        var failed: [String] = []
+        for urlString in jsonUrls {
+            guard let url = URL(string: urlString) else {
+                failed.append(urlString)
+                continue
+            }
+            let before = modules.count
+            // Our addModule throws on failure (upstream's reports via verdicts); either way
+            // a module that didn't install leaves the count unchanged.
+            _ = try? await addModule(from: url)
+            if modules.count == before { failed.append(urlString) }
+        }
+
+        if let activeId, let module = modules.first(where: { $0.id == activeId }) {
+            selectModule(module)
+        }
+        return failed
+    }
+
     func removeModule(_ module: ModuleDefinition) {
         modules.removeAll { $0.id == module.id }
         if activeModule?.id == module.id {

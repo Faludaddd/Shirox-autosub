@@ -156,6 +156,15 @@ import Combine
 
     // MARK: - Persistence
 
+    /// Replaces the whole Continue Reading store from a backup, in one step. Used by the
+    /// backup import.
+    func restore(items newItems: [MangaReadingItem],
+                 readChapters newReadChapters: [String: Set<String>]) {
+        items = newItems
+        readChapters = newReadChapters
+        persist()
+    }
+
     private func persist() {
         if let data = try? JSONEncoder().encode(items) {
             UserDefaults.standard.set(data, forKey: Keys.items)

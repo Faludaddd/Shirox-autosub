@@ -85,6 +85,24 @@ final class JellyfinAuthManager: ObservableObject {
 
     // MARK: - Auth
 
+    /// Restores a backed-up session: writes the server, its name and the Keychain token +
+    /// user id. Used by the backup import (Accounts section). A nil field leaves whatever is
+    /// on this device alone rather than signing the user out.
+    func restoreAccount(token: String?, userId: String?, serverURL: String?, serverName: String?) {
+        if let serverURL, !serverURL.isEmpty {
+            UserDefaults.standard.set(serverURL, forKey: Keys.serverURL)
+        }
+        if let serverName {
+            UserDefaults.standard.set(serverName, forKey: Keys.serverName)
+            self.serverName = serverName
+        }
+        if let token, !token.isEmpty { JellyfinKeychain.save(token, account: Keys.tokenAccount) }
+        if let userId, !userId.isEmpty { JellyfinKeychain.save(userId, account: Keys.userIdAccount) }
+
+        isAuthenticated = JellyfinKeychain.read(Keys.tokenAccount) != nil
+            && UserDefaults.standard.string(forKey: Keys.serverURL) != nil
+    }
+
     func authenticate(serverURL raw: String, username: String, password: String) async throws {
         guard let base = Self.normalizeServerURL(raw) else { throw JellyfinAuthError.invalidURL }
         var req = URLRequest(url: base.appendingPathComponent("Users/AuthenticateByName"))

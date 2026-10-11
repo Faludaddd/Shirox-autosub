@@ -26,7 +26,7 @@ import Combine
     // MARK: - Private Properties
 
     private let maxItems = 20
-    private static let currentDataVersion = 2
+    static let currentDataVersion = 2
 
     // MARK: - Init
 
@@ -1179,6 +1179,18 @@ import Combine
     }
 
     // MARK: - Persistence
+
+    /// Replaces the whole Continue Watching store from a backup, in one step, so the published
+    /// arrays and the persisted JSON can never disagree. Used by the backup import.
+    func restore(items newItems: [ContinueWatchingItem],
+                 watchedKeys newWatchedKeys: Set<String>,
+                 watchedHrefKeys newWatchedHrefKeys: Set<String>) {
+        items = newItems
+        watchedKeys = newWatchedKeys
+        watchedHrefKeys = newWatchedHrefKeys
+        UserDefaults.standard.set(Self.currentDataVersion, forKey: Keys.dataVersion)
+        persist()
+    }
 
     private func persist() {
         items = items.sorted { cwSortOrder($0, $1) }
