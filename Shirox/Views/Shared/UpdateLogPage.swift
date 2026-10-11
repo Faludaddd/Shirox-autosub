@@ -102,6 +102,26 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.30",
+        date: "2026-10-12",
+        added: [],
+        fixed: [
+            "AniList 400 responses while signed in are now read as a refused token — Settings shows \"Sign in again\" instead of claiming a session every request rejects.",
+            "Episode-list number circles: three-digit episode numbers shrink to fit their circle instead of being clipped.",
+            "The screen now stays on while a video plays, and returns to normal idle behavior when playback ends."
+        ],
+        changed: [
+            "The Schedule is RESTORED to the way it was before v2.29: the chain runs AniChart \u{2192} AnimeSchedule \u{2192} MAL \u{2192} AniList \u{2192} Kitsu+TVDB synthesis again and the first source that answers wins — no merged results, no stale-while-refresh; the page loads exactly the way it used to.",
+            "AnimeSchedule's API-token row is back under Settings \u{2192} Data Sources \u{2192} Schedule — the same row in the same place as before. A token saved before v2.29 is still stored on your device and reconnects automatically; without one the provider politely declines and the chain moves on.",
+            "Jikan is no longer a schedule source (the schedule domain runs the restored chain); it remains the general fallback for anime and manga search, shelves and genres."
+        ],
+        improved: [],
+        removed: [],
+        other: [
+            "The Settings layout is UNCHANGED — the Data Sources dashboard, per-domain priority screens, provider tests and cache card are exactly as they were in v2.29."
+        ]
+    ),
+    UpdateLogEntry(
         version: "2.29",
         date: "2026-09-08",
         added: [

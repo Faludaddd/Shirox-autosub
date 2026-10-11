@@ -1358,18 +1358,14 @@ struct ScheduleView: View {
     /// the preload completed during the 3.5s splash, `ScheduleView` renders
     /// instantly with no spinner.
     ///
-    /// Batch 27 — The unified schedule chain: AniChart → MAL → AniList →
-    /// Jikan, then the Kitsu+TVDB synthesized timetable — all through the
-    /// centralized provider system (health-gated, merge-partial, cached —
+    /// v2.24 — The unified schedule chain: AniChart (AniList's own airing
+    /// chart backend) → AnimeSchedule → MAL (Jikan) → AniList, all through
+    /// the centralized provider system (health-gated, deduped, cached —
     /// every screen shares one request). The disk snapshot of the last
     /// good schedule (≤ 48h) is the final fallback. The page only shows
     /// the error state when EVERY source failed; while a backup source
     /// serves data a slim notice explains where it came from. Successful
     /// loads (any source) refresh the snapshot.
-    ///
-    /// STALE-WHILE-REFRESH (Batch 27): a fresh-enough disk snapshot
-    /// renders IMMEDIATELY (no spinner) while the live chain refreshes in
-    /// the background — the UI never blocks on data it already has.
     private func load() async {
         isLoading = true
         loadError = nil
@@ -1387,7 +1383,7 @@ struct ScheduleView: View {
 
         var fetched: [UnifiedScheduleEntry] = []
         // Batch 23 — distinguishes "a LIVE backup provider served the page"
-        // (MAL/AniList/Jikan — fresh, real data worth persisting)
+        // (MAL/AniList/AnimeSchedule — fresh, real data worth persisting)
         // from "the DISK snapshot itself served the page" (re-saving it
         // would just re-stamp stale data as fresh). The old flag conflated
         // the two: when MAL served as backup nothing was persisted, so the
@@ -1395,48 +1391,35 @@ struct ScheduleView: View {
         // the hard error wall with real data nowhere to be found.
         var servedFromDiskSnapshot = false
 
-        // ── Stale-while-refresh (Batch 27): render a fresh-enough disk
-        //    snapshot INSTANTLY, then refresh from the live chain in the
-        //    background — the UI never blocks on data it already has.
-        //    (The 3s "too fresh to re-fetch" guard keeps pull-to-refresh
-        //    and the live refresh from double-firing.)
+        // ── The unified provider chain (AniChart → AnimeSchedule → MAL →
+        //    AniList), with the AniList in-memory cache checked first so a
+        //    completed splash preload still renders instantly. ──────────
         if let cached = AniListService.shared.cachedAiringSchedules(from: startTs, to: endTs) {
             fetched = cached.map { UnifiedScheduleEntry(item: $0) }
         } else {
-            if let snapshot = ScheduleFallbackService.shared.cachedSnapshot(from: startTs, to: endTs) {
-                // Instant render from the snapshot; the live refresh
-                // continues below and replaces it when real data lands.
-                fetched = snapshot.entries
-                let f = RelativeDateTimeFormatter()
-                sourceNotice = "Showing the schedule saved \(f.localizedString(for: snapshot.storedAt, relativeTo: Date())) ago — refreshing…"
-            }
             do {
                 let result = try await UnifiedProviderSystem.shared.scheduleEntries(from: startTs, to: endTs)
                 fetched = result.entries
-                sourceNotice = nil
                 // Honest source notice when a backup (non-primary) source
-                // served the schedule (Batch 27 chain notices —
-                // AnimeSchedule is gone; Jikan is the real 4th leg).
+                // served the schedule.
                 if let source = result.source, source != .anichart {
                     switch source {
+                    case .animeschedule:
+                        sourceNotice = "AniChart is unreachable — showing this week's timetable from AnimeSchedule."
                     case .mal:
-                        sourceNotice = "AniChart is unreachable — showing this week's season chart from MyAnimeList."
+                        sourceNotice = "AniChart and AnimeSchedule are unreachable — showing this week's airing list from MyAnimeList."
                     case .anilist:
                         sourceNotice = "Showing this week's airing schedule from AniList."
-                    case .jikan:
-                        sourceNotice = "AniChart, MAL and AniList are unreachable — showing this week's airing timetable from Jikan."
                     case .kitsu:
-                        sourceNotice = "AniChart, MAL, AniList and Jikan are all unreachable — showing this week's real air times from Kitsu + TVDB."
+                        sourceNotice = "AniChart, AnimeSchedule, MAL and AniList are all unreachable — showing this week's real air times from Kitsu + TVDB."
                     default:
                         break
                     }
                 }
             } catch {
-                Logger.shared.log("[Schedule] provider chain failed (\(error.localizedDescription)) — falling back to the offline snapshot", type: "Provider")
-                // ── Final fallback: the disk snapshot (already served
-                //    instantly above if it existed).
-                if fetched.isEmpty,
-                   let cached = ScheduleFallbackService.shared.cachedSnapshot(from: startTs, to: endTs) {
+                Logger.shared.log("[Schedule] provider chain failed (\(error.localizedDescription)) — trying offline snapshot", type: "Provider")
+                // ── Final fallback: disk snapshot of the last good schedule. ─
+                if let cached = ScheduleFallbackService.shared.cachedSnapshot(from: startTs, to: endTs) {
                     fetched = cached.entries
                     servedFromDiskSnapshot = true
                     let f = RelativeDateTimeFormatter()

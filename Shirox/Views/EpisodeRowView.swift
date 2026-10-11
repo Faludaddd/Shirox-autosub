@@ -61,6 +61,11 @@ struct EpisodeRowView: View {
                                 Text(episode.displayNumber)
                                     .font(.footnote.weight(.bold))
                                     .foregroundStyle(adaptiveBackground)   // ← now defined locally
+                                    // v2.30 (original's fix): a 3-digit episode number
+                                    // must fit its circle — shrink instead of clipping.
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.4)
+                                    .frame(width: 34)
                             }
                         }
                         .shadow(color: Color.glowEnabled ? (isComplete ? Color.green : Color.primary).opacity(0.3) : .clear,

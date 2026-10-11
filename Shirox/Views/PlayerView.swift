@@ -354,6 +354,10 @@ struct PlayerView: View {
         }
         .ignoresSafeArea()
         .onAppear {
+            // v2.30 (original's fix): the screen stays on while a video plays.
+            #if os(iOS)
+            UIApplication.shared.isIdleTimerDisabled = true
+            #endif
             // Sync subtitleTracks from currentStream — safer than relying on init-time @State override
             if subtitleTracks == nil, let tracks = currentStream.allSubtitles, !tracks.isEmpty {
                 subtitleTracks = tracks
@@ -403,6 +407,9 @@ struct PlayerView: View {
             }
         }
         .onDisappear {
+            #if os(iOS)
+            UIApplication.shared.isIdleTimerDisabled = false
+            #endif
             Logger.shared.log("[Rating] PlayerView.onDisappear: completionBox.context=\(completionBox.context != nil ? "set" : "nil")", type: "Debug")
             if let ctx = completionBox.context {
                 Logger.shared.log("[Rating] PlayerView.onDisappear: requesting rating prompt for ep=\(ctx.episodeNumber)", type: "Debug")

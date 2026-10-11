@@ -421,12 +421,12 @@ extension MetaProviderKind {
             return "Additional manga fallback — keeps the Manga tab working through outages."
         case (.anichart, _):
             return "Primary schedule source — AniList's weekly airing chart."
+        case (.animeschedule, _):
+            return "Weekly timetable backup. Add a free API token below to activate it."
         case (.mal, .schedule):
-            return "MyAnimeList's season chart — backs the schedule up when AniChart is down."
+            return "Airing-list backup from MyAnimeList when AniChart is down."
         case (.anilist, .schedule):
             return "Schedule backup from AniList's airing calendar."
-        case (.jikan, .schedule):
-            return "Jikan's weekly airing timetable — the general last-resort schedule source."
         case (.jikan, .manga):
             return "Final manga fallback — keeps manga working when every other source is down."
         case (.jikan, .anime):
@@ -584,6 +584,7 @@ struct ProviderDomainDetailPage: View {
     @State private var showResetConfirmation = false
 
     // User-configurable credentials (moved onto the relevant domains).
+    @State private var animescheduleToken = ""
     @State private var anidbClientName = ""
     @State private var anidbClientVersion = ""
     @State private var loadedCredentials = false
@@ -757,17 +758,16 @@ struct ProviderDomainDetailPage: View {
 
     @ViewBuilder
     private var credentialsSection: some View {
-        // Batch 27 — the schedule chain needs no credentials anymore
-        // (AnimeSchedule was removed entirely; every remaining schedule
-        // source is a public API). AniDB keeps its registered-client
-        // identity row under the Anime domain.
-        if domain == .anime {
+        if domain == .schedule {
+            AnimeScheduleTokenRow(token: $animescheduleToken)
+        } else if domain == .anime {
             AniDBCredentialsRow(clientName: $anidbClientName, clientVersion: $anidbClientVersion)
         }
     }
 
     private func loadCredentials() {
         guard !loadedCredentials else { return }
+        animescheduleToken = AnimeScheduleProvider.shared.apiToken
         anidbClientName = AniDBProvider.shared.clientName
         anidbClientVersion = AniDBProvider.shared.clientVersion
         loadedCredentials = true
@@ -1222,6 +1222,7 @@ private struct ProviderLogoMark: View {
         case .anidb:         return Color(red: 0.42, green: 0.13, blue: 0.22)   // AniDB dark maroon
         case .mangabaka:     return Color(red: 0.48, green: 0.31, blue: 0.92)   // MangaBaka violet
         case .anichart:      return Color(red: 0.00, green: 0.68, blue: 0.63)   // AniChart teal
+        case .animeschedule: return Color(red: 0.20, green: 0.68, blue: 0.33)   // AnimeSchedule green
         case .jikan:         return Color(red: 0.24, green: 0.20, blue: 0.16)   // Jikan ink (MyAnimeList's public API twin)
         }
     }
@@ -1248,6 +1249,7 @@ private struct ProviderLogoMark: View {
         case .mangabaka:     BookMark(color: brandColor, size: size)
         case .anidb:         DatabaseCylinderMark(color: brandColor, size: size)
         case .anichart:      ChartBarsMark(color: brandColor, size: size)
+        case .animeschedule: ClockMark(color: brandColor, size: size)
         case .jikan:         ClockMark(color: brandColor, size: size)
         }
     }
@@ -1421,6 +1423,53 @@ private struct ClockMark: View {
 }
 
 // MARK: - Credential rows
+
+/// AnimeSchedule API token — the provider's v3 API requires a free token
+/// from an AnimeSchedule account (their terms forbid embedding app tokens
+/// in public code, so the app ships without one by design).
+private struct AnimeScheduleTokenRow: View {
+    @Binding var token: String
+    @State private var showHelp = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "key.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.appAccent)
+                Text("AnimeSchedule API Token (optional)")
+                    .font(.caption.weight(.semibold))
+                Spacer()
+                Button {
+                    withAnimation { showHelp.toggle() }
+                } label: {
+                    Image(systemName: "questionmark.circle")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+            }
+            if showHelp {
+                Text("Create a free account at animeschedule.net, open Account → API, create an application, and paste its token here. AnimeSchedule's terms require every app to use its own token — Shirox ships without one, so the provider activates only when you add yours.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            TextField("Paste your application token", text: $token)
+                .font(.caption)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(Color.secondary.opacity(0.1),
+                            in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .onChangeOf(token) { newValue in
+                    AnimeScheduleProvider.shared.apiToken = newValue
+                }
+        }
+        .padding(12)
+        .background(Color.secondary.opacity(0.05),
+                    in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+    }
+}
 
 /// AniDB client identity — AniDB's HTTP API only answers registered
 /// client names, so users with their own registration fill it in here.
