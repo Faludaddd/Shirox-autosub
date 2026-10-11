@@ -388,39 +388,7 @@ struct PlayerView: View {
             }
 
             if engine != nil, !castManager.isConnected {
-                #if !os(tvOS)
-                if subtitleRoute == .assOverlay, let av = engine as? AVPlayerEngine, let assScript {
-                    PlayerAssOverlay(script: assScript, engine: av, filled: assOverlayFilled,
-                                     visible: subtitleSettings.enabled,
-                                     delay: subtitleSettings.delaySeconds,
-                                     fontScale: subtitleSettings.fontSize / 24)
-                        .ignoresSafeArea()
-                        .allowsHitTesting(false)
-                }
-                #endif
-
-                ClockReader(clock: clock) { clock in
-                    PlayerSubtitleOverlay(
-                        // On a mirrored TV they're drawn over the picture there instead.
-                        cues: subtitleRoute == .cues && !mpvOnExternalDisplay ? subtitleCues : [],
-                        currentTime: clock.currentTime,
-                        showControls: showControls,
-                        settings: subtitleSettings
-                    )
-                }
-                .ignoresSafeArea()
-                .allowsHitTesting(false)
-
-                if isBuffering && videoReady && !showStallRetry {
-                    ProgressView()
-                        .tint(.white)
-                        .scaleEffect(1.5)
-                        .allowsHitTesting(false)
-                }
-
-                #if os(iOS)
-                loadingDismissButton
-                #endif
+                subtitleAndBufferOverlays
             }
 
             // While the retry modal is up, drop the interaction layer entirely. Its
@@ -973,6 +941,47 @@ struct PlayerView: View {
     }
 
     // MARK: - Extracted UI Components
+
+    /// The subtitle layers and buffering indicator, pulled out of `body` proper: the merged
+    /// engine-switching body sits past the type-checker's reasonable-time budget, and every
+    /// block moved into its own property brings it back down (the compiler reported a
+    /// time-out at the buffering indicator before this extraction).
+    @ViewBuilder
+    private var subtitleAndBufferOverlays: some View {
+        #if !os(tvOS)
+        if subtitleRoute == .assOverlay, let av = engine as? AVPlayerEngine, let assScript {
+            PlayerAssOverlay(script: assScript, engine: av, filled: assOverlayFilled,
+                             visible: subtitleSettings.enabled,
+                             delay: subtitleSettings.delaySeconds,
+                             fontScale: subtitleSettings.fontSize / 24)
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+        }
+        #endif
+
+        ClockReader(clock: clock) { clock in
+            PlayerSubtitleOverlay(
+                // On a mirrored TV they're drawn over the picture there instead.
+                cues: subtitleRoute == .cues && !mpvOnExternalDisplay ? subtitleCues : [],
+                currentTime: clock.currentTime,
+                showControls: showControls,
+                settings: subtitleSettings
+            )
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+
+        if isBuffering && videoReady && !showStallRetry {
+            ProgressView()
+                .tint(.white)
+                .scaleEffect(1.5)
+                .allowsHitTesting(false)
+        }
+
+        #if os(iOS)
+        loadingDismissButton
+        #endif
+    }
 
     @ViewBuilder
     private var videoLoadingOverlay: some View {

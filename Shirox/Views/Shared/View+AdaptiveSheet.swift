@@ -35,6 +35,13 @@ extension View {
     }
 }
 
+// MARK: - Safe Area Leading Preference Key
+
+struct SafeAreaLeadingKey: PreferenceKey {
+    nonisolated(unsafe) static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+
 extension View {
     @ViewBuilder
     func persistentSystemOverlaysHidden() -> some View {
@@ -82,11 +89,6 @@ extension View {
     }
 
     // MARK: - Safe Area Leading Preference Key
-
-    struct SafeAreaLeadingKey: PreferenceKey {
-        nonisolated(unsafe) static var defaultValue: CGFloat = 0
-        static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
-    }
 
     /// Reports the container's leading safe-area inset into `leadingInset` — Home content that
     /// ignores that safe area pads itself back by it. A Mac's Home keeps that safe area (it's
