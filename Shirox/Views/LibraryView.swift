@@ -1,4 +1,5 @@
 import SwiftUI
+import AuthenticationServices
 
 enum LibrarySortOrder: String, CaseIterable, Identifiable {
     case score      = "My Rating"
@@ -9,53 +10,40 @@ enum LibrarySortOrder: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-/// Top-level mode for the Library tab. "Library" shows the user's tracked
-/// list (anime/manga). "History" shows the unified anime+manga activity feed.
-enum LibraryViewMode: String, CaseIterable, Identifiable {
-    case library
-    case history
-
-    var id: String { rawValue }
-
-    var label: String {
-        switch self {
-        case .library: return "Library"
-        case .history: return "History"
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .library: return "books.vertical.fill"
-        case .history: return "clock.arrow.circlepath"
-        }
-    }
-}
-
 struct LibraryView: View {
     @StateObject private var vm = LibraryViewModel()
     @ObservedObject private var anilistAuth = AniListAuthManager.shared
     @ObservedObject private var malAuth = MALAuthManager.shared
     @ObservedObject private var providerManager = ProviderManager.shared
     @State private var showProfile = false
+    /// What sheets grow out of: an entry's row for its edit sheet, the account chip for the
+    /// profile and notifications, the sort menu for collections.
+    @Namespace private var sheetZoom
+    @State private var showNotifications = false
     @StateObject private var profileVM = ProfileViewModel()
     @State private var searchText = ""
-    @AppStorage("libraryGridLayout") private var isGridLayout = false
     @AppStorage("librarySortOrder") private var sortOrderRaw: String = LibrarySortOrder.score.rawValue
     @AppStorage("librarySortAscending") private var sortAscending = false
+    @ObservedObject private var newEpisodes = NewEpisodeTracker.shared
+    @AppStorage(NewEpisodeTracker.firstKey) private var newEpisodesFirst = false
+    /// Posters in a grid instead of rows.
+    @AppStorage("libraryGridLayout") private var gridLayout = false
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @AppStorage("localScoreFormat") private var localScoreFormatRaw: String = ScoreFormat.point10Decimal.rawValue
 
     #if os(iOS)
         private let toolbarItemPlacement: [ToolbarItemPlacement] = [ToolbarItemPlacement.topBarLeading, ToolbarItemPlacement.topBarTrailing]
     #else
-        // TDOO: fix toolbar placement
         private let toolbarItemPlacement: [ToolbarItemPlacement] = [ToolbarItemPlacement.automatic, ToolbarItemPlacement.automatic]
     #endif
 
     private var sortOrder: LibrarySortOrder {
         LibrarySortOrder(rawValue: sortOrderRaw) ?? .score
     }
-    @AppStorage("dualSync") private var dualSync = false
+    /// AniList ↔ MyAnimeList mirroring — one pair within `SyncTargets`.
+    @AppStorage(SyncTargets.key) private var syncTargetsRaw = ""
+    private var dualSync: Bool { SyncTargets.mirrors(.anilist, .mal, in: SyncTargets.decode(syncTargetsRaw)) }
+    @State private var selectedGenres: Set<String> = []
     @State private var selectedEntry: LibraryEntry? = nil
     @State private var pendingEntry: LibraryEntry? = nil
     @State private var showProviderPicker = false
@@ -93,18 +81,36 @@ struct LibraryView: View {
 
     @AppStorage("libraryStatusOrder") private var statusOrderRaw: String = MediaListStatus.allCases.map(\.rawValue).joined(separator: ",")
 
-    /// The provider type that should drive the library UI right now.
-    /// Normally the primary provider; falls back to secondary when primary is down.
+    /// The account the library UI should present right now: the provider whose list is on
+    /// screen, or — when that one isn't signed in — whichever one is.
     private var activeProviderType: ProviderType {
-        let primary = providerManager.primary?.providerType ?? .anilist
-        if providerManager.fallbackActive, let fallback = providerManager.fallback {
-            return fallback.providerType
+        // Follows the library actually on screen, which is `vm.source` — deliberately fetched
+        // provider-direct, so it never falls back to the other service the way content
+        // elsewhere does.
+        //
+        // It used to switch to `fallback` whenever `ProviderManager.fallbackActive` was set,
+        // which is a global flag any *other* call can raise — Home falling back during an
+        // AniList outage, for instance. The Library's list stayed on the provider you picked
+        // while its toolbar flipped to the other account, so selecting AniList showed the
+        // AniList library under a MyAnimeList avatar and username.
+        let nominal: ProviderType = {
+            if case .provider(let source) = vm.source { return source }
+            return providerManager.primary?.providerType ?? .anilist
+        }()
+
+        // A provider you aren't signed into can't drive the account UI — the username, the
+        // avatar, the notifications bell, the Sign In button. Being signed into AniList while
+        // MyAnimeList was the active provider made the toolbar offer a sign-in for an account
+        // that *was* already connected, just not the one this happened to be pointed at.
+        if !isSignedIn(nominal),
+           let signedIn = ProviderType.userProviders.first(where: { isSignedIn($0) }) {
+            return signedIn
         }
-        return primary
+        return nominal
     }
 
     private var isActiveProviderAuthenticated: Bool {
-        activeProviderType == .mal ? malAuth.isLoggedIn : anilistAuth.isLoggedIn
+        isSignedIn(activeProviderType)
     }
 
     private var scoreFormat: ScoreFormat {
@@ -113,7 +119,7 @@ struct LibraryView: View {
     }
 
     private var displayUsername: String {
-        let name = activeProviderType == .mal
+        let name: String = activeProviderType == .mal
             ? (malAuth.username ?? "Profile")
             : (anilistAuth.username ?? "Profile")
         return name.count > 15 ? String(name.prefix(15)) + "…" : name
@@ -126,7 +132,17 @@ struct LibraryView: View {
     private var orderedStatuses: [MediaListStatus] {
         let saved = statusOrderRaw.components(separatedBy: ",").compactMap(MediaListStatus.init(rawValue:))
         let missing = MediaListStatus.allCases.filter { !saved.contains($0) }
-        return saved + missing
+        return vm.source.statuses(in: saved + missing, for: vm.mediaType)
+    }
+
+    private var availableGenres: [String] {
+        var seen = Set<Int>()
+        let entries = vm.entries.filter { seen.insert($0.media.id).inserted }
+        var genres = Set<String>()
+        for entry in entries {
+            for genre in (entry.media.genres ?? []) { genres.insert(genre) }
+        }
+        return genres.sorted()
     }
 
     private var displayedEntries: [LibraryEntry] {
@@ -137,6 +153,12 @@ struct LibraryView: View {
             entries = entries.filter {
                 ($0.media.title.english?.lowercased().contains(q) ?? false) ||
                 ($0.media.title.romaji?.lowercased().contains(q) ?? false)
+            }
+        }
+        if !selectedGenres.isEmpty {
+            entries = entries.filter { entry in
+                let genres = Set(entry.media.genres ?? [])
+                return !selectedGenres.isDisjoint(with: genres)
             }
         }
         entries.sort {
@@ -157,6 +179,13 @@ struct LibraryView: View {
                 return sortAscending ? a < b : a > b
             }
         }
+        if newEpisodesFirst {
+            // Shows with episodes to catch up on lead, each half in the order chosen above.
+            let behind = entries.filter { newEpisodes.unwatched($0) > 0 }
+            if !behind.isEmpty {
+                entries = behind + entries.filter { newEpisodes.unwatched($0) == 0 }
+            }
+        }
         return entries
     }
 
@@ -170,6 +199,128 @@ struct LibraryView: View {
         }
     }
 
+    // MARK: - Sort menu
+
+    private var sortMenu: some View {
+        Menu {
+            Section("Sort by") {
+                ForEach(LibrarySortOrder.allCases) { order in
+                    Button {
+                        if sortOrder == order { sortAscending.toggle() }
+                        else { sortOrderRaw = order.rawValue; sortAscending = false }
+                    } label: {
+                        HStack {
+                            Text(order.rawValue)
+                            if sortOrder == order {
+                                Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
+                            }
+                        }
+                    }
+                }
+            }
+            Section {
+                Toggle(isOn: $newEpisodesFirst) {
+                    Label("New Episodes First", systemImage: "sparkles.tv")
+                }
+            }
+            Section("Layout") {
+                Picker("Layout", selection: $gridLayout) {
+                    Label("List", systemImage: "list.bullet").tag(false)
+                    Label("Grid", systemImage: "square.grid.3x2").tag(true)
+                }
+                .pickerStyle(.inline)
+            }
+        } label: {
+            HStack(spacing: 3) {
+                Image(systemName: "arrow.up.arrow.down")
+                    .font(.subheadline)
+                Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
+                    .font(.caption)
+            }
+        }
+    }
+
+    // MARK: - Profile unavailable
+
+    /// Shown when an account is signed in but its profile never arrived.
+    ///
+    /// The name, avatar and user id come only from `fetchViewer`, which needs the API — so
+    /// signing in while AniList has its API switched off leaves a session with no identity
+    /// attached to it. The toolbar then reads "Profile" with no picture, and this sheet used to
+    /// have no branch for the case at all, so it opened completely empty and looked broken.
+    private var profileUnavailable: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "person.crop.circle.badge.exclamationmark")
+                .font(.system(size: 48))
+                .foregroundStyle(.secondary)
+            Text("Profile unavailable")
+                .font(.headline)
+            Text("You're signed in, but \(activeProviderType.displayName) hasn't sent your profile yet. This usually means its API is down — your account is fine, and it'll fill in once the service is reachable.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+            Button("Try Again") {
+                Task { await AniListAuthManager.shared.fetchViewer() }
+            }
+            .font(.subheadline.weight(.semibold))
+        }
+        .padding()
+    }
+
+    // MARK: - Sign in
+
+    /// Both trackers, offered explicitly.
+    ///
+    /// Signing in used to go to whichever provider the library happened to be pointed at, with
+    /// no way to say you meant the other one — so someone who wanted MyAnimeList while AniList
+    /// was active had nowhere to say so. Signing in already re-points the library at that
+    /// provider (see the `isLoggedIn` handlers below), so picking one here is the whole action.
+    @ViewBuilder
+    private var signInMenuItems: some View {
+        ForEach(ProviderType.userProviders, id: \.self) { type in
+            Button {
+                signIn(to: type)
+            } label: {
+                // An account that's already connected stays listed, so the menu always shows
+                // both — but says so, rather than offering a sign-in that would do nothing.
+                if isSignedIn(type) {
+                    Label("\(type.displayName) — signed in", systemImage: "checkmark")
+                } else {
+                    Text(type.displayName)
+                }
+            }
+            .disabled(isSignedIn(type))
+        }
+    }
+
+    private func isSignedIn(_ type: ProviderType) -> Bool {
+        switch type {
+        case .anilist: return anilistAuth.isLoggedIn
+        case .mal:     return malAuth.isLoggedIn
+        case .local:   return false
+        }
+    }
+
+    /// Where the Library goes when the list on screen signs out.
+    private var sourceAfterSignOut: LibrarySource {
+        var signedIn: Set<ProviderType> = []
+        if anilistAuth.isLoggedIn { signedIn.insert(.anilist) }
+        if malAuth.isLoggedIn { signedIn.insert(.mal) }
+        return .afterSignOut(primary: providerManager.primary?.providerType, signedIn: signedIn)
+    }
+
+    private func signIn(to type: ProviderType) {
+        #if os(iOS)
+        guard let window = presentationWindow else { return }
+        if type == .mal {
+            MALAuthManager.shared.login(presentationAnchor: window)
+        } else {
+            AniListAuthManager.shared.login(presentationAnchor: window)
+        }
+        #endif
+    }
+
     // MARK: - Login prompt
 
     private var loginPrompt: some View {
@@ -178,9 +329,9 @@ struct LibraryView: View {
             Image(systemName: "books.vertical.fill")
                 .font(.system(size: 64))
                 .foregroundStyle(.primary)
-            Text(activeProviderType == .mal
-                 ? "Track your anime with MyAnimeList"
-                 : "Track your anime with AniList")
+            // Neutral wording now that the button below offers both: naming one service here
+            // while the menu lists two read as though the choice had already been made.
+            Text("Track your anime")
                 .font(.title3.weight(.semibold))
                 .multilineTextAlignment(.center)
             Text("Sign in to view and manage your anime library.")
@@ -188,28 +339,23 @@ struct LibraryView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
-            Button {
-                #if os(iOS)
-                guard let window = presentationWindow else { return }
-                if activeProviderType == .mal {
-                    MALAuthManager.shared.login(presentationAnchor: window)
-                } else {
-                    AniListAuthManager.shared.login(presentationAnchor: window)
-                }
-                #endif
+            Menu {
+                signInMenuItems
             } label: {
-                Text(activeProviderType == .mal ? "Sign in with MyAnimeList" : "Sign in with AniList")
-                    .font(.headline)
-                    #if os(iOS)
-                        .foregroundStyle(Color(.systemBackground))
-                    #else
-                        // TODO: fix missing color ( XCAssets )
-                        .foregroundStyle(Color.secondary)
-                    #endif
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 50)
-                    .background(Color.primary, in: Capsule())
-                    .padding(.horizontal, 40)
+                HStack(spacing: 6) {
+                    Text("Sign In")
+                    Image(systemName: "chevron.down").font(.subheadline)
+                }
+                .font(.headline)
+                #if os(iOS)
+                    .foregroundStyle(Color(.systemBackground))
+                #else
+                    .foregroundStyle(Color.secondary)
+                #endif
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                .background(Color.primary, in: Capsule())
+                .padding(.horizontal, 40)
             }
             .buttonStyle(.plain)
             Spacer()
@@ -232,7 +378,7 @@ struct LibraryView: View {
         vm.selectedCustomList != nil || vm.selectedStatus != .current
     }
 
-    /// The status / custom-list picker items (shared by the macOS capsule and the iOS toolbar button).
+    /// The status / custom-list picker items (shared by the capsule and the toolbar button).
     @ViewBuilder
     private var statusMenuContent: some View {
         Section("Lists") {
@@ -274,114 +420,89 @@ struct LibraryView: View {
         }
     }
 
-    // MARK: - Filter row (unified layout)
-    //
-    // Layout plan (calculated — every control shares these exact dimensions):
-    //
-    //   Height:     38pt (LibraryDS.controlHeight, fixed via .frame(minHeight:))
-    //   H padding:  14pt (LibraryDS.pillHorizontalPadding)
-    //   V padding:  9pt  (LibraryDS.pillVerticalPadding)
-    //   Shape:      Capsule
-    //   Background: .ultraThinMaterial + active tint overlay (Color.primary.opacity(0.12))
-    //   Stroke:     1pt, opacity 0.2 idle / 0.3 active
-    //   Font:       .system(size: 14, weight: .medium) (LibraryDS.pillFont)
-    //   Icon size:  13pt semibold (LibraryDS.pillIconSize)
-    //   Chevron:    9pt bold (LibraryDS.chevronSize)
-    //   Spacing:    10pt between controls (LibraryDS.controlSpacing)
-    //
-    // Controls in this row (ALL use .libraryCapsuleStyle()):
-    //   1. statusFilterCapsule  — Menu: icon + status text + chevron-down
-    //   2. sortCapsule           — Menu: sort icon + direction chevron
-    //   3. gridToggleCapsule     — Button: grid/list icon
-    //
-    // Controls OUTSIDE this row but in the same area (also unified):
-    //   4. mediaTypePill (Anime | Manga) — uses .libraryCapsuleStyle()
-    //   5. LibrarySourceSwitcher pills    — uses .libraryCapsuleStyle()
-    //
-    // Every single control reads from LibraryDS tokens via the shared
-    // libraryCapsuleStyle() ViewModifier — no control has its own
-    // custom padding/sizing. This guarantees identical height, padding,
-    // corner radius, background, and stroke across the entire Library UI.
-
+    /// The genre picker items (shared by the capsule and the toolbar button).
     @ViewBuilder
-    private var filterCapsuleRow: some View {
-        // Filter controls — left-aligned, matching the original layout.
-        // Grid/List toggle is NOT here — it's in the top-right toolbar.
-        HStack(spacing: LibraryDS.controlSpacing) {
-            statusFilterCapsule
-            sortCapsule
-            Spacer()
-        }
-    }
-
-    /// Status filter capsule — uses the shared `.libraryCapsuleStyle()`
-    /// so it matches every other control in the Library exactly.
-    @ViewBuilder
-    private var statusFilterCapsule: some View {
-        Menu { statusMenuContent } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "line.3.horizontal.decrease")
-                    .font(.system(size: LibraryDS.pillIconSize, weight: .semibold))
-                Text(vm.selectedCustomList ?? vm.selectedStatus.displayName(for: vm.mediaType))
-                    .lineLimit(1)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: LibraryDS.chevronSize, weight: .bold))
-                    .foregroundStyle(.secondary)
+    private var genreMenuContent: some View {
+        Section("Genres") {
+            if !selectedGenres.isEmpty {
+                Button(role: .destructive) {
+                    selectedGenres.removeAll()
+                } label: {
+                    Label("Clear All Filters", systemImage: "xmark.circle")
+                }
             }
-            .libraryCapsuleStyle(isActive: isStatusFilterActive)
-        }
-        .menuIndicator(.hidden)
-        .buttonStyle(.plain)
-        .fixedSize(horizontal: true, vertical: false)
-    }
-
-    /// Sort capsule — uses the shared `.libraryCapsuleStyle()`. Displays
-    /// as a TEXT label ("Sort: Recently Updated" etc.) instead of an
-    /// icon-only button so the current sort state is clear at a glance.
-    @ViewBuilder
-    private var sortCapsule: some View {
-        Menu {
-            Section("Sort by") {
-                ForEach(LibrarySortOrder.allCases) { order in
-                    Button {
-                        if sortOrder == order { sortAscending.toggle() }
-                        else { sortOrderRaw = order.rawValue; sortAscending = false }
-                    } label: {
-                        HStack {
-                            Text(order.rawValue)
-                            if sortOrder == order {
-                                Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
-                            }
+            ForEach(availableGenres, id: \.self) { genre in
+                Button {
+                    if selectedGenres.contains(genre) {
+                        selectedGenres.remove(genre)
+                    } else {
+                        selectedGenres.insert(genre)
+                    }
+                } label: {
+                    HStack {
+                        Text(genre)
+                        if selectedGenres.contains(genre) {
+                            Image(systemName: "checkmark")
                         }
                     }
                 }
             }
-        } label: {
-            HStack(spacing: 6) {
-                Text("Sort: \(sortOrder.rawValue)")
-                    .font(LibraryDS.pillFont)
-                    .lineLimit(1)
-                Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
-                    .font(.system(size: LibraryDS.chevronSize, weight: .bold))
-                    .foregroundStyle(.secondary)
-            }
-            .libraryCapsuleStyle()
         }
-        .menuIndicator(.hidden)
-        .buttonStyle(.plain)
-        .fixedSize(horizontal: true, vertical: false)
     }
 
-    /// Anime | Manga capsule pills. Uses the same `.libraryCapsuleStyle()` as
-    /// the filter row and source switcher so every control in the Library
-    /// shares identical height/padding/corner radius.
+    /// These wrap the shared menu content.
+    @ViewBuilder
+    private func statusFilterMenu() -> some View {
+        Menu { statusMenuContent } label: {
+            LibraryFilterLabel(
+                systemImage: "line.3.horizontal.decrease",
+                text: vm.selectedCustomList ?? vm.selectedStatus.displayName(for: vm.mediaType),
+                isActive: isStatusFilterActive,
+                collapsed: false
+            )
+        }
+        .menuIndicator(.hidden)
+        .foregroundStyle(.primary)
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func genreFilterMenu() -> some View {
+        Menu { genreMenuContent } label: {
+            LibraryFilterLabel(
+                systemImage: "tag",
+                text: selectedGenres.isEmpty ? "All Genres" : "\(selectedGenres.count) selected",
+                isActive: !selectedGenres.isEmpty,
+                collapsed: false
+            )
+        }
+        .menuIndicator(.hidden)
+        .foregroundStyle(.primary)
+        .buttonStyle(.plain)
+    }
+
+    /// The capsule filter row (List on the left, Genre on the right).
+    @ViewBuilder
+    private var filterCapsuleRow: some View {
+        HStack {
+            statusFilterMenu()
+            Spacer()
+            if !availableGenres.isEmpty {
+                genreFilterMenu()
+            }
+        }
+    }
+
+    /// The source's kinds as capsule pills — Anime | Manga —
+    /// matching `LibrarySourceSwitcher`'s pill style.
     @ViewBuilder private var mediaTypeSegment: some View {
-        HStack(spacing: LibraryDS.controlSpacing) {
-            mediaTypePill(title: "Anime", systemImage: "tv", kind: .anime)
-            mediaTypePill(title: "Manga", systemImage: "book", kind: .manga)
+        HStack(spacing: 8) {
+            ForEach(vm.source.mediaKinds, id: \.self) { kind in
+                mediaTypePill(title: kind.pillTitle, systemImage: kind.pillIcon, kind: kind)
+            }
             Spacer()
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 8)
     }
 
     @ViewBuilder
@@ -390,13 +511,17 @@ struct LibraryView: View {
         Button { vm.selectMediaType(kind) } label: {
             HStack(spacing: 6) {
                 Image(systemName: systemImage)
-                    .font(.system(size: LibraryDS.pillIconSize, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
+                    .frame(width: 16, height: 16)
                 Text(title)
-                    .font(LibraryDS.pillFont)
+                    .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
             }
             .fixedSize(horizontal: true, vertical: false)
-            .libraryCapsuleStyle(isActive: selected)
+            .padding(.horizontal, 12).padding(.vertical, 7)
+            .background(Capsule().fill(selected ? Color.primary.opacity(0.12) : Color.secondary.opacity(0.08)))
+            .overlay(Capsule().strokeBorder(selected ? Color.primary.opacity(0.3) : .clear, lineWidth: 1))
+            .foregroundStyle(selected ? Color.primary : .secondary)
         }
         .buttonStyle(.plain)
     }
@@ -460,6 +585,7 @@ struct LibraryView: View {
     }
 
     private func openManga(_ entry: LibraryEntry) {
+        newEpisodes.markOpened(entry)
         if let source = entry.localSource, source.kind == .module {
             pendingMangaItem = SearchItem(
                 title: entry.media.title.displayTitle,
@@ -473,13 +599,13 @@ struct LibraryView: View {
     }
 
     /// Anime entries: ALWAYS navigate to DetailView (the page with episodes).
-    /// If the entry has a linked module, use it directly. If not, auto-resolve
-    /// through an installed anime module. If resolution fails or no module is
-    /// installed, STILL go to DetailView — it will show its own state (error /
-    /// empty / module-picker). NEVER route to AniListDetailView — every anime
-    /// tap from Library lands on the same kind of page, every time, no
-    /// exceptions.
+    /// If the entry has a linked module, use it directly. If not, open the
+    /// AniList-backed detail which has its own data loading (doesn't need a
+    /// module href). NEVER route to a module-less DetailView with an empty
+    /// href (blank page — DetailViewModel.load() guards on it) — every anime
+    /// tap from Library lands on a working page, every time, no exceptions.
     private func openAnime(_ entry: LibraryEntry) {
+        newEpisodes.markOpened(entry)
         // Branch 1: entry already has a linked module source — go
         // straight to DetailView with that module (no resolution needed).
         if let source = entry.localSource, source.kind == .module,
@@ -496,9 +622,6 @@ struct LibraryView: View {
         // Branch 2: no linked module — open AniListDetailView which has
         // its own data loading (doesn't need a module href). This is the
         // same page that Search/Browse/Home navigate to for anime.
-        // Previously this pushed DetailView with an empty href, which
-        // caused a blank page because DetailViewModel.load() has
-        // `guard !item.href.isEmpty else { return }`.
         pendingAnimeMedia = entry.media
         animeLinkActive = true
     }
@@ -508,8 +631,9 @@ struct LibraryView: View {
     @ViewBuilder
     private func mangaRow(_ entry: LibraryEntry) -> some View {
         LibraryRowView(entry: entry, scoreFormat: scoreFormat) {
-            selectedEntry = entry
+            editEntry(entry)
         }
+        .zoomSource(entry.id, in: sheetZoom)
         .overlay(alignment: .center) {
             if resolvingMangaId == entry.media.id {
                 ProgressView()
@@ -528,54 +652,46 @@ struct LibraryView: View {
 
     // MARK: - Toolbar
 
-    @ToolbarContentBuilder
-    private var libraryToolbar: some ToolbarContent {
-        #if os(iOS)
-        // Grid/list toggle — top-right, as its own separate icon.
-        // Placed BEFORE the Profile button so the order is:
-        // [Grid/List Icon] [Profile Icon]
-        ToolbarItem(placement: .topBarTrailing) {
-            Button {
-                isGridLayout.toggle()
-            } label: {
-                Image(systemName: isGridLayout ? "list.bullet" : "square.grid.2x2")
-                    .font(.system(size: 17, weight: .medium))
-            }
-        }
-        #endif
-        // Profile / Sign-In button — on the trailing side, after the grid toggle.
-        ToolbarItem(placement: .topBarTrailing) {
-            if isActiveProviderAuthenticated {
-                HStack(spacing: 10) {
+    /// The account chip — notifications and profile, or signing in.
+    @ViewBuilder
+    private var accountToolbarItem: some View {
+        if isActiveProviderAuthenticated {
+            HStack(spacing: 10) {
+                if activeProviderType == .anilist {
                     Button {
-                        showProfile = true
+                        anilistAuth.unreadNotificationCount = 0
+                        showNotifications = true
                     } label: {
-                        HStack(spacing: 6) {
-                            if let url = activeAvatarURL {
-                                CachedAsyncImage(urlString: url)
-                                    .frame(width: 28, height: 28)
-                                    .clipShape(Circle())
-                            }
-                            Text(displayUsername)
-                                .font(.subheadline.weight(.medium))
-                                .layoutPriority(1)
+                        Image(systemName: "bell")
+                            .font(.system(size: 17, weight: .medium))
+                            .notificationBadge(count: anilistAuth.unreadNotificationCount)
+                    }
+                    Divider().frame(height: 16)
+                }
+
+                Button {
+                    showProfile = true
+                } label: {
+                    HStack(spacing: 6) {
+                        if let url = activeAvatarURL {
+                            CachedAsyncImage(urlString: url)
+                                .frame(width: 28, height: 28)
+                                .clipShape(Circle())
                         }
+                        Text(displayUsername)
+                            .font(.subheadline.weight(.medium))
+                            .layoutPriority(1)
                     }
-                    .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 8)
-            } else {
-                Button("Sign In") {
-                    #if os(iOS)
-                    guard let window = presentationWindow else { return }
-                    if activeProviderType == .mal {
-                        MALAuthManager.shared.login(presentationAnchor: window)
-                    } else {
-                        AniListAuthManager.shared.login(presentationAnchor: window)
-                    }
-                    #endif
-                }
-                .font(.subheadline.weight(.semibold))
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 8)
+        } else {
+            Menu {
+                signInMenuItems
+            } label: {
+                Text("Sign In")
+                    .font(.subheadline.weight(.semibold))
             }
         }
     }
@@ -591,7 +707,7 @@ struct LibraryView: View {
     }
 
     private var emptyStateDescription: String {
-        let noun = vm.mediaType == .manga ? "manga" : "anime"
+        let noun = vm.mediaType.noun
         if !searchText.isEmpty {
             return "No \(noun) matching \"\(searchText)\"."
         }
@@ -599,7 +715,7 @@ struct LibraryView: View {
         if vm.isLocal {
             return "Add \(noun) to \(listName) from any title's detail screen."
         }
-        return "Add \(noun) to \(listName) on \(activeProviderType == .mal ? "MyAnimeList" : "AniList")."
+        return "Add \(noun) to \(listName) on \(activeProviderType.displayName)."
     }
 
     // MARK: - Entries list
@@ -626,19 +742,12 @@ struct LibraryView: View {
         .listRowBackground(Color.clear)
         #if !os(tvOS)
         .swipeActions(edge: .leading, allowsFullSwipe: true) {
-            Button {
-                Task {
-                    await vm.update(
-                        entry: entry,
-                        status: entry.status,
-                        progress: entry.progress + 1,
-                        score: entry.displayScore(in: scoreFormat)
-                    )
+            if let quick = quickProgress(entry) {
+                Button { Task { await quick.run() } } label: {
+                    Label(quick.title, systemImage: quick.icon)
                 }
-            } label: {
-                Label(entry.media.isManga ? "+1 CH" : "+1 EP", systemImage: "plus.circle.fill")
+                .tint(.green)
             }
-            .tint(.green)
         }
         .contextMenu {
             libraryContextMenu(for: entry)
@@ -646,6 +755,7 @@ struct LibraryView: View {
         #endif
     }
 
+    /// Ours: the row's long-press menu — move to any status, toggle private, remove.
     @ViewBuilder
     private func libraryContextMenu(for entry: LibraryEntry) -> some View {
         ForEach(MediaListStatus.allCases) { status in
@@ -692,20 +802,26 @@ struct LibraryView: View {
         }
     }
 
-    /// Module-scraped and AniList/MAL entries navigate to a detail screen
-    /// (branched destination). Anime rows use `openAnime` (async module
-    /// resolution → DetailView with episodes) instead of a synchronous
+    /// The one-step progress a row's swipe and a card's menu offer: one more episode or
+    /// chapter, preserving the canonical score by passing it in the active format.
+    private func quickProgress(_ entry: LibraryEntry) -> (title: String, icon: String, run: () async -> Void)? {
+        return (entry.media.isManga ? "+1 CH" : "+1 EP", "plus.circle.fill", {
+            // Pass the score in the active format so the canonical value is preserved (not
+            // reinterpreted in a new scale).
+            await vm.update(entry: entry, status: entry.status, progress: entry.progress + 1,
+                            score: entry.displayScore(in: scoreFormat))
+        })
+    }
+
+    /// Module-scraped and AniList/MAL entries navigate to a detail screen. Anime rows use
+    /// `openAnime` (module-first routing → DetailView with episodes) instead of a synchronous
     /// NavigationLink to AniListDetailView (which has no episode list).
     @ViewBuilder
     private func navigableRow(_ entry: LibraryEntry) -> some View {
         LibraryRowView(entry: entry, scoreFormat: scoreFormat) {
-            if !vm.isLocal && anilistAuth.isLoggedIn && malAuth.isLoggedIn && !dualSync {
-                pendingEntry = entry
-                showProviderPicker = true
-            } else {
-                selectedEntry = entry
-            }
+            editEntry(entry)
         }
+        .zoomSource(entry.id, in: sheetZoom)
         .overlay(alignment: .center) {
             if resolvingAnimeId == entry.media.id {
                 ProgressView()
@@ -719,8 +835,9 @@ struct LibraryView: View {
     @ViewBuilder
     private func localFileRow(_ entry: LibraryEntry, source: LocalSource) -> some View {
         LibraryRowView(entry: entry, scoreFormat: scoreFormat) {
-            selectedEntry = entry   // tap the row content → edit sheet
+            editEntry(entry)   // tap the row content → edit sheet
         }
+        .zoomSource(entry.id, in: sheetZoom)
         .contentShape(Rectangle())
         .onTapGesture { resumeLocalFile(source) }
     }
@@ -742,25 +859,14 @@ struct LibraryView: View {
     }
 
     private var entriesList: some View {
-        Group {
-            if isGridLayout {
-                libraryGridView
-            } else {
-                libraryListView
-            }
-        }
-        .refreshable {
-            async let count: Void = refreshUnreadCountIfNeeded()
-            await vm.refresh()
-            await count
-        }
-    }
-
-    private var libraryListView: some View {
         List {
             #if os(iOS)
+            // The header rows live in the List in every state — loading, empty and error too —
+            // so the List is always the first scroll view on screen. The source switcher scrolls
+            // sideways, and a horizontal scroll view ahead of the List takes over the
+            // `.searchable` bar, which opening a show then tears down (b49f014).
             LibrarySourceSwitcher(selected: vm.source) { vm.selectSource($0) }
-                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 6, trailing: 16))
+                .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 6, trailing: 0))
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
             mediaTypeSegment
@@ -771,84 +877,200 @@ struct LibraryView: View {
                 .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 8, trailing: 16))
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
+            if showsLibraryList {
+                entryRows
+            } else {
+                statusContent
+                    .frame(maxWidth: .infinity, minHeight: 320)
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                    // Only Retry itself responds; a List otherwise turns a row's lone button
+                    // into a tap target for the whole row.
+                    .buttonStyle(.borderless)
+            }
+            #else
+            entryRows
             #endif
+        }
+        .softScrollEdges()
+        .listStyle(.plain)
+        .gooeyRefreshable { await refreshLibrary() }
+    }
+
+    private func refreshLibrary() async {
+        // An explicit user request, so it always checks — the away-time throttle is
+        // for automatic checks only.
+        async let count: Void = refreshUnreadCountIfNeeded()
+        await vm.refresh()
+        await count
+    }
+
+    @ViewBuilder
+    private var entryRows: some View {
+        if gridLayout {
+            gridRows
+        } else {
             ForEach(displayedEntries, id: \.media.id) { entry in
                 entryRow(entry)
             }
         }
-        .listStyle(.plain)
     }
 
-    // MARK: - Grid View (item 6)
-    private var libraryGridView: some View {
-        ScrollView {
-            // Pin the filter controls above the grid
-            VStack(spacing: 0) {
-                #if os(iOS)
-                LibrarySourceSwitcher(selected: vm.source) { vm.selectSource($0) }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                mediaTypeSegment
-                    .padding(.horizontal, 16)
-                    .padding(.top, 4)
-                filterCapsuleRow
-                    .padding(.horizontal, 16)
-                    .padding(.top, 4)
-                    .padding(.bottom, 8)
-                #endif
+    // MARK: - Grid
 
-                let columns = [GridItem(.adaptive(minimum: 100), spacing: 12)]
-                LazyVGrid(columns: columns, spacing: 16) {
-                    ForEach(displayedEntries, id: \.media.id) { entry in
-                        Button {
-                            if entry.media.isManga {
-                                openManga(entry)
-                            } else if let source = entry.localSource, source.kind == .localFile {
-                                resumeLocalFile(source)
-                            } else {
-                                openAnime(entry)
-                            }
-                        } label: {
-                            libraryGridCard(entry)
-                        }
-                        .buttonStyle(.plain)
-                        .contextMenu {
-                            libraryContextMenu(for: entry)
+    private var gridColumns: Int {
+        #if os(iOS)
+        horizontalSizeClass == .regular ? 6 : 3
+        #else
+        6
+        #endif
+    }
+
+    #if os(iOS)
+    /// The grid, in a scroll view of its own rather than the List. As List rows (a row per line
+    /// of posters) holding a card lifted the whole line, so the menu seemed to belong to the
+    /// row. The header rows come first in it, as in the List, so this scroll view is still the
+    /// first on screen and keeps the search bar.
+    private var gridScroll: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                LibrarySourceSwitcher(selected: vm.source) { vm.selectSource($0) }
+                    .padding(.top, 4).padding(.bottom, 6)
+                mediaTypeSegment
+                    .padding(.horizontal, 16).padding(.bottom, 6)
+                filterCapsuleRow
+                    .padding(.horizontal, 16).padding(.bottom, 10)
+                if showsLibraryList {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .top),
+                                             count: gridColumns),
+                              spacing: 18) {
+                        ForEach(displayedEntries, id: \.media.id) { entry in
+                            gridCard(entry)
                         }
                     }
+                    .padding(.horizontal, 16)
+                } else {
+                    statusContent
+                        .frame(maxWidth: .infinity, minHeight: 320)
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 30)
+            }
+            .padding(.bottom, 24)
+        }
+        .softScrollEdges()
+        .gooeyRefreshable { await refreshLibrary() }
+    }
+
+    /// A card: tap opens it, the pencil edits it, the long-press menu acts on it.
+    private func gridCard(_ entry: LibraryEntry) -> some View {
+        Button { openFromGrid(entry) } label: {
+            LibraryGridCard(entry: entry, scoreFormat: scoreFormat)
+        }
+        .buttonStyle(LibraryCardButtonStyle())
+        .overlay(alignment: .topLeading) {
+            // Over the poster's corner, outside the card's own button so it isn't swallowed.
+            GeometryReader { geo in
+                Button { editEntry(entry) } label: {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 28, height: 28)
+                        .background(.black.opacity(0.55), in: Circle())
+                        .overlay(Circle().strokeBorder(.white.opacity(0.25), lineWidth: 0.5))
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Edit \(entry.media.title.displayTitle)")
+                // Bottom-right of the 2:3 poster, above the progress bar.
+                .position(x: geo.size.width - 20, y: geo.size.width * 1.5 - 24)
+            }
+        }
+        .zoomSource(entry.id, in: sheetZoom)
+        .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 12))
+        .contextMenu {
+            libraryContextMenu(for: entry)
+            Divider()
+            if let quick = quickProgress(entry) {
+                Button { Task { await quick.run() } } label: { Label(quick.title, systemImage: quick.icon) }
             }
         }
     }
+    #endif
 
-    private func libraryGridCard(_ entry: LibraryEntry) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            CachedAsyncImage(urlString: entry.media.coverImage.best ?? "")
-                .aspectRatio(2/3, contentMode: .fill)
-                .frame(maxWidth: .infinity)
-                .frame(height: 150)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .overlay(alignment: .topTrailing) {
-                    if let score = entry.media.averageScore {
-                        Text(score.averageScoreOutOf10)
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(.yellow)
-                            .padding(.horizontal, 6).padding(.vertical, 3)
-                            .background(.black.opacity(0.55), in: Capsule())
-                            .padding(4)
-                    }
+    /// The grid, a List row per line of posters, so the List stays lazy and keeps the search bar.
+    private var gridRows: some View {
+        let columns = gridColumns
+        let entries = displayedEntries
+        let lines = stride(from: 0, to: entries.count, by: columns).map {
+            Array(entries[$0..<min($0 + columns, entries.count)])
+        }
+        return ForEach(lines, id: \.first?.media.id) { line in
+            HStack(alignment: .top, spacing: 12) {
+                ForEach(line, id: \.media.id) { entry in
+                    LibraryGridCard(entry: entry, scoreFormat: scoreFormat)
+                        .zoomSource(entry.id, in: sheetZoom)
+                        .contentShape(Rectangle())
+                        .onTapGesture { openFromGrid(entry) }
+                        .contextMenu {
+                            libraryContextMenu(for: entry)
+                            Divider()
+                            if let quick = quickProgress(entry) {
+                                Button { Task { await quick.run() } } label: { Label(quick.title, systemImage: quick.icon) }
+                            }
+                        }
                 }
-            Text(entry.media.title.displayTitle)
-                .font(.caption.weight(.semibold))
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
-            if entry.progress > 0 {
-                Text("\(entry.progress) ep")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                // Keeps a short last line's posters the same size as the rest.
+                ForEach(line.count..<columns, id: \.self) { _ in
+                    Color.clear.frame(maxWidth: .infinity)
+                }
             }
+            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+            #if !os(tvOS)
+            .listRowSeparator(.hidden)
+            #endif
+            .listRowBackground(Color.clear)
+        }
+    }
+
+    /// What tapping the title's row does, for a grid card — module-first, like the list.
+    private func openFromGrid(_ entry: LibraryEntry) {
+        if entry.media.isManga {
+            openManga(entry)
+        } else if let source = entry.localSource, source.kind == .localFile {
+            resumeLocalFile(source)
+        } else {
+            openAnime(entry)
+        }
+    }
+
+    private func editEntry(_ entry: LibraryEntry) {
+        if !vm.isLocal && anilistAuth.isLoggedIn && malAuth.isLoggedIn && !dualSync {
+            pendingEntry = entry
+            showProviderPicker = true
+        } else {
+            selectedEntry = entry
+        }
+    }
+
+    /// What shows in place of the entries while loading, after an error, or when the list is empty.
+    @ViewBuilder
+    private var statusContent: some View {
+        if vm.isLoading {
+            ProgressView()
+        } else if let error = vm.error {
+            ContentUnavailableView {
+                Label("Couldn't Load", systemImage: "wifi.slash")
+            } description: {
+                Text(error)
+            } actions: {
+                Button("Retry") { Task { await vm.refresh() } }
+            }
+        } else {
+            ContentUnavailableView(
+                emptyStateTitle,
+                systemImage: emptyStateIcon,
+                description: Text(emptyStateDescription)
+            )
         }
     }
 
@@ -856,9 +1078,16 @@ struct LibraryView: View {
 
     private var libraryContentBase: some View {
         VStack(spacing: 0) {
-            #if !os(iOS)
+            #if os(iOS)
+            // One List (or, laid out as a grid, one scroll view) in every state, the header rows
+            // included — see `entriesList`.
+            if gridLayout {
+                gridScroll
+            } else {
+                entriesList
+            }
+            #else
             LibrarySourceSwitcher(selected: vm.source) { vm.selectSource($0) }
-                .padding(.horizontal, 16)
             mediaTypeSegment
                 .padding(.horizontal, 16)
                 .padding(.top, 6)
@@ -866,51 +1095,26 @@ struct LibraryView: View {
             filterCapsuleRow
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
-            #else
-            // The source switcher + filter row scroll away as the list's first rows; for the
-            // non-list states (loading / empty / error) they're pinned here so the source and
-            // filters stay usable.
-            if !showsLibraryList {
-                LibrarySourceSwitcher(selected: vm.source) { vm.selectSource($0) }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 4)
-                mediaTypeSegment
-                    .padding(.horizontal, 16)
-                    .padding(.top, 6)
-                filterCapsuleRow
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-            }
-            #endif
-
-            if vm.isLoading {
-                Spacer()
-                ProgressView()
-                Spacer()
-            } else if let error = vm.error {
-                ContentUnavailableView {
-                    Label("Couldn't Load", systemImage: "wifi.slash")
-                } description: {
-                    Text(error)
-                } actions: {
-                    Button("Retry") { Task { await vm.refresh() } }
-                }
-            } else if displayedEntries.isEmpty {
-                ContentUnavailableView(
-                    emptyStateTitle,
-                    systemImage: emptyStateIcon,
-                    description: Text(emptyStateDescription)
-                )
+            if vm.isLoading || vm.error != nil || displayedEntries.isEmpty {
+                statusContent
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 entriesList
             }
+            #endif
         }
+        // Hidden programmatic links — ours: module-first routing for anime + manga rows.
         .background { mangaNavLink }
         .background { aniListMangaNavLink }
         .background { animeDetailNavLink }
         .background { animeNavLink }
-        .toolbar { libraryToolbar }
+        .navigationDestinationCompat(isPresented: $showNotifications) {
+            NotificationsView(vm: profileVM)
+        }
+        .toolbarZoomSource("sort", in: sheetZoom, placement: toolbarItemPlacement[0]) { sortMenu }
+        .toolbarZoomSource("account", in: sheetZoom, placement: toolbarItemPlacement[1]) { accountToolbarItem }
         .task { await vm.autoRefreshIfNeeded() }
+        .task(id: vm.entries.map(\.media.uniqueId)) { await newEpisodes.observe(vm.entries) }
         #if os(iOS)
         .onAppear {
             presentationWindow = UIApplication.shared.connectedScenes
@@ -922,11 +1126,11 @@ struct LibraryView: View {
         #endif
         .onChangeOf(anilistAuth.isLoggedIn) { newValue in
             if newValue { vm.selectSource(.provider(.anilist)) }
-            else if !malAuth.isLoggedIn { vm.selectSource(.local) }
+            else if !malAuth.isLoggedIn, case .provider = vm.source { vm.selectSource(sourceAfterSignOut) }
         }
         .onChangeOf(malAuth.isLoggedIn) { newValue in
             if newValue { vm.selectSource(.provider(.mal)) }
-            else if !anilistAuth.isLoggedIn { vm.selectSource(.local) }
+            else if !anilistAuth.isLoggedIn, case .provider = vm.source { vm.selectSource(sourceAfterSignOut) }
         }
         .onChangeOf(providerManager.fallbackActive) {
             Task { await vm.refresh() }
@@ -957,7 +1161,8 @@ struct LibraryView: View {
                     }
                     Task {
                         await vm.update(entry: entry, status: status, progress: progress, score: score)
-                        if !vm.isLocal && vm.mediaType != .manga && dualSync && anilistAuth.isLoggedIn && malAuth.isLoggedIn {
+                        if !vm.isLocal && vm.mediaType != .manga && dualSync
+                            && anilistAuth.isLoggedIn && malAuth.isLoggedIn {
                             if activeProviderType == .anilist, let idMal = entry.media.idMal {
                                 try? await MALProvider.shared.updateEntry(mediaId: idMal, status: status, progress: progress, score: score)
                             } else if activeProviderType == .mal {
@@ -971,7 +1176,8 @@ struct LibraryView: View {
                 onDelete: {
                     Task {
                         await vm.delete(entry: entry)
-                        if !vm.isLocal && vm.mediaType != .manga && dualSync && anilistAuth.isLoggedIn && malAuth.isLoggedIn {
+                        if !vm.isLocal && vm.mediaType != .manga && dualSync
+                            && anilistAuth.isLoggedIn && malAuth.isLoggedIn {
                             if activeProviderType == .anilist, let idMal = entry.media.idMal {
                                 try? await MALProvider.shared.deleteEntry(entryId: idMal)
                             } else if activeProviderType == .mal {
@@ -982,11 +1188,9 @@ struct LibraryView: View {
                             }
                         }
                     }
-                },
-                onTogglePrivate: { newValue in
-                    Task { await vm.setPrivate(entry: entry, isPrivate: newValue) }
                 }
             )
+            .zoomingOut(of: entry.id, in: sheetZoom)
         }
         .confirmationDialog("Edit on which service?", isPresented: $showProviderPicker, titleVisibility: .visible) {
             Button("Edit on AniList") {
@@ -1069,6 +1273,8 @@ struct LibraryView: View {
                         showOtherSheet = false
                     } : nil
                 )
+                // From the row "Edit on which service?" was asked about.
+                .zoomingOut(of: pendingEntry?.id ?? 0, in: sheetZoom)
             }
         }
         .adaptiveSheet(isPresented: $showProfile) {
@@ -1076,15 +1282,174 @@ struct LibraryView: View {
                 ProfileView(userId: uid, username: malAuth.username ?? "Profile", avatarURL: malAuth.avatarURL)
             } else if let uid = anilistAuth.userId, let username = anilistAuth.username {
                 ProfileView(userId: uid, username: username, avatarURL: anilistAuth.avatarURL)
+            } else {
+                profileUnavailable
             }
         }
         .adaptiveSheet(isPresented: $showManageCollections) {
             ManageCollectionsView()
+                .zoomingOut(of: "sort", in: sheetZoom, fromToolbar: true)
+        }
+    }
+}
+
+private extension MediaKind {
+    var pillTitle: String {
+        switch self {
+        case .anime: return "Anime"
+        case .manga: return "Manga"
+        }
+    }
+
+    var pillIcon: String {
+        switch self {
+        case .anime: return "tv"
+        case .manga: return "book"
+        }
+    }
+
+    /// "Add shows to Watching." / "Add anime to Planning."
+    var noun: String {
+        switch self {
+        case .anime: return "anime"
+        case .manga: return "manga"
         }
     }
 }
 
 // MARK: - Library row
+
+/// A title in the Library's grid: its poster with score and a progress bar, its name and
+/// where the viewer is below.
+private struct LibraryGridCard: View {
+    let entry: LibraryEntry
+    var scoreFormat: ScoreFormat = .point10Decimal
+
+    private var progressText: String {
+        let unit = entry.media.isManga ? "Ch" : "Ep"
+        if let total = entry.media.episodes, total > 0 { return "\(unit) \(entry.progress) of \(total)" }
+        return "\(unit) \(entry.progress)"
+    }
+
+    /// How far through, when the total's known.
+    private var fraction: Double? {
+        guard let total = entry.media.episodes, total > 0 else { return nil }
+        return min(Double(entry.progress) / Double(total), 1)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Color.clear
+                .aspectRatio(2/3, contentMode: .fit)
+                .overlay(
+                    ZStack {
+                        CachedAsyncImage(urlString: entry.media.coverImage.thumb ?? "")
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .clipped()
+                        // Keeps the bar and the edit button readable on a light poster.
+                        LinearGradient(stops: [.init(color: .clear, location: 0.6),
+                                               .init(color: .black.opacity(0.6), location: 1)],
+                                       startPoint: .top, endPoint: .bottom)
+                    }
+                )
+                .overlay(alignment: .bottom) {
+                    if let fraction {
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                Capsule().fill(.white.opacity(0.25))
+                                Capsule().fill(.white)
+                                    .frame(width: max(geo.size.width * fraction, fraction > 0 ? 4 : 0))
+                            }
+                        }
+                        .frame(height: 3)
+                        .padding(.horizontal, 8)
+                        .padding(.bottom, 7)
+                    }
+                }
+                .overlay(alignment: .topTrailing) {
+                    if entry.score > 0 {
+                        HStack(spacing: 2) {
+                            if scoreFormat != .point3 {
+                                Image(systemName: "star.fill").font(.system(size: 7))
+                            }
+                            scoreFormat.scoreText(for: entry.displayScore(in: scoreFormat))
+                                .font(.caption2.weight(.bold))
+                        }
+                        .foregroundStyle(.yellow)
+                        .padding(.horizontal, 6).padding(.vertical, 3)
+                        .background(.black.opacity(0.6), in: Capsule())
+                        .padding(6)
+                    }
+                }
+                .overlay(alignment: .topLeading) {
+                    NewEpisodesBadge(entry: entry).padding(6)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5))
+                .shadow(color: .black.opacity(0.18), radius: 6, x: 0, y: 3)
+            VStack(alignment: .leading, spacing: 2) {
+                // Two lines' room whatever the title, so a row's cards line up below.
+                ZStack(alignment: .topLeading) {
+                    Text("A\nA").hidden().accessibilityHidden(true)
+                    CardTitle(entry.media.title.displayTitle)
+                        .multilineTextAlignment(.leading)
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.primary)
+                .hiddenWithCardTitles()
+                Text(progressText)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// "+2" on a show you're watching with two aired episodes you haven't, and a red dot when
+/// they came out since you last opened it.
+private struct NewEpisodesBadge: View {
+    let entry: LibraryEntry
+    @ObservedObject private var tracker = NewEpisodeTracker.shared
+    @AppStorage(NewEpisodeTracker.badgesKey) private var enabled = true
+
+    var body: some View {
+        let count = tracker.unwatched(entry)
+        if enabled, count > 0 {
+            let isNew = tracker.isNewSinceOpened(entry)
+            Text("+\(count)")
+                .font(.caption2.weight(.bold))
+                .monospacedDigit()
+                .foregroundStyle(.white)
+                .padding(.horizontal, 6).padding(.vertical, 3)
+                .background(Color.blue, in: Capsule())
+                .overlay(alignment: .topTrailing) {
+                    if isNew {
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 9, height: 9)
+                            .overlay(Circle().strokeBorder(.white, lineWidth: 1.5))
+                            .offset(x: 3, y: -3)
+                    }
+                }
+                .accessibilityLabel(isNew ? "\(count) new episodes, new since you last opened it"
+                                          : "\(count) episodes to watch")
+        }
+    }
+}
+
+/// A gentle press for a grid card, in place of a List row's grey highlight.
+private struct LibraryCardButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
+            .opacity(configuration.isPressed ? 0.85 : 1)
+            .animation(.spring(response: 0.25, dampingFraction: 0.8), value: configuration.isPressed)
+    }
+}
 
 private struct LibraryRowView: View {
     let entry: LibraryEntry
@@ -1096,10 +1461,10 @@ private struct LibraryRowView: View {
             // Cover image — AniListCardView style
             Color.clear
                 .aspectRatio(2/3, contentMode: .fit)
-                .frame(width: 80)
+                .frame(width: 70)
                 .overlay(
                     ZStack {
-                        CachedAsyncImage(urlString: entry.media.coverImage.best ?? "")
+                        CachedAsyncImage(urlString: entry.media.coverImage.thumb ?? "")
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .clipped()
 
@@ -1121,8 +1486,6 @@ private struct LibraryRowView: View {
                             }
                             scoreFormat.scoreText(for: entry.displayScore(in: scoreFormat))
                                 .font(.caption2.weight(.bold))
-                                .lineLimit(1)
-                                .fixedSize(horizontal: true, vertical: false)
                         }
                         .foregroundStyle(.yellow)
                         .padding(.horizontal, 5)
@@ -1136,34 +1499,48 @@ private struct LibraryRowView: View {
 
             // Info
             VStack(alignment: .leading, spacing: 5) {
-                Text(entry.media.title.displayTitle)
+                CardTitle(entry.media.title.displayTitle)
                     .font(.subheadline.weight(.semibold))
-                    .lineLimit(2)
 
-                Text(progressLabel)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    Text(progressLabel)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    NewEpisodesBadge(entry: entry)
+                }
+
+                if let total = entry.media.episodes, total > 0 {
+                    ProgressView(value: min(Double(entry.progress), Double(total)), total: Double(total))
+                        .tint(.primary)
+                        .scaleEffect(x: 1, y: 0.8, anchor: .center)
+                        .frame(maxWidth: 180)
+                }
 
                 HStack(spacing: 8) {
                     if let avg = entry.media.averageScore {
                         HStack(spacing: 3) {
                             Image(systemName: "chart.bar.fill")
                                 .font(.system(size: 9))
-                            Text(avg.averageScoreOutOf10)
+                            Text("\(avg)%")
                                 .font(.caption2.weight(.semibold))
-                                .lineLimit(1)
-                                .fixedSize(horizontal: true, vertical: false)
                         }
                         .foregroundStyle(.blue)
                     }
-                    // Personal score is shown on the poster badge only —
-                    // removed from the right-side info to avoid duplication.
+                    if entry.score > 0 {
+                        HStack(spacing: 3) {
+                            if scoreFormat != .point3 {
+                                Image(systemName: "star.fill")
+                                    .font(.system(size: 9))
+                            }
+                            scoreFormat.scoreText(for: entry.displayScore(in: scoreFormat))
+                                .font(.caption2.weight(.semibold))
+                        }
+                        .foregroundStyle(.yellow)
+                    }
                     if let ts = entry.updatedAt {
                         Text(Date(timeIntervalSince1970: TimeInterval(ts)).formatted(.relative(presentation: .named)))
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
-                            .lineLimit(1)
-                            .fixedSize(horizontal: true, vertical: false)
                     }
                 }
 
@@ -1175,8 +1552,6 @@ private struct LibraryRowView: View {
                                 .padding(.horizontal, 7)
                                 .padding(.vertical, 2)
                                 .background(Color.secondary.opacity(0.15), in: Capsule())
-                                .lineLimit(1)
-                                .fixedSize(horizontal: true, vertical: false)
                         }
                     }
                 }
@@ -1190,6 +1565,7 @@ private struct LibraryRowView: View {
             }
             .buttonStyle(.plain)
         }
+        .fullTitleContextMenu(entry.media.title.displayTitle)
     }
 
     private var progressLabel: String {
@@ -1205,4 +1581,3 @@ private struct LibraryRowView: View {
         return "\(entry.progress) episodes watched"
     }
 }
-

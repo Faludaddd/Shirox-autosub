@@ -558,6 +558,53 @@ final class AniListService {
         return try await fetchPage(query: query)
     }
 
+    // MARK: - Aired episode counts (library new-episode badges)
+
+    /// Episodes aired so far for the shows among these that are on air, by AniList id and by
+    /// MyAnimeList id. For the library's new-episode badges: only AniList's own list carries
+    /// the airing schedule, so MyAnimeList and on-device lists ask for it here. Fifty
+    /// titles a request; a show between seasons or finished isn't in the answer.
+    func airedEpisodes(aniListIDs: [Int], malIDs: [Int]) async -> (byAniList: [Int: Int], byMal: [Int: Int]) {
+        struct Payload: Decodable {
+            struct Results: Decodable { let media: [Node] }
+            struct Node: Decodable {
+                struct Airing: Decodable { let episode: Int }
+                let id: Int
+                let idMal: Int?
+                let nextAiringEpisode: Airing?
+            }
+            let Page: Results?
+        }
+        var byAniList: [Int: Int] = [:]
+        var byMal: [Int: Int] = [:]
+        func run(_ field: String, _ ids: [Int]) async -> [Payload.Node] {
+            let query = """
+            query ($ids: [Int]) {
+              Page(perPage: 50) {
+                media(\(field): $ids, type: ANIME, status: RELEASING) {
+                  id idMal nextAiringEpisode { episode }
+                }
+              }
+            }
+            """
+            guard let data = try? await post(query: query, variables: ["ids": ids]),
+                  let page = (try? JSONDecoder().decode(GraphQLResponse<Payload>.self, from: data))?.data?.Page
+            else { return [] }
+            return page.media
+        }
+        for chunk in stride(from: 0, to: aniListIDs.count, by: 50).map({ Array(aniListIDs[$0..<min($0 + 50, aniListIDs.count)]) }) {
+            for node in await run("id_in", chunk) {
+                if let next = node.nextAiringEpisode?.episode, next > 1 { byAniList[node.id] = next - 1 }
+            }
+        }
+        for chunk in stride(from: 0, to: malIDs.count, by: 50).map({ Array(malIDs[$0..<min($0 + 50, malIDs.count)]) }) {
+            for node in await run("idMal_in", chunk) {
+                if let mal = node.idMal, let next = node.nextAiringEpisode?.episode, next > 1 { byMal[mal] = next - 1 }
+            }
+        }
+        return (byAniList, byMal)
+    }
+
     // MARK: - Seasonal & Schedule
 
     /// Anime from a specific season (e.g. Winter 2025), sorted by popularity.
@@ -1588,9 +1635,44 @@ final class AniListMappingManager {
     
     // Dictionary of moduleTitle -> aniListID
     private var mappings: [String: Int] = [:]
+
+    /// Titles the user tracks by hand, as "anilist-<id>" / "mal-<id>": the ids the player has.
+    static let manualTrackingKey = "manualTrackingTitles"
     
     private init() {
         loadMappings()
+    }
+
+    /// The entry the player checks for a title.
+    private func manualTrackingEntry(for media: Media) -> String? {
+        switch media.provider {
+        case .anilist, .mal: return "\(media.provider.rawValue)-\(media.id)"
+        case .local: return nil
+        }
+    }
+
+    private var manualTrackingTitles: Set<String> {
+        Set(userDefaults.stringArray(forKey: Self.manualTrackingKey) ?? [])
+    }
+
+    func canToggleAutomaticTracking(for media: Media) -> Bool {
+        manualTrackingEntry(for: media) != nil
+    }
+
+    func automaticTrackingEnabled(for media: Media) -> Bool {
+        guard let entry = manualTrackingEntry(for: media) else { return true }
+        return !manualTrackingTitles.contains(entry)
+    }
+
+    func automaticTrackingEnabled(provider: ProviderType, mediaId: Int) -> Bool {
+        !manualTrackingTitles.contains("\(provider.rawValue)-\(mediaId)")
+    }
+
+    func setAutomaticTracking(_ enabled: Bool, for media: Media) {
+        guard let entry = manualTrackingEntry(for: media) else { return }
+        var titles = manualTrackingTitles
+        if enabled { titles.remove(entry) } else { titles.insert(entry) }
+        userDefaults.set(titles.sorted(), forKey: Self.manualTrackingKey)
     }
     
     func saveMapping(title: String, aniListID: Int) {

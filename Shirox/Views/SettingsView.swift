@@ -1754,11 +1754,19 @@ struct StreamingSettingsPage: View {
 struct LibrarySettingsPage: View {
     @AppStorage("aniListTrackingEnabled") private var aniListTrackingEnabled = true
     @AppStorage("malTrackingEnabled") private var malTrackingEnabled = true
-    @AppStorage("dualSync") private var dualSync = false
     @AppStorage("skipReWatchTracking") private var skipReWatchTracking = true
     @AppStorage("rateOnFinish") private var rateOnFinish = true
     @AppStorage("localAutoTrackEnabled") private var localAutoTrackEnabled = true
     @AppStorage("titleLanguagePriority") private var titlePriority = "english,romaji,native"
+    @AppStorage(SyncTargets.key) private var syncTargetsRaw = ""
+    @StateObject private var librarySync = LibrarySyncService.shared
+    @State private var pendingSyncRun: SyncRun?
+    @State private var previewRun: SyncRun?
+    @State private var overwritePlan: LibraryOverwritePlan?
+
+    /// The sync sections are generated from whoever is signed in. Defined once on
+    /// `LibrarySyncService` so reads and the UI can never disagree about who that is.
+    private var signedInSides: [LibrarySide] { librarySync.signedInSides }
 
     private var orderedLanguages: [String] {
         titlePriority.components(separatedBy: ",").filter { !$0.isEmpty }
@@ -1769,12 +1777,44 @@ struct LibrarySettingsPage: View {
             VStack(spacing: 16) {
                 trackingCard
                 localLibraryCard
+                librarySyncCard
                 titleLanguageCard
             }
             .padding()
         }
         .navigationTitle("Library")
         .inlineNavBar()
+        .alert(
+            pendingSyncRun?.title ?? "Sync Library",
+            isPresented: Binding(
+                get: { pendingSyncRun != nil },
+                set: { if !$0 { pendingSyncRun = nil } }
+            ),
+            presenting: pendingSyncRun
+        ) { run in
+            Button(run.confirmButtonTitle, role: run.isDestructive ? .destructive : nil) {
+                pendingSyncRun = nil
+                Task { await librarySync.sync(run) }
+            }
+            Button("Cancel", role: .cancel) { pendingSyncRun = nil }
+        } message: { run in
+            Text(run.confirmationMessage)
+        }
+        .sheet(isPresented: Binding(
+            get: { overwritePlan != nil && previewRun != nil },
+            set: { if !$0 { overwritePlan = nil; previewRun = nil } }
+        )) {
+            if let plan = overwritePlan, let run = previewRun {
+                OverwritePreviewSheet(run: run, plan: plan) {
+                    overwritePlan = nil
+                    previewRun = nil
+                    Task { await librarySync.apply(plan, for: run) }
+                } onCancel: {
+                    overwritePlan = nil
+                    previewRun = nil
+                }
+            }
+        }
     }
 
     // MARK: - Card Header
@@ -1803,8 +1843,6 @@ struct LibrarySettingsPage: View {
                 rowDivider
                 toggleRow("Track on MyAnimeList", isOn: $malTrackingEnabled)
                 rowDivider
-                toggleRow("Sync edits to both services", isOn: $dualSync)
-                rowDivider
                 toggleRow("Never reduce progress", isOn: $skipReWatchTracking)
                 rowDivider
                 toggleRow("Prompt to rate after finishing", isOn: $rateOnFinish)
@@ -1814,6 +1852,112 @@ struct LibrarySettingsPage: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.secondary.opacity(0.08),
                     in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    // MARK: - Library Sync Card (whole-library synchronization)
+
+    private var librarySyncCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            cardHeader("Sync", systemImage: "arrow.triangle.2.circlepath.circle")
+
+            if librarySync.isRunning {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text(librarySync.statusText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if signedInSides.count >= 2 {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Mirror Edits")
+                        .font(.subheadline.weight(.semibold))
+                    ForEach(signedInSides, id: \.self) { side in
+                        toggleRow(side.name, isOn: mirrorBinding(for: side))
+                    }
+                    Text("An edit you make to a title — its status, progress, score, or removing it — is also written to every other service switched on here. Services left off change only through the sync runs below.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                syncSection("Sync Library",
+                            runs: SyncRun.runs(in: .sync, among: signedInSides),
+                            footnote: "Brings your two accounts into line — a one-time backfill for everything you tracked before signing in here. Syncing both ways reconciles them in a single pass; the one-way copies only ever write to the destination. Either way progress is only ever moved forward, so anything further along is left as it is.")
+
+                syncSection("Overwrite Library",
+                            runs: SyncRun.runs(in: .overwrite, among: signedInSides),
+                            footnote: "Use when one account is simply the one you want to keep. Overwrites the other with it — progress, status, score and rewatch count — even where that means going backwards. Titles only the overwritten account has are left in place. This can't be undone.")
+
+                syncSection("Mirror Library",
+                            runs: SyncRun.runs(in: .mirror, among: signedInSides),
+                            footnote: "Everything Overwrite does, and the overwritten account also loses any entry the other doesn't have, ending up an exact copy. Entries whose match can't be confirmed are kept rather than deleted. This can't be undone.")
+            } else {
+                Text("Sign in to both AniList and MyAnimeList to sync, overwrite, or mirror your whole library between them.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.secondary.opacity(0.08),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func syncSection(_ title: String, runs: [SyncRun], footnote: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+            ForEach(runs) { run in
+                syncRow(run)
+            }
+            Text(footnote)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .disabled(librarySync.isRunning)
+    }
+
+    private func mirrorBinding(for side: LibrarySide) -> Binding<Bool> {
+        Binding(
+            get: { SyncTargets.decode(syncTargetsRaw).contains(side) },
+            set: { isOn in
+                var sides = SyncTargets.decode(syncTargetsRaw)
+                if isOn { sides.insert(side) } else { sides.remove(side) }
+                SyncTargets.save(sides)
+            })
+    }
+
+    /// One row in the Sync / Overwrite / Mirror sections. Safe runs get a confirmation dialog;
+    /// destructive ones get a full preview of what they would change.
+    @ViewBuilder
+    private func syncRow(_ run: SyncRun) -> some View {
+        Button {
+            if run.isDestructive {
+                // Destructive runs are never launched straight from a tap — they go through a
+                // preview of exactly what they would change.
+                previewRun = run
+                Task { overwritePlan = await librarySync.preview(run) }
+            } else {
+                pendingSyncRun = run
+            }
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(run.title)
+                        .foregroundStyle(run.isDestructive ? Color.red : Color.appAccent)
+                    Text(run.subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.vertical, 6)
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Local Library Card
@@ -1883,6 +2027,96 @@ struct LibrarySettingsPage: View {
     private func toggleRow(_ title: String, isOn: Binding<Bool>) -> some View {
         Toggle(title, isOn: isOn)
             .padding(.vertical, 6)
+    }
+}
+
+// MARK: - Overwrite preview (destructive sync runs)
+
+/// The preview a destructive sync run shows before it runs: exactly what it would add,
+/// overwrite and delete — the run only goes ahead from here.
+private struct OverwritePreviewSheet: View {
+    let run: SyncRun
+    let plan: LibraryOverwritePlan
+    let onConfirm: () -> Void
+    let onCancel: () -> Void
+
+    private var additions: Int { plan.writes.filter(\.isNew).count }
+    private var overwrites: Int { plan.writes.filter { !$0.isNew }.count }
+
+    var body: some View {
+        NavigationView {
+            List {
+                Section {
+                    Text(run.title)
+                        .font(.headline)
+                    Text(run.subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section("What this will do") {
+                    if plan.isEmpty {
+                        Text("Nothing — \(run.targetName) already matches.")
+                            .foregroundStyle(.secondary)
+                    }
+                    if additions > 0 { row("Add to \(run.targetName)", additions) }
+                    if overwrites > 0 { row("Overwrite on \(run.targetName)", overwrites) }
+                    if !plan.deletions.isEmpty {
+                        row("Delete from \(run.targetName)", plan.deletions.count, tint: .red)
+                    }
+                    if plan.unchanged > 0 { row("Leave unchanged", plan.unchanged, tint: .secondary) }
+                }
+
+                if !plan.deletions.isEmpty {
+                    Section("Will be deleted") {
+                        ForEach(plan.deletions, id: \.id) { deletion in
+                            Text(deletion.title)
+                                .font(.callout)
+                        }
+                    }
+                }
+
+                if plan.keptUnverified > 0 || !plan.unmatched.isEmpty {
+                    Section("Left alone") {
+                        if plan.keptUnverified > 0 {
+                            Text("\(plan.keptUnverified) on \(run.targetName) couldn't be matched against \(run.sourceName), so they're kept rather than deleted.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        if !plan.unmatched.isEmpty {
+                            Text("\(plan.unmatched.count) on \(run.sourceName) have no \(run.targetName) entry to write to.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                Section {
+                    Button(run.confirmButtonTitle, role: .destructive, action: onConfirm)
+                        .disabled(plan.isEmpty)
+                } footer: {
+                    Text("This can't be undone.")
+                }
+            }
+            .navigationTitle(run.confirmationTitle)
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", action: onCancel)
+                }
+            }
+        }
+    }
+
+    private func row(_ label: String, _ count: Int, tint: Color = .primary) -> some View {
+        HStack {
+            Text(label)
+            Spacer()
+            Text("\(count)")
+                .foregroundStyle(tint)
+        }
     }
 }
 

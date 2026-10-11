@@ -55,6 +55,14 @@ final class LibraryViewModel: ObservableObject {
     private let minAutoRefreshInterval: TimeInterval = 30
     private var cancellables = Set<AnyCancellable>()
 
+    private static func isSignedIn(_ provider: ProviderType) -> Bool {
+        switch provider {
+        case .anilist: return AniListAuthManager.shared.isLoggedIn
+        case .mal: return MALAuthManager.shared.isLoggedIn
+        default: return false
+        }
+    }
+
     init() {
         // Logged-out users have no provider library, so start on the on-device source.
         // Setting this up front (rather than deferring to an .onAppear) keeps the Library's
@@ -67,8 +75,17 @@ final class LibraryViewModel: ObservableObject {
             // `ProviderManager.primary`, manga fetches switch on `source`'s embedded type, and
             // the cache keys on it. A stale default (.anilist while MAL is primary) would fetch
             // one provider for anime and another for manga, and collide their cache snapshots.
-            source = .provider(primary)
+            // But only one the user is signed into: signed into MyAnimeList alone, with AniList
+            // still first in the order, the Library opened on AniList and said "Not logged in."
+            // while Settings showed the MyAnimeList account.
+            if Self.isSignedIn(primary) {
+                source = .provider(primary)
+            } else if let signedIn = ProviderManager.shared.orderedProviders
+                .map(\.providerType).first(where: Self.isSignedIn) {
+                source = .provider(signedIn)
+            }
         }
+        restoreList()
 
         // Cold start: show the last-saved list for the initial key instantly, before the first
         // network refresh. `autoRefreshIfNeeded` then refreshes silently (no spinner) and keeps
@@ -88,9 +105,11 @@ final class LibraryViewModel: ObservableObject {
                 // Keep `source` in lock-step with the active provider so switching providers
                 // actually re-keys the cache and reloads the list (rather than early-returning
                 // in `selectSource` because the nominal source didn't change).
-                guard let self, let providerType, case .provider = self.source else { return }
+                guard let self, let providerType, case .provider = self.source,
+                      Self.isSignedIn(providerType) else { return }
                 guard self.source != .provider(providerType) else { return }
                 self.source = .provider(providerType)
+                self.restoreList()
                 self.switchKey()
             }
             .store(in: &cancellables)
@@ -108,8 +127,15 @@ final class LibraryViewModel: ObservableObject {
             .sink { [weak self] _ in
                 guard let self, self.isLocal else { return }
                 self.customListNames = LocalLibraryManager.shared.collections.map(\.name).sorted()
+                self.dropMissingCustomList()
                 self.applyFilter()
             }
+            .store(in: &cancellables)
+
+        NotificationCenter.default.publisher(for: AniListEntryExtrasChange.notification)
+            .compactMap { $0.object as? AniListEntryExtrasChange }
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] change in self?.apply(change) }
             .store(in: &cancellables)
 
         NotificationCenter.default.publisher(for: .remoteLibraryProgressDidPush)
@@ -127,15 +153,67 @@ final class LibraryViewModel: ObservableObject {
         await fetch()
     }
 
+    /// An AniList manga list entry, with a manga-tagged Media so `isManga` is reliable and the
+    /// chapter total (episodes field) comes from `chapters`.
+    nonisolated static func aniListMangaEntry(_ r: AniListRawEntry) -> LibraryEntry {
+        let m = r.media
+        let media = Media(
+            id: m.id, idMal: m.idMal, provider: .anilist,
+            title: MediaTitle(romaji: m.title.romaji, english: m.title.english, native: m.title.native),
+            coverImage: MediaCoverImage(large: m.coverImage.large, extraLarge: m.coverImage.extraLarge),
+            bannerImage: m.bannerImage, description: m.description, episodes: m.chapters,
+            status: m.status, averageScore: m.averageScore, genres: m.genres,
+            season: nil, seasonYear: nil, nextAiringEpisode: nil, relations: nil,
+            type: "MANGA", format: m.format,
+            studioNames: nil, source: nil, duration: nil, airDateRange: nil)
+        return LibraryEntry(
+            id: r.id, media: media,
+            status: r.status, progress: r.progress, score: r.score,
+            updatedAt: r.updatedAt, customListName: r.customListName,
+            timesRewatched: r.repeat, isPrivate: r.isPrivate, notes: r.notes)
+    }
+
+    /// Privacy and notes are saved apart from `update`, so the lists held here hear of them now.
+    private func apply(_ change: AniListEntryExtrasChange) {
+        for i in allEntries.indices { change.apply(to: &allEntries[i]) }
+        for (key, entries) in cache where key.source == .provider(.anilist) {
+            cache[key] = entries.map { change.apply(to: $0) ?? $0 }
+        }
+        LibraryCacheStore.shared.apply(change)
+        applyFilter()
+    }
+
     func selectStatus(_ status: MediaListStatus) {
         selectedStatus = status
         selectedCustomList = nil
+        rememberList()
         applyFilter()
     }
 
     func selectCustomList(_ name: String?) {
         selectedCustomList = name
+        rememberList()
         applyFilter()
+    }
+
+    /// Lands on the list last used for this source and type, or the type's default.
+    private func restoreList() {
+        let place = LibraryListMemory.restorable(LibraryListMemory.load(for: source, mediaType),
+                                                 source: source, kind: mediaType)
+        selectedStatus = place?.status ?? LibrarySource.defaultStatus(for: mediaType)
+        selectedCustomList = place?.customList
+    }
+
+    private func rememberList() {
+        LibraryListMemory.save(LibraryListMemory.Place(status: selectedStatus, customList: selectedCustomList),
+                               for: source, mediaType)
+    }
+
+    /// A remembered custom list that no longer exists falls back to its status list.
+    private func dropMissingCustomList() {
+        guard let list = selectedCustomList, !customListNames.contains(list) else { return }
+        selectedCustomList = nil
+        rememberList()
     }
 
     func selectSource(_ source: LibrarySource) {
@@ -143,21 +221,20 @@ final class LibraryViewModel: ObservableObject {
         // fetch (which reads `ProviderManager.primary`) and the manga fetch (which switches on
         // `source`'s type) all agree. When this actually changes primary, the `$orderedProviders`
         // sink updates `source` and reloads; when it doesn't, we fall through and reload here.
-        if case .provider(let type) = source {
+        if let type = source.providerToSelect {
             ProviderManager.shared.selectProvider(type)
         }
         guard self.source != source else { return }
         self.source = source
-        selectedCustomList = nil
-        selectedStatus = .current
+        if !source.mediaKinds.contains(mediaType) { mediaType = .anime }
+        restoreList()
         switchKey()
     }
 
     func selectMediaType(_ kind: MediaKind) {
         guard mediaType != kind else { return }
         mediaType = kind
-        selectedCustomList = nil
-        selectedStatus = .current
+        restoreList()
         switchKey()
     }
 
@@ -202,7 +279,7 @@ final class LibraryViewModel: ObservableObject {
 
     func refresh() async {
         await withTaskGroup(of: Void.self) { group in
-            group.addTask { await self.load() }
+            group.addTask { await self.fetch(userRequested: true) }
             group.addTask {
                 // Sequential: both sync funcs mutate the same CW store across await points.
                 await ContinueWatchingManager.shared.syncWithAniList()
@@ -262,13 +339,7 @@ final class LibraryViewModel: ObservableObject {
         // having the feature at all on those providers.
         guard entry.media.provider == .anilist else { return }
         do {
-            try await AniListLibraryService.shared.updateEntry(
-                mediaId: entry.media.id,
-                status: entry.status,
-                progress: entry.progress,
-                score: entry.score > 0 ? entry.score : nil,
-                type: mediaType == .manga ? .manga : .anime,
-                isPrivate: isPrivate)
+            try await AniListLibraryService.shared.setPrivate(mediaId: entry.media.id, isPrivate: isPrivate)
         } catch {
             self.error = error.localizedDescription
             // Revert just this entry's isPrivate — don't do a full reload
@@ -322,7 +393,7 @@ final class LibraryViewModel: ObservableObject {
 
     // MARK: - Private
 
-    private func fetch(silent: Bool = false) async {
+    private func fetch(silent: Bool = false, userRequested: Bool = false) async {
         // Claim this generation. `mediaType`, `source` and `currentKey` are read synchronously
         // here — before the first await — so they match the selection this fetch is loading.
         loadGeneration &+= 1
@@ -382,6 +453,7 @@ final class LibraryViewModel: ObservableObject {
             customListNames = result.compactMap { $0.customListName }.filter { seen.insert($0).inserted }.sorted()
             UserDefaults.standard.set(customListNames, forKey: "libraryCustomListNames")
         }
+        dropMissingCustomList()
     }
 
     /// Fetches the manga library for the current source. Local reads the on-device
@@ -396,26 +468,7 @@ final class LibraryViewModel: ObservableObject {
             case .anilist:
                 guard let userId = await AniListAuthManager.shared.userId else { return [] }
                 let raw = try await AniListLibraryService.shared.fetchAllLists(userId: userId, type: .manga)
-                return raw.map { r in
-                    let m = r.media   // AniListMedia
-                    // Build a manga-tagged Media directly so `isManga` is reliable and the
-                    // chapter total (episodes field) is populated from `chapters`.
-                    let media = Media(
-                        id: m.id, idMal: m.idMal, provider: .anilist,
-                        title: MediaTitle(romaji: m.title.romaji, english: m.title.english, native: m.title.native),
-                        coverImage: MediaCoverImage(large: m.coverImage.large, extraLarge: m.coverImage.extraLarge),
-                        bannerImage: m.bannerImage, description: m.description, episodes: m.chapters,
-                        status: m.status, averageScore: m.averageScore, genres: m.genres,
-                        season: nil, seasonYear: nil, nextAiringEpisode: nil, relations: nil,
-                        type: "MANGA", format: m.format,
-                        studioNames: nil, source: nil, duration: nil, airDateRange: nil)
-                    return LibraryEntry(
-                        id: r.id, media: media,
-                        status: r.status, progress: r.progress, score: r.score,
-                        updatedAt: r.updatedAt, customListName: r.customListName,
-                        timesRewatched: r.repeat,
-                        isPrivate: r.isPrivate)
-                }
+                return raw.map(Self.aniListMangaEntry)
             case .mal:
                 let entries = try await MALMangaLibraryService.shared.fetchLibrary()
                 return entries.map { e in
@@ -453,5 +506,108 @@ final class LibraryViewModel: ObservableObject {
         } else {
             entries = allEntries.filter { $0.status == selectedStatus && $0.customListName == nil }
         }
+    }
+}
+
+// MARK: - New episodes
+
+/// The library's new-episode badges: how many aired episodes of a show on air you're behind,
+/// and whether more have aired since you last opened it.
+@MainActor
+final class NewEpisodeTracker: ObservableObject {
+    static let shared = NewEpisodeTracker()
+
+    /// The badges and the dot, on cards and rows.
+    static let badgesKey = "libraryNewEpisodeBadges"
+    /// The sort menu's "New Episodes First".
+    static let firstKey = "libraryNewEpisodesFirst"
+    private static let seenKey = "libraryNewEpisodeSeen"
+
+    /// Aired counts asked of AniList for lists that don't carry them, by `Media.uniqueId`.
+    @Published private var fetched: [String: Int] = [:]
+    /// The aired count when each show was last opened (or first seen), by `Media.uniqueId`.
+    @Published private var seen: [String: Int]
+    private var lastFetch: [String: Date] = [:]
+    private var fetching = false
+
+    private init() {
+        seen = UserDefaults.standard.dictionary(forKey: Self.seenKey) as? [String: Int] ?? [:]
+    }
+
+    /// Episodes out so far, for an anime that's on air; nil otherwise.
+    func aired(_ entry: LibraryEntry) -> Int? {
+        let media = entry.media
+        guard !media.isManga else { return nil }
+        if let next = media.nextAiringEpisode?.episode { return next > 1 ? next - 1 : nil }
+        return fetched[media.uniqueId]
+    }
+
+    /// Aired episodes past your progress, for a show you're watching; 0 when there are none.
+    func unwatched(_ entry: LibraryEntry) -> Int {
+        guard entry.status == .current || entry.status == .repeating, let aired = aired(entry) else { return 0 }
+        return max(0, aired - entry.progress)
+    }
+
+    /// More episodes have aired since you last opened the show, and you haven't watched them.
+    func isNewSinceOpened(_ entry: LibraryEntry) -> Bool {
+        guard unwatched(entry) > 0, let aired = aired(entry), let last = seen[entry.media.uniqueId] else { return false }
+        return aired > last
+    }
+
+    /// The show was opened: what's aired so far is no longer new.
+    func markOpened(_ entry: LibraryEntry) {
+        guard let aired = aired(entry), seen[entry.media.uniqueId] != aired else { return }
+        seen[entry.media.uniqueId] = aired
+        save()
+    }
+
+    /// Notes each show's aired count the first time it's seen, so nothing is "new" on first
+    /// launch, and asks AniList for the counts a list doesn't carry.
+    func observe(_ entries: [LibraryEntry]) async {
+        recordFirstSightings(entries)
+        guard !fetching else { return }
+        let stale = Date().addingTimeInterval(-30 * 60)
+        let wanted = entries.filter {
+            ($0.status == .current || $0.status == .repeating) && !$0.media.isManga
+                && $0.media.nextAiringEpisode == nil
+                && (lastFetch[$0.media.uniqueId] ?? .distantPast) < stale
+        }
+        guard !wanted.isEmpty else { return }
+        var byAniList: [Int: [String]] = [:]
+        var byMal: [Int: [String]] = [:]
+        for entry in wanted {
+            let media = entry.media
+            switch media.provider {
+            case .anilist: byAniList[media.id, default: []].append(media.uniqueId)
+            case .mal: byMal[media.idMal ?? media.id, default: []].append(media.uniqueId)
+            default:
+                if let mal = media.idMal { byMal[mal, default: []].append(media.uniqueId) }
+            }
+        }
+        fetching = true
+        defer { fetching = false }
+        let result = await AniListService.shared.airedEpisodes(aniListIDs: Array(byAniList.keys),
+                                                               malIDs: Array(byMal.keys))
+        let now = Date()
+        var updated = fetched
+        for entry in wanted { lastFetch[entry.media.uniqueId] = now; updated[entry.media.uniqueId] = nil }
+        for (id, keys) in byAniList { if let count = result.byAniList[id] { keys.forEach { updated[$0] = count } } }
+        for (id, keys) in byMal { if let count = result.byMal[id] { keys.forEach { updated[$0] = count } } }
+        if updated != fetched { fetched = updated }
+        recordFirstSightings(entries)
+    }
+
+    private func recordFirstSightings(_ entries: [LibraryEntry]) {
+        var changed = false
+        for entry in entries where seen[entry.media.uniqueId] == nil {
+            guard let aired = aired(entry) else { continue }
+            seen[entry.media.uniqueId] = aired
+            changed = true
+        }
+        if changed { save() }
+    }
+
+    private func save() {
+        UserDefaults.standard.set(seen, forKey: Self.seenKey)
     }
 }

@@ -22,7 +22,10 @@ struct AniListDetailView: View {
     @ObservedObject private var malAuth = MALAuthManager.shared
     @State private var showResetConfirmation = false
     @State private var autoPlayOnLoad = false
-    @AppStorage("dualSync") private var dualSync = false
+    /// v2.31: AniList ↔ MyAnimeList mirroring — one pair within `SyncTargets`
+    /// (seeded from the old dualSync Bool at launch).
+    @AppStorage(SyncTargets.key) private var syncTargetsRaw = ""
+    private var dualSync: Bool { SyncTargets.mirrors(.anilist, .mal, in: SyncTargets.decode(syncTargetsRaw)) }
     /// #122 — Controls whether the Statistics grid renders on detail pages.
     @AppStorage("showStatistics") private var showStatistics = true
     @State private var showLibraryEdit = false

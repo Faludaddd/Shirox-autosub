@@ -1,85 +1,111 @@
 import SwiftUI
 
-/// Capsule-pill switcher for the Library tab. Always shows the local "My Library" pill,
+/// The Library's source switcher: a pill for "My Library"
 /// plus a pill for each signed-in provider. Hidden when only one source exists (logged out:
-/// local-only) so a lone pill isn't shown.
-///
-/// Every pill uses the shared `libraryCapsuleStyle` so it matches the status filter,
-/// sort menu, grid toggle, and media-type pills exactly — same height, padding,
-/// corner radius, background, and stroke.
+/// only My Library; logged in to one service: it + My Library).
 struct LibrarySourceSwitcher: View {
-    let selected: LibrarySource
-    let onSelect: (LibrarySource) -> Void
+    @Binding var selected: LibrarySource
+    var onSelect: (LibrarySource) -> Void
 
     @ObservedObject private var anilistAuth = AniListAuthManager.shared
     @ObservedObject private var malAuth = MALAuthManager.shared
     @ObservedObject private var manager = ProviderManager.shared
 
-    private var providerSources: [ProviderType] {
-        var result: [ProviderType] = []
-        if anilistAuth.isLoggedIn { result.append(.anilist) }
-        if malAuth.isLoggedIn { result.append(.mal) }
+    /// The pills, in order: My Library, then each signed-in service.
+    static func sources(anilist: Bool, mal: Bool) -> [LibrarySource] {
+        var result: [LibrarySource] = [.local]
+        if anilist { result.append(.provider(.anilist)) }
+        if mal { result.append(.provider(.mal)) }
         return result
     }
 
-    private var isLocalSelected: Bool {
-        if case .local = selected { return true }
-        return false
+    private var sources: [LibrarySource] {
+        Self.sources(anilist: anilistAuth.isLoggedIn, mal: malAuth.isLoggedIn)
     }
 
-    /// A provider pill is highlighted when we're on a remote source and it is the active
-    /// primary provider — driven by `ProviderManager`, the same store the data source reads.
-    private func isProviderSelected(_ type: ProviderType) -> Bool {
-        !isLocalSelected && manager.primary?.providerType == type
+    /// A provider pill is highlighted when a provider's list is on screen and it is the active
+    /// primary provider — driven by `ProviderManager`, the same store the data source reads. My
+    /// Library is highlighted when it is the source.
+    private func isSelected(_ source: LibrarySource) -> Bool {
+        switch source {
+        case .local:
+            return selected == source
+        case .provider(let type):
+            guard case .provider = selected else { return false }
+            return manager.primary?.providerType == type
+        }
     }
 
     var body: some View {
-        // local + each signed-in provider; only render when there's a real choice.
-        // NOTE: a plain HStack (not a horizontal ScrollView) — at most three pills fit on
-        // any width, and a horizontal ScrollView above the Library's List would steal the
-        // `.searchable` bar's scroll-view association and break it across navigation.
-        if !providerSources.isEmpty {
-            HStack(spacing: LibraryDS.controlSpacing) {
-                pill(title: "My Library", isLocal: true, selected: isLocalSelected) {
-                    onSelect(.local)
-                }
-                ForEach(providerSources, id: \.self) { type in
-                    // Short label keeps all three pills on one line; the icon identifies the
-                    // provider. "MyAnimeList" is the only label wide enough to force a wrap.
-                    pill(title: type == .mal ? "MAL" : type.displayName, isLocal: false,
-                         selected: isProviderSelected(type),
-                         iconURL: type.iconURL) {
-                        ProviderManager.shared.selectProvider(type)
-                        onSelect(.provider(type))
+        // Only render when there's a real choice.
+        // Scrolls sideways so every pill keeps its name. It must never be the first scroll view on
+        // screen: iOS then attaches the Library's `.searchable` bar to it instead of the List, and
+        // opening a show tears the bar down (b49f014). On iOS `LibraryView` keeps this row inside
+        // its List in every state for that reason.
+        let sources = self.sources
+        if sources.count > 1 {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(sources, id: \.self) { source in
+                        pill(source, selected: isSelected(source)) {
+                            if let type = source.providerToSelect {
+                                ProviderManager.shared.selectProvider(type)
+                            }
+                            onSelect(source)
+                        }
                     }
                 }
-                Spacer()
+                // The 16pt inset lives inside the scroll view, so the first pill lines up with
+                // `filterCapsuleRow` and the row still scrolls to the screen's edges. Call sites
+                // add no horizontal padding.
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
             }
-            // No internal horizontal padding — call sites supply the 16pt inset (matching
-            // `filterCapsuleRow`) so the pills sit flush-left with the List button + search bar.
-            .padding(.vertical, 4)
+        }
+    }
+
+    /// Short labels keep the pills compact; the icon identifies the service.
+    private func title(for source: LibrarySource) -> String {
+        switch source {
+        case .local:              return "My Library"
+        case .provider(.mal):     return "MAL"
+        case .provider(let type): return type.displayName
         }
     }
 
     @ViewBuilder
-    private func pill(title: String, isLocal: Bool, selected: Bool,
-                      iconURL: String? = nil, action: @escaping () -> Void) -> some View {
+    private func icon(for source: LibrarySource) -> some View {
+        switch source {
+        case .local:
+            Image(systemName: "books.vertical.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .frame(width: 16, height: 16)
+        case .provider(let type):
+            serviceIcon(type.iconURL)
+        }
+    }
+
+    private func serviceIcon(_ url: String) -> some View {
+        CachedAsyncImage(urlString: url)
+            .frame(width: 16, height: 16)
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+    }
+
+    @ViewBuilder
+    private func pill(_ source: LibrarySource, selected: Bool,
+                      action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 6) {
-                if isLocal {
-                    Image(systemName: "books.vertical.fill")
-                        .font(.system(size: LibraryDS.pillIconSize, weight: .semibold))
-                } else if let iconURL {
-                    CachedAsyncImage(urlString: iconURL)
-                        .frame(width: 18, height: 18)
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
-                }
-                Text(title)
-                    .font(LibraryDS.pillFont)
+                icon(for: source)
+                Text(title(for: source))
+                    .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
             }
             .fixedSize(horizontal: true, vertical: false)
-            .libraryCapsuleStyle(isActive: selected)
+            .padding(.horizontal, 12).padding(.vertical, 7)
+            .background(Capsule().fill(selected ? Color.primary.opacity(0.12) : Color.secondary.opacity(0.08)))
+            .overlay(Capsule().strokeBorder(selected ? Color.primary.opacity(0.3) : .clear, lineWidth: 1))
+            .foregroundStyle(selected ? Color.primary : .secondary)
         }
         .buttonStyle(.plain)
     }

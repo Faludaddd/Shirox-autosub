@@ -75,6 +75,20 @@ final class LibraryCacheStore {
         persist()
     }
 
+    /// Reflect a privacy or notes change AniList accepted, keeping when the snapshot was synced.
+    func apply(_ change: AniListEntryExtrasChange) {
+        var changed = false
+        for kind in [MediaKind.anime, .manga] {
+            let k = Self.key(.anilist, kind)
+            guard var snap = snapshots[k],
+                  let idx = snap.entries.firstIndex(where: { $0.media.id == change.mediaId }) else { continue }
+            change.apply(to: &snap.entries[idx])
+            snapshots[k] = snap
+            changed = true
+        }
+        if changed { persist() }
+    }
+
     /// On-disk size in bytes (0 if the file is absent) — for CacheManager's storage view.
     func diskByteSize() -> Int {
         (try? Data(contentsOf: fileURL).count) ?? 0

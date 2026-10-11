@@ -266,6 +266,8 @@ struct ShiroxApp: App {
         #endif
         ProviderManager.shared.setup(providers: [AniListProvider.shared, MALProvider.shared])
         PendingWriteQueue.shared.register(sink: LibraryWriteSink())
+        // v2.31: seed the SyncTargets set from the old dualSync Bool, once per install.
+        SyncTargets.migrateIfNeeded()
         LocalLibraryManager.shared.syncFromContinueWatching()
         HostBlocklist.shared.loadIfNeeded()
         EpisodeNotificationManager.shared.registerDelegate()

@@ -277,6 +277,8 @@ struct MediaCoverImage: Codable, Equatable, Hashable {
     let large: String?
     let extraLarge: String?
     var best: String? { extraLarge ?? large }
+    /// Art for a grid cell or a row thumbnail — the same as `best` (no Data Saver in this fork).
+    var thumb: String? { extraLarge ?? large }
 }
 
 struct MediaAiringEpisode: Codable, Equatable, Hashable {

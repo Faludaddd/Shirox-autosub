@@ -216,3 +216,73 @@ extension View {
         }
     }
 }
+
+// MARK: - Sheets that grow out of their button
+
+extension View {
+    /// Marks the button a sheet grows out of, from iOS 18 — pair it with `zoomingOut(of:in:)` on
+    /// the sheet's content, under the same id. Before 18 the sheet slides up as usual.
+    ///
+    /// `cornerRadius` rounds the shape the sheet starts from; the default is the button's own
+    /// rectangle.
+    @ViewBuilder
+    func zoomSource(_ id: some Hashable, in namespace: Namespace.ID, cornerRadius: CGFloat? = nil) -> some View {
+        #if os(iOS)
+        if #available(iOS 18, *) {
+            if let cornerRadius {
+                matchedTransitionSource(id: id, in: namespace) {
+                    $0.clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                }
+            } else {
+                matchedTransitionSource(id: id, in: namespace)
+            }
+        } else {
+            self
+        }
+        #else
+        self
+        #endif
+    }
+
+    /// A sheet's content, growing out of the view marked with `zoomSource` under `id` — or, with
+    /// `fromToolbar`, out of the button added by `toolbarZoomSource`. That one is a source only from
+    /// iOS 26; before, a zoom with nothing to start from would grow from the middle of the screen,
+    /// so the sheet slides up as usual instead.
+    @ViewBuilder
+    func zoomingOut(of id: some Hashable, in namespace: Namespace.ID, fromToolbar: Bool = false) -> some View {
+        #if os(iOS)
+        if #available(iOS 26, *) {
+            navigationTransition(.zoom(sourceID: id, in: namespace))
+        } else if #available(iOS 18, *), !fromToolbar {
+            navigationTransition(.zoom(sourceID: id, in: namespace))
+        } else {
+            self
+        }
+        #else
+        self
+        #endif
+    }
+
+    /// A toolbar button a sheet grows out of — pair it with `zoomingOut(of:in:fromToolbar:)`.
+    ///
+    /// A toolbar item can be a zoom source only from iOS 26, so the button comes in a plain
+    /// toolbar below that. A plain `zoomSource` on a view inside a toolbar item isn't found: the
+    /// sheet grows from the middle of the screen.
+    @ViewBuilder
+    func toolbarZoomSource<Item: View>(_ id: some Hashable, in namespace: Namespace.ID,
+                                       placement: ToolbarItemPlacement = .primaryAction,
+                                       @ViewBuilder item: @escaping () -> Item) -> some View {
+        #if os(iOS)
+        if #available(iOS 26, *) {
+            toolbar {
+                ToolbarItem(placement: placement, content: item)
+                    .matchedTransitionSource(id: id, in: namespace)
+            }
+        } else {
+            toolbar { ToolbarItem(placement: placement, content: item) }
+        }
+        #else
+        toolbar { ToolbarItem(placement: placement, content: item) }
+        #endif
+    }
+}

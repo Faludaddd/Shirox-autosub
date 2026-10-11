@@ -14,7 +14,6 @@ enum LibraryListMemory {
         let name: String
         switch source {
         case .local:              name = "local"
-        case .simkl:              name = "simkl"
         case .provider(let type): name = "provider-\(type.rawValue)"
         }
         return "\(name)|\(kind.rawValue)"

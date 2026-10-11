@@ -178,11 +178,20 @@ import Combine
     /// existing and watched episode, promotes Planning→Watching and Watching→Completed at the
     /// final (non-airing) episode, and never demotes an existing Completed or manually-chosen
     /// (paused/dropped) status. `existing*` are nil for a brand-new entry. No side effects.
+    ///
+    /// `remoteStatus` is the AniList/MyAnimeList status read for the same event, when there was
+    /// one. A title being rewatched there stays Rewatching here: this merge only knew Watching,
+    /// so every rewatched episode turned the library entry back to Watching.
     nonisolated static func mergedTracking(existingProgress: Int?, existingStatus: MediaListStatus?,
-                                           watchedEpisode: Int, totalEpisodes: Int?, isAiring: Bool?)
+                                           watchedEpisode: Int, totalEpisodes: Int?, isAiring: Bool?,
+                                           remoteStatus: MediaListStatus? = nil)
         -> (progress: Int, status: MediaListStatus) {
         let isFinished = isAiring != true
             && (totalEpisodes.map { $0 > 0 && watchedEpisode >= $0 } ?? false)
+        if remoteStatus == .repeating || (remoteStatus == nil && existingStatus == .repeating) {
+            // A rewatch counts up from the start again, so its progress is the episode watched.
+            return (watchedEpisode, isFinished ? .completed : .repeating)
+        }
         let progress = max(existingProgress ?? 0, watchedEpisode)
         guard let existingStatus else {
             return (progress, isFinished ? .completed : .current)
@@ -198,7 +207,7 @@ import Combine
     /// `episode`, promotes Planning→Watching and Watching→Completed at the final episode,
     /// never demotes a Completed/manual status, never overwrites a hand-set score. No-op when
     /// the toggle is off or the event has no trackable identity.
-    func recordWatched(context: MarkContext, episode: Int) {
+    func recordWatched(context: MarkContext, episode: Int, remoteStatus: MediaListStatus? = nil) {
         guard autoTrackEnabled else { return }
 
         let source: LocalSource? = (context.aniListID == nil && context.malID == nil)
@@ -214,7 +223,8 @@ import Combine
         let existing = entry(forUniqueId: media.uniqueId)
         let merged = Self.mergedTracking(
             existingProgress: existing?.progress, existingStatus: existing?.status,
-            watchedEpisode: episode, totalEpisodes: context.totalEpisodes, isAiring: context.isAiring)
+            watchedEpisode: episode, totalEpisodes: context.totalEpisodes, isAiring: context.isAiring,
+            remoteStatus: remoteStatus)
         upsert(media: existing?.media ?? media, status: merged.status, progress: merged.progress,
                score: existing?.displayScore(in: Self.currentLocalFormat) ?? 0,
                localSource: existing?.localSource ?? source)
@@ -293,6 +303,13 @@ import Combine
             let merged = Self.mergedTracking(
                 existingProgress: existing?.progress, existingStatus: existing?.status,
                 watchedEpisode: watchedCount, totalEpisodes: item.totalEpisodes, isAiring: item.isAiring)
+            // Runs on every launch: an entry it has nothing new for keeps its "updated" time,
+            // which a re-save set to now — every title read "1 second ago" and the
+            // recently-updated order was lost.
+            if let existing, existing.status == merged.status, existing.progress == merged.progress,
+               existing.localSource != nil || source == nil {
+                continue
+            }
             // Preserve the user's score and any manually-chosen status (dropped/paused).
             // Pass the score in the active format so upsert keeps the canonical value.
             upsert(media: existing?.media ?? media, status: merged.status, progress: merged.progress,
@@ -333,6 +350,14 @@ import Combine
     }
 
     // MARK: - Persistence
+
+    /// Replaces the local library from a backup — writes the JSON file *and* refreshes the
+    /// published arrays, since this singleton reads the file only once, from `init`.
+    func restore(entries newEntries: [LibraryEntry], collections newCollections: [LocalCollection]) {
+        entries = newEntries
+        collections = newCollections
+        persist()
+    }
 
     private static var fileURL: URL {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]

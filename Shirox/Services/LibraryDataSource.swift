@@ -6,6 +6,39 @@ enum LibrarySource: Hashable {
     case local
 }
 
+extension LibrarySource {
+    /// The provider choosing this source makes primary — none for My Library.
+    var providerToSelect: ProviderType? {
+        if case .provider(let type) = self { return type }
+        return nil
+    }
+
+    /// What this source lists.
+    var mediaKinds: [MediaKind] { [.anime, .manga] }
+
+    /// The status lists this source can hold for `kind`, in the user's order.
+    func statuses(in order: [MediaListStatus], for kind: MediaKind = .anime) -> [MediaListStatus] {
+        order
+    }
+
+    /// The list a kind opens on.
+    static func defaultStatus(for kind: MediaKind) -> MediaListStatus {
+        .current
+    }
+
+    /// Where the Library goes when the list on screen signs out: the primary provider if it is
+    /// still signed in, then any signed-in provider, then My Library.
+    static func afterSignOut(primary: ProviderType?, signedIn: Set<ProviderType>) -> LibrarySource {
+        if let primary, ProviderType.userProviders.contains(primary), signedIn.contains(primary) {
+            return .provider(primary)
+        }
+        if let type = ProviderType.userProviders.first(where: { signedIn.contains($0) }) {
+            return .provider(type)
+        }
+        return .local
+    }
+}
+
 /// The four library operations the Library tab needs, decoupled from where the data lives.
 @MainActor protocol LibraryDataSource {
     func fetchLibrary() async throws -> [LibraryEntry]

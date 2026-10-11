@@ -980,6 +980,9 @@ import Combine
         let aniListEnabled = Self.trackingPref("aniListTrackingEnabled", default: true)
         let malEnabled     = Self.trackingPref("malTrackingEnabled", default: true)
         let skipRewatch    = Self.trackingPref("skipReWatchTracking", default: true)
+        // The remote entry's status before any write — a title being rewatched there stays
+        // Rewatching in the on-device library too.
+        var remoteStatusBefore: MediaListStatus?
 
         // Remap a module's global (absolute) episode number to the correct season entry
         // and season-relative number. Falls back to the raw values when unresolved.
@@ -1016,6 +1019,7 @@ import Combine
             }
             if let aid = resolvedAniListID {
                 let current = try? await AniListProvider.shared.fetchEntry(mediaId: aid)
+                if remoteStatusBefore == nil { remoteStatusBefore = current?.status }
                 let decision = Self.remoteTrackDecision(
                     currentStatus: current?.status, currentProgress: current?.progress ?? 0,
                     watchedEpisode: ep, totalEpisodes: totalEpisodes,
@@ -1050,6 +1054,7 @@ import Combine
             }
             if let mid = resolvedMALID {
                 let current = try? await MALProvider.shared.fetchEntry(mediaId: mid)
+                if remoteStatusBefore == nil { remoteStatusBefore = current?.status }
                 let decision = Self.remoteTrackDecision(
                     currentStatus: current?.status, currentProgress: current?.progress ?? 0,
                     watchedEpisode: ep, totalEpisodes: totalEpisodes,
@@ -1083,8 +1088,12 @@ import Combine
         // Mirror into the on-device library using the anchor context + the absolute watched
         // episode, so completion and the final episode are captured even when Continue Watching
         // drops the finished card. Gated by localAutoTrackEnabled inside recordWatched, so it runs
-        // regardless of provider login/tracking toggles.
-        LocalLibraryManager.shared.recordWatched(context: context, episode: rawEp)
+        // regardless of provider login/tracking toggles. A rewatch there is one here too — the
+        // remote decision above writes REPEATING for a completed or repeating entry.
+        let rewatching = remoteStatusBefore == .repeating
+            || (remoteStatusBefore == .completed && !isCompleted && totalEpisodes != 1)
+        LocalLibraryManager.shared.recordWatched(context: context, episode: rawEp,
+                                                 remoteStatus: rewatching ? .repeating : nil)
 
         let aniListWillWrite = aniListEnabled && AniListAuthManager.shared.isLoggedIn
         let malWillWrite     = malEnabled     && MALAuthManager.shared.isLoggedIn

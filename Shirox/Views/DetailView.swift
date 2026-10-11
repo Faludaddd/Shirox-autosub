@@ -18,7 +18,10 @@ struct DetailView: View {
     @State private var showResetConfirmation = false
     @State private var autoPlayOnLoad = false
     @State private var existingEntry: LibraryEntry? = nil
-    @AppStorage("dualSync") private var dualSync = false
+    /// v2.31: AniList ↔ MyAnimeList mirroring — one pair within `SyncTargets`
+    /// (seeded from the old dualSync Bool at launch).
+    @AppStorage(SyncTargets.key) private var syncTargetsRaw = ""
+    private var dualSync: Bool { SyncTargets.mirrors(.anilist, .mal, in: SyncTargets.decode(syncTargetsRaw)) }
     @State private var isLoadingEntry = false
     @State private var showLibraryEdit = false
     @State private var showAniListEdit = false
