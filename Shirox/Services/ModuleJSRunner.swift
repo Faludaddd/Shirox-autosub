@@ -15,6 +15,7 @@ import Combine
 final class ModuleJSRunner {
 
     private var context: JSContext?
+    private var module: ModuleDefinition?
 
     /// Set when a request made by *this* runner hit a Turnstile wall with no cached cookie.
     /// Host-scoped to this module, so the picker only offers verification for the module
@@ -55,13 +56,14 @@ final class ModuleJSRunner {
             script = fetched
         }
         
-        let ctx = JSContext()!
+        let ctx = JSContext.forModule()
         setupContext(ctx)
         ctx.evaluateScript(script)
         if let exception = ctx.exception {
             Logger.shared.log("[ModuleJSRunner] Script load error: \(exception)", type: "Error")
         }
         self.context = ctx
+        self.module = module
     }
 
     // MARK: - Search
@@ -88,9 +90,6 @@ final class ModuleJSRunner {
     /// get the same result. This prevents the "repeatedly requesting the
     /// same 18 episodes" log spam.
     private static var inFlightEpisodes: [String: Task<[EpisodeLink], Error>] = [:]
-    /// In-flight stream fetch dedup. Same pattern — prevents duplicate
-    /// extractStreamUrl calls for the same episode URL.
-    private static var inFlightStreams: [String: Task<[StreamResult], Error>] = [:]
 
     func fetchEpisodes(url: String) async throws -> [EpisodeLink] {
         // Dedup: if a fetch for this URL is already in flight, await it
@@ -133,10 +132,13 @@ final class ModuleJSRunner {
 
     // MARK: - Streams
 
+    /// In-flight stream fetch dedup. Same pattern — prevents duplicate
+    /// extractStreamUrl calls for the same episode URL (repeated 403s).
+    private static var inFlightStreams: [String: Task<[StreamResult], Error>] = [:]
+
     func fetchStreams(episodeUrl: String) async throws -> [StreamResult] {
         // Dedup: if a stream fetch for this URL is already in flight, await
-        // it instead of starting a new one. This prevents the duplicate
-        // extractStreamUrl calls that lead to repeated 403 errors.
+        // it instead of starting a new one.
         if let existing = Self.inFlightStreams[episodeUrl] {
             return try await existing.value
         }
@@ -266,8 +268,8 @@ final class ModuleJSRunner {
     }
 
     private func setupFetchV2(_ ctx: JSContext) {
-        let fetchNative: @convention(block) (String, JSValue, JSValue, JSValue, JSValue, JSValue) -> Void =
-        { [weak self] urlString, headersVal, methodVal, bodyVal, resolve, reject in
+        let fetchNative: @convention(block) (String, JSValue, JSValue, JSValue, JSValue, JSValue, JSValue) -> Void =
+        { [weak self] urlString, headersVal, methodVal, bodyVal, extraVal, resolve, reject in
             guard let self else {
                 reject.call(withArguments: ["ModuleJSRunner deallocated"])
                 return
@@ -283,31 +285,96 @@ final class ModuleJSRunner {
 
             let method = (methodVal.isNull || methodVal.isUndefined) ? "GET" : (methodVal.toString() ?? "GET")
             let body: String? = (bodyVal.isNull || bodyVal.isUndefined) ? nil : bodyVal.toString()
+            var jsHeaders: [String: String] = [:]
+            if !headersVal.isUndefined, !headersVal.isNull {
+                if let dict = headersVal.toDictionary() as? [String: String] {
+                    jsHeaders = dict
+                }
+            }
+
+            var impersonateTarget: BrowserTarget? = nil
+            var useWebView = false
+
+            if !extraVal.isUndefined && !extraVal.isNull {
+                if extraVal.isBoolean {
+                    if extraVal.toBool() { impersonateTarget = .auto }
+                } else if extraVal.isString {
+                    let str = extraVal.toString()?.lowercased()
+                    if str == "webview" {
+                        useWebView = true
+                    } else if let target = BrowserTarget(rawValue: str ?? "") {
+                        impersonateTarget = target
+                    } else {
+                        impersonateTarget = .auto
+                    }
+                } else if extraVal.isObject {
+                    let dict = extraVal.toDictionary()
+                    if let impVal = dict?["impersonate"] {
+                        if let boolVal = impVal as? Bool, boolVal {
+                            impersonateTarget = .auto
+                        } else if let strVal = impVal as? String {
+                            let low = strVal.lowercased()
+                            if low == "webview" {
+                                useWebView = true
+                            } else if let target = BrowserTarget(rawValue: low) {
+                                impersonateTarget = target
+                            } else {
+                                impersonateTarget = .auto
+                            }
+                        }
+                    }
+                    if let engine = dict?["engine"] as? String, engine.lowercased() == "webview" {
+                        useWebView = true
+                    }
+                }
+            }
+
+            if impersonateTarget == nil && !useWebView {
+                if let imp = jsHeaders["impersonate"] {
+                    jsHeaders.removeValue(forKey: "impersonate")
+                    if imp.lowercased() == "webview" {
+                        useWebView = true
+                    } else if let target = BrowserTarget(rawValue: imp.lowercased()) {
+                        impersonateTarget = target
+                    } else {
+                        impersonateTarget = .auto
+                    }
+                }
+            }
+
+            #if !os(tvOS)
+            if useWebView {
+                Task {
+                    do {
+                        let (data, status, headersDict, finalURL) = try await WebKitFetchEngine.shared.fetch(
+                            url: url,
+                            method: method,
+                            headers: jsHeaders,
+                            body: body
+                        )
+                        let responseText = String(data: data, encoding: .utf8) ?? ""
+                        let responseObj = ctx.makeFetchResponse(
+                            status: status, statusText: nil, url: finalURL, headers: headersDict, body: responseText
+                        )
+
+                        resolve.call(withArguments: [responseObj])
+                    } catch {
+                        reject.call(withArguments: [error.localizedDescription])
+                    }
+                }
+                return
+            }
+            #endif
 
             var request = URLRequest(url: url)
             request.httpMethod = method
             request.setValue(self.userAgent, forHTTPHeaderField: "User-Agent")
 
-            // Set a default Referer derived from the request's own host if
-            // the module's JS didn't explicitly provide one. Many anime-
-            // streaming source sites 403 requests without a matching Referer.
-            let existingHeaders = (!headersVal.isUndefined && !headersVal.isNull)
-                ? (headersVal.toDictionary() as? [String: String] ?? [:])
-                : [String: String]()
-            if existingHeaders["Referer"] == nil && existingHeaders["referer"] == nil,
-               let host = url.host {
-                let scheme = url.scheme ?? "https"
-                request.setValue("\(scheme)://\(host)/", forHTTPHeaderField: "Referer")
-            }
-            if existingHeaders["Origin"] == nil && existingHeaders["origin"] == nil,
-               let host = url.host {
-                let scheme = url.scheme ?? "https"
-                request.setValue("\(scheme)://\(host)", forHTTPHeaderField: "Origin")
-            }
-
-            if !headersVal.isUndefined, !headersVal.isNull {
-                if let dict = headersVal.toDictionary() as? [String: String] {
-                    for (key, value) in dict { request.setValue(value, forHTTPHeaderField: key) }
+            if let impersonateTarget {
+                BrowserImpersonator.apply(to: &request, target: impersonateTarget, customHeaders: jsHeaders)
+            } else {
+                for (key, value) in jsHeaders {
+                    request.setValue(value, forHTTPHeaderField: key)
                 }
             }
 
@@ -341,10 +408,6 @@ final class ModuleJSRunner {
                     // CF reactive retry: bypass the final redirect destination, retry directly against it
                     if JSEngine.isTurnstileResponse(status: httpResponse.statusCode, body: responseText) {
                         let cfResponseURL = httpResponse.url ?? url
-                        // Retry the final URL directly with our solved session (live WebView cookies
-                        // or a persisted cookie+UA after relaunch) — only fall back to prompting the
-                        // user if we have no session or it's itself walled. Avoids re-popping the
-                        // bypass sheet on every request once a host has been solved.
                         let recovered = await CloudflareBypassManager.shared.retryWithSolvedSession(
                             for: cfResponseURL,
                             method: request.httpMethod ?? "GET",
@@ -363,36 +426,18 @@ final class ModuleJSRunner {
                     }
 
                     let status = httpResponse.statusCode
-
-                    // Log 403/401 errors with the actual URL so we can
-                    // diagnose which source site is blocking the request.
-                    if status == 403 || status == 401 {
-                        let bodySnippet = String(responseText.prefix(200))
-                        Logger.shared.log(
-                            "[fetchNative] \(status) on \(method) \(urlString) — body: \(bodySnippet)",
-                            type: "Error"
-                        )
-                    }
-
                     var headersDict: [String: String] = [:]
                     for (key, value) in httpResponse.allHeaderFields {
                         headersDict[String(describing: key)] = String(describing: value)
                     }
 
-                    let responseObj = JSValue(newObjectIn: ctx)!
-                    responseObj.setValue(status, forProperty: "status")
-                    responseObj.setValue(status >= 200 && status < 300, forProperty: "ok")
-                    responseObj.setValue(httpResponse.url?.absoluteString ?? urlString, forProperty: "url")
-                    responseObj.setValue(headersDict, forProperty: "headers")
-
-                    let textFn: @convention(block) () -> String = { responseText }
-                    responseObj.setObject(textFn, forKeyedSubscript: "text" as NSString)
-
-                    let jsonFn: @convention(block) () -> JSValue = {
-                        let escaped = JSEngine.jsStringLiteral(responseText)
-                        return ctx.evaluateScript("JSON.parse(\(escaped))") ?? JSValue(undefinedIn: ctx)
-                    }
-                    responseObj.setObject(jsonFn, forKeyedSubscript: "json" as NSString)
+                    let responseObj = ctx.makeFetchResponse(
+                        status: status,
+                        statusText: HTTPURLResponse.localizedString(forStatusCode: status),
+                        url: httpResponse.url?.absoluteString ?? urlString,
+                        headers: headersDict,
+                        body: responseText
+                    )
 
                     resolve.call(withArguments: [responseObj])
                 } catch {
@@ -403,9 +448,32 @@ final class ModuleJSRunner {
 
         ctx.setObject(fetchNative, forKeyedSubscript: "fetchv2Native" as NSString)
         ctx.evaluateScript("""
-        function fetchv2(url, headers, method, body) {
+        function fetchv2(url, headers, method, body, extra) {
+            var h = headers || {};
+            var m = method || 'GET';
+            var b = body || null;
+            var opt = extra || null;
+
+            if (typeof headers === 'boolean' || typeof headers === 'string') {
+                opt = { impersonate: headers };
+                h = {};
+            } else if (typeof headers === 'object' && headers !== null && (headers.method || headers.headers || headers.body || headers.impersonate !== undefined || headers.engine !== undefined)) {
+                h = headers.headers || {};
+                m = headers.method || (typeof method === 'string' ? method : 'GET');
+                b = headers.body || (typeof body === 'string' ? body : null);
+                opt = headers;
+            } else if (typeof extra === 'boolean') {
+                opt = { impersonate: extra };
+            } else if (typeof method === 'boolean') {
+                opt = { impersonate: method };
+                m = 'GET';
+            } else if (typeof body === 'boolean') {
+                opt = { impersonate: body };
+                b = null;
+            }
+
             return new Promise(function(resolve, reject) {
-                fetchv2Native(url, headers || {}, method || 'GET', body || null, resolve, reject);
+                fetchv2Native(url, h, m, b, opt || {}, resolve, reject);
             });
         }
         """)
@@ -414,20 +482,30 @@ final class ModuleJSRunner {
     /// Bridges `fetch` and `soraFetch` to `fetchv2`, properly unwrapping the
     /// Sora-style options object `{ headers, method, body }` into the positional
     /// arguments that `fetchv2` expects.
+    ///
+    /// `fetch` holds Shirox's own `soraFetch` and `fetchv2`, not the globals of those names: a
+    /// module that defines its own `soraFetch` and falls back to `fetch` on a failure (HydraHD)
+    /// otherwise bounced between the two forever on a host that kept failing — one request per
+    /// bounce, ~1,700 a second, for as long as the runner lived.
     private func setupFetchAliases(_ ctx: JSContext) {
         ctx.evaluateScript("""
-        function soraFetch(url, options) {
-            var headers = {}, method = 'GET', body = null;
-            if (options) {
-                headers = options.headers || {};
-                method  = options.method  || 'GET';
-                body    = options.body    || null;
+        (function(global) {
+            var shiroxFetchV2 = global.fetchv2;
+            function shiroxSoraFetch(url, options) {
+                var headers = {}, method = 'GET', body = null, extra = null;
+                if (options && typeof options === 'object') {
+                    headers = options.headers || {};
+                    method  = options.method  || 'GET';
+                    body    = options.body    || null;
+                    extra   = options;
+                }
+                return shiroxFetchV2(url, headers, method, body, extra);
             }
-            return fetchv2(url, headers, method, body);
-        }
-        function fetch(url, options) {
-            return soraFetch(url, options);
-        }
+            global.soraFetch = shiroxSoraFetch;
+            global.fetch = function(url, options) {
+                return shiroxSoraFetch(url, options);
+            };
+        })(this);
         """)
     }
 

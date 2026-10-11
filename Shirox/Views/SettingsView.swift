@@ -1239,6 +1239,7 @@ struct PlayerGeneralSettingsPage: View {
     @AppStorage("showServicesButton") private var showServicesButton = true
     @AppStorage("preferDownloaded") private var preferDownloaded = false
     @AppStorage("showRemainingTime") private var showRemainingTime = false
+    @AppStorage("playerEngine") private var playerEngine = PlaybackEngineKind.native.rawValue
 
     private let speedOptions: [Double] = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
     private let speedColumns = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
@@ -1259,6 +1260,17 @@ struct PlayerGeneralSettingsPage: View {
                             )
                         }
                     }
+                }
+                PlaybackSettingsCard(title: "Player Engine") {
+                    #if !os(tvOS)
+                    Picker("Player Engine", selection: $playerEngine) {
+                        Text("Native").tag(PlaybackEngineKind.native.rawValue)
+                        Text("MPV").tag(PlaybackEngineKind.mpv.rawValue)
+                    }
+                    Text("MPV plays more formats, like MKV, WebM and AVI, and more subtitle styles. Native switches to MPV by itself when it can't play something; MPV sources that AirPlay can't take move back to Native.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    #endif
                 }
                 PlaybackSettingsCard(title: "Player Controls") {
                     Toggle("Force Landscape Mode", isOn: $forceLandscape)

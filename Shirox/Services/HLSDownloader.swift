@@ -1,4 +1,4 @@
-#if os(iOS)
+#if !os(tvOS)
 import Foundation
 import AVFoundation
 import CommonCrypto
@@ -28,102 +28,184 @@ actor HLSDownloader {
 
     /// Downloads HLS segments and generates a local .m3u8 manifest for playback.
     /// Returns the path to the manifest file relative to downloadDir.
+    ///
+    /// - Parameter playlistKey: the stream's playlist key when its playlists are scrambled
+    ///   (see ``HLSPlaylistCipher``). Segments dressed up as images are unwrapped
+    ///   (see ``HLSSegmentDisguise``).
     func download(
         id: UUID,
         url: URL,
         headers: [String: String],
+        playlistKey: String? = nil,
         downloadDir: URL,
         onProgress: @escaping @Sendable (Double) -> Void
     ) async throws -> String {
         Logger.shared.log("[HLS] Downloading manifest: \(Logger.redact(url))", type: "Download")
 
-        // 1. Resolve Master Playlist → highest-bandwidth media playlist.
-        var manifest = try await fetchManifest(url: url, headers: headers)
-        var currentURL = url
-        if manifest.contains("#EXT-X-STREAM-INF"), let variant = HLSManifestParser.selectBestVariant(manifest, baseURL: url) {
-            currentURL = variant
-            manifest = try await fetchManifest(url: variant, headers: headers)
+        // 1. Resolve Master Playlist → the media playlist at the Download Quality setting, and its audio when
+        //    that comes as renditions of its own — every language, as the subtitles are. Only the
+        //    video used to be fetched, so a stream with separate audio downloaded silent; then only
+        //    the default language, so a dub couldn't be picked offline.
+        var manifest = try await fetchManifest(url: url, headers: headers, playlistKey: playlistKey)
+        var videoURL = url
+        var audio: [(rendition: HLSAudioRendition, manifest: String)] = []
+        var choice: HLSVariantChoice?
+        if manifest.contains("#EXT-X-STREAM-INF"),
+           let picked = HLSManifestParser.selectBestVariantChoice(
+               manifest, baseURL: url,
+               quality: UserDefaults.standard.string(forKey: "downloadQuality") ?? "highest") {
+            choice = picked
+            videoURL = picked.video
+            manifest = try await fetchManifest(url: picked.video, headers: headers, playlistKey: playlistKey)
+            for rendition in picked.audioRenditions {
+                do {
+                    audio.append((rendition, try await fetchManifest(url: rendition.url, headers: headers,
+                                                                     playlistKey: playlistKey)))
+                } catch where rendition.url != picked.audio {
+                    // An extra language that won't load is left out; the default one is needed.
+                    Logger.shared.log("[HLS] Skipping audio '\(rendition.name)': \(error.localizedDescription)", type: "Download")
+                }
+            }
         }
 
         // 2. Parse into a download plan that preserves the fMP4 init segment (#EXT-X-MAP),
         //    AES-128 encryption (#EXT-X-KEY) and byte ranges (#EXT-X-BYTERANGE). The legacy
         //    parser dropped all three, producing "completed" downloads that couldn't decode
         //    and crashed the player a couple seconds in.
-        let plan = HLSManifestParser.parseMediaPlaylist(manifest, baseURL: currentURL)
-        guard !plan.segments.isEmpty else { throw HLSError.invalidManifest }
+        let videoPlan = HLSManifestParser.parseMediaPlaylist(manifest, baseURL: videoURL)
+        guard !videoPlan.segments.isEmpty else { throw HLSError.invalidManifest }
+        var audioPlans: [(rendition: HLSAudioRendition, plan: HLSDownloadPlan)] = []
+        for (rendition, text) in audio {
+            let plan = HLSManifestParser.parseMediaPlaylist(text, baseURL: rendition.url)
+            if !plan.segments.isEmpty {
+                audioPlans.append((rendition, plan))
+            } else if rendition.url == choice?.audio {
+                throw HLSError.invalidManifest
+            }
+        }
 
         // 3. Create Episode Folder
         let episodeFolder = downloadDir.appendingPathComponent(id.uuidString)
         try FileManager.default.createDirectory(at: episodeFolder, withIntermediateDirectories: true)
 
-        let segmentExt = plan.isFMP4 ? "m4s" : "ts"
+        // 4–5. The renditions' files, side by side; one progress across them all.
+        let total = videoPlan.segments.count + audioPlans.reduce(0) { $0 + $1.plan.segments.count }
+        let counter = ProgressCounter(total: total, report: onProgress)
+        let videoPlaylist = try await downloadRendition(
+            videoPlan, prefix: "", folder: episodeFolder, headers: headers, counter: counter)
 
-        // 4. fMP4 init segment — carries the codec config / moov box the media segments need
-        //    to decode. Downloading the segments without it was a primary crash cause.
+        // 6. Generate Local Manifest — self-contained, cleartext, init referenced via EXT-X-MAP.
+        let manifestName = "playlist.m3u8"
+        if !audioPlans.isEmpty, let choice {
+            let videoName = "video.m3u8"
+            var localAudio: [HLSLocalAudio] = []
+            for (index, entry) in audioPlans.enumerated() {
+                // The first keeps the names a one-language download always had.
+                let prefix = index == 0 ? "a_" : "a\(index)_"
+                let audioName = index == 0 ? "audio.m3u8" : "audio_\(index).m3u8"
+                let audioPlaylist = try await downloadRendition(
+                    entry.plan, prefix: prefix, folder: episodeFolder, headers: headers, counter: counter)
+                try audioPlaylist.write(to: episodeFolder.appendingPathComponent(audioName), atomically: true, encoding: .utf8)
+                localAudio.append(HLSLocalAudio(playlist: audioName, name: entry.rendition.name,
+                                                language: entry.rendition.language,
+                                                isDefault: entry.rendition.url == choice.audio))
+            }
+            try videoPlaylist.write(to: episodeFolder.appendingPathComponent(videoName), atomically: true, encoding: .utf8)
+            let master = HLSManifestParser.localMasterManifest(
+                videoPlaylist: videoName, audio: localAudio,
+                bandwidth: choice.bandwidth, codecs: choice.codecs)
+            try master.write(to: episodeFolder.appendingPathComponent(manifestName), atomically: true, encoding: .utf8)
+        } else {
+            try videoPlaylist.write(to: episodeFolder.appendingPathComponent(manifestName), atomically: true, encoding: .utf8)
+        }
+
+        // Return relative path: "UUID/playlist.m3u8"
+        return "\(id.uuidString)/\(manifestName)"
+    }
+
+    /// Counts finished segments across renditions into one progress figure.
+    private final class ProgressCounter: @unchecked Sendable {
+        private let lock = NSLock()
+        private var done = 0
+        let total: Int
+        let report: @Sendable (Double) -> Void
+        init(total: Int, report: @escaping @Sendable (Double) -> Void) { self.total = total; self.report = report }
+        func tick() {
+            lock.lock(); done += 1; let fraction = Double(done) / Double(max(total, 1)); lock.unlock()
+            report(fraction)
+        }
+    }
+
+    /// Downloads one rendition's init segment and segments as `<prefix>init.mp4` and
+    /// `<prefix>seg_<i>.<ext>`, and returns the local media playlist naming them.
+    private func downloadRendition(_ plan: HLSDownloadPlan, prefix: String, folder: URL,
+                                   headers: [String: String], counter: ProgressCounter) async throws -> String {
+        // Packed audio (.aac and kin) keeps its own extension: served as video/mp2t it's unreadable.
+        let originalExt = plan.segments.first?.url.pathExtension.lowercased() ?? ""
+        let segmentExt = plan.isFMP4 ? "m4s" : (["aac", "mp3", "ac3", "ec3"].contains(originalExt) ? originalExt : "ts")
+
+        // fMP4 init segment — carries the codec config / moov box the media segments need
+        // to decode. Downloading the segments without it was a primary crash cause.
         var initFileName: String?
         if let initSeg = plan.initSegment {
             let initData = try await fetchResource(
                 url: initSeg.url, byteRange: initSeg.byteRange, key: initSeg.key,
-                mediaSequence: 0, headers: headers, label: "init segment"
+                mediaSequence: 0, headers: headers, label: "\(prefix)init segment"
             )
-            try initData.write(to: episodeFolder.appendingPathComponent("init.mp4"), options: .atomic)
-            initFileName = "init.mp4"
+            initFileName = "\(prefix)init.mp4"
+            try initData.write(to: folder.appendingPathComponent(initFileName!), options: .atomic)
         }
 
-        // 5. Concurrent Download with limited concurrency
         let segments = plan.segments
-        Logger.shared.log("[HLS] Downloading \(segments.count) segments (ext=\(segmentExt), fMP4=\(plan.isFMP4), encrypted=\(segments.first?.key != nil)) to \(episodeFolder.lastPathComponent)...", type: "Download")
+        let namePrefix = "\(prefix)seg_"
+        Logger.shared.log("[HLS] Downloading \(segments.count) \(prefix.isEmpty ? "" : "audio ")segments (ext=\(segmentExt), fMP4=\(plan.isFMP4), encrypted=\(segments.first?.key != nil)) to \(folder.lastPathComponent)...", type: "Download")
 
         // Kept very low: owocdn/kwik-style segment CDNs 429 even a burst of 4. 2 keeps
         // some parallelism while the jittered backoff in fetchData absorbs the rest.
         let maxConcurrentSegments = 2
         try await withThrowingTaskGroup(of: Int.self) { group in
             var index = 0
-
-            // Initial fill
             while index < min(segments.count, maxConcurrentSegments) {
                 let currentIdx = index
                 let segment = segments[currentIdx]
                 group.addTask {
-                    try await self.downloadSegment(segment, index: currentIdx, folder: episodeFolder, ext: segmentExt, headers: headers)
+                    try await self.downloadSegment(segment, index: currentIdx, folder: folder, ext: segmentExt,
+                                                   namePrefix: namePrefix, headers: headers)
                 }
                 index += 1
             }
-
-            var completed = 0
             for try await _ in group {
-                completed += 1
-                onProgress(Double(completed) / Double(segments.count))
-
+                counter.tick()
                 if index < segments.count {
                     let currentIdx = index
                     let segment = segments[currentIdx]
                     group.addTask {
-                        try await self.downloadSegment(segment, index: currentIdx, folder: episodeFolder, ext: segmentExt, headers: headers)
+                        try await self.downloadSegment(segment, index: currentIdx, folder: folder, ext: segmentExt,
+                                                       namePrefix: namePrefix, headers: headers)
                     }
                     index += 1
                 }
             }
         }
 
-        // 6. Generate Local Manifest — self-contained, cleartext, init referenced via EXT-X-MAP.
-        let manifestContent = HLSManifestParser.localManifest(
+        return HLSManifestParser.localManifest(
             durations: segments.map { $0.duration },
             segmentExtension: segmentExt,
-            initFileName: initFileName
+            initFileName: initFileName,
+            segmentPrefix: namePrefix
         )
-        let manifestName = "playlist.m3u8"
-        let manifestURL = episodeFolder.appendingPathComponent(manifestName)
-        try manifestContent.write(to: manifestURL, atomically: true, encoding: .utf8)
-
-        // Return relative path: "UUID/playlist.m3u8"
-        return "\(id.uuidString)/\(manifestName)"
     }
 
     // MARK: - Internal
 
-    private func fetchManifest(url: URL, headers: [String: String]) async throws -> String {
+    private func fetchManifest(url: URL, headers: [String: String], playlistKey: String? = nil) async throws -> String {
         let data = try await fetchData(url: url, headers: headers, label: "manifest")
+        if let playlistKey {
+            guard let text = HLSPlaylistCipher.decode(data, key: playlistKey) else {
+                throw HLSError.downloadFailed("the playlist couldn't be unscrambled with the module's key")
+            }
+            return text
+        }
         return String(data: data, encoding: .utf8) ?? ""
     }
 
@@ -133,8 +215,9 @@ actor HLSDownloader {
     /// segment 0. Reusing on-disk segments makes restarts cheap and guarantees forward
     /// progress. Segments are written atomically, so any file present on disk is complete
     /// and safe to trust — an interrupted write never leaves a truncated segment behind.
-    private func downloadSegment(_ segment: HLSPlannedSegment, index: Int, folder: URL, ext: String, headers: [String: String]) async throws -> Int {
-        let path = folder.appendingPathComponent("seg_\(index).\(ext)")
+    private func downloadSegment(_ segment: HLSPlannedSegment, index: Int, folder: URL, ext: String,
+                                 namePrefix: String = "seg_", headers: [String: String]) async throws -> Int {
+        let path = folder.appendingPathComponent("\(namePrefix)\(index).\(ext)")
         if let size = try? FileManager.default.attributesOfItem(atPath: path.path)[.size] as? Int, size > 0 {
             return index
         }
@@ -166,6 +249,7 @@ actor HLSDownloader {
             }
             data = data.subdata(in: range.offset..<end)
         }
+        if HLSSegmentDisguise.mayBeDisguised(url) { data = HLSSegmentDisguise.unwrap(data) }
 
         guard let key, key.method == .aes128, let keyURL = key.url else {
             // Cleartext: a 200 HTML challenge/error page saved as a segment is undecodable and

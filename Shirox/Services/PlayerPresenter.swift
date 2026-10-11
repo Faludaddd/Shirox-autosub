@@ -11,6 +11,7 @@ import Combine
 
 #if os(iOS)
 import UIKit
+import CoreMotion
 #endif
 
 #if canImport(GoogleCast)
@@ -27,7 +28,10 @@ final class PlayerPresenter: ObservableObject {
     static let shared = PlayerPresenter()
 
     #if os(iOS)
-    @Published var orientationLock = UIInterfaceOrientationMask.portrait
+    /// Read by the app delegate when UIKit asks, never observed — so not `@Published`. Pages set it
+    /// from `onAppear`, and publishing re-rendered the root tab view (it observes this object) as
+    /// each page appeared, which on iOS 27 popped the page that had just been pushed.
+    var orientationLock = UIInterfaceOrientationMask.portrait
     #endif
 
     /// Set by `presentRatingPromptIfNeeded` after the user finishes the last episode.
@@ -38,23 +42,28 @@ final class PlayerPresenter: ObservableObject {
     #if os(iOS)
     private weak var playerVC: UIViewController?
     private var sourceView: UIView?
+    /// The player, held while Picture in Picture plays it with its screen put away so the rest
+    /// of the app can be used. Presented again, as it was, when Picture in Picture restores it.
+    private var pictureInPicturePlayer: UIViewController?
+    /// Between Picture in Picture asking for the player back and it being on screen again.
+    private var isRestoringFromPictureInPicture = false
     /// Last interface orientation observed during a player session via device-orientation notifications.
     private var trackedPlayerOrientation: UIInterfaceOrientation = .portrait
     private var orientationObserver: NSObjectProtocol?
+    private let motionManager = CMMotionManager()
     #endif
 
     nonisolated private init() {}
 
-    /// Shared flag set by PlayerView when 2× speed hold is active, so the
-    /// drag-to-dismiss gesture coordinator can check it and block dismissal.
-    /// Unconditional: the iOS player is the one that sets and reads it; other
-    /// targets simply never touch it.
-    @Published var isSpeedBoosted = false
 
     #if !os(iOS)
 
     func presentPlayer(stream: StreamResult, streams: [StreamResult] = [], context: PlayerContext? = nil, onWatchNext: WatchNextLoader? = nil, onStreamExpired: StreamRefetchLoader? = nil, onSequelNeeded: SequelLoader? = nil, onSequelAdvanced: ((SequelNavigation) -> Void)? = nil, onFinished: ((PlayerContext) -> Void)? = nil, from sourceView: Any? = nil) {
-        // TODO: implement this function for tv and macos
+        #if os(macOS)
+        MacPlayerWindowManager.shared.open(stream: stream, streams: streams, context: context, onWatchNext: onWatchNext,
+                                           onStreamExpired: onStreamExpired, onSequelNeeded: onSequelNeeded,
+                                           onSequelAdvanced: onSequelAdvanced, onFinished: onFinished)
+        #endif
     }
 
     #else
@@ -102,6 +111,8 @@ final class PlayerPresenter: ObservableObject {
         // can never wedge playback shut; a player on its way out falls through to the retry
         // below instead, so relaunching straight after a dismiss still works.
         if let existing = playerVC, existing.viewIfLoaded?.window != nil, !existing.isBeingDismissed { return }
+        // One player at a time: the one playing in Picture in Picture goes for the new one.
+        if pictureInPicturePlayer != nil { closePictureInPicturePlayer() }
 
         // UIKit silently refuses to present on a controller that is still presenting something
         // else — which is exactly what happens when the stream-picker sheet is still animating
@@ -144,6 +155,7 @@ final class PlayerPresenter: ObservableObject {
         hostingController.modalPresentationStyle = UIModalPresentationStyle.fullScreen
 
         let forceLandscape = UserDefaults.standard.bool(forKey: "forceLandscape")
+        let autoRotateLandscape = UserDefaults.standard.bool(forKey: "autoRotateForcedLandscape")
         let lastRaw = UserDefaults.standard.integer(forKey: "lastLandscapeOrientation")
         let lastLandscape = UIInterfaceOrientation(rawValue: lastRaw)
         let preferredLandscape: UIInterfaceOrientation = (lastLandscape != nil && lastLandscape!.isLandscape) ? lastLandscape! : .landscapeRight
@@ -170,6 +182,11 @@ final class PlayerPresenter: ObservableObject {
         // `lastLandscapeOrientation` the user never chose.
         trackedPlayerOrientation = forceLandscape ? preferredLandscape : snapshotCurrentOrientation()
         startTrackingOrientation()
+        // iOS rotates between the landscape sides itself, but not under Control Center's
+        // rotation lock. This option follows the device's tilt so the player still turns.
+        if forceLandscape && autoRotateLandscape {
+            startLandscapeRotationTracking()
+        }
 
         topVC.present(hostingController, animated: true)
     }
@@ -182,6 +199,7 @@ final class PlayerPresenter: ObservableObject {
             UserDefaults.standard.set(trackedPlayerOrientation.rawValue, forKey: "lastLandscapeOrientation")
         }
         stopTrackingOrientation()
+        stopLandscapeRotationTracking()
         // Reset orientation without animation before dismissing.
         // UIView.performWithoutAnimation suppresses the system rotation animation on the
         // root VC so the app snaps to portrait instantly instead of animating.
@@ -193,6 +211,64 @@ final class PlayerPresenter: ObservableObject {
         }
     }
 
+    // MARK: - Picture in Picture
+
+    /// Whether the player is playing in Picture in Picture with its screen put away. Its view
+    /// leaves the screen then, and mustn't stop playback for it.
+    var isPlayerHiddenForPictureInPicture: Bool { pictureInPicturePlayer != nil }
+
+    /// Picture in Picture started with the app open: the player's screen goes, the player
+    /// stays, and the app underneath can be used until Picture in Picture hands it back.
+    func hidePlayerForPictureInPicture() {
+        guard pictureInPicturePlayer == nil, UIApplication.shared.applicationState == .active,
+              let player = playerVC, player.presentingViewController != nil, !player.isBeingDismissed else { return }
+        pictureInPicturePlayer = player
+        if trackedPlayerOrientation.isLandscape {
+            UserDefaults.standard.set(trackedPlayerOrientation.rawValue, forKey: "lastLandscapeOrientation")
+        }
+        stopTrackingOrientation()
+        stopLandscapeRotationTracking()
+        orientationLock = .portrait
+        UIView.performWithoutAnimation { refreshSupportedOrientations() }
+        player.dismiss(animated: true)
+    }
+
+    /// Picture in Picture's button back to the app: the same player, still playing, on screen
+    /// again.
+    func restorePlayerFromPictureInPicture(completion: @escaping (Bool) -> Void) {
+        guard let player = pictureInPicturePlayer else { return completion(true) }
+        guard let top = Self.findTopViewController() else { return completion(false) }
+        isRestoringFromPictureInPicture = true
+        let forceLandscape = UserDefaults.standard.bool(forKey: "forceLandscape")
+        orientationLock = forceLandscape ? .landscape : .allButUpsideDown
+        trackedPlayerOrientation = snapshotCurrentOrientation()
+        startTrackingOrientation()
+        if forceLandscape && UserDefaults.standard.bool(forKey: "autoRotateForcedLandscape") {
+            startLandscapeRotationTracking()
+        }
+        player.modalPresentationStyle = .fullScreen
+        top.present(player, animated: true) { [weak self] in
+            self?.pictureInPicturePlayer = nil
+            self?.isRestoringFromPictureInPicture = false
+            completion(true)
+        }
+    }
+
+    /// Picture in Picture ended. Closed with its own button while the player was put away, the
+    /// player closes too, as it would have on screen.
+    func pictureInPictureDidStop() {
+        guard pictureInPicturePlayer != nil, !isRestoringFromPictureInPicture else { return }
+        closePictureInPicturePlayer()
+    }
+
+    private func closePictureInPicturePlayer() {
+        pictureInPicturePlayer = nil
+        playerVC = nil
+        sourceView = nil
+        // The player's view is off screen, so its disappearing never comes; it stops on this.
+        NotificationCenter.default.post(name: .playerClosedInPictureInPicture, object: nil)
+    }
+
     /// Called after the player view has already been manually animated off screen (drag-to-dismiss).
     func dragDismiss() {
         guard let playerVC = playerVC else { return }
@@ -200,6 +276,7 @@ final class PlayerPresenter: ObservableObject {
             UserDefaults.standard.set(trackedPlayerOrientation.rawValue, forKey: "lastLandscapeOrientation")
         }
         stopTrackingOrientation()
+        stopLandscapeRotationTracking()
         orientationLock = .portrait
         UIView.performWithoutAnimation { refreshSupportedOrientations() }
         playerVC.dismiss(animated: false) { [weak self] in
@@ -207,6 +284,136 @@ final class PlayerPresenter: ObservableObject {
             self?.sourceView = nil
         }
     }
+
+    // MARK: - Orientation tracking
+
+    private func startTrackingOrientation() {
+        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+        orientationObserver = NotificationCenter.default.addObserver(
+            forName: UIDevice.orientationDidChangeNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                let mapped = self?.snapshotCurrentOrientation()
+                // Only update for concrete orientations (ignore faceUp/faceDown/unknown).
+                if let o = mapped, o != .unknown {
+                    // A landscape-only player never shows portrait, so a portrait reading isn't where it is.
+                    if UserDefaults.standard.bool(forKey: "forceLandscape"), !o.isLandscape { return }
+                    self?.trackedPlayerOrientation = o
+                    if o.isLandscape {
+                        UserDefaults.standard.set(o.rawValue, forKey: "lastLandscapeOrientation")
+                    }
+                }
+            }
+        }
+    }
+
+    private func stopTrackingOrientation() {
+        if let obs = orientationObserver {
+            NotificationCenter.default.removeObserver(obs)
+            orientationObserver = nil
+        }
+        UIDevice.current.endGeneratingDeviceOrientationNotifications()
+    }
+
+    private func startLandscapeRotationTracking() {
+        guard motionManager.isDeviceMotionAvailable else { return }
+        motionManager.deviceMotionUpdateInterval = 0.25
+        motionManager.startDeviceMotionUpdates(to: .main) { [weak self] motion, _ in
+            MainActor.assumeIsolated {
+                guard let self, let gravity = motion?.gravity,
+                      abs(gravity.x) > 0.75, abs(gravity.x) > abs(gravity.y) else { return }
+                let target: UIInterfaceOrientation = gravity.x > 0 ? .landscapeLeft : .landscapeRight
+                // Compared with the screen, not the tracker: without the rotation lock iOS has
+                // usually turned already, and the notification may have updated the tracker first.
+                guard let scene = self.playerVC?.viewIfLoaded?.window?.windowScene,
+                      scene.interfaceOrientation != target else { return }
+                self.trackedPlayerOrientation = target
+                UserDefaults.standard.set(target.rawValue, forKey: "lastLandscapeOrientation")
+                self.requestRotation(to: target == .landscapeLeft ? .landscapeLeft : .landscapeRight)
+            }
+        }
+    }
+
+    private func stopLandscapeRotationTracking() {
+        motionManager.stopDeviceMotionUpdates()
+    }
+
+    /// Converts the live device orientation to an interface orientation.
+    /// Returns the last scene orientation as a fallback for flat/unknown positions.
+    private func snapshotCurrentOrientation() -> UIInterfaceOrientation {
+        switch UIDevice.current.orientation {
+        case .landscapeLeft:      return .landscapeRight
+        case .landscapeRight:     return .landscapeLeft
+        case .portrait:           return .portrait
+        case .portraitUpsideDown: return .portraitUpsideDown
+        default:
+            return (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.interfaceOrientation ?? .portrait
+        }
+    }
+
+    func resetToAppOrientation(shouldRotate: Bool = false) {
+        #if !targetEnvironment(macCatalyst)
+        updateOrientationLock(.portrait, shouldRotate: shouldRotate)
+        #endif
+    }
+
+    func updateOrientationLock(_ orientation: UIInterfaceOrientationMask, shouldRotate: Bool = false) {
+        #if !targetEnvironment(macCatalyst)
+        guard UIDevice.current.userInterfaceIdiom == .phone else { return }
+
+        self.orientationLock = orientation
+
+        if shouldRotate {
+            let preferredRotation: UIInterfaceOrientationMask
+            if orientation == .landscape {
+                preferredRotation = .landscapeRight
+            } else if orientation == .portrait {
+                preferredRotation = .portrait
+            } else {
+                preferredRotation = orientation
+            }
+            requestRotation(to: preferredRotation)
+        }
+
+        refreshSupportedOrientations()
+        #endif
+    }
+
+    func requestRotation(to orientation: UIInterfaceOrientationMask) {
+        #if !targetEnvironment(macCatalyst)
+        guard let scene = playerVC?.viewIfLoaded?.window?.windowScene
+            ?? UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else { return }
+        if #available(iOS 16, *) {
+            playerVC?.setNeedsUpdateOfSupportedInterfaceOrientations()
+            scene.requestGeometryUpdate(.iOS(interfaceOrientations: orientation)) { error in
+                Logger.shared.log("[Player] Rotation request failed: \(error)", type: "Error")
+            }
+        } else {
+            let value: Int
+            switch orientation {
+            case .portrait: value = UIInterfaceOrientation.portrait.rawValue
+            case .landscapeLeft: value = UIInterfaceOrientation.landscapeLeft.rawValue
+            case .landscapeRight: value = UIInterfaceOrientation.landscapeRight.rawValue
+            default: value = UIInterfaceOrientation.portrait.rawValue
+            }
+            UIDevice.current.setValue(value, forKey: "orientation")
+            UINavigationController.attemptRotationToDeviceOrientation()
+        }
+        #endif
+    }
+
+    func refreshSupportedOrientations() {
+        if #available(iOS 16, *) {
+            for scene in UIApplication.shared.connectedScenes {
+                guard let windowScene = scene as? UIWindowScene else { continue }
+                for window in windowScene.windows {
+                    window.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+                }
+            }
+        }
+    }
+    #endif
 
     // MARK: - Rating prompt
 
@@ -262,106 +469,6 @@ final class PlayerPresenter: ObservableObject {
         }
     }
 
-    // MARK: - Orientation tracking
-
-    private func startTrackingOrientation() {
-        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
-        orientationObserver = NotificationCenter.default.addObserver(
-            forName: UIDevice.orientationDidChangeNotification,
-            object: nil, queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                let mapped = self?.snapshotCurrentOrientation()
-                // Only update for concrete orientations (ignore faceUp/faceDown/unknown).
-                if let o = mapped, o != .unknown {
-                    self?.trackedPlayerOrientation = o
-                    if o.isLandscape {
-                        UserDefaults.standard.set(o.rawValue, forKey: "lastLandscapeOrientation")
-                    }
-                }
-            }
-        }
-    }
-
-    private func stopTrackingOrientation() {
-        if let obs = orientationObserver {
-            NotificationCenter.default.removeObserver(obs)
-            orientationObserver = nil
-        }
-        UIDevice.current.endGeneratingDeviceOrientationNotifications()
-    }
-
-    /// Converts the live device orientation to an interface orientation.
-    /// Returns the last scene orientation as a fallback for flat/unknown positions.
-    private func snapshotCurrentOrientation() -> UIInterfaceOrientation {
-        switch UIDevice.current.orientation {
-        case .landscapeLeft:      return .landscapeRight
-        case .landscapeRight:     return .landscapeLeft
-        case .portrait:           return .portrait
-        case .portraitUpsideDown: return .portraitUpsideDown
-        default:
-            return (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.interfaceOrientation ?? .portrait
-        }
-    }
-
-    func resetToAppOrientation(shouldRotate: Bool = false) {
-        #if !targetEnvironment(macCatalyst)
-        updateOrientationLock(.portrait, shouldRotate: shouldRotate)
-        #endif
-    }
-
-    func updateOrientationLock(_ orientation: UIInterfaceOrientationMask, shouldRotate: Bool = false) {
-        #if !targetEnvironment(macCatalyst)
-        guard UIDevice.current.userInterfaceIdiom == .phone else { return }
-
-        self.orientationLock = orientation
-
-        if shouldRotate {
-            let preferredRotation: UIInterfaceOrientationMask
-            if orientation == .landscape {
-                preferredRotation = .landscapeRight
-            } else if orientation == .portrait {
-                preferredRotation = .portrait
-            } else {
-                preferredRotation = orientation
-            }
-            requestRotation(to: preferredRotation)
-        }
-
-        refreshSupportedOrientations()
-        #endif
-    }
-
-    func requestRotation(to orientation: UIInterfaceOrientationMask) {
-        #if !targetEnvironment(macCatalyst)
-        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene else { return }
-        if #available(iOS 16, *) {
-            scene.requestGeometryUpdate(.iOS(interfaceOrientations: orientation)) { _ in }
-        } else {
-            let value: Int
-            switch orientation {
-            case .portrait: value = UIInterfaceOrientation.portrait.rawValue
-            case .landscapeLeft: value = UIInterfaceOrientation.landscapeLeft.rawValue
-            case .landscapeRight: value = UIInterfaceOrientation.landscapeRight.rawValue
-            default: value = UIInterfaceOrientation.portrait.rawValue
-            }
-            UIDevice.current.setValue(value, forKey: "orientation")
-            UINavigationController.attemptRotationToDeviceOrientation()
-        }
-        #endif
-    }
-
-    func refreshSupportedOrientations() {
-        if #available(iOS 16, *) {
-            for scene in UIApplication.shared.connectedScenes {
-                guard let windowScene = scene as? UIWindowScene else { continue }
-                for window in windowScene.windows {
-                    window.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
-                }
-            }
-        }
-    }
-    #endif
 }
 
 // MARK: - Cast Manager
@@ -388,6 +495,13 @@ final class CastManager: NSObject, ObservableObject {
     /// Set when a cast ends abnormally, so the player can tell the user why the movie just
     /// came back to the phone instead of silently swapping under them.
     @Published var lastError: String?
+    /// Bumped every time the receiver reports the current media played through to its end.
+    ///
+    /// Auto-advance is driven by the *local* item's `didPlayToEndTimeNotification`, but during
+    /// a cast the local player is deliberately parked and never reaches an end — so an episode
+    /// finishing on the TV simply stopped there and the queue never moved. A counter rather
+    /// than a flag so each finish is a distinct event the player can observe.
+    @Published private(set) var finishedMediaCount = 0
 
     /// Whether the UI should present itself as casting. Stays true through a suspend —
     /// the SDK usually recovers it, and bouncing to the local player on every screen lock
@@ -576,6 +690,7 @@ final class CastManager: NSObject, ObservableObject {
         if status.playerState == .idle, status.idleReason == .finished {
             isPlaying = false
             stopProgressTimer()
+            finishedMediaCount += 1
             return
         }
 
@@ -816,3 +931,8 @@ extension CastManager: GCKRequestDelegate {
     }
 }
 #endif
+
+extension Notification.Name {
+    /// The player playing in Picture in Picture, with its screen put away, was closed.
+    static let playerClosedInPictureInPicture = Notification.Name("shirox.playerClosedInPictureInPicture")
+}

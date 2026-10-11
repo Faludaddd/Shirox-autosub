@@ -275,6 +275,7 @@ final class DownloadManager: NSObject, ObservableObject {
             streamTitle: context.streamTitle,
             streamURL: stream.url,
             headers: stream.headers,
+            playlistKey: stream.playlistKey,
             subtitleURL: stream.subtitleURL,
             subtitleHeaders: stream.subtitleHeaders.isEmpty ? nil : stream.subtitleHeaders,
             state: .pending,
@@ -995,6 +996,7 @@ final class DownloadManager: NSObject, ObservableObject {
                     id: id,
                     url: streamURL,
                     headers: item.headers,
+                    playlistKey: item.playlistKey,
                     downloadDir: downloadDir,
                     onProgress: { [weak self] p in
                         Task { @MainActor in self?.updateProgress(id, p) }

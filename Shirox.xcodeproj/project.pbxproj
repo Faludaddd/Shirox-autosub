@@ -822,6 +822,64 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */ = {isa = PBXBui
 		64C9B0B46E3949C8BC2B072A /* DataSourcesSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1490E05108E643F9959205B8 /* DataSourcesSettingsPage.swift */; };
 		CA904BD67DF8446FB1813485 /* DataSourcesSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1490E05108E643F9959205B8 /* DataSourcesSettingsPage.swift */; };
 		D97B2063009A40478A165DEF /* DataSourcesSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1490E05108E643F9959205B8 /* DataSourcesSettingsPage.swift */; };
+                102EE2C1DD9BD993FDC45312 /* PlaybackEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60B798231DDDA4482EFD7DF /* PlaybackEngine.swift */; };
+                4B83CA001513C5586B4DA164 /* PlaybackEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60B798231DDDA4482EFD7DF /* PlaybackEngine.swift */; };
+                A00137A45A0CEF5CE53358BD /* PlaybackEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60B798231DDDA4482EFD7DF /* PlaybackEngine.swift */; };
+                55B0A26C4CDE4A62A52AE504 /* AVPlayerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 976920C598CE1A6C087D952F /* AVPlayerEngine.swift */; };
+                6C0CB9E1021BE57C25CEE736 /* AVPlayerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 976920C598CE1A6C087D952F /* AVPlayerEngine.swift */; };
+                8D6E98F73013EF1B8E8E48D8 /* AVPlayerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 976920C598CE1A6C087D952F /* AVPlayerEngine.swift */; };
+                4EB62FDB4E0622446849C220 /* MPVEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEF7675FF198EE0091C6488D /* MPVEngine.swift */; };
+                848E8B943BFF423E59D9C7F6 /* MPVEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEF7675FF198EE0091C6488D /* MPVEngine.swift */; };
+                F29145E29CB7A5D6C0A5781B /* MPVEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEF7675FF198EE0091C6488D /* MPVEngine.swift */; };
+                614F626F558ADE2978C7815F /* MPVOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12E407E2EB753E5929447BF8 /* MPVOptions.swift */; };
+                9F689B963746A49BD2F7E786 /* MPVOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12E407E2EB753E5929447BF8 /* MPVOptions.swift */; };
+                D4B8E0BD943495140FF1AFF1 /* MPVOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12E407E2EB753E5929447BF8 /* MPVOptions.swift */; };
+                941D8D72E4228B20ACC2EBFF /* MPVRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 934CF6C649A71441C6FC2A54 /* MPVRouter.swift */; };
+                C0B0C8288603C79233F1BD43 /* MPVRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 934CF6C649A71441C6FC2A54 /* MPVRouter.swift */; };
+                DB2DA8CCF4F182F10FAD42BC /* MPVRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 934CF6C649A71441C6FC2A54 /* MPVRouter.swift */; };
+                06D5984194F4BEC0051C0D93 /* PlaybackFallback.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4F397C9FA6A14A5DDD98D3F /* PlaybackFallback.swift */; };
+                C9C8A4E5BC1EB0520A5BD713 /* PlaybackFallback.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4F397C9FA6A14A5DDD98D3F /* PlaybackFallback.swift */; };
+                F7E1EC3545C16B62012ADF5F /* PlaybackFallback.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4F397C9FA6A14A5DDD98D3F /* PlaybackFallback.swift */; };
+                86DC5D5F83635B202F82F8DD /* SubtitleRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 881989087D5AEFEADB010420 /* SubtitleRouting.swift */; };
+                E107D4BF53B86BFE5626C76D /* SubtitleRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 881989087D5AEFEADB010420 /* SubtitleRouting.swift */; };
+                FF2F81D3615940308F608BD6 /* SubtitleRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 881989087D5AEFEADB010420 /* SubtitleRouting.swift */; };
+                06A8932A5DD8B7661CA8FD99 /* TrackPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E8B657977876178EDFBEA38 /* TrackPreferences.swift */; };
+                4E221463553438851802D93C /* TrackPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E8B657977876178EDFBEA38 /* TrackPreferences.swift */; };
+                C91EA9EDEB92E0DC8E014A8F /* TrackPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E8B657977876178EDFBEA38 /* TrackPreferences.swift */; };
+                8FF9077E0792A74FF47CA7A6 /* AssRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDE30B9763346F02AE6DEFBB /* AssRenderer.swift */; };
+                A2D2EFB4D55B12D686DA4F63 /* AssRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDE30B9763346F02AE6DEFBB /* AssRenderer.swift */; };
+                CF8F569B2D479043D6C99B65 /* AssRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDE30B9763346F02AE6DEFBB /* AssRenderer.swift */; };
+                04DBEF55EDB77596BB10882B /* ZstdDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C08F6988DE355E187F365E4 /* ZstdDecoder.swift */; };
+                7698C6BC5051D48EC77EC20D /* ZstdDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C08F6988DE355E187F365E4 /* ZstdDecoder.swift */; };
+                B08FC90349BADE23EDE995CB /* ZstdDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C08F6988DE355E187F365E4 /* ZstdDecoder.swift */; };
+                618F48B7E938CE21E402D81F /* AirPlaySubtitles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E696EC6140A22B62B4A48B5 /* AirPlaySubtitles.swift */; };
+                810D354BEEAAB679469A76FF /* AirPlaySubtitles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E696EC6140A22B62B4A48B5 /* AirPlaySubtitles.swift */; };
+                B4EECCFA50130D2CEAFDFB2D /* AirPlaySubtitles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E696EC6140A22B62B4A48B5 /* AirPlaySubtitles.swift */; };
+                325DD05EDEB96E9A3DF41493 /* AppAudioSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDE73B1CB59832DCFDFF4FC7 /* AppAudioSession.swift */; };
+                4FB3A265EF14005001D7250A /* AppAudioSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDE73B1CB59832DCFDFF4FC7 /* AppAudioSession.swift */; };
+                D3369B0E9477CBED11F224E9 /* AppAudioSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDE73B1CB59832DCFDFF4FC7 /* AppAudioSession.swift */; };
+                5F4CFD741F26ED40296B4E20 /* ExternalDisplay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47AA022027AA055BCC1917AC /* ExternalDisplay.swift */; };
+                2F08CC4F2A0F14878722B080 /* TSAudioTimestamps.swift in Sources */ = {isa = PBXBuildFile; fileRef = 737D49FA204E2B5B62147574 /* TSAudioTimestamps.swift */; };
+                37A3DF15BF733721F9379C84 /* TSAudioTimestamps.swift in Sources */ = {isa = PBXBuildFile; fileRef = 737D49FA204E2B5B62147574 /* TSAudioTimestamps.swift */; };
+                C5D564B2D3E7413582AC7697 /* TSAudioTimestamps.swift in Sources */ = {isa = PBXBuildFile; fileRef = 737D49FA204E2B5B62147574 /* TSAudioTimestamps.swift */; };
+                27E688310674413D73AD3F09 /* MouseCursorManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3441A874201C391FE263F1A6 /* MouseCursorManager.swift */; };
+                777371011B3406E0C6B3F2EA /* MouseCursorManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3441A874201C391FE263F1A6 /* MouseCursorManager.swift */; };
+                C0EBDADBA10F1CC1730E8491 /* MouseCursorManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3441A874201C391FE263F1A6 /* MouseCursorManager.swift */; };
+                A49E0E23C1C7285635391C71 /* MPVVideoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D543E2A2D8BF2A3E8FE21B10 /* MPVVideoView.swift */; };
+                A8B8B520CF0D9E86D4ABFC7D /* MPVVideoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D543E2A2D8BF2A3E8FE21B10 /* MPVVideoView.swift */; };
+                E9D99AB9241F1DCFBE51218E /* MPVVideoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D543E2A2D8BF2A3E8FE21B10 /* MPVVideoView.swift */; };
+                487D4362E36FEB276271DC6F /* PlayerAssOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A08E27B4A688BE98644F700 /* PlayerAssOverlay.swift */; };
+                A05FBBC4521D380C9FD9BEA1 /* PlayerAssOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A08E27B4A688BE98644F700 /* PlayerAssOverlay.swift */; };
+                F203FF3416950534546A9E17 /* PlayerAssOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A08E27B4A688BE98644F700 /* PlayerAssOverlay.swift */; };
+                57A5FF39DD77F9750B46936D /* PlayerSubtitleMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78A498256CCC09BF0F188F4B /* PlayerSubtitleMenu.swift */; };
+                C94930CB548D39EC9D3DB68A /* PlayerSubtitleMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78A498256CCC09BF0F188F4B /* PlayerSubtitleMenu.swift */; };
+                DF08A3492973808F06D5997D /* PlayerSubtitleMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78A498256CCC09BF0F188F4B /* PlayerSubtitleMenu.swift */; };
+                23D6C34EC9EC443168F997F1 /* MPVKit in Frameworks */ = {isa = PBXBuildFile; productRef = 98DACBDDFA4D953F5D7F559E /* MPVKit */; };
+                241C08ED40752B534F055933 /* libzstd in Frameworks */ = {isa = PBXBuildFile; productRef = 254F319EE376CCB39DE7AF9C /* libzstd */; };
+                32F3A54684036F605CB9A10A /* MPVKit in Frameworks */ = {isa = PBXBuildFile; productRef = AD2529EB8362B5776B962BCC /* MPVKit */; };
+                4534EAA6EBAA8ADDB6343896 /* libzstd in Frameworks */ = {isa = PBXBuildFile; productRef = 17FB32D34DDEB0E0E09776CE /* libzstd */; };
+                A06C948886D47E15E4842DF6 /* MPVKit in Frameworks */ = {isa = PBXBuildFile; productRef = C333924C8E6D85D22BFA180C /* MPVKit */; };
+                C4BFF68BBC523AB88DCA3247 /* libzstd in Frameworks */ = {isa = PBXBuildFile; productRef = C482D0E0AC514A00E36EEC7A /* libzstd */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1120,6 +1178,24 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
 		787DB5DB440C0962E4829173 /* DiscoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoveryService.swift; sourceTree = "<group>"; };
 		0BC087EE9207079BA4AE569E /* MediaNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaNormalizer.swift; sourceTree = "<group>"; };
 		1490E05108E643F9959205B8 /* DataSourcesSettingsPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataSourcesSettingsPage.swift; sourceTree = "<group>"; };
+                D60B798231DDDA4482EFD7DF /* PlaybackEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlaybackEngine.swift; sourceTree = "<group>"; };
+                976920C598CE1A6C087D952F /* AVPlayerEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AVPlayerEngine.swift; sourceTree = "<group>"; };
+                CEF7675FF198EE0091C6488D /* MPVEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MPVEngine.swift; sourceTree = "<group>"; };
+                12E407E2EB753E5929447BF8 /* MPVOptions.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MPVOptions.swift; sourceTree = "<group>"; };
+                934CF6C649A71441C6FC2A54 /* MPVRouter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MPVRouter.swift; sourceTree = "<group>"; };
+                F4F397C9FA6A14A5DDD98D3F /* PlaybackFallback.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlaybackFallback.swift; sourceTree = "<group>"; };
+                881989087D5AEFEADB010420 /* SubtitleRouting.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SubtitleRouting.swift; sourceTree = "<group>"; };
+                0E8B657977876178EDFBEA38 /* TrackPreferences.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrackPreferences.swift; sourceTree = "<group>"; };
+                DDE30B9763346F02AE6DEFBB /* AssRenderer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AssRenderer.swift; sourceTree = "<group>"; };
+                5C08F6988DE355E187F365E4 /* ZstdDecoder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ZstdDecoder.swift; sourceTree = "<group>"; };
+                0E696EC6140A22B62B4A48B5 /* AirPlaySubtitles.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AirPlaySubtitles.swift; sourceTree = "<group>"; };
+                EDE73B1CB59832DCFDFF4FC7 /* AppAudioSession.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppAudioSession.swift; sourceTree = "<group>"; };
+                47AA022027AA055BCC1917AC /* ExternalDisplay.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExternalDisplay.swift; sourceTree = "<group>"; };
+                737D49FA204E2B5B62147574 /* TSAudioTimestamps.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TSAudioTimestamps.swift; sourceTree = "<group>"; };
+                3441A874201C391FE263F1A6 /* MouseCursorManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MouseCursorManager.swift; sourceTree = "<group>"; };
+                D543E2A2D8BF2A3E8FE21B10 /* MPVVideoView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MPVVideoView.swift; sourceTree = "<group>"; };
+                0A08E27B4A688BE98644F700 /* PlayerAssOverlay.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayerAssOverlay.swift; sourceTree = "<group>"; };
+                78A498256CCC09BF0F188F4B /* PlayerSubtitleMenu.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayerSubtitleMenu.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1127,6 +1203,8 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
                         isa = PBXFrameworksBuildPhase;
                         buildActionMask = 2147483647;
                         files = (
+                                241C08ED40752B534F055933 /* libzstd in Frameworks */,
+                                A06C948886D47E15E4842DF6 /* MPVKit in Frameworks */,
                                 0F474E242FE9E84200FAC2BA /* Kingfisher in Frameworks */,
                                 7C3F1DFEF54BF11BDDA8626B /* JavaScriptCore.framework in Frameworks */,
                                 FAFF9AA00DEB80103E5C7F76 /* WebKit.framework in Frameworks */,
@@ -1138,6 +1216,8 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
                         isa = PBXFrameworksBuildPhase;
                         buildActionMask = 2147483647;
                         files = (
+                                C4BFF68BBC523AB88DCA3247 /* libzstd in Frameworks */,
+                                32F3A54684036F605CB9A10A /* MPVKit in Frameworks */,
                                 0F474E262FE9E84800FAC2BA /* Kingfisher in Frameworks */,
                                 121D9B452FCA53AA000FF9B4 /* FakeWebKit in Frameworks */,
                         );
@@ -1155,6 +1235,8 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
                         isa = PBXFrameworksBuildPhase;
                         buildActionMask = 2147483647;
                         files = (
+                                4534EAA6EBAA8ADDB6343896 /* libzstd in Frameworks */,
+                                23D6C34EC9EC443168F997F1 /* MPVKit in Frameworks */,
                                 0F474E222FE9E7D600FAC2BA /* Kingfisher in Frameworks */,
                                 42F7F6A06C1039A0472932B8 /* JavaScriptCore.framework in Frameworks */,
                                 0FB47691410BFA732D132352 /* WebKit.framework in Frameworks */,
@@ -1222,6 +1304,13 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
                 1279E49F2FCA397700C9BA56 /* Services */ = {
                         isa = PBXGroup;
                         children = (
+                                5C08F6988DE355E187F365E4 /* ZstdDecoder.swift */,
+                                0E696EC6140A22B62B4A48B5 /* AirPlaySubtitles.swift */,
+                                EDE73B1CB59832DCFDFF4FC7 /* AppAudioSession.swift */,
+                                47AA022027AA055BCC1917AC /* ExternalDisplay.swift */,
+                                737D49FA204E2B5B62147574 /* TSAudioTimestamps.swift */,
+                                3441A874201C391FE263F1A6 /* MouseCursorManager.swift */,
+                                C44D2451545353874948DF1F /* Playback */,
                                 1279E47B2FCA397700C9BA56 /* AniListAuthManager.swift */,
                                 1279E47C2FCA397700C9BA56 /* AniListLibraryService.swift */,
                                 1659CAEADDD8118DA5FF4FFF /* LibraryDataSource.swift */,
@@ -1371,6 +1460,9 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
                 1279E4C12FCA397700C9BA56 /* Player */ = {
                         isa = PBXGroup;
                         children = (
+                                D543E2A2D8BF2A3E8FE21B10 /* MPVVideoView.swift */,
+                                0A08E27B4A688BE98644F700 /* PlayerAssOverlay.swift */,
+                                78A498256CCC09BF0F188F4B /* PlayerSubtitleMenu.swift */,
                                 1279E4B12FCA397700C9BA56 /* AirPlayButton.swift */,
                                 1279E4B22FCA397700C9BA56 /* CastOverlayView.swift */,
                                 1279E4B32FCA397700C9BA56 /* PlayerBottomBar.swift */,
@@ -1607,6 +1699,7 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */,
                         path = Reader;
                         sourceTree = "<group>";
                 };
+C44D2451545353874948DF1F
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -1624,6 +1717,8 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */,
                         );
                         name = Shirox_tvOS;
                         packageProductDependencies = (
+                                C482D0E0AC514A00E36EEC7A /* libzstd */,
+                                AD2529EB8362B5776B962BCC /* MPVKit */,
                                 121D9B442FCA53AA000FF9B4 /* FakeWebKit */,
                                 0F474E252FE9E84800FAC2BA /* Kingfisher */,
                         );
@@ -1638,10 +1733,15 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */,
                                 95DE5ABBF64ACBFE36B79FBD /* Sources */,
                                 896FE0E84327FF272C55EBF6 /* Frameworks */,
                                 AA000003000000000000CC01 /* Resources */,
+                                9CA99335E0742827EA68E858 /* Remove MPVKit Stubs (Mac Catalyst) */,
                         );
                         buildRules = (
                         );
                         dependencies = (
+                        );
+                        packageProductDependencies = (
+                                17FB32D34DDEB0E0E09776CE /* libzstd */,
+                                98DACBDDFA4D953F5D7F559E /* MPVKit */,
                         );
                         name = Shirox_iOS;
                         productName = Shirox_iOS;
@@ -1677,6 +1777,10 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */,
                         buildRules = (
                         );
                         dependencies = (
+                        );
+                        packageProductDependencies = (
+                                254F319EE376CCB39DE7AF9C /* libzstd */,
+                                C333924C8E6D85D22BFA180C /* MPVKit */,
                         );
                         name = Shirox_macOS;
                         productName = Shirox_macOS;
@@ -1716,6 +1820,8 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */,
                         mainGroup = 0E44B107A7072B8B23CC975A;
                         minimizedProjectReferenceProxies = 1;
                         packageReferences = (
+1E95D785326020281E9DCAAE
+2338EEEFC73F4EC8953A9F5F
                                 1279E5DB2FCA3A1200C9BA56 /* XCRemoteSwiftPackageReference "google-cast-spm" */,
                                 121D9B432FCA53AA000FF9B4 /* XCRemoteSwiftPackageReference "FakeWebKit" */,
                                 0F474E202FE9E7D600FAC2BA /* XCRemoteSwiftPackageReference "Kingfisher" */,
@@ -1773,6 +1879,27 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */,
                         runOnlyForDeploymentPostprocessing = 0;
                 };
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+                9CA99335E0742827EA68E858 /* Remove MPVKit Stubs (Mac Catalyst) */ = {
+                        isa = PBXShellScriptBuildPhase;
+                        alwaysOutOfDate = 1;
+                        buildActionMask = 2147483647;
+                        files = (
+                        );
+                        inputFileListPaths = (
+                        );
+                        inputPaths = (
+                        );
+                        name = "Remove MPVKit Stubs (Mac Catalyst)";
+                        outputFileListPaths = (
+                        );
+                        outputPaths = (
+                        );
+                        runOnlyForDeploymentPostprocessing = 0;
+                        shellPath = /bin/sh;
+                        shellScript = "# MPVKit links mpv, FFmpeg and the rest statically, yet Xcode still copies a small stub\n# framework for each into the app. On Mac Catalyst those stubs have the iPhone layout, and the\n# app fails validation (\"contains Info.plist, expected Versions/Current/Resources/Info.plist\").\n# Nothing loads them - the app has no load command for any - so they are removed.\n[ \"${IS_MACCATALYST}\" = \"YES\" ] || exit 0\ncd \"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}\" 2>/dev/null || exit 0\nfor name in Libmpv Libavcodec Libavdevice Libavfilter Libavformat Libavutil Libswresample Libswscale \\\n            Libass Libfreetype Libfribidi Libharfbuzz Libunibreak Libplacebo Libshaderc_combined lcms2 \\\n            Libdovi Libdav1d Libuavs3d Libbluray Libuchardet Libssl Libcrypto gmp nettle hogweed gnutls; do\n  rm -rf \"${name}.framework\"\ndone\n";
+                };/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
                 0D7C42462608CC0CC47C2FD3 /* Sources */ = {
@@ -1858,6 +1985,23 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                         isa = PBXSourcesBuildPhase;
                         buildActionMask = 2147483647;
                         files = (
+                                C94930CB548D39EC9D3DB68A /* PlayerSubtitleMenu.swift in Sources */,
+                                7698C6BC5051D48EC77EC20D /* ZstdDecoder.swift in Sources */,
+                                102EE2C1DD9BD993FDC45312 /* PlaybackEngine.swift in Sources */,
+                                6C0CB9E1021BE57C25CEE736 /* AVPlayerEngine.swift in Sources */,
+                                06D5984194F4BEC0051C0D93 /* PlaybackFallback.swift in Sources */,
+                                614F626F558ADE2978C7815F /* MPVOptions.swift in Sources */,
+                                848E8B943BFF423E59D9C7F6 /* MPVEngine.swift in Sources */,
+                                E9D99AB9241F1DCFBE51218E /* MPVVideoView.swift in Sources */,
+                                941D8D72E4228B20ACC2EBFF /* MPVRouter.swift in Sources */,
+                                86DC5D5F83635B202F82F8DD /* SubtitleRouting.swift in Sources */,
+                                8FF9077E0792A74FF47CA7A6 /* AssRenderer.swift in Sources */,
+                                487D4362E36FEB276271DC6F /* PlayerAssOverlay.swift in Sources */,
+                                618F48B7E938CE21E402D81F /* AirPlaySubtitles.swift in Sources */,
+                                4FB3A265EF14005001D7250A /* AppAudioSession.swift in Sources */,
+                                777371011B3406E0C6B3F2EA /* MouseCursorManager.swift in Sources */,
+                                C91EA9EDEB92E0DC8E014A8F /* TrackPreferences.swift in Sources */,
+                                37A3DF15BF733721F9379C84 /* TSAudioTimestamps.swift in Sources */,
                                                                 F5A6B7C8D9E10000000000A2 /* AnimatedSplashView.swift in Sources */,
 121D9B462FCA5603000FF9B4 /* EpisodeLink.swift in Sources */,
                                 121D9B5A2FCA5612000FF9B4 /* CastProxyServer.swift in Sources */,
@@ -2103,6 +2247,23 @@ A17F1001000000000000000A /* ForcedUpdateView.swift in Sources */,
                         isa = PBXSourcesBuildPhase;
                         buildActionMask = 2147483647;
                         files = (
+                                57A5FF39DD77F9750B46936D /* PlayerSubtitleMenu.swift in Sources */,
+                                04DBEF55EDB77596BB10882B /* ZstdDecoder.swift in Sources */,
+                                A00137A45A0CEF5CE53358BD /* PlaybackEngine.swift in Sources */,
+                                8D6E98F73013EF1B8E8E48D8 /* AVPlayerEngine.swift in Sources */,
+                                F7E1EC3545C16B62012ADF5F /* PlaybackFallback.swift in Sources */,
+                                D4B8E0BD943495140FF1AFF1 /* MPVOptions.swift in Sources */,
+                                F29145E29CB7A5D6C0A5781B /* MPVEngine.swift in Sources */,
+                                A49E0E23C1C7285635391C71 /* MPVVideoView.swift in Sources */,
+                                C0B0C8288603C79233F1BD43 /* MPVRouter.swift in Sources */,
+                                E107D4BF53B86BFE5626C76D /* SubtitleRouting.swift in Sources */,
+                                CF8F569B2D479043D6C99B65 /* AssRenderer.swift in Sources */,
+                                A05FBBC4521D380C9FD9BEA1 /* PlayerAssOverlay.swift in Sources */,
+                                B4EECCFA50130D2CEAFDFB2D /* AirPlaySubtitles.swift in Sources */,
+                                D3369B0E9477CBED11F224E9 /* AppAudioSession.swift in Sources */,
+                                C0EBDADBA10F1CC1730E8491 /* MouseCursorManager.swift in Sources */,
+                                4E221463553438851802D93C /* TrackPreferences.swift in Sources */,
+                                2F08CC4F2A0F14878722B080 /* TSAudioTimestamps.swift in Sources */,
                                                                 F5A6B7C8D9E10000000000A5 /* AnimatedSplashView.swift in Sources */,
 2FFDB0F7AE21B9B527B83D18 /* ShiroxApp.swift in Sources */,
                                 1279E4E82FCA397700C9BA56 /* PlayerPresenter.swift in Sources */,
@@ -2350,6 +2511,24 @@ A17F1001000000000000000B /* ForcedUpdateView.swift in Sources */,
                         isa = PBXSourcesBuildPhase;
                         buildActionMask = 2147483647;
                         files = (
+                                DF08A3492973808F06D5997D /* PlayerSubtitleMenu.swift in Sources */,
+                                B08FC90349BADE23EDE995CB /* ZstdDecoder.swift in Sources */,
+                                4B83CA001513C5586B4DA164 /* PlaybackEngine.swift in Sources */,
+                                55B0A26C4CDE4A62A52AE504 /* AVPlayerEngine.swift in Sources */,
+                                C9C8A4E5BC1EB0520A5BD713 /* PlaybackFallback.swift in Sources */,
+                                9F689B963746A49BD2F7E786 /* MPVOptions.swift in Sources */,
+                                4EB62FDB4E0622446849C220 /* MPVEngine.swift in Sources */,
+                                A8B8B520CF0D9E86D4ABFC7D /* MPVVideoView.swift in Sources */,
+                                DB2DA8CCF4F182F10FAD42BC /* MPVRouter.swift in Sources */,
+                                FF2F81D3615940308F608BD6 /* SubtitleRouting.swift in Sources */,
+                                A2D2EFB4D55B12D686DA4F63 /* AssRenderer.swift in Sources */,
+                                F203FF3416950534546A9E17 /* PlayerAssOverlay.swift in Sources */,
+                                810D354BEEAAB679469A76FF /* AirPlaySubtitles.swift in Sources */,
+                                325DD05EDEB96E9A3DF41493 /* AppAudioSession.swift in Sources */,
+                                27E688310674413D73AD3F09 /* MouseCursorManager.swift in Sources */,
+                                5F4CFD741F26ED40296B4E20 /* ExternalDisplay.swift in Sources */,
+                                06A8932A5DD8B7661CA8FD99 /* TrackPreferences.swift in Sources */,
+                                C5D564B2D3E7413582AC7697 /* TSAudioTimestamps.swift in Sources */,
                                                                 F5A6B7C8D9E10000000000A3 /* AnimatedSplashView.swift in Sources */,
 3A42CE0D50F5B4711F556C97 /* ShiroxApp.swift in Sources */,
                                 1279E5612FCA397700C9BA56 /* PlayerPresenter.swift in Sources */,
@@ -3029,6 +3208,22 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                 kind = branch;
                         };
                 };
+                1E95D785326020281E9DCAAE /* XCRemoteSwiftPackageReference "zstd" */ = {
+                        isa = XCRemoteSwiftPackageReference;
+                        repositoryURL = "https://github.com/facebook/zstd";
+                        requirement = {
+                                kind = exactVersion;
+                                version = 1.5.7;
+                        };
+                };
+                2338EEEFC73F4EC8953A9F5F /* XCRemoteSwiftPackageReference "MPVKit" */ = {
+                        isa = XCRemoteSwiftPackageReference;
+                        repositoryURL = "https://github.com/mpvkit/MPVKit";
+                        requirement = {
+                                kind = exactVersion;
+                                version = 1.0.0;
+                        };
+                };
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -3061,6 +3256,36 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                         isa = XCSwiftPackageProductDependency;
                         package = 1279E5DB2FCA3A1200C9BA56 /* XCRemoteSwiftPackageReference "google-cast-spm" */;
                         productName = GoogleCastDynamicCore;
+                };
+                17FB32D34DDEB0E0E09776CE /* libzstd */ = {
+                        isa = XCSwiftPackageProductDependency;
+                        package = 1E95D785326020281E9DCAAE /* XCRemoteSwiftPackageReference "zstd" */;
+                        productName = libzstd;
+                };
+                254F319EE376CCB39DE7AF9C /* libzstd */ = {
+                        isa = XCSwiftPackageProductDependency;
+                        package = 1E95D785326020281E9DCAAE /* XCRemoteSwiftPackageReference "zstd" */;
+                        productName = libzstd;
+                };
+                98DACBDDFA4D953F5D7F559E /* MPVKit */ = {
+                        isa = XCSwiftPackageProductDependency;
+                        package = 2338EEEFC73F4EC8953A9F5F /* XCRemoteSwiftPackageReference "MPVKit" */;
+                        productName = MPVKit;
+                };
+                AD2529EB8362B5776B962BCC /* MPVKit */ = {
+                        isa = XCSwiftPackageProductDependency;
+                        package = 2338EEEFC73F4EC8953A9F5F /* XCRemoteSwiftPackageReference "MPVKit" */;
+                        productName = MPVKit;
+                };
+                C333924C8E6D85D22BFA180C /* MPVKit */ = {
+                        isa = XCSwiftPackageProductDependency;
+                        package = 2338EEEFC73F4EC8953A9F5F /* XCRemoteSwiftPackageReference "MPVKit" */;
+                        productName = MPVKit;
+                };
+                C482D0E0AC514A00E36EEC7A /* libzstd */ = {
+                        isa = XCSwiftPackageProductDependency;
+                        package = 1E95D785326020281E9DCAAE /* XCRemoteSwiftPackageReference "zstd" */;
+                        productName = libzstd;
                 };
 /* End XCSwiftPackageProductDependency section */
         };

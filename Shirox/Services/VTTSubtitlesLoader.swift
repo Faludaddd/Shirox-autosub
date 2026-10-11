@@ -9,6 +9,14 @@ struct SubtitleCue: Identifiable {
     let text: String   // plain text, HTML tags stripped
 }
 
+/// What a subtitle file turned out to be.
+enum LoadedSubtitles {
+    /// WebVTT or SRT, as plain-text cues `PlayerSubtitleOverlay` draws.
+    case cues([SubtitleCue])
+    /// An ASS/SSA script, kept whole: its styles, positions and fonts are libass's (or mpv's) to draw.
+    case ass(String)
+}
+
 // MARK: - VTTSubtitlesLoader
 
 enum VTTSubtitlesLoader {
@@ -22,14 +30,14 @@ enum VTTSubtitlesLoader {
             switch self {
             case .invalidURL:     return "The subtitle URL is invalid."
             case .decodingFailed: return "Could not decode subtitle data as UTF-8."
-            case .unknownFormat:  return "Subtitle format is not recognised (expected VTT or SRT)."
+            case .unknownFormat:  return "Subtitle format is not recognised (expected VTT, SRT or ASS)."
             }
         }
     }
 
     // MARK: Public entry point
 
-    static func load(from urlString: String, headers: [String: String] = [:]) async throws -> [SubtitleCue] {
+    static func load(from urlString: String, headers: [String: String] = [:]) async throws -> LoadedSubtitles {
         guard let url = URL(string: urlString) else {
             throw LoadError.invalidURL
         }
@@ -47,12 +55,14 @@ enum VTTSubtitlesLoader {
             request.setValue(value, forHTTPHeaderField: key)
         }
 
-        let (data, _) = try await URLSession.shared.data(for: request)
+        let (data, _) = try await URLSession.shared.decodedData(for: request)
+        return try parse(data)
+    }
 
-        guard let content = String(data: data, encoding: .utf8) ??
-                            String(data: data, encoding: .isoLatin1) else {
-            throw LoadError.decodingFailed
-        }
+    /// Tells the format by content, not by extension: modules serve ASS from URLs without one.
+    static func parse(_ data: Data) throws -> LoadedSubtitles {
+        guard let content = decode(data) else { throw LoadError.decodingFailed }
+        if isASS(content) { return .ass(content) }
 
         let cues: [SubtitleCue]
         if isVTT(content) {
@@ -63,23 +73,57 @@ enum VTTSubtitlesLoader {
             throw LoadError.unknownFormat
         }
 
-        return cues.sorted { $0.start < $1.start }
+        return .cues(cues.sorted { $0.start < $1.start })
     }
 
+    /// UTF-16 when it says so with a byte-order mark — older fansub scripts are saved that way.
+    /// Anything that isn't UTF-8 is most likely a Windows code page: Arabic, Cyrillic and Greek
+    /// subtitles still come as those, and reading them as Latin-1 garbled every line.
+    /// A UTF-8 byte-order mark is dropped so it can't sit in front of the first line.
+    private static func decode(_ data: Data) -> String? {
+        if data.starts(with: [0xFF, 0xFE]) || data.starts(with: [0xFE, 0xFF]) {
+            return String(data: data, encoding: .utf16)
+        }
+        if let utf8 = String(data: data, encoding: .utf8) {
+            return utf8.hasPrefix("\u{FEFF}") ? String(utf8.dropFirst()) : utf8
+        }
+        var converted: NSString?
+        let found = NSString.stringEncoding(for: data, encodingOptions: [
+            .suggestedEncodingsKey: windowsCodePages.map { NSNumber(value: $0.rawValue) },
+            .useOnlySuggestedEncodingsKey: true
+        ], convertedString: &converted, usedLossyConversion: nil)
+        if found != 0, let converted { return converted as String }
+        return String(data: data, encoding: .isoLatin1)
+    }
+
+    private static let windowsCodePages: [String.Encoding] = [
+        CFStringEncodings.windowsArabic, .windowsCyrillic, .windowsGreek, .windowsHebrew,
+        .windowsLatin2, .windowsLatin5
+    ].map { String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding($0.rawValue))) }
+        + [.windowsCP1252]
+
     // MARK: Format detection
+
+    private static func isASS(_ content: String) -> Bool {
+        let start = content.drop { $0 == "\u{FEFF}" || $0.isWhitespace }
+        return start.prefix(13).lowercased() == "[script info]"
+    }
 
     private static func isVTT(_ content: String) -> Bool {
         let stripped = content.hasPrefix("\u{FEFF}") ? String(content.dropFirst()) : content
         return stripped.hasPrefix("WEBVTT")
     }
 
+    /// A numeric index, or straight away a timing line — some tools leave the indexes out.
     private static func isSRT(_ content: String) -> Bool {
-        // First non-empty line of a valid SRT file is a numeric index
-        let firstNonEmpty = content
+        let firstLines = content
             .components(separatedBy: .newlines)
-            .first { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
-        guard let line = firstNonEmpty else { return false }
-        return Int(line.trimmingCharacters(in: .whitespaces)) != nil
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .prefix(2)
+        guard let first = firstLines.first else { return false }
+        if Int(first) != nil { return true }
+        return parseTimestampLine(first) != nil
     }
 
     // MARK: VTT parser
@@ -133,14 +177,11 @@ enum VTTSubtitlesLoader {
                              .map { $0.trimmingCharacters(in: .whitespaces) }
                              .filter { !$0.isEmpty }
 
-            // Need at least: index line, timestamp line, and one text line
-            guard lines.count >= 3 else { continue }
+            // The timing line, after the cue's index when it has one.
+            guard let tsIndex = lines.prefix(2).firstIndex(where: { $0.contains("-->") }),
+                  let (start, end) = parseTimestampLine(lines[tsIndex]) else { continue }
 
-            // lines[0] is the numeric index – skip it
-            let tsLine = lines[1]
-            guard let (start, end) = parseTimestampLine(tsLine) else { continue }
-
-            let textLines = lines[2...]
+            let textLines = lines[(tsIndex + 1)...]
             let rawText = textLines.joined(separator: "\n")
             let text = stripTags(rawText)
             guard !text.isEmpty else { continue }
@@ -164,7 +205,10 @@ enum VTTSubtitlesLoader {
         guard parts.count >= 2 else { return nil }
 
         let startStr = parts[0].trimmingCharacters(in: .whitespaces)
-        // The end part may have cue settings appended; take only the first token
+        // The end part may have cue settings appended; take only the first token. Split on any
+        // whitespace, not just a literal space — WebVTT permits tabs between the timestamp and
+        // its settings, and splitting on " " alone left "00:00:05.000\talign:start" intact, so
+        // parseTimestamp rejected it and the cue was silently dropped.
         let endStr = parts[1]
             .trimmingCharacters(in: .whitespaces)
             .components(separatedBy: .whitespaces)

@@ -19,6 +19,13 @@ struct PlayerSubtitleSettingsView: View {
     @Binding var selectedTrack: SubtitleTrack?
     var allowLocalImport: Bool = false
     var onImport: ((SubtitleTrack) -> Void)? = nil
+    /// Subtitle tracks inside the video file itself, which only the MPV engine can draw.
+    var embeddedTracks: [PlaybackSubtitleOption] = []
+    var selectedEmbedded: Int? = nil
+    var onSelectEmbedded: ((Int) -> Void)? = nil
+    /// True while an .ass script or the file's own track is on screen — its own fonts and
+    /// colours win; only size and delay still apply.
+    var showsStyledNote = false
     @Environment(\.dismiss) private var dismiss
     @State private var showImporter = false
 
@@ -46,6 +53,9 @@ struct PlayerSubtitleSettingsView: View {
                     }
                     if let tracks = availableTracks, !tracks.isEmpty {
                         trackCard(tracks)
+                    }
+                    if !embeddedTracks.isEmpty {
+                        embeddedTracksCard
                     }
                     if allowLocalImport {
                         importCard
@@ -395,6 +405,29 @@ struct PlayerSubtitleSettingsView: View {
                     trackRow(title: track.title, isActive: selectedTrack?.id == track.id) {
                         selectedTrack = track
                     }
+                }
+            }
+        }
+    }
+
+    /// Tracks inside the video file itself — embedded muxed subtitles, drawn by the
+    /// MPV engine (or ignored on AVPlayer, which can't render them).
+    private var embeddedTracksCard: some View {
+        card(icon: "film.stack", title: "In This Video") {
+            VStack(spacing: 0) {
+                ForEach(Array(embeddedTracks.enumerated()), id: \.element.id) { index, option in
+                    if index > 0 { Divider().padding(.leading, 12) }
+                    trackRow(title: option.title, isActive: selectedEmbedded == option.id) {
+                        onSelectEmbedded?(option.id)
+                    }
+                }
+                if showsStyledNote {
+                    Divider().padding(.leading, 12)
+                    Text("Styled (.ass) subtitles and the file's own tracks keep their own fonts and colours; size and delay still apply.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 8)
                 }
             }
         }

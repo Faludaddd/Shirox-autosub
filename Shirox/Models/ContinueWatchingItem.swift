@@ -6,11 +6,13 @@ struct StoredStream: Codable, Hashable {
     let headers: [String: String]
     let subtitle: String?
     var subtitleHeaders: [String: String]?
+    var playlistKey: String? = nil
 
     var asStreamResult: StreamResult? {
         guard let url = URL(string: url) else { return nil }
         return StreamResult(title: title, url: url, headers: headers,
-                            subtitle: subtitle, subtitleHeaders: subtitleHeaders ?? [:])
+                            subtitle: subtitle, subtitleHeaders: subtitleHeaders ?? [:],
+                            playlistKey: playlistKey)
     }
 }
 
@@ -51,6 +53,10 @@ struct ContinueWatchingItem: Identifiable, Codable, Hashable {
     var localImportName: String?
     /// Filename of an up-front subtitle copied alongside the video, so resume reloads it.
     var localSubtitleImportName: String?
+    /// The key the stream's playlists are scrambled with (see ``HLSPlaylistCipher``). Not kept
+    /// before, so resuming a scrambled stream (Re:ANIME) handed the player a playlist it couldn't
+    /// read and the episode never loaded. Optional, so saved items still decode.
+    var playlistKey: String? = nil
 }
 
 extension ContinueWatchingItem {
@@ -67,5 +73,15 @@ extension ContinueWatchingItem {
             return itemHref == href
         }
         return episodeNumber == number
+    }
+
+    /// True when this item is the downloaded episode `number`/`href`: the href *and* the number.
+    ///
+    /// Some sources give every episode of a show the same href and tell them apart some other
+    /// way, so a download's href alone matched every downloaded episode. Watching episode 19 put
+    /// its progress on all of them, and each one then resumed a third of the way in. Both sides
+    /// here come from the same download, so its number is in the same units and can be required.
+    func matchesDownloadedEpisode(number: Int, href: String?) -> Bool {
+        episodeNumber == number && matchesEpisode(number: number, href: href)
     }
 }

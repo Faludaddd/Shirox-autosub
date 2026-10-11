@@ -66,11 +66,10 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 
     private func configureAudioSession() {
         do {
-            let audioSession = AVAudioSession.sharedInstance()
             // Declare the category at launch (harmless — does NOT interrupt other
             // apps' audio). Activation is deferred to player open so system music
             // (Spotify/Apple Music) keeps playing while browsing the app.
-            try audioSession.setCategory(.playback, mode: .moviePlayback)
+            try AppAudioSession.configureForPlayback()
         } catch {
             Logger.shared.log("Failed to configure audio session: \(error)", type: "Error")
         }

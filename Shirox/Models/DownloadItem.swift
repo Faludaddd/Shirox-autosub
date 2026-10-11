@@ -27,6 +27,10 @@ struct DownloadItem: Identifiable, Codable {
     /// for filling it in and then re-triggering the queue.
     var streamURL: URL?
     var headers: [String: String]
+    /// The key the stream's playlists are scrambled with (see ``HLSPlaylistCipher``), so a
+    /// downloaded scrambled source unscrambles on fetch and plays back offline. Optional, so
+    /// old manifests decode.
+    var playlistKey: String? = nil
 
     // Subtitles
     var subtitleURL: URL?

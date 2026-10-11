@@ -1,10 +1,12 @@
 import Combine
 
-#if os(iOS)
+#if !os(tvOS)
 import Foundation
 import Network
 import Darwin
+#if os(iOS)
 import UIKit
+#endif
 
 /// Local HTTP proxy bound to every interface (0.0.0.0) so a Chromecast — a separate LAN
 /// device — can reach it, and so an AirPlay receiver can too. It injects the stream's auth
@@ -35,9 +37,11 @@ final class CastProxyServer: @unchecked Sendable {
 
     // MARK: - Configuration
 
-    private let port: NWEndpoint.Port = 8766
-    /// How long a kept-alive connection may sit idle before it is reclaimed.
-    private let idleTimeout: TimeInterval = 60
+    // `port` and `idleTimeout` change only while the proxy is down — tests move them, clear of
+    // a copy of the app running in a simulator on the same Mac, which shares its ports.
+    var port: NWEndpoint.Port = 8766
+    /// How long a connection may go with nothing moving on it before it is reclaimed.
+    var idleTimeout: TimeInterval = 60
     /// Backoff before re-arming a listener that failed.
     private let restartDelay: TimeInterval = 1.0
 
@@ -48,9 +52,11 @@ final class CastProxyServer: @unchecked Sendable {
 
     private var listener: NWListener?
     private var proxyHeaders: [String: String] = [:]
-    private var readyContinuations: [CheckedContinuation<Void, Never>] = []
+    private var readyContinuations: [UUID: CheckedContinuation<Bool, Never>] = [:]
     private var connections: [ObjectIdentifier: ProxyConnection] = [:]
+    #if os(iOS)
     private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
+    #endif
     private var pathMonitor: NWPathMonitor?
     private var cachedIP: String?
     /// Who currently needs the proxy up. Reason-counted because Chromecast and AirPlay
@@ -61,6 +67,25 @@ final class CastProxyServer: @unchecked Sendable {
     private var running = false
     /// Signs proxy URLs so only URLs this app minted are honoured.
     private var token = CastProxyServer.makeToken()
+    /// Subtitles handed to an AirPlay receiver as a WebVTT rendition (see ``AirPlaySubtitles``),
+    /// by id. Only the latest is kept: one video plays at a time.
+    private var subtitleSessions: [String: SubtitleSession] = [:]
+    /// AES-128 keys fetched for audio segments being evened out (see ``AudioSegmentRepair``),
+    /// by URL: a stream uses one or a few, and fetching one per segment would double requests.
+    private var segmentKeys: [URL: Data] = [:]
+    /// Hosts whose audio has had its timestamps evened out this run, logged once each.
+    private var repairedHosts: Set<String> = []
+
+    private struct SubtitleSession {
+        var cues: [SubtitleCue]
+        var name: String
+        var duration: Double
+        /// The stream's first media segment and its init map, found while its media playlist
+        /// went through — read for the timestamp the cues are mapped onto.
+        var firstSegment: URL?
+        var initSegment: URL?
+        var firstTimestamp: Int64?
+    }
 
     /// Called on the main queue when the device's LAN address changes while casting. Any
     /// URL already handed to the receiver now points at an address the phone has given up,
@@ -90,21 +115,78 @@ final class CastProxyServer: @unchecked Sendable {
 
     // MARK: - Lifecycle
 
-    /// Starts the server (if not already running) and suspends until the listener is ready.
+    /// Starts the server (if not already running) and suspends until the listener is ready, or
+    /// until `timeout` passes: a port something else holds never becomes ready, and waiting
+    /// for it used to hang forever. The listener keeps retrying either way until stopped.
     /// - Parameter reason: who needs it up; pass the same value to ``stop(reason:)``.
-    func startAndWait(headers: [String: String], reason: String = "cast") async {
+    /// - Returns: whether the proxy is up.
+    @discardableResult
+    func startAndWait(headers: [String: String], reason: String = "cast",
+                      timeout: TimeInterval = 10) async -> Bool {
         await withCheckedContinuation { continuation in
             stateQueue.async {
                 self.proxyHeaders = headers
                 self.reasons.insert(reason)
-                if self.running {
-                    continuation.resume()
+                guard self.running else {
+                    self.waitLocked(for: continuation, timeout: timeout)
                     return
                 }
-                self.readyContinuations.append(continuation)
-                if self.listener == nil { self.startListenerLocked() }
+                // THE BUG: iOS takes a suspended app's listening socket back and the listener
+                // isn't told — it stayed ready while every connection was refused, so after the
+                // phone had been locked a while mpv couldn't reopen a stream until the player
+                // was closed. So a running listener is checked before it's trusted.
+                let probed = self.listener
+                self.probeLocked { accepting in
+                    // Only the listener probed is replaced: another wait may have replaced it already.
+                    if !accepting, let probed, self.listener === probed {
+                        Logger.shared.log("[CastProxy] Listener stopped taking connections; re-arming", type: "Stream")
+                        probed.stateUpdateHandler = nil
+                        probed.cancel()
+                        self.listener = nil
+                        self.running = false
+                    }
+                    if self.running {
+                        continuation.resume(returning: true)
+                    } else {
+                        self.waitLocked(for: continuation, timeout: timeout)
+                    }
+                }
             }
         }
+    }
+
+    /// Resumes `continuation` once the listener is ready — starting one if there's none — or
+    /// with whether it is once `timeout` passes.
+    private func waitLocked(for continuation: CheckedContinuation<Bool, Never>, timeout: TimeInterval) {
+        let waiter = UUID()
+        readyContinuations[waiter] = continuation
+        if listener == nil { startListenerLocked() }
+        stateQueue.asyncAfter(deadline: .now() + timeout) {
+            self.readyContinuations.removeValue(forKey: waiter)?.resume(returning: self.running)
+        }
+    }
+
+    /// Answers on `stateQueue` whether anything takes a connection on the proxy's port.
+    private func probeLocked(_ answer: @escaping (Bool) -> Void) {
+        let probe = NWConnection(host: "127.0.0.1", port: port, using: .tcp)
+        var answered = false
+        let finish = { (accepting: Bool) in
+            guard !answered else { return }
+            answered = true
+            probe.stateUpdateHandler = nil
+            probe.cancel()
+            answer(accepting)
+        }
+        probe.stateUpdateHandler = { state in
+            switch state {
+            case .ready: finish(true)
+            // A refused connection waits for the network to change rather than failing.
+            case .waiting, .failed: finish(false)
+            default: break
+            }
+        }
+        probe.start(queue: stateQueue)
+        stateQueue.asyncAfter(deadline: .now() + 1) { finish(false) }
     }
 
     func start(headers: [String: String], reason: String = "cast") {
@@ -142,9 +224,9 @@ final class CastProxyServer: @unchecked Sendable {
     }
 
     private func resumeWaitersLocked() {
-        let waiting = readyContinuations
+        let waiting = Array(readyContinuations.values)
         readyContinuations.removeAll()
-        waiting.forEach { $0.resume() }
+        waiting.forEach { $0.resume(returning: running) }
     }
 
     private func startListenerLocked() {
@@ -152,6 +234,11 @@ final class CastProxyServer: @unchecked Sendable {
         startPathMonitorLocked()
 
         let params = NWParameters.tcp
+        #if os(macOS)
+        // On a Mac it serves only the players on this machine, so it listens on loopback alone,
+        // which also keeps the firewall from asking to accept incoming connections.
+        params.acceptLocalOnly = true
+        #endif
         params.allowLocalEndpointReuse = true
 
         do {
@@ -234,6 +321,8 @@ final class CastProxyServer: @unchecked Sendable {
     /// app's `audio` background mode (held by ``BackgroundKeepAlive`` during a cast) is what
     /// provides indefinite runtime; this covers the gap before that takes effect.
     private func beginBackgroundTaskLocked() {
+        // A Mac app keeps running in the background without asking.
+        #if os(iOS)
         // THE BUG: this used to overwrite a live identifier on every start, leaking the
         // previous assertion — iOS eventually stops granting them.
         guard backgroundTaskID == .invalid else { return }
@@ -250,38 +339,82 @@ final class CastProxyServer: @unchecked Sendable {
                 }
             }
         }
+        #endif
     }
 
     private func endBackgroundTask() { stateQueue.async { self.endBackgroundTaskLocked() } }
 
     private func endBackgroundTaskLocked() {
+        #if os(iOS)
         let id = backgroundTaskID
         guard id != .invalid else { return }
         backgroundTaskID = .invalid
         DispatchQueue.main.async { UIApplication.shared.endBackgroundTask(id) }
+        #endif
     }
 
     // MARK: - URL minting
 
+    /// Registers subtitles to hand an AirPlay receiver with the next stream minted with the id
+    /// this returns. `duration` is the video's, in seconds.
+    func registerSubtitles(cues: [SubtitleCue], name: String, duration: Double) -> String {
+        let id = String(UUID().uuidString.prefix(8))
+        stateQueue.sync {
+            subtitleSessions = [id: SubtitleSession(cues: cues, name: name, duration: duration)]
+        }
+        return id
+    }
+
     /// Returns a proxied URL on the device's LAN address, signed with this run's token.
-    func proxyURL(for url: URL) -> URL? {
+    /// - Parameters:
+    ///   - playlistKey: the stream's playlist key (see ``HLSPlaylistCipher``), for a playlist
+    ///     URL; nil for anything else.
+    ///   - subtitlesID: from ``registerSubtitles(cues:name:duration:)``, to add those subtitles
+    ///     to the stream's master playlist.
+    func proxyURL(for url: URL, playlistKey: String? = nil, subtitlesID: String? = nil) -> URL? {
         stateQueue.sync {
             // Cached: a manifest rewrite calls this once per line, and `getifaddrs` per
             // segment on a long playlist is real work for a constant answer.
             let host = cachedIP ?? Self.currentLocalIP()
             cachedIP = host
             guard let host, host != "127.0.0.1" else { return nil }
-            var c = URLComponents()
-            c.scheme = "http"
-            c.host = host
-            c.port = Int(port.rawValue)
-            c.path = "/proxy"
-            c.queryItems = [
-                URLQueryItem(name: "url", value: url.absoluteString),
-                URLQueryItem(name: "t", value: token)
-            ]
-            return c.url
+            return mintLocked(url, host: host, playlistKey: playlistKey,
+                              extra: subtitlesID.map { [URLQueryItem(name: "s", value: $0)] } ?? [])
         }
+    }
+
+    /// Returns a proxied URL on loopback, signed with this run's token — for a client on this
+    /// device (mpv), which reaches the proxy with or without Wi-Fi.
+    func loopbackURL(for url: URL, playlistKey: String? = nil, subtitlesID: String? = nil) -> URL? {
+        stateQueue.sync {
+            mintLocked(url, host: "127.0.0.1", playlistKey: playlistKey,
+                       extra: subtitlesID.map { [URLQueryItem(name: "s", value: $0)] } ?? [])
+        }
+    }
+
+    private func mintLocked(_ url: URL, host: String, playlistKey: String?, extra: [URLQueryItem] = []) -> URL? {
+        var c = URLComponents()
+        c.scheme = "http"
+        c.host = host
+        c.port = Int(port.rawValue)
+        c.path = "/proxy"
+        c.queryItems = [
+            URLQueryItem(name: "url", value: url.absoluteString),
+            URLQueryItem(name: "t", value: token)
+        ]
+        if let playlistKey { c.queryItems?.append(URLQueryItem(name: "k", value: playlistKey)) }
+        c.queryItems?.append(contentsOf: extra)
+        // `URLComponents` leaves `+` alone, which a server reads back as a space; a base64 key
+        // is full of them.
+        c.percentEncodedQuery = c.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
+        return c.url
+    }
+
+    /// Whether a request reached the proxy over loopback, going by its `Host`. Its playlists are
+    /// then rewritten with loopback URLs too, so the segments don't depend on Wi-Fi either.
+    static func isLoopback(hostHeader: String?) -> Bool {
+        guard let host = hostHeader?.split(separator: ":").first?.lowercased() else { return false }
+        return host == "127.0.0.1" || host == "localhost"
     }
 
     private static func makeToken() -> String {
@@ -317,10 +450,25 @@ final class CastProxyServer: @unchecked Sendable {
     /// Serves one parsed request onto `connection`. Returns once the response is fully
     /// written, so the connection can decide whether to read another request.
     fileprivate func serve(_ head: HTTPRequestHead, on connection: ProxyConnection) async {
+        let query = URLComponents(string: "http://localhost" + head.path)
+        if let path = query?.path, path == "/subs.m3u8" || path == "/subs.vtt" {
+            guard validate(path: head.path),
+                  let id = query?.queryItems?.first(where: { $0.name == "id" })?.value else {
+                connection.writeStatus(403)
+                return
+            }
+            await serveSubtitles(id: id, playlist: path == "/subs.m3u8", head: head, on: connection)
+            return
+        }
         guard validate(path: head.path), let target = head.targetURL else {
             connection.writeStatus(head.targetURL == nil ? 400 : 403)
             return
         }
+
+        // Present only on a scrambled stream's playlists: its responses are unscrambled, and
+        // the playlists they name are minted with it in turn.
+        let playlistKey = URLComponents(string: "http://localhost" + head.path)?
+            .queryItems?.first(where: { $0.name == "k" })?.value
 
         var request = URLRequest(url: target)
         request.httpMethod = head.wantsBody ? "GET" : "HEAD"
@@ -328,17 +476,236 @@ final class CastProxyServer: @unchecked Sendable {
 
         // A manifest gets rewritten, which changes its length — so a range over it would be
         // a lie. Manifests are small and never usefully ranged, so ask for the whole thing.
-        let expectManifest = target.pathExtension.lowercased() == "m3u8"
-        if !expectManifest, let range = head.value(for: "range") {
+        let expectManifest = playlistKey != nil || target.pathExtension.lowercased() == "m3u8"
+        // A segment dressed up as an image (see HLSSegmentDisguise) is fetched whole and
+        // unwrapped; the unwrapped one is shorter, so a range over it is the same lie.
+        let unwrapsDisguise = !expectManifest && head.wantsBody && HLSSegmentDisguise.mayBeDisguised(target)
+        if !expectManifest, !unwrapsDisguise, let range = head.value(for: "range") {
             request.setValue(range, forHTTPHeaderField: "Range")
         }
 
+        let loopback = Self.isLoopback(hostHeader: head.value(for: "host"))
+        let items = query?.queryItems ?? []
+        // An alternate-audio playlist (`ar`) names its segments for evening out; such a segment
+        // (`fx`) carries its key and IV (`fk`, `fiv`) when it's encrypted. Only a whole segment
+        // is rewritten: a ranged request is passed through as it is.
+        let isAudioPlaylist = items.contains { $0.name == "ar" }
+        let repairPlan = RepairPlanBox()
+        var segmentRepair: ProxyExchangeRegistry.SegmentRepair?
+        if items.contains(where: { $0.name == "fx" }), head.wantsBody, unwrapsDisguise || head.value(for: "range") == nil {
+            let keyURL = items.first(where: { $0.name == "fk" })?.value.flatMap(URL.init(string:))
+            let iv = items.first(where: { $0.name == "fiv" })?.value.flatMap(Self.bytes(hex:))
+            let crypto = keyURL.flatMap { key in iv.map { AudioSegmentRepair.Crypto(key: key, iv: $0) } }
+            let host = target.host ?? "?"
+            segmentRepair = .init(crypto: crypto, key: { [weak self] url in await self?.segmentKey(url) },
+                                  repaired: { [weak self] in self?.noteRepaired(host: host) })
+        }
+        // AirPlay subtitles: `s` on the stream's own URL (add the rendition), `sp` on the
+        // playlists it names (find the first segment, for the timing).
+        let subtitlesID = query?.queryItems?.first(where: { $0.name == "s" })?.value
+        let probeID = subtitlesID ?? query?.queryItems?.first(where: { $0.name == "sp" })?.value
+        let finish: ((String, String) -> String)? = probeID.map { id in
+            { [weak self] original, rewritten in
+                guard let self else { return rewritten }
+                self.recordSegments(of: original, baseURL: target, subtitlesID: id)
+                guard let subtitlesID else { return rewritten }
+                return self.addSubtitles(to: original, rewritten: rewritten, target: target,
+                                         playlistKey: playlistKey, subtitlesID: subtitlesID,
+                                         loopback: loopback)
+            }
+        }
         await exchanges.run(request: request,
                             on: upstream,
                             connection: connection,
                             wantsBody: head.wantsBody,
                             rewriteManifestFrom: target,
-                            proxy: { [weak self] in self?.proxyURL(for: $0) })
+                            playlistKey: playlistKey,
+                            finish: finish,
+                            prepare: isAudioPlaylist ? { text in
+                                repairPlan.plan = AudioSegmentRepair.plan(mediaPlaylist: text, baseURL: target)
+                            } : nil,
+                            segmentRepair: segmentRepair,
+                            unwrapsDisguise: unwrapsDisguise,
+                            proxy: { [weak self] url, resource in
+                                self?.mintNested(url, resource: resource, playlistKey: playlistKey,
+                                                 probeID: probeID, loopback: loopback,
+                                                 repair: repairPlan.plan?[url])
+                            })
+    }
+
+    /// The repair plan of the audio playlist being rewritten, filled in before its URLs are.
+    private final class RepairPlanBox: @unchecked Sendable {
+        var plan: [URL: AudioSegmentRepair.Crypto?]?
+    }
+
+    /// `hex` as bytes; nil unless it's an even run of hex digits.
+    static func bytes(hex: String) -> Data? {
+        let digits = Array(hex.utf8)
+        guard digits.count % 2 == 0 else { return nil }
+        var out = Data(capacity: digits.count / 2)
+        for i in stride(from: 0, to: digits.count, by: 2) {
+            guard let byte = UInt8(String(decoding: digits[i..<i + 2], as: UTF8.self), radix: 16) else { return nil }
+            out.append(byte)
+        }
+        return out
+    }
+
+    /// An audio segment's AES-128 key, fetched once with the stream's headers.
+    private func segmentKey(_ url: URL) async -> Data? {
+        if let cached = stateQueue.sync(execute: { segmentKeys[url] }) { return cached }
+        var request = URLRequest(url: url)
+        currentHeaders().forEach { request.setValue($1, forHTTPHeaderField: $0) }
+        guard let (data, response) = try? await upstream.data(for: request),
+              (response as? HTTPURLResponse)?.statusCode ?? 200 < 400, data.count == 16 else { return nil }
+        stateQueue.sync { segmentKeys[url] = data }
+        return data
+    }
+
+    private func noteRepaired(host: String) {
+        let first = stateQueue.sync { repairedHosts.insert(host).inserted }
+        if first { Logger.shared.log("[CastProxy] Evening out audio timestamps from \(host)", type: "Stream") }
+    }
+
+    /// A URL a playlist names, minted back through the proxy: playlists keep the stream's key
+    /// and the subtitle probe, segments and keys need neither. An audio rendition is marked so
+    /// its segments are minted for evening out (`repair`: nil for any other URL, `.some(nil)`
+    /// for a segment in the clear).
+    private func mintNested(_ url: URL, resource: CastManifestRewriter.Resource, playlistKey: String?,
+                            probeID: String?, loopback: Bool,
+                            repair: AudioSegmentRepair.Crypto??) -> URL? {
+        stateQueue.sync {
+            let host = loopback ? "127.0.0.1" : (cachedIP ?? Self.currentLocalIP())
+            guard let host else { return nil }
+            var extra: [URLQueryItem] = []
+            if resource.isPlaylist, let probeID { extra.append(URLQueryItem(name: "sp", value: probeID)) }
+            if resource == .audioPlaylist { extra.append(URLQueryItem(name: "ar", value: "1")) }
+            if case .some(let crypto) = repair {
+                extra.append(URLQueryItem(name: "fx", value: "1"))
+                if let crypto {
+                    extra.append(URLQueryItem(name: "fk", value: crypto.key.absoluteString))
+                    extra.append(URLQueryItem(name: "fiv", value: crypto.iv.map { String(format: "%02x", $0) }.joined()))
+                }
+            }
+            return mintLocked(url, host: host, playlistKey: resource.isPlaylist ? playlistKey : nil, extra: extra)
+        }
+    }
+
+    // MARK: - AirPlay subtitles
+
+    private func subtitleURL(_ path: String, id: String, loopback: Bool) -> String? {
+        stateQueue.sync {
+            let host = loopback ? "127.0.0.1" : (cachedIP ?? Self.currentLocalIP())
+            guard let host else { return nil }
+            var c = URLComponents()
+            c.scheme = "http"
+            c.host = host
+            c.port = Int(port.rawValue)
+            c.path = path
+            c.queryItems = [URLQueryItem(name: "id", value: id), URLQueryItem(name: "t", value: token)]
+            return c.url?.absoluteString
+        }
+    }
+
+    /// The stream's top playlist with the subtitle rendition in it — or, for a stream that is a
+    /// single media playlist, a master around it that names both.
+    private func addSubtitles(to original: String, rewritten: String, target: URL, playlistKey: String?,
+                              subtitlesID: String, loopback: Bool) -> String {
+        let name = stateQueue.sync { subtitleSessions[subtitlesID]?.name }
+        guard let name, let uri = subtitleURL("/subs.m3u8", id: subtitlesID, loopback: loopback) else { return rewritten }
+        let tag = AirPlaySubtitles.mediaTag(uri: uri, name: name)
+        if original.contains("#EXT-X-STREAM-INF") {
+            return AirPlaySubtitles.inject(into: rewritten, mediaTag: tag)
+        }
+        guard let media = mintNested(target, resource: .playlist, playlistKey: playlistKey,
+                                     probeID: subtitlesID, loopback: loopback, repair: nil) else { return rewritten }
+        return AirPlaySubtitles.wrap(mediaPlaylistURL: media.absoluteString, mediaTag: tag)
+    }
+
+    /// Notes a media playlist's first segment and init map, once per subtitle session.
+    private func recordSegments(of playlist: String, baseURL: URL, subtitlesID: String) {
+        guard !playlist.contains("#EXT-X-STREAM-INF") else { return }
+        var initSegment: URL?
+        var first: URL?
+        for raw in playlist.components(separatedBy: .newlines) {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("#EXT-X-MAP:"),
+               let range = line.range(of: "(?<=[:,])URI=\"[^\"]*\"", options: .regularExpression) {
+                let value = String(line[range].dropFirst(5).dropLast())
+                initSegment = CastManifestRewriter.resolve(value, relativeTo: baseURL)
+            } else if !line.isEmpty, !line.hasPrefix("#") {
+                first = CastManifestRewriter.resolve(line, relativeTo: baseURL)
+                break
+            }
+        }
+        guard let first else { return }
+        stateQueue.sync {
+            guard subtitleSessions[subtitlesID] != nil, subtitleSessions[subtitlesID]?.firstSegment == nil else { return }
+            subtitleSessions[subtitlesID]?.firstSegment = first
+            subtitleSessions[subtitlesID]?.initSegment = initSegment
+        }
+    }
+
+    private func serveSubtitles(id: String, playlist: Bool, head: HTTPRequestHead, on connection: ProxyConnection) async {
+        guard let session = stateQueue.sync(execute: { subtitleSessions[id] }) else {
+            connection.writeStatus(404)
+            return
+        }
+        let loopback = Self.isLoopback(hostHeader: head.value(for: "host"))
+        if playlist {
+            guard let vtt = subtitleURL("/subs.vtt", id: id, loopback: loopback) else {
+                connection.writeStatus(404)
+                return
+            }
+            respond(AirPlaySubtitles.subtitlePlaylist(vttURL: vtt, duration: session.duration),
+                    type: "application/x-mpegURL", wantsBody: head.wantsBody, on: connection)
+            return
+        }
+        let timestamp = await firstTimestamp(for: id)
+        respond(AirPlaySubtitles.webVTT(cues: session.cues, firstTimestamp: timestamp ?? 0),
+                type: "text/vtt", wantsBody: head.wantsBody, on: connection)
+    }
+
+    /// The stream's first timestamp, read once off its first segment. The receiver can ask for
+    /// the subtitles before the video's media playlist has come through, so this waits a little
+    /// for that to name the segment.
+    private func firstTimestamp(for id: String) async -> Int64? {
+        var session = stateQueue.sync { subtitleSessions[id] }
+        for _ in 0..<30 where session?.firstSegment == nil {
+            try? await Task.sleep(nanoseconds: 100_000_000)
+            session = stateQueue.sync { subtitleSessions[id] }
+        }
+        guard let session, let segment = session.firstSegment else {
+            Logger.shared.log("[AirPlay] Subtitles served unmapped: no segment seen yet", type: "Stream")
+            return nil
+        }
+        if let known = session.firstTimestamp { return known }
+        let headers = currentHeaders()
+        func fetch(_ url: URL, range: String?) async -> Data? {
+            var request = URLRequest(url: url, timeoutInterval: 15)
+            headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
+            if let range { request.setValue(range, forHTTPHeaderField: "Range") }
+            return try? await URLSession.shared.data(for: request).0
+        }
+        let timestamp: Int64?
+        if let initURL = session.initSegment {
+            guard let initData = await fetch(initURL, range: nil),
+                  let start = await fetch(segment, range: "bytes=0-65535") else { return nil }
+            timestamp = AirPlaySubtitles.firstTimestamp(fragmentedInit: initData, segment: start)
+        } else {
+            guard let start = await fetch(segment, range: "bytes=0-37599") else { return nil }
+            timestamp = AirPlaySubtitles.firstTimestamp(transportStream: start)
+        }
+        Logger.shared.log("[AirPlay] Subtitles mapped to timestamp \(timestamp.map(String.init) ?? "none")", type: "Stream")
+        stateQueue.sync { subtitleSessions[id]?.firstTimestamp = timestamp }
+        return timestamp
+    }
+
+    private func respond(_ text: String, type: String, wantsBody: Bool, on connection: ProxyConnection) {
+        let body = Data(text.utf8)
+        var head = "HTTP/1.1 200 OK\r\nContent-Type: \(type)\r\nContent-Length: \(body.count)\r\n"
+        head += "Access-Control-Allow-Origin: *\r\nCache-Control: no-cache\r\nConnection: keep-alive\r\n\r\n"
+        guard connection.writeBlocking(Data(head.utf8)) else { return }
+        if wantsBody { _ = connection.writeBlocking(body) }
     }
 
     // MARK: - Local IP
@@ -385,6 +752,10 @@ fileprivate final class ProxyConnection: @unchecked Sendable {
     private var buffer = Data()
     private var closed = false
     private var idleTimer: DispatchSourceTimer?
+    /// When bytes last moved either way. Idle means nothing moved for `idleTimeout`, not that
+    /// the request is older than that: a whole episode goes out over one response, and timing
+    /// from the request cut mpv off mid-file once a minute.
+    private var lastActivity = DispatchTime.now()
 
     /// A head larger than this is not a real request — refuse it rather than buffer forever.
     private static let maxHeadBytes = 64 * 1024
@@ -466,7 +837,7 @@ fileprivate final class ProxyConnection: @unchecked Sendable {
             semaphore.signal()
         })
         semaphore.wait()
-        if !ok { close() }
+        if !ok { close() } else { markActivity() }
         return ok
     }
 
@@ -483,13 +854,34 @@ fileprivate final class ProxyConnection: @unchecked Sendable {
 
     private func armIdleTimer() {
         lock.lock()
+        lastActivity = .now()
         idleTimer?.cancel()
         let timer = DispatchSource.makeTimerSource(queue: queue)
         timer.schedule(deadline: .now() + idleTimeout)
-        timer.setEventHandler { [weak self] in self?.close() }
+        timer.setEventHandler { [weak self] in self?.idleTimerFired() }
         idleTimer = timer
         timer.resume()
         lock.unlock()
+    }
+
+    private func markActivity() {
+        lock.lock()
+        lastActivity = .now()
+        lock.unlock()
+    }
+
+    /// Closes the connection if nothing has moved for the whole timeout; otherwise waits out
+    /// the rest of it from the last activity.
+    private func idleTimerFired() {
+        lock.lock()
+        let deadline = lastActivity + idleTimeout
+        if deadline > .now(), let timer = idleTimer {
+            timer.schedule(deadline: deadline)
+            lock.unlock()
+            return
+        }
+        lock.unlock()
+        close()
     }
 
     /// Idempotent — every path (idle, peer hangup, send failure, server shutdown) lands here.
@@ -521,19 +913,42 @@ fileprivate final class ProxyExchangeRegistry: NSObject, URLSessionDataDelegate,
         let connection: ProxyConnection
         let wantsBody: Bool
         let manifestBase: URL
-        let proxy: (URL) -> URL?
+        let playlistKey: String?
+        /// Last say over a rewritten manifest: (as fetched, rewritten) → served.
+        let finishManifest: ((String, String) -> String)?
+        let proxy: (URL, CastManifestRewriter.Resource) -> URL?
+        let prepare: ((String) -> Void)?
+        let segmentRepair: SegmentRepair?
+        let unwrapsDisguise: Bool
         var isManifest = false
+        /// A segment held whole to be unwrapped or evened out before it's sent.
+        var isRepairing = false
         var manifestBuffer = Data()
         var headerSent = false
         var failed = false
         var finish: ((Void) -> Void)?
 
-        init(connection: ProxyConnection, wantsBody: Bool, manifestBase: URL, proxy: @escaping (URL) -> URL?) {
+        init(connection: ProxyConnection, wantsBody: Bool, manifestBase: URL, playlistKey: String?,
+             finish: ((String, String) -> String)?, prepare: ((String) -> Void)?,
+             segmentRepair: SegmentRepair?, unwrapsDisguise: Bool,
+             proxy: @escaping (URL, CastManifestRewriter.Resource) -> URL?) {
+            self.finishManifest = finish
+            self.prepare = prepare
+            self.segmentRepair = segmentRepair
+            self.unwrapsDisguise = unwrapsDisguise
             self.connection = connection
             self.wantsBody = wantsBody
             self.manifestBase = manifestBase
+            self.playlistKey = playlistKey
             self.proxy = proxy
         }
+    }
+
+    /// How to even out an audio segment's timestamps (see ``AudioSegmentRepair``).
+    struct SegmentRepair {
+        let crypto: AudioSegmentRepair.Crypto?
+        let key: (URL) async -> Data?
+        let repaired: () -> Void
     }
 
     private let lock = NSLock()
@@ -545,9 +960,16 @@ fileprivate final class ProxyExchangeRegistry: NSObject, URLSessionDataDelegate,
              connection: ProxyConnection,
              wantsBody: Bool,
              rewriteManifestFrom base: URL,
-             proxy: @escaping (URL) -> URL?) async {
+             playlistKey: String? = nil,
+             finish: ((String, String) -> String)? = nil,
+             prepare: ((String) -> Void)? = nil,
+             segmentRepair: SegmentRepair? = nil,
+             unwrapsDisguise: Bool = false,
+             proxy: @escaping (URL, CastManifestRewriter.Resource) -> URL?) async {
         let task = session.dataTask(with: request)
-        let exchange = Exchange(connection: connection, wantsBody: wantsBody, manifestBase: base, proxy: proxy)
+        let exchange = Exchange(connection: connection, wantsBody: wantsBody, manifestBase: base,
+                                playlistKey: playlistKey, finish: finish, prepare: prepare,
+                                segmentRepair: segmentRepair, unwrapsDisguise: unwrapsDisguise, proxy: proxy)
         lock.lock(); active[task.taskIdentifier] = exchange; lock.unlock()
 
         await withCheckedContinuation { continuation in
@@ -577,14 +999,26 @@ fileprivate final class ProxyExchangeRegistry: NSObject, URLSessionDataDelegate,
                     completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
         guard let exchange = exchange(for: dataTask) else { completionHandler(.cancel); return }
         let http = response as? HTTPURLResponse
+        if let http, http.statusCode >= 400 {
+            // Passed on as is; logged so a refusal is plainly the server's, not the proxy's.
+            Logger.shared.log("[CastProxy] \(http.url?.host ?? "Upstream") answered \(http.statusCode)", type: "Error")
+        }
         let mime = http?.value(forHTTPHeaderField: "Content-Type")
             ?? response.mimeType
             ?? Self.mimeType(for: exchange.manifestBase.pathExtension)
 
-        exchange.isManifest = CastManifestRewriter.isManifest(mime: mime, url: exchange.manifestBase)
+        // A scrambled playlist comes back as text/plain base64, so its key marks it instead.
+        exchange.isManifest = exchange.playlistKey != nil
+            || CastManifestRewriter.isManifest(mime: mime, url: exchange.manifestBase)
 
         if exchange.isManifest {
             // Length is unknown until the rewrite is done, so the head waits.
+            completionHandler(.allow)
+            return
+        }
+        if exchange.segmentRepair != nil || exchange.unwrapsDisguise, (200..<300).contains(http?.statusCode ?? 200) {
+            // Held whole until it's unwrapped or evened out; the head goes with it.
+            exchange.isRepairing = true
             completionHandler(.allow)
             return
         }
@@ -614,7 +1048,7 @@ fileprivate final class ProxyExchangeRegistry: NSObject, URLSessionDataDelegate,
         guard let exchange = exchange(for: dataTask), !exchange.failed else { return }
         guard exchange.wantsBody else { return }
 
-        if exchange.isManifest {
+        if exchange.isManifest || exchange.isRepairing {
             exchange.manifestBuffer.append(data)
             return
         }
@@ -627,6 +1061,32 @@ fileprivate final class ProxyExchangeRegistry: NSObject, URLSessionDataDelegate,
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         guard let exchange = exchange(for: task) else { complete(task); return }
+        if exchange.isRepairing, error == nil, !exchange.failed {
+            // Answered once it's unwrapped and evened out: the request isn't done until then,
+            // so the connection reads no next request before this one's body is written.
+            let original = exchange.unwrapsDisguise
+                ? HLSSegmentDisguise.unwrap(exchange.manifestBuffer) : exchange.manifestBuffer
+            let repair = exchange.segmentRepair
+            Task {
+                var fixed: Data?
+                if let repair {
+                    var key: Data?
+                    if let crypto = repair.crypto { key = await repair.key(crypto.key) }
+                    fixed = AudioSegmentRepair.repaired(original, crypto: repair.crypto, key: key)
+                    if fixed != nil { repair.repaired() }
+                }
+                let body = fixed ?? original
+                var head = "HTTP/1.1 200 OK\r\n"
+                head += "Content-Type: video/mp2t\r\n"
+                head += "Content-Length: \(body.count)\r\n"
+                head += "Access-Control-Allow-Origin: *\r\nCache-Control: no-cache\r\nConnection: keep-alive\r\n\r\n"
+                if exchange.connection.writeBlocking(Data(head.utf8)) {
+                    _ = exchange.connection.writeBlocking(body)
+                }
+                self.complete(task)
+            }
+            return
+        }
         defer { complete(task) }
 
         if exchange.failed { exchange.connection.close(); return }
@@ -647,11 +1107,17 @@ fileprivate final class ProxyExchangeRegistry: NSObject, URLSessionDataDelegate,
         guard exchange.isManifest else { return }
 
         let body: Data
-        if let text = String(data: exchange.manifestBuffer, encoding: .utf8) {
+        let text = exchange.playlistKey.map { HLSPlaylistCipher.decode(exchange.manifestBuffer, key: $0) }
+            ?? String(data: exchange.manifestBuffer, encoding: .utf8)
+        if exchange.playlistKey != nil, text == nil {
+            Logger.shared.log("[CastProxy] Couldn't unscramble a playlist from \(exchange.manifestBase.host ?? "?") with the module's key", type: "Error")
+        }
+        if let text {
+            exchange.prepare?(text)
             let rewritten = CastManifestRewriter.rewrite(text,
                                                          baseURL: exchange.manifestBase,
-                                                         proxy: exchange.proxy)
-            body = Data(rewritten.utf8)
+                                                         resource: exchange.proxy)
+            body = Data((exchange.finishManifest?(text, rewritten) ?? rewritten).utf8)
         } else {
             body = exchange.manifestBuffer
         }

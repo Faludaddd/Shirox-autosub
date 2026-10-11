@@ -33,7 +33,7 @@ final class BackgroundKeepAlive {
     func acquire(_ reason: String) -> Bool {
         let wasIdle = reasons.isEmpty
         reasons.insert(reason)
-        guard wasIdle else { return player != nil }
+        guard wasIdle else { return player != nil || !AppAudioSession.isManaged }
         return start()
     }
 
@@ -46,6 +46,8 @@ final class BackgroundKeepAlive {
 
     @discardableResult
     private func start() -> Bool {
+        // A Mac doesn't suspend the app in the background, so there's nothing to hold open.
+        guard AppAudioSession.isManaged else { return true }
         do {
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(.playback, mode: .moviePlayback)
