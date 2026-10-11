@@ -15,6 +15,11 @@ final class HomeViewModel: ObservableObject {
     @Published var genreShelves: [String: [Media]] = [:]
     @Published var isLoading = false
     @Published var error: String?
+    /// v2.30 (original's home) — whose page Home is showing, driving the
+    /// provider page-turn animation. The unified chain serves the feed; the
+    /// primary tracker names the page, so switching providers in the menu
+    /// turns the page exactly as the original does.
+    @Published private(set) var feedProvider: ProviderType?
 
     private var loaded = false
     private var cancellables = Set<AnyCancellable>()
@@ -46,6 +51,15 @@ final class HomeViewModel: ObservableObject {
         guard !loaded else { return }
         isLoading = true
         error = nil
+        feedProvider = ProviderManager.shared.primary?.providerType
+
+        // v2.31 (original's instant per-provider disk cache, adapted to our chain):
+        // seed this provider page's last-good shelves from disk IMMEDIATELY — Home
+        // renders real content on a cold start with no spinner, and the live chain
+        // refreshes in the background (stale-while-refresh, exactly like the original's
+        // HomeCacheStore). No TTL on the seed: the live load replaces it moments later;
+        // the 6h-TTL snapshot remains the bridge when every source fails.
+        seedFromDiskCache()
 
         // v2.24 — every shelf now goes through the UnifiedProviderSystem
         // chain (TVDB → MAL → AniList → Kitsu → AniDB, health-gated with
@@ -66,10 +80,13 @@ final class HomeViewModel: ObservableObject {
         _ = await (t, s, p, r, rc, u, g)
 
         // Persist the last-good shelves AFTER everything settles so the
-        // snapshot captures the fully-populated page.
+        // snapshot captures the fully-populated page. Saved per provider page
+        // so switching back to a provider restores ITS rows instantly.
         if !trending.isEmpty {
             SnapshotStore.saveHomeShelves(trending: trending, seasonal: seasonal, popular: popular, topRated: topRated,
-                                          recentlyCompleted: recentlyCompleted, upcoming: upcoming)
+                                          recentlyCompleted: recentlyCompleted, upcoming: upcoming,
+                                          genreShelves: genreShelves,
+                                          provider: feedProvider)
         }
 
         loaded = true
@@ -156,7 +173,7 @@ final class HomeViewModel: ObservableObject {
     /// carousel — alive with real data instead of an error wall. Only
     /// surfaces an error when there is NO snapshot to serve.
     private func serveSnapshotIfAvailable(error: Error, quiet: Bool = false) {
-        if let snapshot = SnapshotStore.loadHomeShelves() {
+        if let snapshot = SnapshotStore.loadHomeShelves(provider: feedProvider) {
             if trending.isEmpty, let snapTrending = snapshot.trending, !snapTrending.isEmpty {
                 trending = snapTrending
             }
@@ -187,22 +204,41 @@ final class HomeViewModel: ObservableObject {
         loaded = false
         await load()
     }
+
+    /// Instant seed of this provider page's last-good shelves (the original's
+    /// HomeCacheStore behavior): render the disk copy at once, no spinner, then
+    /// let the live chain refresh over it.
+    private func seedFromDiskCache() {
+        guard let snapshot = SnapshotStore.loadHomeShelves(provider: feedProvider, ignoreTTL: true) else { return }
+        if trending.isEmpty { trending = snapshot.trending ?? [] }
+        if seasonal.isEmpty { seasonal = snapshot.seasonal ?? [] }
+        if popular.isEmpty { popular = snapshot.popular ?? [] }
+        if topRated.isEmpty { topRated = snapshot.topRated ?? [] }
+        if recentlyCompleted.isEmpty { recentlyCompleted = snapshot.recentlyCompleted ?? [] }
+        if upcoming.isEmpty { upcoming = snapshot.upcoming ?? [] }
+        for (slug, list) in snapshot.genreShelves ?? [:] where genreShelves[slug] == nil {
+            genreShelves[slug] = list
+        }
+    }
 }
 
 // MARK: - Home shelf snapshot (offline fallback of last resort)
 
-/// Disk snapshot of the last-good Home shelves. Requirement: the carousel
-/// (and shelves) keep rendering REAL data through provider outages —
-/// AniList 403 → MAL/Jikan → this snapshot. Written on every successful
-/// load, read when every source fails, 6-hour TTL (it's a bridge over
-/// outages, not a permanent freeze — after 6h the honest error state
-/// shows instead of stale content).
+/// Disk snapshot of the last-good Home shelves, keyed by provider page. Written on
+/// every successful load, read two ways: INSTANTLY on cold start / provider switch
+/// (the original's per-provider HomeCacheStore — stale-while-refresh, no TTL), and
+/// with a 6-hour TTL as the bridge when every source fails (an outage bridge, not a
+/// permanent freeze — after 6h the honest error state shows instead of stale content).
 enum SnapshotStore {
     private static let ttl: TimeInterval = 6 * 3600
 
-    private static var fileURL: URL {
-        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-        return caches.appendingPathComponent("home-shelves-snapshot.json")
+    private static var cachesDirectory: URL {
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+    }
+
+    private static func fileURL(provider: ProviderType?) -> URL {
+        let key = provider?.rawValue ?? "chain"
+        return cachesDirectory.appendingPathComponent("home-shelves-\(key).json")
     }
 
     struct ShelfSnapshot: Codable {
@@ -215,10 +251,14 @@ enum SnapshotStore {
         // so snapshots written before these fields existed still decode.
         var recentlyCompleted: [Media]? = nil
         var upcoming: [Media]? = nil
+        // v2.31 — genre shelves cached per provider too (the heaviest reload:
+        // six parallel genre queries).
+        var genreShelves: [String: [Media]]? = nil
     }
 
     static func saveHomeShelves(trending: [Media], seasonal: [Media], popular: [Media], topRated: [Media],
-                                 recentlyCompleted: [Media] = [], upcoming: [Media] = []) {
+                                 recentlyCompleted: [Media] = [], upcoming: [Media] = [],
+                                 genreShelves: [String: [Media]] = [:], provider: ProviderType? = nil) {
         guard !trending.isEmpty else { return }
         let snapshot = ShelfSnapshot(savedAt: Date(),
                                      trending: trending,
@@ -226,17 +266,26 @@ enum SnapshotStore {
                                      popular: popular.isEmpty ? nil : popular,
                                      topRated: topRated.isEmpty ? nil : topRated,
                                      recentlyCompleted: recentlyCompleted.isEmpty ? nil : recentlyCompleted,
-                                     upcoming: upcoming.isEmpty ? nil : upcoming)
+                                     upcoming: upcoming.isEmpty ? nil : upcoming,
+                                     genreShelves: genreShelves.isEmpty ? nil : genreShelves)
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
-        try? data.write(to: fileURL, options: .atomic)
+        try? data.write(to: fileURL(provider: provider), options: .atomic)
     }
 
-    /// Returns the snapshot when it's fresh enough (6h TTL — a bridge
-    /// over outages, not a permanent freeze).
-    static func loadHomeShelves() -> ShelfSnapshot? {
-        guard let data = try? Data(contentsOf: fileURL),
-              let snapshot = try? JSONDecoder().decode(ShelfSnapshot.self, from: data),
-              Date().timeIntervalSince(snapshot.savedAt) < ttl else { return nil }
-        return snapshot
+    /// The snapshot for a provider page. `ignoreTTL` is the instant-seed path
+    /// (the original's HomeCacheStore: stale-while-refresh with no age limit);
+    /// the TTL-gated read stays as the outage bridge.
+    static func loadHomeShelves(provider: ProviderType? = nil, ignoreTTL: Bool = false) -> ShelfSnapshot? {
+        // Per-provider file first; the pre-v2.31 single snapshot still serves as a
+        // chain-keyed fallback so an upgrading user keeps their cached shelves.
+        let candidates = [fileURL(provider: provider), fileURL(provider: nil)]
+        for url in candidates {
+            if let data = try? Data(contentsOf: url),
+               let snapshot = try? JSONDecoder().decode(ShelfSnapshot.self, from: data),
+               ignoreTTL || Date().timeIntervalSince(snapshot.savedAt) < ttl {
+                return snapshot
+            }
+        }
+        return nil
     }
 }

@@ -698,10 +698,6 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */ = {isa = PBXBui
                 A059508F65B7400595DF13C4 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB9A6134C59C4A32B8003889 /* Haptics.swift */; };
                 7F79015A0ABA4261AA83F778 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB9A6134C59C4A32B8003889 /* Haptics.swift */; };
                 57BF5714069E486B97AA8FBF /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB9A6134C59C4A32B8003889 /* Haptics.swift */; };
-                32DA168EE48448DE9CB5FBB2 /* CustomRefreshControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B960C6896464EEC9886FA2B /* CustomRefreshControl.swift */; };
-                77C010496C1B48E08ACD3FEB /* CustomRefreshControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B960C6896464EEC9886FA2B /* CustomRefreshControl.swift */; };
-                4ECDE91B709E40C4B7131936 /* CustomRefreshControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B960C6896464EEC9886FA2B /* CustomRefreshControl.swift */; };
-                D13549A1608449AF9EBDE353 /* CustomRefreshControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B960C6896464EEC9886FA2B /* CustomRefreshControl.swift */; };
                 AE0E0074652F42FF99D98593 /* app-logo.png in Resources */ = {isa = PBXBuildFile; fileRef = ACCF2A92A85C4B4BA8E11E55 /* app-logo.png */; };
                 41ECBA699CB9404AAE84293C /* app-logo.png in Resources */ = {isa = PBXBuildFile; fileRef = ACCF2A92A85C4B4BA8E11E55 /* app-logo.png */; };
                 3C2CD6ABFBD54C04B88011A9 /* app-logo.png in Resources */ = {isa = PBXBuildFile; fileRef = ACCF2A92A85C4B4BA8E11E55 /* app-logo.png */; };
@@ -876,6 +872,27 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */ = {isa = PBXBui
                 4534EAA6EBAA8ADDB6343896 /* libzstd in Frameworks */ = {isa = PBXBuildFile; productRef = 17FB32D34DDEB0E0E09776CE /* libzstd */; };
                 A06C948886D47E15E4842DF6 /* MPVKit in Frameworks */ = {isa = PBXBuildFile; productRef = C333924C8E6D85D22BFA180C /* MPVKit */; };
                 C4BFF68BBC523AB88DCA3247 /* libzstd in Frameworks */ = {isa = PBXBuildFile; productRef = C482D0E0AC514A00E36EEC7A /* libzstd */; };
+                37FB7D42EE1E99C28D876CCD /* CardTitle.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4A3C0DADA174E6B7E28C4E9 /* CardTitle.swift */; };
+                952A753155924A270DC2F15D /* CardTitle.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4A3C0DADA174E6B7E28C4E9 /* CardTitle.swift */; };
+                3AD6E27B5FE83E5416583D82 /* CardTitle.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4A3C0DADA174E6B7E28C4E9 /* CardTitle.swift */; };
+                3AA0B1C6201AA779B94550C2 /* CinematicDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62A0214488DB2CD6779A918C /* CinematicDetail.swift */; };
+                5ABBE26ACE4695A64F4D001F /* CinematicDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62A0214488DB2CD6779A918C /* CinematicDetail.swift */; };
+                A8EDC45F58E26DDCEFDEA82A /* CinematicDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62A0214488DB2CD6779A918C /* CinematicDetail.swift */; };
+                3F759395F88ABD5DE5A53AF4 /* CircleRefresh.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31FA628A785B49BB2E67CEA4 /* CircleRefresh.swift */; };
+                E991317441B9DA169C456434 /* CircleRefresh.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31FA628A785B49BB2E67CEA4 /* CircleRefresh.swift */; };
+                F69D4F076D5CB8FD06F8860F /* CircleRefresh.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31FA628A785B49BB2E67CEA4 /* CircleRefresh.swift */; };
+                DB56BF5CF9BA736669633C73 /* GooeyRefresh.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D7714C9A6E9CBD6939FC19F /* GooeyRefresh.swift */; };
+                0F7D562D63DBE0D66F4224EE /* GooeyRefresh.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D7714C9A6E9CBD6939FC19F /* GooeyRefresh.swift */; };
+                D5EC6CB4D02357B93617C722 /* GooeyRefresh.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D7714C9A6E9CBD6939FC19F /* GooeyRefresh.swift */; };
+                0B64154B1E2A7C952669E127 /* RefreshLimiter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC657585FC3D3120E7FD45CE /* RefreshLimiter.swift */; };
+                90216DCB221D251272E456CD /* RefreshLimiter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC657585FC3D3120E7FD45CE /* RefreshLimiter.swift */; };
+                9F381E10B6153ECAE7226CE5 /* RefreshLimiter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC657585FC3D3120E7FD45CE /* RefreshLimiter.swift */; };
+                58AE81DAEBFD998D3E8581D3 /* MediaDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3C0CAB104930A91BB8A9F40 /* MediaDestination.swift */; };
+                3DE6722B1EE584B336833FA6 /* MediaDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3C0CAB104930A91BB8A9F40 /* MediaDestination.swift */; };
+                9808704E4AEB705A81E87573 /* MediaDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3C0CAB104930A91BB8A9F40 /* MediaDestination.swift */; };
+                BCDFFEDBCB7CBD40C94E429C /* UpcomingCalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CCA69C05976C635B7D9796C /* UpcomingCalendarView.swift */; };
+                58D4303A72D1CD2CD7B5E10A /* UpcomingCalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CCA69C05976C635B7D9796C /* UpcomingCalendarView.swift */; };
+                401902F346DEE7A8DA54F2F8 /* UpcomingCalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CCA69C05976C635B7D9796C /* UpcomingCalendarView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1142,7 +1159,6 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
                 DE94F57295DC32DA4514938E /* AppleHomeContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleHomeContent.swift; sourceTree = "<group>"; };
                 0A932F6A725797CC0CD0CE4A /* MediaCarousel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaCarousel.swift; sourceTree = "<group>"; };
                 CB9A6134C59C4A32B8003889 /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
-                7B960C6896464EEC9886FA2B /* CustomRefreshControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomRefreshControl.swift; sourceTree = "<group>"; };
                 ACCF2A92A85C4B4BA8E11E55 /* app-logo.png */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = image.png; path = app-logo.png; sourceTree = "<group>"; };
                 4E540997BA864448B082B725 /* SettingsSearchIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSearchIndex.swift; sourceTree = "<group>"; };
                 9F913A366E28436E9B132B7B /* MangaHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MangaHomeView.swift; sourceTree = "<group>"; };
@@ -1191,6 +1207,13 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
                 D543E2A2D8BF2A3E8FE21B10 /* MPVVideoView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MPVVideoView.swift; sourceTree = "<group>"; };
                 0A08E27B4A688BE98644F700 /* PlayerAssOverlay.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayerAssOverlay.swift; sourceTree = "<group>"; };
                 78A498256CCC09BF0F188F4B /* PlayerSubtitleMenu.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayerSubtitleMenu.swift; sourceTree = "<group>"; };
+                C4A3C0DADA174E6B7E28C4E9 /* CardTitle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardTitle.swift; sourceTree = "<group>"; };
+                62A0214488DB2CD6779A918C /* CinematicDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CinematicDetail.swift; sourceTree = "<group>"; };
+                31FA628A785B49BB2E67CEA4 /* CircleRefresh.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CircleRefresh.swift; sourceTree = "<group>"; };
+                0D7714C9A6E9CBD6939FC19F /* GooeyRefresh.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GooeyRefresh.swift; sourceTree = "<group>"; };
+                EC657585FC3D3120E7FD45CE /* RefreshLimiter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefreshLimiter.swift; sourceTree = "<group>"; };
+                E3C0CAB104930A91BB8A9F40 /* MediaDestination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaDestination.swift; sourceTree = "<group>"; };
+                7CCA69C05976C635B7D9796C /* UpcomingCalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpcomingCalendarView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1497,6 +1520,12 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
                 1279E4D72FCA397700C9BA56 /* Shared */ = {
                         isa = PBXGroup;
                         children = (
+                                C4A3C0DADA174E6B7E28C4E9 /* CardTitle.swift */,
+                                62A0214488DB2CD6779A918C /* CinematicDetail.swift */,
+                                31FA628A785B49BB2E67CEA4 /* CircleRefresh.swift */,
+                                0D7714C9A6E9CBD6939FC19F /* GooeyRefresh.swift */,
+                                EC657585FC3D3120E7FD45CE /* RefreshLimiter.swift */,
+                                E3C0CAB104930A91BB8A9F40 /* MediaDestination.swift */,
                                 DC272D4B21A0374FC3081540 /* StaffAndVideosSections.swift */,
                                 2D3190485D774219690E87AD /* UpdateLogPage.swift */,
                                 1251C4582FCAE1AA002AD0B2 /* LegalWebView.swift */,
@@ -1525,7 +1554,6 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */,
                                 DE94F57295DC32DA4514938E /* AppleHomeContent.swift */,
                                 0A932F6A725797CC0CD0CE4A /* MediaCarousel.swift */,
                                 CB9A6134C59C4A32B8003889 /* Haptics.swift */,
-                                7B960C6896464EEC9886FA2B /* CustomRefreshControl.swift */,
                                 4E540997BA864448B082B725 /* SettingsSearchIndex.swift */,
                                 0C1B57D4AEDB48F28A04789C /* AnimationModifiers.swift */,
                                 A15090D8B47044D285B51DCF /* ToggleGlow.swift */,
@@ -1545,6 +1573,7 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */,
                 1279E4E72FCA397700C9BA56 /* Views */ = {
                         isa = PBXGroup;
                         children = (
+                                7CCA69C05976C635B7D9796C /* UpcomingCalendarView.swift */,
                                 1279E4AE2FCA397700C9BA56 /* Downloads */,
                                 1279E4B02FCA397700C9BA56 /* Library */,
                                 1279E4C12FCA397700C9BA56 /* Player */,
@@ -1942,7 +1971,6 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 30184DCC597C0BAF86C1F673 /* AppleHomeContent.swift in Sources */,
                                 5A424D70662EFC40E1125C5A /* MediaCarousel.swift in Sources */,
                                 57BF5714069E486B97AA8FBF /* Haptics.swift in Sources */,
-                                D13549A1608449AF9EBDE353 /* CustomRefreshControl.swift in Sources */,
                                 01A20920D09146A29404813E /* SettingsSearchIndex.swift in Sources */,
                                 AE5D7AE099454F4DBFFA1406 /* MangaHomeView.swift in Sources */,
                                 D9AE76341D1B4FF99675633F /* AppModeManager.swift in Sources */,
@@ -1978,6 +2006,13 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                         isa = PBXSourcesBuildPhase;
                         buildActionMask = 2147483647;
                         files = (
+                                BCDFFEDBCB7CBD40C94E429C /* UpcomingCalendarView.swift in Sources */,
+                                3AA0B1C6201AA779B94550C2 /* CinematicDetail.swift in Sources */,
+                                58AE81DAEBFD998D3E8581D3 /* MediaDestination.swift in Sources */,
+                                0B64154B1E2A7C952669E127 /* RefreshLimiter.swift in Sources */,
+                                3F759395F88ABD5DE5A53AF4 /* CircleRefresh.swift in Sources */,
+                                DB56BF5CF9BA736669633C73 /* GooeyRefresh.swift in Sources */,
+                                37FB7D42EE1E99C28D876CCD /* CardTitle.swift in Sources */,
                                 C94930CB548D39EC9D3DB68A /* PlayerSubtitleMenu.swift in Sources */,
                                 7698C6BC5051D48EC77EC20D /* ZstdDecoder.swift in Sources */,
                                 102EE2C1DD9BD993FDC45312 /* PlaybackEngine.swift in Sources */,
@@ -2203,7 +2238,6 @@ A17F1001000000000000000A /* ForcedUpdateView.swift in Sources */,
                                 09A3FD832C432105D9100005 /* AppleHomeContent.swift in Sources */,
                                 B948544B1B990759A828D918 /* MediaCarousel.swift in Sources */,
                                 7F79015A0ABA4261AA83F778 /* Haptics.swift in Sources */,
-                                4ECDE91B709E40C4B7131936 /* CustomRefreshControl.swift in Sources */,
                                 2E0E8A3882B1417499E1D5FA /* SettingsSearchIndex.swift in Sources */,
                                 1CAC259234054464BCC1E60C /* MangaHomeView.swift in Sources */,
                                 BAAA0A4B15404C19805883A1 /* AppModeManager.swift in Sources */,
@@ -2239,6 +2273,13 @@ A17F1001000000000000000A /* ForcedUpdateView.swift in Sources */,
                         isa = PBXSourcesBuildPhase;
                         buildActionMask = 2147483647;
                         files = (
+                                5ABBE26ACE4695A64F4D001F /* CinematicDetail.swift in Sources */,
+                                3DE6722B1EE584B336833FA6 /* MediaDestination.swift in Sources */,
+                                90216DCB221D251272E456CD /* RefreshLimiter.swift in Sources */,
+                                E991317441B9DA169C456434 /* CircleRefresh.swift in Sources */,
+                                0F7D562D63DBE0D66F4224EE /* GooeyRefresh.swift in Sources */,
+                                952A753155924A270DC2F15D /* CardTitle.swift in Sources */,
+                                58D4303A72D1CD2CD7B5E10A /* UpcomingCalendarView.swift in Sources */,
                                 57A5FF39DD77F9750B46936D /* PlayerSubtitleMenu.swift in Sources */,
                                 04DBEF55EDB77596BB10882B /* ZstdDecoder.swift in Sources */,
                                 A00137A45A0CEF5CE53358BD /* PlaybackEngine.swift in Sources */,
@@ -2466,7 +2507,6 @@ A17F1001000000000000000B /* ForcedUpdateView.swift in Sources */,
                                 06364BC893631B068EDDEED4 /* AppleHomeContent.swift in Sources */,
                                 03B0A35D0DF6739461F417DF /* MediaCarousel.swift in Sources */,
                                 A059508F65B7400595DF13C4 /* Haptics.swift in Sources */,
-                                77C010496C1B48E08ACD3FEB /* CustomRefreshControl.swift in Sources */,
                                 CE8BECC8DB5A46128FE0F71F /* SettingsSearchIndex.swift in Sources */,
                                 49018AF1B1824E1BBB4FBF2F /* MangaHomeView.swift in Sources */,
                                 73E828E8CEDC4F4FADE37960 /* AppModeManager.swift in Sources */,
@@ -2502,6 +2542,13 @@ A17F1001000000000000000B /* ForcedUpdateView.swift in Sources */,
                         isa = PBXSourcesBuildPhase;
                         buildActionMask = 2147483647;
                         files = (
+                                A8EDC45F58E26DDCEFDEA82A /* CinematicDetail.swift in Sources */,
+                                9808704E4AEB705A81E87573 /* MediaDestination.swift in Sources */,
+                                9F381E10B6153ECAE7226CE5 /* RefreshLimiter.swift in Sources */,
+                                F69D4F076D5CB8FD06F8860F /* CircleRefresh.swift in Sources */,
+                                D5EC6CB4D02357B93617C722 /* GooeyRefresh.swift in Sources */,
+                                3AD6E27B5FE83E5416583D82 /* CardTitle.swift in Sources */,
+                                401902F346DEE7A8DA54F2F8 /* UpcomingCalendarView.swift in Sources */,
                                 DF08A3492973808F06D5997D /* PlayerSubtitleMenu.swift in Sources */,
                                 B08FC90349BADE23EDE995CB /* ZstdDecoder.swift in Sources */,
                                 4B83CA001513C5586B4DA164 /* PlaybackEngine.swift in Sources */,
@@ -2730,7 +2777,6 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                 8F4A78588D154291F8B30330 /* AppleHomeContent.swift in Sources */,
                                 FC357250F01E1BE77E5B37C4 /* MediaCarousel.swift in Sources */,
                                 FB3055616FBE4A399FAA8A5D /* Haptics.swift in Sources */,
-                                32DA168EE48448DE9CB5FBB2 /* CustomRefreshControl.swift in Sources */,
                                 9FC65E10AF3F4044AA31F0E7 /* SettingsSearchIndex.swift in Sources */,
                                 9E2601C92E784D40961B5E9A /* MangaHomeView.swift in Sources */,
                                 9EE290864CBC47F394FC0115 /* AppModeManager.swift in Sources */,
