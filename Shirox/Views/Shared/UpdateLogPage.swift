@@ -102,6 +102,41 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.31",
+        date: "2026-10-12",
+        added: [
+            "MPV playback engine: the same dual-engine setup the original has — AVPlayer for what it plays well, MPV for everything else (mkv, webm, avi, flv, wmv, ts and more), with automatic fallback when a stream fails. Pick your preferred engine under Settings \u{2192} Player \u{2192} General.",
+            "Scrambled and disguised video streams now play: encrypted playlists are unscrambled, disguised segments unwrapped, and header-authenticated streams proxied — sources that resolved but never played should now work.",
+            "The original's Library: genre filters, list-position memory (each source and type reopens on the list you left it on), new-episode badges with a red dot for episodes that aired since you last opened a show, 'New Episodes First' sorting, poster-grid layout with progress bars and score capsules, and a swipe or menu action for +1 episode / +1 chapter.",
+            "The original's full entry editor: typed progress, total rewatches/rereads, start and finish dates, custom AniList lists, private notes, the privacy toggle and the per-anime auto-track switch.",
+            "Whole-library synchronization under Settings \u{2192} Library: Sync (merge all ways / copy forward, progress only ever moves forward), Overwrite and Mirror runs between AniList and MyAnimeList — destructive runs show a full preview of every add, change and deletion before they run. 'Mirror edits' replaces the old 'sync edits to both services' switch and carries your setting over.",
+            "First-run onboarding: a live checklist of the two things that make the app work (connect a source, sign in to a tracker) that ticks itself as you go, plus a proper launch animation on every cold start.",
+            "Backup & Restore (Settings \u{2192} Data): a .shiroxbackup file covering preferences, installed modules, Continue Watching / Continue Reading, watch history, your local library and — opt-in — account sign-ins. Each part restores independently; a section that fails is reported and skipped, never taking the rest down with it.",
+            "Modules are tested the moment they're added (and from the row's menu): the app runs one search, one episode list and one stream and reports the verdict — a Cloudflare check is reported as 'needs verification', not broken."
+        ],
+        fixed: [
+            "Saving an entry no longer wipes your MyAnimeList rating: updates that don't change the score now omit it instead of sending 0 (MAL reads 0 as 'remove the rating').",
+            "Rewatching a show no longer flips its local library entry back to Watching; a rewatch stays Rewatching, locally and on AniList/MAL.",
+            "Fixes carried from the original's module system: zstd-compressed responses and browser-impersonated fetches decode, so module extraction and quality lists survive sites that require them."
+        ],
+        changed: [
+            "The Home tab is the original's design: hero carousel with stretch and parallax, gooey pull-to-refresh, page-turn provider transitions, the Upcoming calendar, and the cinematic full-window layout on iPad.",
+            "The Data Sources tab is gone from Settings (as you asked): source management is the Sources page (providers, tokens, AniDB credentials) and the Modules page. The AnimeSchedule token row now lives under Sources \u{2192} Schedule Provider — the schedule chain itself is untouched.",
+            "The Library's own History mode is retired; History remains where it always was on the Home tab."
+        ],
+        improved: [
+            "Playback hardening from the original: 75-second opening patience, segment-failure watching, refetch-then-switch-engine recovery, and hardware-decode retry.",
+            "The Library reopens instantly on its last-saved list and refreshes silently in the background; switching between AniList, MAL, anime and manga is instant when a cached copy exists.",
+            "Subtitle rendering keeps every improvement of this fork (presets, import, per-session styling) and gains the original's embedded-track routing and libass-powered ASS support under MPV.",
+            "Downloads keep their segment folders but gain the original's remux-on-finish where available, plus proxy-side audio-rendition handling."
+        ],
+        removed: [],
+        other: [
+            "The Schedule tab and the Settings layout are otherwise exactly as they were in v2.30 \u{2014} nothing about the timetable chain, tokens or page order changed.",
+            "Your data is untouched: library entries, Continue Watching, progress, settings and sign-ins all carry over; the one setting that moved ('sync edits to both services') is migrated automatically."
+        ]
+    ),
+    UpdateLogEntry(
         version: "2.30",
         date: "2026-10-12",
         added: [],
