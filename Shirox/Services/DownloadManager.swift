@@ -278,9 +278,9 @@ final class DownloadManager: NSObject, ObservableObject {
             playlistKey: stream.playlistKey,
             subtitleURL: stream.subtitleURL,
             subtitleHeaders: stream.subtitleHeaders.isEmpty ? nil : stream.subtitleHeaders,
-            subtitleTracks: Self.subtitleTracks(of: stream),
             state: .pending,
             progress: 0,
+            subtitleTracks: Self.subtitleTracks(of: stream),
             createdAt: Date()
         )
 

@@ -427,23 +427,8 @@ struct PlayerView: View {
             // preference-key offset hack — that collided with the bottom-bar button group in
             // portrait (the "Skip Intro overlaps everything" bug we fixed in v2.15). The button
             // also carries our 5-second auto-dismiss countdown chip.
-            if let segment = activeSkipSegment, !skipButtonAutoDismissed, !isLocked, !castManager.isConnected {
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        PlayerSkipButton(
-                            segmentType: segment,
-                            activatedAt: skipSegmentActivatedAt,
-                            onSkip: skipToSegmentEnd
-                        )
-                    }
-                    .padding(.trailing, 20)
-                    .padding(.bottom, 150)
-                }
-                .ignoresSafeArea()
-                .allowsHitTesting(true)
-                .transition(.opacity)
+            if skipSegmentOverlayVisible {
+                skipSegmentOverlay
             }
 
             // Top-most modal: must sit above interactionLayer / controls so its
@@ -981,6 +966,34 @@ struct PlayerView: View {
         #if os(iOS)
         loadingDismissButton
         #endif
+    }
+
+    /// The skip-intro/outro chip's visibility — a plain Bool kept separate from the view so
+    /// the body's `if` stays a simple condition (type-checker budget).
+    private var skipSegmentOverlayVisible: Bool {
+        activeSkipSegment != nil && !skipButtonAutoDismissed && !isLocked && !castManager.isConnected
+    }
+
+    /// The skip chip itself, bottom-trailing and clear of the caption band and the bottom bar.
+    private var skipSegmentOverlay: some View {
+        VStack {
+            Spacer()
+            HStack {
+                Spacer()
+                if let segment = activeSkipSegment {
+                    PlayerSkipButton(
+                        segmentType: segment,
+                        activatedAt: skipSegmentActivatedAt,
+                        onSkip: skipToSegmentEnd
+                    )
+                }
+            }
+            .padding(.trailing, 20)
+            .padding(.bottom, 150)
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(true)
+        .transition(.opacity)
     }
 
     @ViewBuilder
