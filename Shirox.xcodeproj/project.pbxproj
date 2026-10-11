@@ -678,22 +678,22 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */ = {isa = PBXBui
                 EA699B91BC6B4BCF8B325D40 /* ToastSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ED5C58C75D046CCB3CEEE12 /* ToastSystem.swift */; };
                 F600445A08244B5095556D9D /* ToastSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ED5C58C75D046CCB3CEEE12 /* ToastSystem.swift */; };
                 895B393387144BA2B7146905 /* ToastSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ED5C58C75D046CCB3CEEE12 /* ToastSystem.swift */; };
-		366844F1B89D534618F6B1BB /* MetadataPillRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 487B6180E1663A605389FA55 /* MetadataPillRow.swift */; };
-		99845379B1FDC5993408FB0F /* MetadataPillRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 487B6180E1663A605389FA55 /* MetadataPillRow.swift */; };
-		4C2EE4514602405653E639E6 /* MetadataPillRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 487B6180E1663A605389FA55 /* MetadataPillRow.swift */; };
-		EC2901F3CDBA86689872E396 /* MetadataPillRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 487B6180E1663A605389FA55 /* MetadataPillRow.swift */; };
-		CB5EC3149DD03776FB94E449 /* CharacterPortrait.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FF7632428288FC0BC55D33A /* CharacterPortrait.swift */; };
-		3F8DA85F087325CD072FB2ED /* CharacterPortrait.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FF7632428288FC0BC55D33A /* CharacterPortrait.swift */; };
-		10BC63C8FD8F802F849EFA5E /* CharacterPortrait.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FF7632428288FC0BC55D33A /* CharacterPortrait.swift */; };
-		3B68DF5D5989C5DF3AF1AD58 /* CharacterPortrait.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FF7632428288FC0BC55D33A /* CharacterPortrait.swift */; };
-		30184DCC597C0BAF86C1F673 /* AppleHomeContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE94F57295DC32DA4514938E /* AppleHomeContent.swift */; };
-		09A3FD832C432105D9100005 /* AppleHomeContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE94F57295DC32DA4514938E /* AppleHomeContent.swift */; };
-		06364BC893631B068EDDEED4 /* AppleHomeContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE94F57295DC32DA4514938E /* AppleHomeContent.swift */; };
-		8F4A78588D154291F8B30330 /* AppleHomeContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE94F57295DC32DA4514938E /* AppleHomeContent.swift */; };
-		5A424D70662EFC40E1125C5A /* MediaCarousel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A932F6A725797CC0CD0CE4A /* MediaCarousel.swift */; };
-		B948544B1B990759A828D918 /* MediaCarousel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A932F6A725797CC0CD0CE4A /* MediaCarousel.swift */; };
-		03B0A35D0DF6739461F417DF /* MediaCarousel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A932F6A725797CC0CD0CE4A /* MediaCarousel.swift */; };
-		FC357250F01E1BE77E5B37C4 /* MediaCarousel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A932F6A725797CC0CD0CE4A /* MediaCarousel.swift */; };
+                366844F1B89D534618F6B1BB /* MetadataPillRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 487B6180E1663A605389FA55 /* MetadataPillRow.swift */; };
+                99845379B1FDC5993408FB0F /* MetadataPillRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 487B6180E1663A605389FA55 /* MetadataPillRow.swift */; };
+                4C2EE4514602405653E639E6 /* MetadataPillRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 487B6180E1663A605389FA55 /* MetadataPillRow.swift */; };
+                EC2901F3CDBA86689872E396 /* MetadataPillRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 487B6180E1663A605389FA55 /* MetadataPillRow.swift */; };
+                CB5EC3149DD03776FB94E449 /* CharacterPortrait.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FF7632428288FC0BC55D33A /* CharacterPortrait.swift */; };
+                3F8DA85F087325CD072FB2ED /* CharacterPortrait.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FF7632428288FC0BC55D33A /* CharacterPortrait.swift */; };
+                10BC63C8FD8F802F849EFA5E /* CharacterPortrait.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FF7632428288FC0BC55D33A /* CharacterPortrait.swift */; };
+                3B68DF5D5989C5DF3AF1AD58 /* CharacterPortrait.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FF7632428288FC0BC55D33A /* CharacterPortrait.swift */; };
+                30184DCC597C0BAF86C1F673 /* AppleHomeContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE94F57295DC32DA4514938E /* AppleHomeContent.swift */; };
+                09A3FD832C432105D9100005 /* AppleHomeContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE94F57295DC32DA4514938E /* AppleHomeContent.swift */; };
+                06364BC893631B068EDDEED4 /* AppleHomeContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE94F57295DC32DA4514938E /* AppleHomeContent.swift */; };
+                8F4A78588D154291F8B30330 /* AppleHomeContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE94F57295DC32DA4514938E /* AppleHomeContent.swift */; };
+                5A424D70662EFC40E1125C5A /* MediaCarousel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A932F6A725797CC0CD0CE4A /* MediaCarousel.swift */; };
+                B948544B1B990759A828D918 /* MediaCarousel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A932F6A725797CC0CD0CE4A /* MediaCarousel.swift */; };
+                03B0A35D0DF6739461F417DF /* MediaCarousel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A932F6A725797CC0CD0CE4A /* MediaCarousel.swift */; };
+                FC357250F01E1BE77E5B37C4 /* MediaCarousel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A932F6A725797CC0CD0CE4A /* MediaCarousel.swift */; };
                 FB3055616FBE4A399FAA8A5D /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB9A6134C59C4A32B8003889 /* Haptics.swift */; };
                 A059508F65B7400595DF13C4 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB9A6134C59C4A32B8003889 /* Haptics.swift */; };
                 7F79015A0ABA4261AA83F778 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB9A6134C59C4A32B8003889 /* Haptics.swift */; };
@@ -713,10 +713,10 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */ = {isa = PBXBui
                 73E828E8CEDC4F4FADE37960 /* AppModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 180EA8BB63D54E6BBFCE8E9A /* AppModeManager.swift */; };
                 BAAA0A4B15404C19805883A1 /* AppModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 180EA8BB63D54E6BBFCE8E9A /* AppModeManager.swift */; };
                 D9AE76341D1B4FF99675633F /* AppModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 180EA8BB63D54E6BBFCE8E9A /* AppModeManager.swift */; };
-		9DA3184CF9791D95AD3CD220 /* UIDesignMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F9FB352443C2544C64F2200 /* UIDesignMode.swift */; };
-		876867AD12751CC85ECA143F /* UIDesignMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F9FB352443C2544C64F2200 /* UIDesignMode.swift */; };
-		7B8C7936646922FE21EA7FC4 /* UIDesignMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F9FB352443C2544C64F2200 /* UIDesignMode.swift */; };
-		B5BC638900BFD0DB03526A9E /* UIDesignMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F9FB352443C2544C64F2200 /* UIDesignMode.swift */; };
+                9DA3184CF9791D95AD3CD220 /* UIDesignMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F9FB352443C2544C64F2200 /* UIDesignMode.swift */; };
+                876867AD12751CC85ECA143F /* UIDesignMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F9FB352443C2544C64F2200 /* UIDesignMode.swift */; };
+                7B8C7936646922FE21EA7FC4 /* UIDesignMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F9FB352443C2544C64F2200 /* UIDesignMode.swift */; };
+                B5BC638900BFD0DB03526A9E /* UIDesignMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F9FB352443C2544C64F2200 /* UIDesignMode.swift */; };
                 9B9E10BF51174701A886E01E /* AppUpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB80077A4D92485BBE75B22E /* AppUpdateManager.swift */; };
                 99B13F351A134812AD75DA49 /* AppUpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB80077A4D92485BBE75B22E /* AppUpdateManager.swift */; };
                 AF2335D043404C4E97C5932A /* AppUpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB80077A4D92485BBE75B22E /* AppUpdateManager.swift */; };
@@ -770,50 +770,50 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */ = {isa = PBXBui
                                 C6CE1B5A31348C73AABA02CD /* StaffAndVideosSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC272D4B21A0374FC3081540 /* StaffAndVideosSections.swift */; };
                                 756F68CD2C046ACE7EC4FB28 /* StaffAndVideosSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC272D4B21A0374FC3081540 /* StaffAndVideosSections.swift */; };
                                 229BEF165B3FC43B3A3A3E37 /* StaffAndVideosSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC272D4B21A0374FC3081540 /* StaffAndVideosSections.swift */; };
-		51E375895C444F3ABED4609E /* TVDBProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB34EFEE922491F892DADE3 /* TVDBProvider.swift */; };
-		CAF7C6429D344C89857824F6 /* TVDBProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB34EFEE922491F892DADE3 /* TVDBProvider.swift */; };
-		3C1E2780E3414642A66DF068 /* TVDBProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB34EFEE922491F892DADE3 /* TVDBProvider.swift */; };
-		B33062947557401CA7F093E8 /* TVDBProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB34EFEE922491F892DADE3 /* TVDBProvider.swift */; };
-		4A1D8C6BBB9B6DE766982274 /* AnimeLogoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B9BAD38A50FF93DA27759E7 /* AnimeLogoService.swift */; };
-		CDC2AA2D96A19A2E912D5519 /* AnimeLogoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B9BAD38A50FF93DA27759E7 /* AnimeLogoService.swift */; };
-		96019253F6E7D943010E4F97 /* AnimeLogoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B9BAD38A50FF93DA27759E7 /* AnimeLogoService.swift */; };
-		DEB34BB69F239FFA65B931B1 /* AnimeLogoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B9BAD38A50FF93DA27759E7 /* AnimeLogoService.swift */; };
-		ECA4FF9876F141729684505F /* KitsuProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2BBD98CB78444EEB01BFB76 /* KitsuProvider.swift */; };
-		7A2AFDBBC83F4248AD131BFD /* KitsuProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2BBD98CB78444EEB01BFB76 /* KitsuProvider.swift */; };
-		DBA5B970FB154B4ABECCFE44 /* KitsuProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2BBD98CB78444EEB01BFB76 /* KitsuProvider.swift */; };
-		CDF8655D3C2E49DABD9F42F7 /* KitsuProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2BBD98CB78444EEB01BFB76 /* KitsuProvider.swift */; };
-		504198A72CEE44D194D56738 /* AniDBProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 781091FCDF6A4833B4328100 /* AniDBProvider.swift */; };
-		E3413DFAB4A245EEBBB6A5CF /* AniDBProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 781091FCDF6A4833B4328100 /* AniDBProvider.swift */; };
-		5C9AFAC265A447119B89DBD6 /* AniDBProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 781091FCDF6A4833B4328100 /* AniDBProvider.swift */; };
-		3D144AA73D984FB78F9FFF00 /* AniDBProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 781091FCDF6A4833B4328100 /* AniDBProvider.swift */; };
-		8669A37F3CC4429E972C4170 /* MangaBakaProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 142F2144A810425DB981F42B /* MangaBakaProvider.swift */; };
-		447050E960A84032915D63D0 /* MangaBakaProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 142F2144A810425DB981F42B /* MangaBakaProvider.swift */; };
-		FD70D2C4FBB842D6BE4FA21B /* MangaBakaProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 142F2144A810425DB981F42B /* MangaBakaProvider.swift */; };
-		70580AE3D2E9460B8807F590 /* MangaBakaProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 142F2144A810425DB981F42B /* MangaBakaProvider.swift */; };
-		B2B8D5C672A84F978FC695C8 /* ScheduleProviders.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BAB5E8B3D5348289AB25239 /* ScheduleProviders.swift */; };
-		808A867595684E9F9E2983B9 /* ScheduleProviders.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BAB5E8B3D5348289AB25239 /* ScheduleProviders.swift */; };
-		6A6820DE97FF408CB56642C0 /* ScheduleProviders.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BAB5E8B3D5348289AB25239 /* ScheduleProviders.swift */; };
-		9F7247A7924B4A74AFD7B1C8 /* ScheduleProviders.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BAB5E8B3D5348289AB25239 /* ScheduleProviders.swift */; };
-		E4C20729B0574336A62FFBCF /* UnifiedProviderSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EE1C02020534CC3ACFBDA82 /* UnifiedProviderSystem.swift */; };
-		9727806D7AB9472B942DADDF /* UnifiedProviderSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EE1C02020534CC3ACFBDA82 /* UnifiedProviderSystem.swift */; };
-		0CD7D157FBC142E29D3B8C80 /* UnifiedProviderSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EE1C02020534CC3ACFBDA82 /* UnifiedProviderSystem.swift */; };
-		0D60C779068849A6A2F1FE01 /* UnifiedProviderSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EE1C02020534CC3ACFBDA82 /* UnifiedProviderSystem.swift */; };
-		BEDAA4D199678AD27A12743B /* CharacterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 623F4B3B8B0A01B4110A996E /* CharacterService.swift */; };
-		5E4577316315FE64E49230FE /* CharacterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 623F4B3B8B0A01B4110A996E /* CharacterService.swift */; };
-		4726090BC58DA246C1E2E740 /* CharacterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 623F4B3B8B0A01B4110A996E /* CharacterService.swift */; };
-		B95C102A08038B4C3FB8E082 /* CharacterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 623F4B3B8B0A01B4110A996E /* CharacterService.swift */; };
-		7BD992FAF791273F7D197180 /* KitsuTVDBTimetableService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57A8B6E2BAB5A3203C6082B6 /* KitsuTVDBTimetableService.swift */; };
-		F21D7E9C441DD0767B8663A8 /* KitsuTVDBTimetableService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57A8B6E2BAB5A3203C6082B6 /* KitsuTVDBTimetableService.swift */; };
-		E620FEBA7ECAA92F33F791C8 /* KitsuTVDBTimetableService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57A8B6E2BAB5A3203C6082B6 /* KitsuTVDBTimetableService.swift */; };
-		CA1D8B93F04008540E95C300 /* KitsuTVDBTimetableService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57A8B6E2BAB5A3203C6082B6 /* KitsuTVDBTimetableService.swift */; };
-		ECF92469546E4EA9B13C5225 /* DiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 787DB5DB440C0962E4829173 /* DiscoveryService.swift */; };
-		8EFBEAEAC00EEC727100E47D /* DiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 787DB5DB440C0962E4829173 /* DiscoveryService.swift */; };
-		72D1E8AE4231910B316CA554 /* DiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 787DB5DB440C0962E4829173 /* DiscoveryService.swift */; };
-		9857225A5B00092A9CA08294 /* DiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 787DB5DB440C0962E4829173 /* DiscoveryService.swift */; };
-		3818E7F611B5E389D80B2BDD /* MediaNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BC087EE9207079BA4AE569E /* MediaNormalizer.swift */; };
-		C7FE61B972DA2C48C57591BF /* MediaNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BC087EE9207079BA4AE569E /* MediaNormalizer.swift */; };
-		3C1C0993803DE1CF8E98086F /* MediaNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BC087EE9207079BA4AE569E /* MediaNormalizer.swift */; };
-		CFDD26BCCCE08F19EDD11142 /* MediaNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BC087EE9207079BA4AE569E /* MediaNormalizer.swift */; };
+                51E375895C444F3ABED4609E /* TVDBProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB34EFEE922491F892DADE3 /* TVDBProvider.swift */; };
+                CAF7C6429D344C89857824F6 /* TVDBProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB34EFEE922491F892DADE3 /* TVDBProvider.swift */; };
+                3C1E2780E3414642A66DF068 /* TVDBProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB34EFEE922491F892DADE3 /* TVDBProvider.swift */; };
+                B33062947557401CA7F093E8 /* TVDBProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB34EFEE922491F892DADE3 /* TVDBProvider.swift */; };
+                4A1D8C6BBB9B6DE766982274 /* AnimeLogoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B9BAD38A50FF93DA27759E7 /* AnimeLogoService.swift */; };
+                CDC2AA2D96A19A2E912D5519 /* AnimeLogoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B9BAD38A50FF93DA27759E7 /* AnimeLogoService.swift */; };
+                96019253F6E7D943010E4F97 /* AnimeLogoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B9BAD38A50FF93DA27759E7 /* AnimeLogoService.swift */; };
+                DEB34BB69F239FFA65B931B1 /* AnimeLogoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B9BAD38A50FF93DA27759E7 /* AnimeLogoService.swift */; };
+                ECA4FF9876F141729684505F /* KitsuProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2BBD98CB78444EEB01BFB76 /* KitsuProvider.swift */; };
+                7A2AFDBBC83F4248AD131BFD /* KitsuProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2BBD98CB78444EEB01BFB76 /* KitsuProvider.swift */; };
+                DBA5B970FB154B4ABECCFE44 /* KitsuProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2BBD98CB78444EEB01BFB76 /* KitsuProvider.swift */; };
+                CDF8655D3C2E49DABD9F42F7 /* KitsuProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2BBD98CB78444EEB01BFB76 /* KitsuProvider.swift */; };
+                504198A72CEE44D194D56738 /* AniDBProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 781091FCDF6A4833B4328100 /* AniDBProvider.swift */; };
+                E3413DFAB4A245EEBBB6A5CF /* AniDBProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 781091FCDF6A4833B4328100 /* AniDBProvider.swift */; };
+                5C9AFAC265A447119B89DBD6 /* AniDBProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 781091FCDF6A4833B4328100 /* AniDBProvider.swift */; };
+                3D144AA73D984FB78F9FFF00 /* AniDBProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 781091FCDF6A4833B4328100 /* AniDBProvider.swift */; };
+                8669A37F3CC4429E972C4170 /* MangaBakaProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 142F2144A810425DB981F42B /* MangaBakaProvider.swift */; };
+                447050E960A84032915D63D0 /* MangaBakaProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 142F2144A810425DB981F42B /* MangaBakaProvider.swift */; };
+                FD70D2C4FBB842D6BE4FA21B /* MangaBakaProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 142F2144A810425DB981F42B /* MangaBakaProvider.swift */; };
+                70580AE3D2E9460B8807F590 /* MangaBakaProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 142F2144A810425DB981F42B /* MangaBakaProvider.swift */; };
+                B2B8D5C672A84F978FC695C8 /* ScheduleProviders.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BAB5E8B3D5348289AB25239 /* ScheduleProviders.swift */; };
+                808A867595684E9F9E2983B9 /* ScheduleProviders.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BAB5E8B3D5348289AB25239 /* ScheduleProviders.swift */; };
+                6A6820DE97FF408CB56642C0 /* ScheduleProviders.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BAB5E8B3D5348289AB25239 /* ScheduleProviders.swift */; };
+                9F7247A7924B4A74AFD7B1C8 /* ScheduleProviders.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BAB5E8B3D5348289AB25239 /* ScheduleProviders.swift */; };
+                E4C20729B0574336A62FFBCF /* UnifiedProviderSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EE1C02020534CC3ACFBDA82 /* UnifiedProviderSystem.swift */; };
+                9727806D7AB9472B942DADDF /* UnifiedProviderSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EE1C02020534CC3ACFBDA82 /* UnifiedProviderSystem.swift */; };
+                0CD7D157FBC142E29D3B8C80 /* UnifiedProviderSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EE1C02020534CC3ACFBDA82 /* UnifiedProviderSystem.swift */; };
+                0D60C779068849A6A2F1FE01 /* UnifiedProviderSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EE1C02020534CC3ACFBDA82 /* UnifiedProviderSystem.swift */; };
+                BEDAA4D199678AD27A12743B /* CharacterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 623F4B3B8B0A01B4110A996E /* CharacterService.swift */; };
+                5E4577316315FE64E49230FE /* CharacterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 623F4B3B8B0A01B4110A996E /* CharacterService.swift */; };
+                4726090BC58DA246C1E2E740 /* CharacterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 623F4B3B8B0A01B4110A996E /* CharacterService.swift */; };
+                B95C102A08038B4C3FB8E082 /* CharacterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 623F4B3B8B0A01B4110A996E /* CharacterService.swift */; };
+                7BD992FAF791273F7D197180 /* KitsuTVDBTimetableService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57A8B6E2BAB5A3203C6082B6 /* KitsuTVDBTimetableService.swift */; };
+                F21D7E9C441DD0767B8663A8 /* KitsuTVDBTimetableService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57A8B6E2BAB5A3203C6082B6 /* KitsuTVDBTimetableService.swift */; };
+                E620FEBA7ECAA92F33F791C8 /* KitsuTVDBTimetableService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57A8B6E2BAB5A3203C6082B6 /* KitsuTVDBTimetableService.swift */; };
+                CA1D8B93F04008540E95C300 /* KitsuTVDBTimetableService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57A8B6E2BAB5A3203C6082B6 /* KitsuTVDBTimetableService.swift */; };
+                ECF92469546E4EA9B13C5225 /* DiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 787DB5DB440C0962E4829173 /* DiscoveryService.swift */; };
+                8EFBEAEAC00EEC727100E47D /* DiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 787DB5DB440C0962E4829173 /* DiscoveryService.swift */; };
+                72D1E8AE4231910B316CA554 /* DiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 787DB5DB440C0962E4829173 /* DiscoveryService.swift */; };
+                9857225A5B00092A9CA08294 /* DiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 787DB5DB440C0962E4829173 /* DiscoveryService.swift */; };
+                3818E7F611B5E389D80B2BDD /* MediaNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BC087EE9207079BA4AE569E /* MediaNormalizer.swift */; };
+                C7FE61B972DA2C48C57591BF /* MediaNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BC087EE9207079BA4AE569E /* MediaNormalizer.swift */; };
+                3C1C0993803DE1CF8E98086F /* MediaNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BC087EE9207079BA4AE569E /* MediaNormalizer.swift */; };
+                CFDD26BCCCE08F19EDD11142 /* MediaNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BC087EE9207079BA4AE569E /* MediaNormalizer.swift */; };
                 102EE2C1DD9BD993FDC45312 /* PlaybackEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60B798231DDDA4482EFD7DF /* PlaybackEngine.swift */; };
                 4B83CA001513C5586B4DA164 /* PlaybackEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60B798231DDDA4482EFD7DF /* PlaybackEngine.swift */; };
                 A00137A45A0CEF5CE53358BD /* PlaybackEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60B798231DDDA4482EFD7DF /* PlaybackEngine.swift */; };
@@ -1214,17 +1214,17 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
                 83539AD56A87E95D0B97CAFD /* AnimeNotificationDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimeNotificationDetailView.swift; sourceTree = "<group>"; };
                 2D3190485D774219690E87AD /* UpdateLogPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateLogPage.swift; sourceTree = "<group>"; };
                 DC272D4B21A0374FC3081540 /* StaffAndVideosSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffAndVideosSections.swift; sourceTree = "<group>"; };
-		1AB34EFEE922491F892DADE3 /* TVDBProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVDBProvider.swift; sourceTree = "<group>"; };
-		6B9BAD38A50FF93DA27759E7 /* AnimeLogoService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimeLogoService.swift; sourceTree = "<group>"; };
-		C2BBD98CB78444EEB01BFB76 /* KitsuProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KitsuProvider.swift; sourceTree = "<group>"; };
-		781091FCDF6A4833B4328100 /* AniDBProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniDBProvider.swift; sourceTree = "<group>"; };
-		142F2144A810425DB981F42B /* MangaBakaProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MangaBakaProvider.swift; sourceTree = "<group>"; };
-		1BAB5E8B3D5348289AB25239 /* ScheduleProviders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleProviders.swift; sourceTree = "<group>"; };
-		5EE1C02020534CC3ACFBDA82 /* UnifiedProviderSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnifiedProviderSystem.swift; sourceTree = "<group>"; };
-		623F4B3B8B0A01B4110A996E /* CharacterService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CharacterService.swift; sourceTree = "<group>"; };
-		57A8B6E2BAB5A3203C6082B6 /* KitsuTVDBTimetableService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KitsuTVDBTimetableService.swift; sourceTree = "<group>"; };
-		787DB5DB440C0962E4829173 /* DiscoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoveryService.swift; sourceTree = "<group>"; };
-		0BC087EE9207079BA4AE569E /* MediaNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaNormalizer.swift; sourceTree = "<group>"; };
+                1AB34EFEE922491F892DADE3 /* TVDBProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVDBProvider.swift; sourceTree = "<group>"; };
+                6B9BAD38A50FF93DA27759E7 /* AnimeLogoService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimeLogoService.swift; sourceTree = "<group>"; };
+                C2BBD98CB78444EEB01BFB76 /* KitsuProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KitsuProvider.swift; sourceTree = "<group>"; };
+                781091FCDF6A4833B4328100 /* AniDBProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniDBProvider.swift; sourceTree = "<group>"; };
+                142F2144A810425DB981F42B /* MangaBakaProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MangaBakaProvider.swift; sourceTree = "<group>"; };
+                1BAB5E8B3D5348289AB25239 /* ScheduleProviders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleProviders.swift; sourceTree = "<group>"; };
+                5EE1C02020534CC3ACFBDA82 /* UnifiedProviderSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnifiedProviderSystem.swift; sourceTree = "<group>"; };
+                623F4B3B8B0A01B4110A996E /* CharacterService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CharacterService.swift; sourceTree = "<group>"; };
+                57A8B6E2BAB5A3203C6082B6 /* KitsuTVDBTimetableService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KitsuTVDBTimetableService.swift; sourceTree = "<group>"; };
+                787DB5DB440C0962E4829173 /* DiscoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoveryService.swift; sourceTree = "<group>"; };
+                0BC087EE9207079BA4AE569E /* MediaNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaNormalizer.swift; sourceTree = "<group>"; };
                 D60B798231DDDA4482EFD7DF /* PlaybackEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlaybackEngine.swift; sourceTree = "<group>"; };
                 976920C598CE1A6C087D952F /* AVPlayerEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AVPlayerEngine.swift; sourceTree = "<group>"; };
                 CEF7675FF198EE0091C6488D /* MPVEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MPVEngine.swift; sourceTree = "<group>"; };
@@ -1470,17 +1470,17 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
                                 BB80077A4D92485BBE75B22E /* AppUpdateManager.swift */,
                                 A70A5ACBBFA0410391A8C9F6 /* HistoryManager.swift */,
                                 FB817FD6F25142E088911D9D /* MangaModuleManager.swift */,
-				1AB34EFEE922491F892DADE3 /* TVDBProvider.swift */,
-				6B9BAD38A50FF93DA27759E7 /* AnimeLogoService.swift */,
-				C2BBD98CB78444EEB01BFB76 /* KitsuProvider.swift */,
-				781091FCDF6A4833B4328100 /* AniDBProvider.swift */,
-				142F2144A810425DB981F42B /* MangaBakaProvider.swift */,
-				1BAB5E8B3D5348289AB25239 /* ScheduleProviders.swift */,
-				5EE1C02020534CC3ACFBDA82 /* UnifiedProviderSystem.swift */,
-				623F4B3B8B0A01B4110A996E /* CharacterService.swift */,
-				57A8B6E2BAB5A3203C6082B6 /* KitsuTVDBTimetableService.swift */,
-				787DB5DB440C0962E4829173 /* DiscoveryService.swift */,
-				0BC087EE9207079BA4AE569E /* MediaNormalizer.swift */,
+                                1AB34EFEE922491F892DADE3 /* TVDBProvider.swift */,
+                                6B9BAD38A50FF93DA27759E7 /* AnimeLogoService.swift */,
+                                C2BBD98CB78444EEB01BFB76 /* KitsuProvider.swift */,
+                                781091FCDF6A4833B4328100 /* AniDBProvider.swift */,
+                                142F2144A810425DB981F42B /* MangaBakaProvider.swift */,
+                                1BAB5E8B3D5348289AB25239 /* ScheduleProviders.swift */,
+                                5EE1C02020534CC3ACFBDA82 /* UnifiedProviderSystem.swift */,
+                                623F4B3B8B0A01B4110A996E /* CharacterService.swift */,
+                                57A8B6E2BAB5A3203C6082B6 /* KitsuTVDBTimetableService.swift */,
+                                787DB5DB440C0962E4829173 /* DiscoveryService.swift */,
+                                0BC087EE9207079BA4AE569E /* MediaNormalizer.swift */,
                         );
                         path = Services;
                         sourceTree = "<group>";
@@ -1781,7 +1781,22 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */,
                         path = Reader;
                         sourceTree = "<group>";
                 };
-C44D2451545353874948DF1F
+                C44D2451545353874948DF1F /* Playback */ = {
+                        isa = PBXGroup;
+                        children = (
+                                D60B798231DDDA4482EFD7DF /* PlaybackEngine.swift */,
+                                976920C598CE1A6C087D952F /* AVPlayerEngine.swift */,
+                                F4F397C9FA6A14A5DDD98D3F /* PlaybackFallback.swift */,
+                                12E407E2EB753E5929447BF8 /* MPVOptions.swift */,
+                                CEF7675FF198EE0091C6488D /* MPVEngine.swift */,
+                                934CF6C649A71441C6FC2A54 /* MPVRouter.swift */,
+                                881989087D5AEFEADB010420 /* SubtitleRouting.swift */,
+                                DDE30B9763346F02AE6DEFBB /* AssRenderer.swift */,
+                                0E8B657977876178EDFBEA38 /* TrackPreferences.swift */,
+                        );
+                        path = Playback;
+                        sourceTree = "<group>";
+                };
                 D5F8DE36F46927AA442E5C1B /* Onboarding */ = {
                         isa = PBXGroup;
                         children = (
@@ -1911,8 +1926,8 @@ C44D2451545353874948DF1F
                         mainGroup = 0E44B107A7072B8B23CC975A;
                         minimizedProjectReferenceProxies = 1;
                         packageReferences = (
-1E95D785326020281E9DCAAE
-2338EEEFC73F4EC8953A9F5F
+                                1E95D785326020281E9DCAAE /* XCRemoteSwiftPackageReference "zstd" */,
+                                2338EEEFC73F4EC8953A9F5F /* XCRemoteSwiftPackageReference "MPVKit" */,
                                 1279E5DB2FCA3A1200C9BA56 /* XCRemoteSwiftPackageReference "google-cast-spm" */,
                                 121D9B432FCA53AA000FF9B4 /* XCRemoteSwiftPackageReference "FakeWebKit" */,
                                 0F474E202FE9E7D600FAC2BA /* XCRemoteSwiftPackageReference "Kingfisher" */,
@@ -2064,17 +2079,17 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                                         C94290844B96D63AB48F746E /* AnimeNotificationDetailView.swift in Sources */,
                                 5703C0FFE4EE6FB06C424562 /* UpdateLogPage.swift in Sources */,
                                 485457D1871AC64945A3A565 /* StaffAndVideosSections.swift in Sources */,
-				B33062947557401CA7F093E8 /* TVDBProvider.swift in Sources */,
-				4A1D8C6BBB9B6DE766982274 /* AnimeLogoService.swift in Sources */,
-				CDF8655D3C2E49DABD9F42F7 /* KitsuProvider.swift in Sources */,
-				3D144AA73D984FB78F9FFF00 /* AniDBProvider.swift in Sources */,
-				70580AE3D2E9460B8807F590 /* MangaBakaProvider.swift in Sources */,
-				9F7247A7924B4A74AFD7B1C8 /* ScheduleProviders.swift in Sources */,
-				0D60C779068849A6A2F1FE01 /* UnifiedProviderSystem.swift in Sources */,
-				BEDAA4D199678AD27A12743B /* CharacterService.swift in Sources */,
-				7BD992FAF791273F7D197180 /* KitsuTVDBTimetableService.swift in Sources */,
-				ECF92469546E4EA9B13C5225 /* DiscoveryService.swift in Sources */,
-				3818E7F611B5E389D80B2BDD /* MediaNormalizer.swift in Sources */,
+                                B33062947557401CA7F093E8 /* TVDBProvider.swift in Sources */,
+                                4A1D8C6BBB9B6DE766982274 /* AnimeLogoService.swift in Sources */,
+                                CDF8655D3C2E49DABD9F42F7 /* KitsuProvider.swift in Sources */,
+                                3D144AA73D984FB78F9FFF00 /* AniDBProvider.swift in Sources */,
+                                70580AE3D2E9460B8807F590 /* MangaBakaProvider.swift in Sources */,
+                                9F7247A7924B4A74AFD7B1C8 /* ScheduleProviders.swift in Sources */,
+                                0D60C779068849A6A2F1FE01 /* UnifiedProviderSystem.swift in Sources */,
+                                BEDAA4D199678AD27A12743B /* CharacterService.swift in Sources */,
+                                7BD992FAF791273F7D197180 /* KitsuTVDBTimetableService.swift in Sources */,
+                                ECF92469546E4EA9B13C5225 /* DiscoveryService.swift in Sources */,
+                                3818E7F611B5E389D80B2BDD /* MediaNormalizer.swift in Sources */,
 );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -2343,17 +2358,17 @@ A17F1001000000000000000A /* ForcedUpdateView.swift in Sources */,
                                                         4F053E6E871DD8A501DCC50C /* AnimeNotificationDetailView.swift in Sources */,
                                 A66C21D9758B528ED76D9835 /* UpdateLogPage.swift in Sources */,
                                 C6CE1B5A31348C73AABA02CD /* StaffAndVideosSections.swift in Sources */,
-				3C1E2780E3414642A66DF068 /* TVDBProvider.swift in Sources */,
-				CDC2AA2D96A19A2E912D5519 /* AnimeLogoService.swift in Sources */,
-				DBA5B970FB154B4ABECCFE44 /* KitsuProvider.swift in Sources */,
-				5C9AFAC265A447119B89DBD6 /* AniDBProvider.swift in Sources */,
-				FD70D2C4FBB842D6BE4FA21B /* MangaBakaProvider.swift in Sources */,
-				6A6820DE97FF408CB56642C0 /* ScheduleProviders.swift in Sources */,
-				0CD7D157FBC142E29D3B8C80 /* UnifiedProviderSystem.swift in Sources */,
-				5E4577316315FE64E49230FE /* CharacterService.swift in Sources */,
-				F21D7E9C441DD0767B8663A8 /* KitsuTVDBTimetableService.swift in Sources */,
-				8EFBEAEAC00EEC727100E47D /* DiscoveryService.swift in Sources */,
-				C7FE61B972DA2C48C57591BF /* MediaNormalizer.swift in Sources */,
+                                3C1E2780E3414642A66DF068 /* TVDBProvider.swift in Sources */,
+                                CDC2AA2D96A19A2E912D5519 /* AnimeLogoService.swift in Sources */,
+                                DBA5B970FB154B4ABECCFE44 /* KitsuProvider.swift in Sources */,
+                                5C9AFAC265A447119B89DBD6 /* AniDBProvider.swift in Sources */,
+                                FD70D2C4FBB842D6BE4FA21B /* MangaBakaProvider.swift in Sources */,
+                                6A6820DE97FF408CB56642C0 /* ScheduleProviders.swift in Sources */,
+                                0CD7D157FBC142E29D3B8C80 /* UnifiedProviderSystem.swift in Sources */,
+                                5E4577316315FE64E49230FE /* CharacterService.swift in Sources */,
+                                F21D7E9C441DD0767B8663A8 /* KitsuTVDBTimetableService.swift in Sources */,
+                                8EFBEAEAC00EEC727100E47D /* DiscoveryService.swift in Sources */,
+                                C7FE61B972DA2C48C57591BF /* MediaNormalizer.swift in Sources */,
 );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -2624,17 +2639,17 @@ A17F1001000000000000000B /* ForcedUpdateView.swift in Sources */,
                                                         6BAA3DA7E2E722E5B6159A8F /* AnimeNotificationDetailView.swift in Sources */,
                                 C843276266E1B02BC14E77A1 /* UpdateLogPage.swift in Sources */,
                                 756F68CD2C046ACE7EC4FB28 /* StaffAndVideosSections.swift in Sources */,
-				CAF7C6429D344C89857824F6 /* TVDBProvider.swift in Sources */,
-				96019253F6E7D943010E4F97 /* AnimeLogoService.swift in Sources */,
-				7A2AFDBBC83F4248AD131BFD /* KitsuProvider.swift in Sources */,
-				E3413DFAB4A245EEBBB6A5CF /* AniDBProvider.swift in Sources */,
-				447050E960A84032915D63D0 /* MangaBakaProvider.swift in Sources */,
-				808A867595684E9F9E2983B9 /* ScheduleProviders.swift in Sources */,
-				9727806D7AB9472B942DADDF /* UnifiedProviderSystem.swift in Sources */,
-				4726090BC58DA246C1E2E740 /* CharacterService.swift in Sources */,
-				E620FEBA7ECAA92F33F791C8 /* KitsuTVDBTimetableService.swift in Sources */,
-				72D1E8AE4231910B316CA554 /* DiscoveryService.swift in Sources */,
-				3C1C0993803DE1CF8E98086F /* MediaNormalizer.swift in Sources */,
+                                CAF7C6429D344C89857824F6 /* TVDBProvider.swift in Sources */,
+                                96019253F6E7D943010E4F97 /* AnimeLogoService.swift in Sources */,
+                                7A2AFDBBC83F4248AD131BFD /* KitsuProvider.swift in Sources */,
+                                E3413DFAB4A245EEBBB6A5CF /* AniDBProvider.swift in Sources */,
+                                447050E960A84032915D63D0 /* MangaBakaProvider.swift in Sources */,
+                                808A867595684E9F9E2983B9 /* ScheduleProviders.swift in Sources */,
+                                9727806D7AB9472B942DADDF /* UnifiedProviderSystem.swift in Sources */,
+                                4726090BC58DA246C1E2E740 /* CharacterService.swift in Sources */,
+                                E620FEBA7ECAA92F33F791C8 /* KitsuTVDBTimetableService.swift in Sources */,
+                                72D1E8AE4231910B316CA554 /* DiscoveryService.swift in Sources */,
+                                3C1C0993803DE1CF8E98086F /* MediaNormalizer.swift in Sources */,
 );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -2898,17 +2913,17 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                                         3C04C87F762887C0AF4A356D /* AnimeNotificationDetailView.swift in Sources */,
                                 EB141EEBA4B687995F0CBDB7 /* UpdateLogPage.swift in Sources */,
                                 229BEF165B3FC43B3A3A3E37 /* StaffAndVideosSections.swift in Sources */,
-				51E375895C444F3ABED4609E /* TVDBProvider.swift in Sources */,
-				DEB34BB69F239FFA65B931B1 /* AnimeLogoService.swift in Sources */,
-				ECA4FF9876F141729684505F /* KitsuProvider.swift in Sources */,
-				504198A72CEE44D194D56738 /* AniDBProvider.swift in Sources */,
-				8669A37F3CC4429E972C4170 /* MangaBakaProvider.swift in Sources */,
-				B2B8D5C672A84F978FC695C8 /* ScheduleProviders.swift in Sources */,
-				E4C20729B0574336A62FFBCF /* UnifiedProviderSystem.swift in Sources */,
-				B95C102A08038B4C3FB8E082 /* CharacterService.swift in Sources */,
-				CA1D8B93F04008540E95C300 /* KitsuTVDBTimetableService.swift in Sources */,
-				9857225A5B00092A9CA08294 /* DiscoveryService.swift in Sources */,
-				CFDD26BCCCE08F19EDD11142 /* MediaNormalizer.swift in Sources */,
+                                51E375895C444F3ABED4609E /* TVDBProvider.swift in Sources */,
+                                DEB34BB69F239FFA65B931B1 /* AnimeLogoService.swift in Sources */,
+                                ECA4FF9876F141729684505F /* KitsuProvider.swift in Sources */,
+                                504198A72CEE44D194D56738 /* AniDBProvider.swift in Sources */,
+                                8669A37F3CC4429E972C4170 /* MangaBakaProvider.swift in Sources */,
+                                B2B8D5C672A84F978FC695C8 /* ScheduleProviders.swift in Sources */,
+                                E4C20729B0574336A62FFBCF /* UnifiedProviderSystem.swift in Sources */,
+                                B95C102A08038B4C3FB8E082 /* CharacterService.swift in Sources */,
+                                CA1D8B93F04008540E95C300 /* KitsuTVDBTimetableService.swift in Sources */,
+                                9857225A5B00092A9CA08294 /* DiscoveryService.swift in Sources */,
+                                CFDD26BCCCE08F19EDD11142 /* MediaNormalizer.swift in Sources */,
 );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
