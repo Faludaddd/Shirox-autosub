@@ -28,8 +28,9 @@
       "versions": [
         {
           "version": "2.30",
-          "date": "2026-10-12",
-          "localizedDescription": "v2.30 — The schedule is back to the way it was: AnimeSchedule returns as the timetable source (AniChart → AnimeSchedule → MAL → AniList → Kitsu+TVDB — first source that answers wins), and its API-token row is back under Settings → Data Sources → Schedule; a token you saved before is still stored on your device and reconnects automatically. The Settings layout is unchanged — the Data Sources dashboard, priority screens, provider tests and cache card are exactly as they were. Also fixed: AniList shows 'Sign in again' when it refuses your token, three-digit episode numbers fit their circle, and the screen stays on during playback."
+          "date": "2026-10-11",
+          "localizedDescription": "v2.30 — The schedule is back to the way it was: AnimeSchedule returns as the timetable source (AniChart → AnimeSchedule → MAL → AniList → Kitsu+TVDB — first source that answers wins), and its API-token row is back under Settings → Data Sources → Schedule; a token you saved before is still stored on your device and reconnects automatically. The Settings layout is unchanged — the Data Sources dashboard, priority screens, provider tests and cache card are exactly as they were. Also fixed: AniList shows 'Sign in again' when it refuses your token, three-digit episode numbers fit their circle, and the screen stays on during playback.",
+          "size": 12666576
         },
         {
           "version": "2.29",
