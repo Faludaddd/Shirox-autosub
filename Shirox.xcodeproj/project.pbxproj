@@ -893,6 +893,18 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */ = {isa = PBXBui
                 BCDFFEDBCB7CBD40C94E429C /* UpcomingCalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CCA69C05976C635B7D9796C /* UpcomingCalendarView.swift */; };
                 58D4303A72D1CD2CD7B5E10A /* UpcomingCalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CCA69C05976C635B7D9796C /* UpcomingCalendarView.swift */; };
                 401902F346DEE7A8DA54F2F8 /* UpcomingCalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CCA69C05976C635B7D9796C /* UpcomingCalendarView.swift */; };
+                28BDA8965C1D91955B3BD78B /* LibraryListMemory.swift in Sources */ = {isa = PBXBuildFile; fileRef = E61C24FD91CE887F9588F162 /* LibraryListMemory.swift */; };
+                4F7EA1855BB98E7A704141B1 /* LibraryListMemory.swift in Sources */ = {isa = PBXBuildFile; fileRef = E61C24FD91CE887F9588F162 /* LibraryListMemory.swift */; };
+                B5CA82A9FB0C3B1BA576EB5F /* LibraryListMemory.swift in Sources */ = {isa = PBXBuildFile; fileRef = E61C24FD91CE887F9588F162 /* LibraryListMemory.swift */; };
+                3FCE9A2E8111478BC412C937 /* LibrarySyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6D4488D593D0B711FA06E32 /* LibrarySyncService.swift */; };
+                94B697176EF98978DE15DF49 /* LibrarySyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6D4488D593D0B711FA06E32 /* LibrarySyncService.swift */; };
+                E905B6BA7539F65C8321C3DD /* LibrarySyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6D4488D593D0B711FA06E32 /* LibrarySyncService.swift */; };
+                074D937EBB3DF5A34CCD9F10 /* LibrarySyncPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9970B31153A18CDD095323FB /* LibrarySyncPlanner.swift */; };
+                8D6DC81DF20E6467EBB9BA32 /* LibrarySyncPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9970B31153A18CDD095323FB /* LibrarySyncPlanner.swift */; };
+                FB157A299403D6BF6BC1D083 /* LibrarySyncPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9970B31153A18CDD095323FB /* LibrarySyncPlanner.swift */; };
+                1D7E00496481B46D86C0E530 /* SyncTargets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FCF5D4BE28837126DC12CF1 /* SyncTargets.swift */; };
+                72D3BC415BD6D3245B2A21AC /* SyncTargets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FCF5D4BE28837126DC12CF1 /* SyncTargets.swift */; };
+                D10DC173D3EB3959398A5A65 /* SyncTargets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FCF5D4BE28837126DC12CF1 /* SyncTargets.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1214,6 +1226,10 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
                 EC657585FC3D3120E7FD45CE /* RefreshLimiter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefreshLimiter.swift; sourceTree = "<group>"; };
                 E3C0CAB104930A91BB8A9F40 /* MediaDestination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaDestination.swift; sourceTree = "<group>"; };
                 7CCA69C05976C635B7D9796C /* UpcomingCalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpcomingCalendarView.swift; sourceTree = "<group>"; };
+                E61C24FD91CE887F9588F162 /* LibraryListMemory.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibraryListMemory.swift; sourceTree = "<group>"; };
+                A6D4488D593D0B711FA06E32 /* LibrarySyncService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibrarySyncService.swift; sourceTree = "<group>"; };
+                9970B31153A18CDD095323FB /* LibrarySyncPlanner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibrarySyncPlanner.swift; sourceTree = "<group>"; };
+                1FCF5D4BE28837126DC12CF1 /* SyncTargets.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncTargets.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1322,6 +1338,10 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
                 1279E49F2FCA397700C9BA56 /* Services */ = {
                         isa = PBXGroup;
                         children = (
+                                E61C24FD91CE887F9588F162 /* LibraryListMemory.swift */,
+                                A6D4488D593D0B711FA06E32 /* LibrarySyncService.swift */,
+                                9970B31153A18CDD095323FB /* LibrarySyncPlanner.swift */,
+                                1FCF5D4BE28837126DC12CF1 /* SyncTargets.swift */,
                                 5C08F6988DE355E187F365E4 /* ZstdDecoder.swift */,
                                 0E696EC6140A22B62B4A48B5 /* AirPlaySubtitles.swift */,
                                 EDE73B1CB59832DCFDFF4FC7 /* AppAudioSession.swift */,
@@ -2006,6 +2026,10 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                         isa = PBXSourcesBuildPhase;
                         buildActionMask = 2147483647;
                         files = (
+                                8D6DC81DF20E6467EBB9BA32 /* LibrarySyncPlanner.swift in Sources */,
+                                94B697176EF98978DE15DF49 /* LibrarySyncService.swift in Sources */,
+                                D10DC173D3EB3959398A5A65 /* SyncTargets.swift in Sources */,
+                                28BDA8965C1D91955B3BD78B /* LibraryListMemory.swift in Sources */,
                                 BCDFFEDBCB7CBD40C94E429C /* UpcomingCalendarView.swift in Sources */,
                                 3AA0B1C6201AA779B94550C2 /* CinematicDetail.swift in Sources */,
                                 58AE81DAEBFD998D3E8581D3 /* MediaDestination.swift in Sources */,
@@ -2273,6 +2297,10 @@ A17F1001000000000000000A /* ForcedUpdateView.swift in Sources */,
                         isa = PBXSourcesBuildPhase;
                         buildActionMask = 2147483647;
                         files = (
+                                074D937EBB3DF5A34CCD9F10 /* LibrarySyncPlanner.swift in Sources */,
+                                3FCE9A2E8111478BC412C937 /* LibrarySyncService.swift in Sources */,
+                                72D3BC415BD6D3245B2A21AC /* SyncTargets.swift in Sources */,
+                                4F7EA1855BB98E7A704141B1 /* LibraryListMemory.swift in Sources */,
                                 5ABBE26ACE4695A64F4D001F /* CinematicDetail.swift in Sources */,
                                 3DE6722B1EE584B336833FA6 /* MediaDestination.swift in Sources */,
                                 90216DCB221D251272E456CD /* RefreshLimiter.swift in Sources */,
@@ -2542,6 +2570,10 @@ A17F1001000000000000000B /* ForcedUpdateView.swift in Sources */,
                         isa = PBXSourcesBuildPhase;
                         buildActionMask = 2147483647;
                         files = (
+                                FB157A299403D6BF6BC1D083 /* LibrarySyncPlanner.swift in Sources */,
+                                E905B6BA7539F65C8321C3DD /* LibrarySyncService.swift in Sources */,
+                                1D7E00496481B46D86C0E530 /* SyncTargets.swift in Sources */,
+                                B5CA82A9FB0C3B1BA576EB5F /* LibraryListMemory.swift in Sources */,
                                 A8EDC45F58E26DDCEFDEA82A /* CinematicDetail.swift in Sources */,
                                 9808704E4AEB705A81E87573 /* MediaDestination.swift in Sources */,
                                 9F381E10B6153ECAE7226CE5 /* RefreshLimiter.swift in Sources */,

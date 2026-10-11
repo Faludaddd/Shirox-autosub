@@ -16,9 +16,10 @@ struct LibraryWriteSink: PendingWriteSink {
                 try await MALMangaLibraryService.shared.rawUpdateEntry(
                     malId: w.mediaId ?? 0, status: w.status ?? .current, progress: w.progress ?? 0, score: w.score ?? 0)
             } else {
+                // v2.31 (regression fix): nil score leaves the rating alone; 0 would remove it.
                 try await MALLibraryService.shared.rawUpdateEntry(
                     malId: w.mediaId ?? 0, status: w.status ?? .current, progress: w.progress ?? 0,
-                    score: w.score ?? 0, numTimesRewatched: w.repeatCount)
+                    score: w.score, numTimesRewatched: w.repeatCount)
             }
         case (.mal, .delete):
             if w.mediaType == .manga {

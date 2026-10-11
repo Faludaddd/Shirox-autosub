@@ -1061,13 +1061,16 @@ import Combine
                     do {
                         if incrementRepeat {
                             let newRepeat = (current?.timesRewatched ?? 0) + 1
+                            // v2.31 (regression fix): pass nil, not 0 — MAL reads 0 as
+                            // "remove the rating"; nil leaves the existing rating alone.
                             try await MALLibraryService.shared.updateEntry(
-                                malId: mid, status: status, progress: progress, score: 0,
+                                malId: mid, status: status, progress: progress, score: nil,
                                 numTimesRewatched: newRepeat)
                             Logger.shared.log("[Tracking] MAL rewatch complete: \(status.rawValue) ep \(progress), num_times_rewatched → \(newRepeat)", type: "Info")
                         } else {
-                            try await MALProvider.shared.updateEntry(
-                                mediaId: mid, status: status, progress: progress, score: 0)
+                            // v2.31 (regression fix): nil, not 0 — 0 removes the rating on MAL.
+                            try await MALLibraryService.shared.updateEntry(
+                                malId: mid, status: status, progress: progress, score: nil)
                             Logger.shared.log("[Tracking] MAL update: \(status.rawValue) ep \(progress), malId \(mid)", type: "Info")
                         }
                     } catch {
