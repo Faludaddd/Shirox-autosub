@@ -338,6 +338,13 @@ struct PlayerView: View {
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
+                #if os(iOS)
+                .alert("Save Frame", isPresented: $showFrameSaveAlert) {
+                    Button("OK", role: .cancel) { }
+                } message: {
+                    Text(frameSaveMessage)
+                }
+                #endif
 
             if castManager.isConnected {
                 CastOverlayView(
@@ -439,68 +446,10 @@ struct PlayerView: View {
             }
         }
         .ignoresSafeArea()
-        #if os(iOS)
-        .alert("Save Frame", isPresented: $showFrameSaveAlert) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(frameSaveMessage)
-        }
-        #endif
         .onPreferenceChange(Skip85ButtonFramePreferenceKey.self) { frame in
             if frame != .zero { skip85ButtonFrame = frame }
         }
-        .onAppear {
-            // Back from Picture in Picture, which put the player's screen away and kept it playing.
-            guard !hasAppeared else { return }
-            hasAppeared = true
-            // Sync subtitleTracks from currentStream — safer than relying on init-time @State override
-            if subtitleTracks == nil, let tracks = currentStream.allSubtitles, !tracks.isEmpty {
-                subtitleTracks = tracks
-            }
-            // Load per-show playback speed — remembers the speed the user
-            // last used for this specific anime (our fork's PerShowPlaybackStore).
-            let saved = PerShowPlaybackStore.shared.settings(
-                for: currentContext?.aniListID, malID: currentContext?.malID)
-            if let speed = saved.playbackSpeed, speed > 0 {
-                playbackSpeed = speed
-            }
-            setupPlayer()
-            loadSubtitles()
-            loadTVDBTitle()
-            let needsStreamRefresh = availableStreams.count == 1
-            let needsTrackRefresh = subtitleTracks == nil
-            Logger.shared.log("[Subtitles] onAppear: subtitleTracks=\(subtitleTracks?.count ?? -1) currentStream.allSubtitles=\(currentStream.allSubtitles?.count ?? -1) currentStream.subtitle=\(currentStream.subtitle ?? "nil") needsTrackRefresh=\(needsTrackRefresh) onStreamExpired=\(onStreamExpired != nil)", type: "Debug")
-            if (needsStreamRefresh || needsTrackRefresh), let loader = onStreamExpired {
-                Task {
-                    // Defer this proactive backfill until the first frame is ready. The loader runs
-                    // extractStreamUrl on the @MainActor, and firing it during onAppear starves the
-                    // player's initial item setup + resume seek (also main-actor), stranding playback
-                    // behind a several-second JS extraction even when the stored URL is perfectly
-                    // valid — the "long spinner on a fresh Continue Watching resume" symptom. A
-                    // genuinely dead URL is recovered separately by the .failed KVO path, so deferring
-                    // here only delays metadata backfill (quality list / subtitle tracks), not playback.
-                    await waitForVideoReady()
-                    do {
-                        let streams = try await loader(currentContext?.episodeNumber ?? 1, currentContext?.episodeHref)
-                        Logger.shared.log("[Subtitles] onAppear loader returned \(streams.count) streams; allSubtitles counts: \(streams.map { $0.allSubtitles?.count ?? -1 })", type: "Debug")
-                        guard !streams.isEmpty else { return }
-                        await MainActor.run {
-                            if needsStreamRefresh { availableStreams = streams }
-                            if needsTrackRefresh,
-                               let tracks = streams.compactMap({ $0.allSubtitles }).first(where: { !$0.isEmpty }) {
-                                Logger.shared.log("[Subtitles] onAppear populating subtitleTracks with \(tracks.count) tracks", type: "Debug")
-                                subtitleTracks = tracks
-                                loadSubtitles()
-                            } else if needsTrackRefresh {
-                                Logger.shared.log("[Subtitles] onAppear loader returned streams but none had allSubtitles", type: "Debug")
-                            }
-                        }
-                    } catch {
-                        Logger.shared.log("[Subtitles] onAppear loader failed: \(error)", type: "Error")
-                    }
-                }
-            }
-        }
+        .onAppear(perform: handleFirstAppear)
         .onDisappear {
             #if os(iOS)
             // Put away for Picture in Picture, still playing; it stops when that closes.
@@ -923,6 +872,60 @@ struct PlayerView: View {
         if showControls, now.timeIntervalSince(lastPointerActivity) < 0.4 { return }
         lastPointerActivity = now
         handleMouseActivity()
+    }
+
+    /// First-appear setup, extracted from `body`'s modifier chain — the merged chain was past
+    /// the type-checker's reasonable-time budget (time-outs reported at the chain before this).
+    private func handleFirstAppear() {
+        // Back from Picture in Picture, which put the player's screen away and kept it playing.
+        guard !hasAppeared else { return }
+        hasAppeared = true
+        // Sync subtitleTracks from currentStream — safer than relying on init-time @State override
+        if subtitleTracks == nil, let tracks = currentStream.allSubtitles, !tracks.isEmpty {
+            subtitleTracks = tracks
+        }
+        // Load per-show playback speed — remembers the speed the user
+        // last used for this specific anime (our fork's PerShowPlaybackStore).
+        let saved = PerShowPlaybackStore.shared.settings(
+            for: currentContext?.aniListID, malID: currentContext?.malID)
+        if let speed = saved.playbackSpeed, speed > 0 {
+            playbackSpeed = speed
+        }
+        setupPlayer()
+        loadSubtitles()
+        loadTVDBTitle()
+        let needsStreamRefresh = availableStreams.count == 1
+        let needsTrackRefresh = subtitleTracks == nil
+        Logger.shared.log("[Subtitles] onAppear: subtitleTracks=\(subtitleTracks?.count ?? -1) currentStream.allSubtitles=\(currentStream.allSubtitles?.count ?? -1) currentStream.subtitle=\(currentStream.subtitle ?? "nil") needsTrackRefresh=\(needsTrackRefresh) onStreamExpired=\(onStreamExpired != nil)", type: "Debug")
+        guard needsStreamRefresh || needsTrackRefresh, let loader = onStreamExpired else { return }
+        Task {
+            // Defer this proactive backfill until the first frame is ready. The loader runs
+            // extractStreamUrl on the @MainActor, and firing it during onAppear starves the
+            // player's initial item setup + resume seek (also main-actor), stranding playback
+            // behind a several-second JS extraction even when the stored URL is perfectly
+            // valid — the "long spinner on a fresh Continue Watching resume" symptom. A
+            // genuinely dead URL is recovered separately by the .failed KVO path, so deferring
+            // here only delays metadata backfill (quality list / subtitle tracks), not playback.
+            await waitForVideoReady()
+            do {
+                let streams = try await loader(currentContext?.episodeNumber ?? 1, currentContext?.episodeHref)
+                Logger.shared.log("[Subtitles] onAppear loader returned \(streams.count) streams; allSubtitles counts: \(streams.map { $0.allSubtitles?.count ?? -1 })", type: "Debug")
+                guard !streams.isEmpty else { return }
+                await MainActor.run {
+                    if needsStreamRefresh { availableStreams = streams }
+                    if needsTrackRefresh,
+                       let tracks = streams.compactMap({ $0.allSubtitles }).first(where: { !$0.isEmpty }) {
+                        Logger.shared.log("[Subtitles] onAppear populating subtitleTracks with \(tracks.count) tracks", type: "Debug")
+                        subtitleTracks = tracks
+                        loadSubtitles()
+                    } else if needsTrackRefresh {
+                        Logger.shared.log("[Subtitles] onAppear loader returned streams but none had allSubtitles", type: "Debug")
+                    }
+                }
+            } catch {
+                Logger.shared.log("[Subtitles] onAppear loader failed: \(error)", type: "Error")
+            }
+        }
     }
 
     // MARK: - Extracted UI Components
