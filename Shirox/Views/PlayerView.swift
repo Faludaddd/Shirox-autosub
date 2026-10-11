@@ -465,28 +465,7 @@ struct PlayerView: View {
             tearDown()
         }
         #endif
-        .onChangeOf(isPlaying) { playing in
-            #if os(iOS)
-            // The screen stays on while a video plays. AVPlayer's own display-sleep prevention
-            // didn't hold on iOS 26 (the screen dimmed mid-episode), and mpv has none at all.
-            UIApplication.shared.isIdleTimerDisabled = playing
-            #elseif os(macOS)
-            // Nor does a Mac's display sleep, or its screen saver start, mid-episode — mpv doesn't
-            // stop either by itself.
-            if playing { MacDisplaySleep.prevent() } else { MacDisplaySleep.allow() }
-            #endif
-            // On a Mac the controls and the pointer go away together while playing and come
-            // back on a pause. Not on iPhone or iPad, where a pause from Control Center or a
-            // call shouldn't bring the controls up.
-            guard MouseCursorManager.isSupported else { return }
-            if playing {
-                scheduleHide()
-            } else {
-                hideTask?.cancel()
-                setControlsVisible(true)
-                MouseCursorManager.unhide()
-            }
-        }
+        .onChangeOf(isPlaying, perform: handlePlayingChanged(_:))
         .onChangeOf(volume) { newVolume in
             engine?.volume = newVolume
             castManager.setVolume(newVolume)
@@ -603,97 +582,10 @@ struct PlayerView: View {
             resumeAfterInactivePause()
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
-            guard let engine else { return }
-            // While casting, `isPlaying` mirrors the Chromecast's state and the local
-            // player must stay silent — never resume it on foreground or you get audio
-            // from both the device and the TV.
-            if castManager.isConnected {
-                engine.pause()
-                return
-            }
-            // If we return still intending to play, another app may have taken audio focus while
-            // we were backgrounded and deactivated our session — a player without an active
-            // session wedges in .waitingToPlayAtSpecifiedRate (black frame, no audio, forever).
-            // Reclaim focus before the resume-seek below. Gated on isPlaying so returning to a
-            // player the user left PAUSED doesn't needlessly silence their music; the paused
-            // recovery paths reactivate the session themselves when they actually rebuild.
-            if isPlaying {
-                AppAudioSession.activate()
-            }
-            // How long we were actually suspended (didEnterBackground → now). A transient
-            // resign-active never set backgroundedAt, so it reads 0 and we take the cheap path.
-            let suspendedFor = backgroundedAt.map { Date().timeIntervalSince($0) } ?? 0
-            backgroundedAt = nil
-            // Once iOS suspends us the forward buffer is evicted and the source dies — a
-            // streaming CDN URL expires, a download's localhost HLS proxy loses its sockets. A
-            // PAUSED player has no stall watchdog (it never enters .waitingToPlayAtSpecifiedRate),
-            // so the resume-seek below just wedges on the dead source: black frame, infinite
-            // spinner, no recovery. (The PLAYING case self-heals — the watchdog escalates to a
-            // refetch.) So when we come back paused after a real suspension, proactively
-            // re-resolve the source. recoverByRefetch preserves position and keeps us paused.
-            // Decision (thresholds, paused-only, recoverable) is unit-tested in
-            // PlayerForegroundRecoveryTests.
-            if PlayerForegroundRecovery.shouldRecoverOnForeground(
-                suspendedFor: suspendedFor,
-                isPlaying: isPlaying,
-                isLocalPlayback: isLocalPlayback,
-                canRecoverStream: canRecoverStream
-            ) {
-                Task { @MainActor in await recoverPlayback() }
-                return
-            }
-            // Back from Picture in Picture, or from background audio, still playing: it was never
-            // suspended, and the seek below would only cut its sound out for a second.
-            guard PlayerForegroundRecovery.needsResumeNudge(isPlaying: isPlaying, timeControl: engine.timeControl) else { return }
-            engine.seek(to: currentTime, precision: .exact, completion: nil)
-            if isPlaying {
-                engine.rate = Float(playbackSpeed)
-                // After a long suspension the forward buffer is gone and the CDN URL may
-                // have expired, so this resume can stall indefinitely. The watchdog armed
-                // before suspension ran on a frozen timer and is unreliable; arm a fresh
-                // one now that timers run again so an unrecoverable stall escalates to a
-                // refetch instead of spinning forever. If playback resumes cleanly the
-                // rate observer cancels it (position advances / status goes .playing).
-                cancelStallWatchdog(resetAttempts: false)
-                startStallWatchdog()
-            }
-            // A downloaded episode is served by the localhost HLS proxy, whose sockets the OS
-            // kills across a long suspension. AVPlayer often surfaces that as a hard .failed
-            // (not a stall), which the watchdog never catches — the player just sits dead until
-            // the user restarts the episode. Recover immediately when we come back failed.
-            if canRecoverStream, engine.isItemFailed {
-                Task { @MainActor in await recoverPlayback() }
-            }
+            handleWillEnterForeground()
         }
         .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification).receive(on: RunLoop.main)) { note in
-            // A call, Siri, an alarm, or another media app deactivates our audio session
-            // and pauses the player. Without this the player stays dead after the
-            // interruption ends — the exact "stops working after returning" symptom when
-            // the interruption coincides with backgrounding.
-            guard let info = note.userInfo,
-                  let rawType = info[AVAudioSessionInterruptionTypeKey] as? UInt,
-                  let type = AVAudioSession.InterruptionType(rawValue: rawType) else { return }
-            switch type {
-            case .began:
-                // The system has already paused us; remember whether we owe a resume.
-                wasPlayingBeforeInterruption = isPlaying
-            case .ended:
-                guard wasPlayingBeforeInterruption else { return }
-                wasPlayingBeforeInterruption = false
-                // While casting, the local player must stay silent (audio comes from the TV).
-                if castManager.isConnected { return }
-                // Only resume if the system says it's appropriate (e.g. call ended, not
-                // a permanent takeover by another media app).
-                let shouldResume = (info[AVAudioSessionInterruptionOptionKey] as? UInt)
-                    .map { AVAudioSession.InterruptionOptions(rawValue: $0).contains(.shouldResume) } ?? false
-                guard shouldResume else { return }
-                // The session was deactivated during the interruption — reactivate before resuming.
-                AppAudioSession.activate(notifyingOthers: false)
-                engine?.rate = Float(playbackSpeed)
-                isPlaying = true
-            @unknown default:
-                break
-            }
+            handleAudioInterruption(note)
         }
         .onReceive(NotificationCenter.default.publisher(for: UIWindow.didBecomeKeyNotification)) { _ in
             // A bottom-bar menu is hosted by iOS in its own window; when it closes, our window
@@ -725,19 +617,7 @@ struct PlayerView: View {
         }
         #endif
         .sheet(isPresented: $showSubtitleSettings) {
-            PlayerSubtitleSettingsView(
-                settings: subtitleSettings,
-                availableTracks: subtitleTracks,
-                selectedTrack: Binding(get: { shownSubtitleTrack }, set: { pickSubtitleTrack($0) }),
-                allowLocalImport: canImportSubtitles,
-                onImport: { addImportedSubtitle(keptWithDownload($0) ?? $0) },
-                embeddedTracks: embeddedSubtitles,
-                selectedEmbedded: shownEmbeddedSubtitle,
-                onSelectEmbedded: { pickEmbeddedSubtitle($0) },
-                showsStyledNote: subtitleRoute == .assOverlay || subtitleRoute == .mpvScript
-                    || shownEmbeddedSubtitle != nil
-            )
-            .id(subtitleTracks?.count ?? 0)            .adaptivePresentationDetents([.medium, .large])
+            subtitleSettingsSheet
         }
         #if !os(tvOS)
         .fileImporter(isPresented: $showSubtitleImporter,
@@ -773,18 +653,13 @@ struct PlayerView: View {
             nextEpisodeNumber = 0
             nextEpisodeHref = nil
         }) {
-            PlayerNextEpisodePicker(streams: nextEpisodeStreams) { selected in
-                swapStream(selected, episodeNumber: nextEpisodeNumber, allStreams: nextEpisodeStreams, episodeHref: nextEpisodeHref)
-            }
-            .adaptivePresentationDetents([.height(nextEpisodePickerHeight)])
+            nextEpisodePickerSheet
         }
         .sheet(isPresented: $showSequelPicker, onDismiss: {
             sequelResults = []
             pendingSequelMediaID = nil
         }) {
-            PlayerSequelPickerSheet(results: sequelResults) { selected in
-                advanceToSequel(selected)
-            }            .adaptivePresentationDetents([.medium])
+            sequelPickerSheet
         }
         .playerKeyboardShortcuts(
             togglePlayPause: togglePlayPause,
@@ -928,7 +803,162 @@ struct PlayerView: View {
         }
     }
 
+    /// Play/pause changes, extracted from `body`'s modifier chain (type-checker budget):
+    /// display-sleep prevention per platform, and on a Mac the controls and pointer go away
+    /// together while playing and come back on a pause. Not on iPhone or iPad, where a pause
+    /// from Control Center or a call shouldn't bring the controls up.
+    private func handlePlayingChanged(_ playing: Bool) {
+        #if os(iOS)
+        // The screen stays on while a video plays. AVPlayer's own display-sleep prevention
+        // didn't hold on iOS 26 (the screen dimmed mid-episode), and mpv has none at all.
+        UIApplication.shared.isIdleTimerDisabled = playing
+        #elseif os(macOS)
+        // Nor does a Mac's display sleep, or its screen saver start, mid-episode — mpv doesn't
+        // stop either by itself.
+        if playing { MacDisplaySleep.prevent() } else { MacDisplaySleep.allow() }
+        #endif
+        guard MouseCursorManager.isSupported else { return }
+        if playing {
+            scheduleHide()
+        } else {
+            hideTask?.cancel()
+            setControlsVisible(true)
+            MouseCursorManager.unhide()
+        }
+    }
+
+    /// Foreground return, extracted from `body`'s modifier chain (type-checker budget).
+    private func handleWillEnterForeground() {
+        guard let engine else { return }
+        // While casting, `isPlaying` mirrors the Chromecast's state and the local
+        // player must stay silent — never resume it on foreground or you get audio
+        // from both the device and the TV.
+        if castManager.isConnected {
+            engine.pause()
+            return
+        }
+        // If we return still intending to play, another app may have taken audio focus while
+        // we were backgrounded and deactivated our session — a player without an active
+        // session wedges in .waitingToPlayAtSpecifiedRate (black frame, no audio, forever).
+        // Reclaim focus before the resume-seek below. Gated on isPlaying so returning to a
+        // player the user left PAUSED doesn't needlessly silence their music; the paused
+        // recovery paths reactivate the session themselves when they actually rebuild.
+        if isPlaying {
+            AppAudioSession.activate()
+        }
+        // How long we were actually suspended (didEnterBackground → now). A transient
+        // resign-active never set backgroundedAt, so it reads 0 and we take the cheap path.
+        let suspendedFor = backgroundedAt.map { Date().timeIntervalSince($0) } ?? 0
+        backgroundedAt = nil
+        // Once iOS suspends us the forward buffer is evicted and the source dies — a
+        // streaming CDN URL expires, a download's localhost HLS proxy loses its sockets. A
+        // PAUSED player has no stall watchdog (it never enters .waitingToPlayAtSpecifiedRate),
+        // so the resume-seek below just wedges on the dead source: black frame, infinite
+        // spinner, no recovery. (The PLAYING case self-heals — the watchdog escalates to a
+        // refetch.) So when we come back paused after a real suspension, proactively
+        // re-resolve the source. recoverByRefetch preserves position and keeps us paused.
+        // Decision (thresholds, paused-only, recoverable) is unit-tested in
+        // PlayerForegroundRecoveryTests.
+        if PlayerForegroundRecovery.shouldRecoverOnForeground(
+            suspendedFor: suspendedFor,
+            isPlaying: isPlaying,
+            isLocalPlayback: isLocalPlayback,
+            canRecoverStream: canRecoverStream
+        ) {
+            Task { @MainActor in await recoverPlayback() }
+            return
+        }
+        // Back from Picture in Picture, or from background audio, still playing: it was never
+        // suspended, and the seek below would only cut its sound out for a second.
+        guard PlayerForegroundRecovery.needsResumeNudge(isPlaying: isPlaying, timeControl: engine.timeControl) else { return }
+        engine.seek(to: currentTime, precision: .exact, completion: nil)
+        if isPlaying {
+            engine.rate = Float(playbackSpeed)
+            // After a long suspension the forward buffer is gone and the CDN URL may
+            // have expired, so this resume can stall indefinitely. The watchdog armed
+            // before suspension ran on a frozen timer and is unreliable; arm a fresh
+            // one now that timers run again so an unrecoverable stall escalates to a
+            // refetch instead of spinning forever. If playback resumes cleanly the
+            // rate observer cancels it (position advances / status goes .playing).
+            cancelStallWatchdog(resetAttempts: false)
+            startStallWatchdog()
+        }
+        // A downloaded episode is served by the localhost HLS proxy, whose sockets the OS
+        // kills across a long suspension. AVPlayer often surfaces that as a hard .failed
+        // (not a stall), which the watchdog never catches — the player just sits dead until
+        // the user restarts the episode. Recover immediately when we come back failed.
+        if canRecoverStream, engine.isItemFailed {
+            Task { @MainActor in await recoverPlayback() }
+        }
+    }
+
+    /// Audio-session interruptions (a call, Siri, an alarm, or another media app), extracted
+    /// from `body`'s modifier chain (type-checker budget). Without this the player stays dead
+    /// after the interruption ends — the exact "stops working after returning" symptom when
+    /// the interruption coincides with backgrounding.
+    private func handleAudioInterruption(_ note: Notification) {
+        guard let info = note.userInfo,
+              let rawType = info[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: rawType) else { return }
+        switch type {
+        case .began:
+            // The system has already paused us; remember whether we owe a resume.
+            wasPlayingBeforeInterruption = isPlaying
+        case .ended:
+            guard wasPlayingBeforeInterruption else { return }
+            wasPlayingBeforeInterruption = false
+            // While casting, the local player must stay silent (audio comes from the TV).
+            if castManager.isConnected { return }
+            // Only resume if the system says it's appropriate (e.g. call ended, not
+            // a permanent takeover by another media app).
+            let shouldResume = (info[AVAudioSessionInterruptionOptionKey] as? UInt)
+                .map { AVAudioSession.InterruptionOptions(rawValue: $0).contains(.shouldResume) } ?? false
+            guard shouldResume else { return }
+            // The session was deactivated during the interruption — reactivate before resuming.
+            AppAudioSession.activate(notifyingOthers: false)
+            engine?.rate = Float(playbackSpeed)
+            isPlaying = true
+        @unknown default:
+            break
+        }
+    }
+
     // MARK: - Extracted UI Components
+
+    /// The subtitle settings sheet's content, extracted from `body`'s modifier chain
+    /// (type-checker budget).
+    private var subtitleSettingsSheet: some View {
+        PlayerSubtitleSettingsView(
+            settings: subtitleSettings,
+            availableTracks: subtitleTracks,
+            selectedTrack: Binding(get: { shownSubtitleTrack }, set: { pickSubtitleTrack($0) }),
+            allowLocalImport: canImportSubtitles,
+            onImport: { addImportedSubtitle(keptWithDownload($0) ?? $0) },
+            embeddedTracks: embeddedSubtitles,
+            selectedEmbedded: shownEmbeddedSubtitle,
+            onSelectEmbedded: { pickEmbeddedSubtitle($0) },
+            showsStyledNote: subtitleRoute == .assOverlay || subtitleRoute == .mpvScript
+                || shownEmbeddedSubtitle != nil
+        )
+        .id(subtitleTracks?.count ?? 0)
+        .adaptivePresentationDetents([.medium, .large])
+    }
+
+    /// The Up Next episode picker sheet's content, extracted from `body`'s modifier chain.
+    private var nextEpisodePickerSheet: some View {
+        PlayerNextEpisodePicker(streams: nextEpisodeStreams) { selected in
+            swapStream(selected, episodeNumber: nextEpisodeNumber, allStreams: nextEpisodeStreams, episodeHref: nextEpisodeHref)
+        }
+        .adaptivePresentationDetents([.height(nextEpisodePickerHeight)])
+    }
+
+    /// The sequel picker sheet's content, extracted from `body`'s modifier chain.
+    private var sequelPickerSheet: some View {
+        PlayerSequelPickerSheet(results: sequelResults) { selected in
+            advanceToSequel(selected)
+        }
+        .adaptivePresentationDetents([.medium])
+    }
 
     /// The subtitle layers and buffering indicator, pulled out of `body` proper: the merged
     /// engine-switching body sits past the type-checker's reasonable-time budget, and every
