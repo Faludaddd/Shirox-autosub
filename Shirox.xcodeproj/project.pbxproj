@@ -356,6 +356,24 @@
                 F1AB924A028C0E25691FE092 /* CopyTitle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9B9C4B7F8CC17DCA4244990 /* CopyTitle.swift */; };
                 2EBFA0A47C32A4C438A0D324 /* CopyTitle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9B9C4B7F8CC17DCA4244990 /* CopyTitle.swift */; };
                 AE08652BAC34A34294246221 /* CopyTitle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9B9C4B7F8CC17DCA4244990 /* CopyTitle.swift */; };
+		3AA0B1C6201AA779B94550C2 /* CinematicDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62A0214488DB2CD6779A918C /* CinematicDetail.swift */; };
+		5ABBE26ACE4695A64F4D001F /* CinematicDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62A0214488DB2CD6779A918C /* CinematicDetail.swift */; };
+		A8EDC45F58E26DDCEFDEA82A /* CinematicDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62A0214488DB2CD6779A918C /* CinematicDetail.swift */; };
+		58AE81DAEBFD998D3E8581D3 /* MediaDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3C0CAB104930A91BB8A9F40 /* MediaDestination.swift */; };
+		3DE6722B1EE584B336833FA6 /* MediaDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3C0CAB104930A91BB8A9F40 /* MediaDestination.swift */; };
+		9808704E4AEB705A81E87573 /* MediaDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3C0CAB104930A91BB8A9F40 /* MediaDestination.swift */; };
+		0B64154B1E2A7C952669E127 /* RefreshLimiter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC657585FC3D3120E7FD45CE /* RefreshLimiter.swift */; };
+		90216DCB221D251272E456CD /* RefreshLimiter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC657585FC3D3120E7FD45CE /* RefreshLimiter.swift */; };
+		9F381E10B6153ECAE7226CE5 /* RefreshLimiter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC657585FC3D3120E7FD45CE /* RefreshLimiter.swift */; };
+		3F759395F88ABD5DE5A53AF4 /* CircleRefresh.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31FA628A785B49BB2E67CEA4 /* CircleRefresh.swift */; };
+		E991317441B9DA169C456434 /* CircleRefresh.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31FA628A785B49BB2E67CEA4 /* CircleRefresh.swift */; };
+		F69D4F076D5CB8FD06F8860F /* CircleRefresh.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31FA628A785B49BB2E67CEA4 /* CircleRefresh.swift */; };
+		DB56BF5CF9BA736669633C73 /* GooeyRefresh.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D7714C9A6E9CBD6939FC19F /* GooeyRefresh.swift */; };
+		0F7D562D63DBE0D66F4224EE /* GooeyRefresh.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D7714C9A6E9CBD6939FC19F /* GooeyRefresh.swift */; };
+		D5EC6CB4D02357B93617C722 /* GooeyRefresh.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D7714C9A6E9CBD6939FC19F /* GooeyRefresh.swift */; };
+		37FB7D42EE1E99C28D876CCD /* CardTitle.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4A3C0DADA174E6B7E28C4E9 /* CardTitle.swift */; };
+		952A753155924A270DC2F15D /* CardTitle.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4A3C0DADA174E6B7E28C4E9 /* CardTitle.swift */; };
+		3AD6E27B5FE83E5416583D82 /* CardTitle.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4A3C0DADA174E6B7E28C4E9 /* CardTitle.swift */; };
                 99E5E18EA31431732038AD72 /* PosterViewer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F5E22F3922DEDB01A89A0B0 /* PosterViewer.swift */; };
 A17F1001000000000000000A /* ForcedUpdateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17F1001000000000000000D /* ForcedUpdateView.swift */; };
 A17F1001000000000000000B /* ForcedUpdateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17F1001000000000000000D /* ForcedUpdateView.swift */; };
@@ -381,6 +399,12 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */ = {isa = PBXBui
                 1279E5AE2FCA397700C9BA56 /* ContentUnavailableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4CF2FCA397700C9BA56 /* ContentUnavailableView.swift */; };
                 1279E5AF2FCA397700C9BA56 /* VTTSubtitlesLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E49D2FCA397700C9BA56 /* VTTSubtitlesLoader.swift */; };
                 1279E5B02FCA397700C9BA56 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4DE2FCA397700C9BA56 /* HomeView.swift */; };
+		785CE07D4E211E16252FCFA2 /* BackupSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EE0549196228898709C79E6 /* BackupSettingsView.swift */; };
+		FEC6643250A678DA6C563828 /* BackupSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EE0549196228898709C79E6 /* BackupSettingsView.swift */; };
+		4E411D4931B5251EA88B8F86 /* BackupSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EE0549196228898709C79E6 /* BackupSettingsView.swift */; };
+		BCDFFEDBCB7CBD40C94E429C /* UpcomingCalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CCA69C05976C635B7D9796C /* UpcomingCalendarView.swift */; };
+		58D4303A72D1CD2CD7B5E10A /* UpcomingCalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CCA69C05976C635B7D9796C /* UpcomingCalendarView.swift */; };
+		401902F346DEE7A8DA54F2F8 /* UpcomingCalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CCA69C05976C635B7D9796C /* UpcomingCalendarView.swift */; };
                 1279E5B12FCA397700C9BA56 /* PlayerTimeFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4BE2FCA397700C9BA56 /* PlayerTimeFormat.swift */; };
                 1279E5B22FCA397700C9BA56 /* LikesSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4C42FCA397700C9BA56 /* LikesSheetView.swift */; };
                 1279E5B32FCA397700C9BA56 /* StreamResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4742FCA397700C9BA56 /* StreamResult.swift */; };
@@ -396,6 +420,9 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */ = {isa = PBXBui
                 1279E5BD2FCA397700C9BA56 /* PlayerSkipButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4BA2FCA397700C9BA56 /* PlayerSkipButton.swift */; };
                 1279E5BE2FCA397700C9BA56 /* WatchHistoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E49E2FCA397700C9BA56 /* WatchHistoryService.swift */; };
                 1279E5BF2FCA397700C9BA56 /* Media.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E46E2FCA397700C9BA56 /* Media.swift */; };
+		88A3B8D8603A4CD39AAE889E /* BackupEnvelope.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BEC8F30221A0D707EA2996E /* BackupEnvelope.swift */; };
+		089D6232A50C822AF97A8955 /* BackupEnvelope.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BEC8F30221A0D707EA2996E /* BackupEnvelope.swift */; };
+		C20267013032003AA6B7D9A2 /* BackupEnvelope.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BEC8F30221A0D707EA2996E /* BackupEnvelope.swift */; };
                 1279E5C02FCA397700C9BA56 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4E42FCA397700C9BA56 /* SettingsView.swift */; };
                 1279E5C12FCA397700C9BA56 /* ProfileActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4C62FCA397700C9BA56 /* ProfileActivityView.swift */; };
                 1279E5C22FCA397700C9BA56 /* UserActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4752FCA397700C9BA56 /* UserActivity.swift */; };
@@ -415,6 +442,18 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */ = {isa = PBXBui
                 1279E5D12FCA397700C9BA56 /* MALProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4922FCA397700C9BA56 /* MALProvider.swift */; };
                 1279E5D22FCA397700C9BA56 /* View+AdaptiveSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4D62FCA397700C9BA56 /* View+AdaptiveSheet.swift */; };
                 1279E5D32FCA397700C9BA56 /* ModuleManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4952FCA397700C9BA56 /* ModuleManager.swift */; };
+		2605D4FA5EEDEC97BAA7AF1A /* BackupAccountsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8E6474F1B8A5B830B7EB022 /* BackupAccountsSection.swift */; };
+		6C072D81F0182CA93B688EAD /* BackupAccountsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8E6474F1B8A5B830B7EB022 /* BackupAccountsSection.swift */; };
+		44E484BCFA287BF4B8302762 /* BackupAccountsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8E6474F1B8A5B830B7EB022 /* BackupAccountsSection.swift */; };
+		275164F8C3388B137E648C92 /* BackupSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 628BD9F64744E4EFD04AD849 /* BackupSections.swift */; };
+		8D4710C48296E216EC77B4F0 /* BackupSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 628BD9F64744E4EFD04AD849 /* BackupSections.swift */; };
+		B5A54A9FB8820760A18539EB /* BackupSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 628BD9F64744E4EFD04AD849 /* BackupSections.swift */; };
+		F7A6457B14162A299DD1DBC3 /* BackupManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44E9FF68256D9925105993A5 /* BackupManager.swift */; };
+		53C0C3B371F72A80CD75912B /* BackupManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44E9FF68256D9925105993A5 /* BackupManager.swift */; };
+		A214BC0A52977F7154E71DEB /* BackupManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44E9FF68256D9925105993A5 /* BackupManager.swift */; };
+		130FF83A23F7C7AFBDA52D01 /* ModuleCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDF59DADF2F5620A3A998B3E /* ModuleCheck.swift */; };
+		A5DCCA98478E0C751C8694FF /* ModuleCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDF59DADF2F5620A3A998B3E /* ModuleCheck.swift */; };
+		740B208FA9436D07BF88CFAB /* ModuleCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDF59DADF2F5620A3A998B3E /* ModuleCheck.swift */; };
                 1279E5D42FCA397700C9BA56 /* AniListMedia.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4662FCA397700C9BA56 /* AniListMedia.swift */; };
                 1279E5D52FCA397700C9BA56 /* BrowseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4DA2FCA397700C9BA56 /* BrowseView.swift */; };
                 1279E5D62FCA397700C9BA56 /* MALDiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4902FCA397700C9BA56 /* MALDiscoveryService.swift */; };
@@ -698,10 +737,6 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */ = {isa = PBXBui
                 A059508F65B7400595DF13C4 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB9A6134C59C4A32B8003889 /* Haptics.swift */; };
                 7F79015A0ABA4261AA83F778 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB9A6134C59C4A32B8003889 /* Haptics.swift */; };
                 57BF5714069E486B97AA8FBF /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB9A6134C59C4A32B8003889 /* Haptics.swift */; };
-                32DA168EE48448DE9CB5FBB2 /* CustomRefreshControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B960C6896464EEC9886FA2B /* CustomRefreshControl.swift */; };
-                77C010496C1B48E08ACD3FEB /* CustomRefreshControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B960C6896464EEC9886FA2B /* CustomRefreshControl.swift */; };
-                4ECDE91B709E40C4B7131936 /* CustomRefreshControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B960C6896464EEC9886FA2B /* CustomRefreshControl.swift */; };
-                D13549A1608449AF9EBDE353 /* CustomRefreshControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B960C6896464EEC9886FA2B /* CustomRefreshControl.swift */; };
                 AE0E0074652F42FF99D98593 /* app-logo.png in Resources */ = {isa = PBXBuildFile; fileRef = ACCF2A92A85C4B4BA8E11E55 /* app-logo.png */; };
                 41ECBA699CB9404AAE84293C /* app-logo.png in Resources */ = {isa = PBXBuildFile; fileRef = ACCF2A92A85C4B4BA8E11E55 /* app-logo.png */; };
                 3C2CD6ABFBD54C04B88011A9 /* app-logo.png in Resources */ = {isa = PBXBuildFile; fileRef = ACCF2A92A85C4B4BA8E11E55 /* app-logo.png */; };
@@ -818,10 +853,10 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */ = {isa = PBXBui
 		C7FE61B972DA2C48C57591BF /* MediaNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BC087EE9207079BA4AE569E /* MediaNormalizer.swift */; };
 		3C1C0993803DE1CF8E98086F /* MediaNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BC087EE9207079BA4AE569E /* MediaNormalizer.swift */; };
 		CFDD26BCCCE08F19EDD11142 /* MediaNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BC087EE9207079BA4AE569E /* MediaNormalizer.swift */; };
-		428E4CA25C0A426599BD0F72 /* DataSourcesSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1490E05108E643F9959205B8 /* DataSourcesSettingsPage.swift */; };
-		64C9B0B46E3949C8BC2B072A /* DataSourcesSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1490E05108E643F9959205B8 /* DataSourcesSettingsPage.swift */; };
-		CA904BD67DF8446FB1813485 /* DataSourcesSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1490E05108E643F9959205B8 /* DataSourcesSettingsPage.swift */; };
-		D97B2063009A40478A165DEF /* DataSourcesSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1490E05108E643F9959205B8 /* DataSourcesSettingsPage.swift */; };
+		419D6F329079F0014E88692E /* SettingsPages.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E15F3F37C09F4FB61BE77AA /* SettingsPages.swift */; };
+		9C75AB188078C9A1B0176CF7 /* SettingsPages.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E15F3F37C09F4FB61BE77AA /* SettingsPages.swift */; };
+		EAEEE0391DEC0B6ECB3606A4 /* SettingsPages.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E15F3F37C09F4FB61BE77AA /* SettingsPages.swift */; };
+		A19D759BD6EB906CAA66B42E /* SettingsPages.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E15F3F37C09F4FB61BE77AA /* SettingsPages.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -850,6 +885,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */ = {isa = PBXBui
                 1279E46C2FCA397700C9BA56 /* LibraryEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryEntry.swift; sourceTree = "<group>"; };
                 1279E46D2FCA397700C9BA56 /* MarkContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkContext.swift; sourceTree = "<group>"; };
                 1279E46E2FCA397700C9BA56 /* Media.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Media.swift; sourceTree = "<group>"; };
+                9BEC8F30221A0D707EA2996E /* BackupEnvelope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupEnvelope.swift; sourceTree = "<group>"; };
                 1279E46F2FCA397700C9BA56 /* MediaDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaDetail.swift; sourceTree = "<group>"; };
                 1279E4702FCA397700C9BA56 /* ModuleDefinition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleDefinition.swift; sourceTree = "<group>"; };
                 1279E4712FCA397700C9BA56 /* PlayerContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerContext.swift; sourceTree = "<group>"; };
@@ -893,6 +929,10 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */ = {isa = PBXBui
                 1279E4932FCA397700C9BA56 /* MALSocialService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MALSocialService.swift; sourceTree = "<group>"; };
                 1279E4942FCA397700C9BA56 /* ModuleJSRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleJSRunner.swift; sourceTree = "<group>"; };
                 1279E4952FCA397700C9BA56 /* ModuleManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleManager.swift; sourceTree = "<group>"; };
+                F8E6474F1B8A5B830B7EB022 /* BackupAccountsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupAccountsSection.swift; sourceTree = "<group>"; };
+                628BD9F64744E4EFD04AD849 /* BackupSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupSections.swift; sourceTree = "<group>"; };
+                44E9FF68256D9925105993A5 /* BackupManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupManager.swift; sourceTree = "<group>"; };
+                BDF59DADF2F5620A3A998B3E /* ModuleCheck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleCheck.swift; sourceTree = "<group>"; };
                 1279E4962FCA397700C9BA56 /* ModuleSearchAliasManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleSearchAliasManager.swift; sourceTree = "<group>"; };
                 1279E4972FCA397700C9BA56 /* NetworkFetch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkFetch.swift; sourceTree = "<group>"; };
                 1279E4982FCA397700C9BA56 /* PlayerPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerPresenter.swift; sourceTree = "<group>"; };
@@ -943,6 +983,12 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */ = {isa = PBXBui
                 1279E4CA2FCA397700C9BA56 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
                 1279E4CC2FCA397700C9BA56 /* CachedAsyncImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachedAsyncImage.swift; sourceTree = "<group>"; };
                 B9B9C4B7F8CC17DCA4244990 /* CopyTitle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopyTitle.swift; sourceTree = "<group>"; };
+                62A0214488DB2CD6779A918C /* CinematicDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CinematicDetail.swift; sourceTree = "<group>"; };
+                E3C0CAB104930A91BB8A9F40 /* MediaDestination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaDestination.swift; sourceTree = "<group>"; };
+                EC657585FC3D3120E7FD45CE /* RefreshLimiter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefreshLimiter.swift; sourceTree = "<group>"; };
+                31FA628A785B49BB2E67CEA4 /* CircleRefresh.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CircleRefresh.swift; sourceTree = "<group>"; };
+                0D7714C9A6E9CBD6939FC19F /* GooeyRefresh.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GooeyRefresh.swift; sourceTree = "<group>"; };
+                C4A3C0DADA174E6B7E28C4E9 /* CardTitle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardTitle.swift; sourceTree = "<group>"; };
                 3F5E22F3922DEDB01A89A0B0 /* PosterViewer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterViewer.swift; sourceTree = "<group>"; };
 A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForcedUpdateView.swift; sourceTree = "<group>"; };
                 1279E4CD2FCA397700C9BA56 /* CloudflareBypassSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudflareBypassSheetView.swift; sourceTree = "<group>"; };
@@ -962,6 +1008,8 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
                 1279E4DC2FCA397700C9BA56 /* DetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailView.swift; sourceTree = "<group>"; };
                 1279E4DD2FCA397700C9BA56 /* EpisodeRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpisodeRowView.swift; sourceTree = "<group>"; };
                 1279E4DE2FCA397700C9BA56 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+                7EE0549196228898709C79E6 /* BackupSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupSettingsView.swift; sourceTree = "<group>"; };
+                7CCA69C05976C635B7D9796C /* UpcomingCalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpcomingCalendarView.swift; sourceTree = "<group>"; };
                 1279E4DF2FCA397700C9BA56 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
                 1279E4E02FCA397700C9BA56 /* ModuleListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleListView.swift; sourceTree = "<group>"; };
                 1279E4E12FCA397700C9BA56 /* ModuleStreamPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleStreamPickerView.swift; sourceTree = "<group>"; };
@@ -1088,7 +1136,6 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
                 DE94F57295DC32DA4514938E /* AppleHomeContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleHomeContent.swift; sourceTree = "<group>"; };
                 0A932F6A725797CC0CD0CE4A /* MediaCarousel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaCarousel.swift; sourceTree = "<group>"; };
                 CB9A6134C59C4A32B8003889 /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
-                7B960C6896464EEC9886FA2B /* CustomRefreshControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomRefreshControl.swift; sourceTree = "<group>"; };
                 ACCF2A92A85C4B4BA8E11E55 /* app-logo.png */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = image.png; path = app-logo.png; sourceTree = "<group>"; };
                 4E540997BA864448B082B725 /* SettingsSearchIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSearchIndex.swift; sourceTree = "<group>"; };
                 9F913A366E28436E9B132B7B /* MangaHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MangaHomeView.swift; sourceTree = "<group>"; };
@@ -1119,7 +1166,7 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
 		57A8B6E2BAB5A3203C6082B6 /* KitsuTVDBTimetableService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KitsuTVDBTimetableService.swift; sourceTree = "<group>"; };
 		787DB5DB440C0962E4829173 /* DiscoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoveryService.swift; sourceTree = "<group>"; };
 		0BC087EE9207079BA4AE569E /* MediaNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaNormalizer.swift; sourceTree = "<group>"; };
-		1490E05108E643F9959205B8 /* DataSourcesSettingsPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataSourcesSettingsPage.swift; sourceTree = "<group>"; };
+		7E15F3F37C09F4FB61BE77AA /* SettingsPages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPages.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1192,6 +1239,7 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
                                 1279E46C2FCA397700C9BA56 /* LibraryEntry.swift */,
                                 1279E46D2FCA397700C9BA56 /* MarkContext.swift */,
                                 1279E46E2FCA397700C9BA56 /* Media.swift */,
+                                9BEC8F30221A0D707EA2996E /* BackupEnvelope.swift */,
                                 1279E46F2FCA397700C9BA56 /* MediaDetail.swift */,
                                 1279E4702FCA397700C9BA56 /* ModuleDefinition.swift */,
                                 1279E4712FCA397700C9BA56 /* PlayerContext.swift */,
@@ -1259,6 +1307,10 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
                                 1279E4932FCA397700C9BA56 /* MALSocialService.swift */,
                                 1279E4942FCA397700C9BA56 /* ModuleJSRunner.swift */,
                                 1279E4952FCA397700C9BA56 /* ModuleManager.swift */,
+                                F8E6474F1B8A5B830B7EB022 /* BackupAccountsSection.swift */,
+                                628BD9F64744E4EFD04AD849 /* BackupSections.swift */,
+                                44E9FF68256D9925105993A5 /* BackupManager.swift */,
+                                BDF59DADF2F5620A3A998B3E /* ModuleCheck.swift */,
                                 1279E4962FCA397700C9BA56 /* ModuleSearchAliasManager.swift */,
                                 E548862288E04B9EA60BBCF3 /* LocalPlaybackCoordinator.swift */,
                                 1279E4972FCA397700C9BA56 /* NetworkFetch.swift */,
@@ -1416,6 +1468,12 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
                                 F5A6B7C8D9E10000000000A1 /* AnimatedSplashView.swift */,
                                 1279E4CC2FCA397700C9BA56 /* CachedAsyncImage.swift */,
                                 B9B9C4B7F8CC17DCA4244990 /* CopyTitle.swift */,
+                                62A0214488DB2CD6779A918C /* CinematicDetail.swift */,
+                                E3C0CAB104930A91BB8A9F40 /* MediaDestination.swift */,
+                                EC657585FC3D3120E7FD45CE /* RefreshLimiter.swift */,
+                                31FA628A785B49BB2E67CEA4 /* CircleRefresh.swift */,
+                                0D7714C9A6E9CBD6939FC19F /* GooeyRefresh.swift */,
+                                C4A3C0DADA174E6B7E28C4E9 /* CardTitle.swift */,
                                 3F5E22F3922DEDB01A89A0B0 /* PosterViewer.swift */,
 A17F1001000000000000000D /* ForcedUpdateView.swift */,
                                 21201D48C8E94395977F4564 /* ScoreInputView.swift */,
@@ -1438,7 +1496,6 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */,
                                 DE94F57295DC32DA4514938E /* AppleHomeContent.swift */,
                                 0A932F6A725797CC0CD0CE4A /* MediaCarousel.swift */,
                                 CB9A6134C59C4A32B8003889 /* Haptics.swift */,
-                                7B960C6896464EEC9886FA2B /* CustomRefreshControl.swift */,
                                 4E540997BA864448B082B725 /* SettingsSearchIndex.swift */,
                                 0C1B57D4AEDB48F28A04789C /* AnimationModifiers.swift */,
                                 A15090D8B47044D285B51DCF /* ToggleGlow.swift */,
@@ -1451,7 +1508,7 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */,
                 85C82CA86B694094A25519CA /* Settings */ = {
                         isa = PBXGroup;
                         children = (
-                                1490E05108E643F9959205B8 /* DataSourcesSettingsPage.swift */,
+                                7E15F3F37C09F4FB61BE77AA /* SettingsPages.swift */,
                         );
                         path = Settings;
                         sourceTree = "<group>";
@@ -1472,6 +1529,8 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */,
                                 46A77C1128934BF5BD3A9047 /* RatingPromptView.swift */,
                                 1279E4DD2FCA397700C9BA56 /* EpisodeRowView.swift */,
                                 1279E4DE2FCA397700C9BA56 /* HomeView.swift */,
+                                7EE0549196228898709C79E6 /* BackupSettingsView.swift */,
+                                7CCA69C05976C635B7D9796C /* UpcomingCalendarView.swift */,
                                 1279E4DF2FCA397700C9BA56 /* LibraryView.swift */,
                                 1279E4E02FCA397700C9BA56 /* ModuleListView.swift */,
                                 1279E4E12FCA397700C9BA56 /* ModuleStreamPickerView.swift */,
@@ -1821,7 +1880,6 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 30184DCC597C0BAF86C1F673 /* AppleHomeContent.swift in Sources */,
                                 5A424D70662EFC40E1125C5A /* MediaCarousel.swift in Sources */,
                                 57BF5714069E486B97AA8FBF /* Haptics.swift in Sources */,
-                                D13549A1608449AF9EBDE353 /* CustomRefreshControl.swift in Sources */,
                                 01A20920D09146A29404813E /* SettingsSearchIndex.swift in Sources */,
                                 AE5D7AE099454F4DBFFA1406 /* MangaHomeView.swift in Sources */,
                                 D9AE76341D1B4FF99675633F /* AppModeManager.swift in Sources */,
@@ -1850,7 +1908,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
 				7BD992FAF791273F7D197180 /* KitsuTVDBTimetableService.swift in Sources */,
 				ECF92469546E4EA9B13C5225 /* DiscoveryService.swift in Sources */,
 				3818E7F611B5E389D80B2BDD /* MediaNormalizer.swift in Sources */,
-				D97B2063009A40478A165DEF /* DataSourcesSettingsPage.swift in Sources */,
+				419D6F329079F0014E88692E /* SettingsPages.swift in Sources */,
 );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -1900,6 +1958,10 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 5EA50C4A17000000000000BA /* PlayerForegroundRecovery.swift in Sources */,
                                 5EA50C4A170000000000020A /* PlayerNextEpisodePrefetch.swift in Sources */,
                                 121D9B6C2FCA5612000FF9B4 /* ModuleManager.swift in Sources */,
+                                2605D4FA5EEDEC97BAA7AF1A /* BackupAccountsSection.swift in Sources */,
+                                275164F8C3388B137E648C92 /* BackupSections.swift in Sources */,
+                                F7A6457B14162A299DD1DBC3 /* BackupManager.swift in Sources */,
+                                130FF83A23F7C7AFBDA52D01 /* ModuleCheck.swift in Sources */,
                                 121D9B6D2FCA5612000FF9B4 /* ProviderManager.swift in Sources */,
                                 121D9B6E2FCA5612000FF9B4 /* AniListService.swift in Sources */,
                                 121D9B6F2FCA5612000FF9B4 /* JSEngine+Details.swift in Sources */,
@@ -1962,6 +2024,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 121D9B4A2FCA5603000FF9B4 /* AniListActivity.swift in Sources */,
                                 121D9B4B2FCA5603000FF9B4 /* UserNotification.swift in Sources */,
                                 121D9B4C2FCA5603000FF9B4 /* Media.swift in Sources */,
+                                88A3B8D8603A4CD39AAE889E /* BackupEnvelope.swift in Sources */,
                                 121D9B4D2FCA5603000FF9B4 /* StreamResult.swift in Sources */,
                                 121D9BC02FCA564F000FF9B4 /* ShiroxApp.swift in Sources */,
                                 1251C45A2FCAE1AA002AD0B2 /* LegalWebView.swift in Sources */,
@@ -1973,8 +2036,16 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                                 121D9BA82FCA563E000FF9B4 /* PlayerView.swift in Sources */,
                                 121D9BA92FCA563E000FF9B4 /* AniListDetailView.swift in Sources */,
                                 121D9BAA2FCA563E000FF9B4 /* HomeView.swift in Sources */,
+                                785CE07D4E211E16252FCFA2 /* BackupSettingsView.swift in Sources */,
+                                BCDFFEDBCB7CBD40C94E429C /* UpcomingCalendarView.swift in Sources */,
                                 121D9BAB2FCA563E000FF9B4 /* CachedAsyncImage.swift in Sources */,
                                 F1AB924A028C0E25691FE092 /* CopyTitle.swift in Sources */,
+                                3AA0B1C6201AA779B94550C2 /* CinematicDetail.swift in Sources */,
+                                58AE81DAEBFD998D3E8581D3 /* MediaDestination.swift in Sources */,
+                                0B64154B1E2A7C952669E127 /* RefreshLimiter.swift in Sources */,
+                                3F759395F88ABD5DE5A53AF4 /* CircleRefresh.swift in Sources */,
+                                DB56BF5CF9BA736669633C73 /* GooeyRefresh.swift in Sources */,
+                                37FB7D42EE1E99C28D876CCD /* CardTitle.swift in Sources */,
                                 99E5E18EA31431732038AD72 /* PosterViewer.swift in Sources */,
 A17F1001000000000000000A /* ForcedUpdateView.swift in Sources */,
                                 8BD8E901FE5D4CF199886175 /* ScoreInputView.swift in Sources */,
@@ -2066,7 +2137,6 @@ A17F1001000000000000000A /* ForcedUpdateView.swift in Sources */,
                                 09A3FD832C432105D9100005 /* AppleHomeContent.swift in Sources */,
                                 B948544B1B990759A828D918 /* MediaCarousel.swift in Sources */,
                                 7F79015A0ABA4261AA83F778 /* Haptics.swift in Sources */,
-                                4ECDE91B709E40C4B7131936 /* CustomRefreshControl.swift in Sources */,
                                 2E0E8A3882B1417499E1D5FA /* SettingsSearchIndex.swift in Sources */,
                                 1CAC259234054464BCC1E60C /* MangaHomeView.swift in Sources */,
                                 BAAA0A4B15404C19805883A1 /* AppModeManager.swift in Sources */,
@@ -2095,7 +2165,7 @@ A17F1001000000000000000A /* ForcedUpdateView.swift in Sources */,
 				F21D7E9C441DD0767B8663A8 /* KitsuTVDBTimetableService.swift in Sources */,
 				8EFBEAEAC00EEC727100E47D /* DiscoveryService.swift in Sources */,
 				C7FE61B972DA2C48C57591BF /* MediaNormalizer.swift in Sources */,
-				CA904BD67DF8446FB1813485 /* DataSourcesSettingsPage.swift in Sources */,
+				9C75AB188078C9A1B0176CF7 /* SettingsPages.swift in Sources */,
 );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -2184,6 +2254,12 @@ A17F1001000000000000000A /* ForcedUpdateView.swift in Sources */,
                                 AA105005000000000000F103 /* LocalSource.swift in Sources */,
                                 1279E5222FCA397700C9BA56 /* CachedAsyncImage.swift in Sources */,
                                 2EBFA0A47C32A4C438A0D324 /* CopyTitle.swift in Sources */,
+                                5ABBE26ACE4695A64F4D001F /* CinematicDetail.swift in Sources */,
+                                3DE6722B1EE584B336833FA6 /* MediaDestination.swift in Sources */,
+                                90216DCB221D251272E456CD /* RefreshLimiter.swift in Sources */,
+                                E991317441B9DA169C456434 /* CircleRefresh.swift in Sources */,
+                                0F7D562D63DBE0D66F4224EE /* GooeyRefresh.swift in Sources */,
+                                952A753155924A270DC2F15D /* CardTitle.swift in Sources */,
                                 34A9E8C8C65E6822AAD610A2 /* PosterViewer.swift in Sources */,
 A17F1001000000000000000B /* ForcedUpdateView.swift in Sources */,
                                 17265E759B724CB6BF9F6C7A /* ScoreInputView.swift in Sources */,
@@ -2208,6 +2284,8 @@ A17F1001000000000000000B /* ForcedUpdateView.swift in Sources */,
                                 1279E5352FCA397700C9BA56 /* ContentUnavailableView.swift in Sources */,
                                 1279E5362FCA397700C9BA56 /* VTTSubtitlesLoader.swift in Sources */,
                                 1279E5372FCA397700C9BA56 /* HomeView.swift in Sources */,
+                                FEC6643250A678DA6C563828 /* BackupSettingsView.swift in Sources */,
+                                58D4303A72D1CD2CD7B5E10A /* UpcomingCalendarView.swift in Sources */,
                                 1279E5382FCA397700C9BA56 /* PlayerTimeFormat.swift in Sources */,
                                 1279E5392FCA397700C9BA56 /* LikesSheetView.swift in Sources */,
                                 1251C45B2FCAE1AA002AD0B2 /* LegalWebView.swift in Sources */,
@@ -2228,6 +2306,7 @@ A17F1001000000000000000B /* ForcedUpdateView.swift in Sources */,
                                 1279E5442FCA397700C9BA56 /* PlayerSkipButton.swift in Sources */,
                                 1279E5452FCA397700C9BA56 /* WatchHistoryService.swift in Sources */,
                                 1279E5462FCA397700C9BA56 /* Media.swift in Sources */,
+                                089D6232A50C822AF97A8955 /* BackupEnvelope.swift in Sources */,
                                 1279E5472FCA397700C9BA56 /* SettingsView.swift in Sources */,
                                 1279E5482FCA397700C9BA56 /* ProfileActivityView.swift in Sources */,
                                 1279E5492FCA397700C9BA56 /* UserActivity.swift in Sources */,
@@ -2247,6 +2326,10 @@ A17F1001000000000000000B /* ForcedUpdateView.swift in Sources */,
                                 1279E5582FCA397700C9BA56 /* MALProvider.swift in Sources */,
                                 1279E5592FCA397700C9BA56 /* View+AdaptiveSheet.swift in Sources */,
                                 1279E55A2FCA397700C9BA56 /* ModuleManager.swift in Sources */,
+                                6C072D81F0182CA93B688EAD /* BackupAccountsSection.swift in Sources */,
+                                8D4710C48296E216EC77B4F0 /* BackupSections.swift in Sources */,
+                                53C0C3B371F72A80CD75912B /* BackupManager.swift in Sources */,
+                                A5DCCA98478E0C751C8694FF /* ModuleCheck.swift in Sources */,
                                 1279E55B2FCA397700C9BA56 /* AniListMedia.swift in Sources */,
                                 1279E55C2FCA397700C9BA56 /* BrowseView.swift in Sources */,
                                 1279E55D2FCA397700C9BA56 /* MALDiscoveryService.swift in Sources */,
@@ -2313,7 +2396,6 @@ A17F1001000000000000000B /* ForcedUpdateView.swift in Sources */,
                                 06364BC893631B068EDDEED4 /* AppleHomeContent.swift in Sources */,
                                 03B0A35D0DF6739461F417DF /* MediaCarousel.swift in Sources */,
                                 A059508F65B7400595DF13C4 /* Haptics.swift in Sources */,
-                                77C010496C1B48E08ACD3FEB /* CustomRefreshControl.swift in Sources */,
                                 CE8BECC8DB5A46128FE0F71F /* SettingsSearchIndex.swift in Sources */,
                                 49018AF1B1824E1BBB4FBF2F /* MangaHomeView.swift in Sources */,
                                 73E828E8CEDC4F4FADE37960 /* AppModeManager.swift in Sources */,
@@ -2342,7 +2424,7 @@ A17F1001000000000000000B /* ForcedUpdateView.swift in Sources */,
 				E620FEBA7ECAA92F33F791C8 /* KitsuTVDBTimetableService.swift in Sources */,
 				72D1E8AE4231910B316CA554 /* DiscoveryService.swift in Sources */,
 				3C1C0993803DE1CF8E98086F /* MediaNormalizer.swift in Sources */,
-				64C9B0B46E3949C8BC2B072A /* DataSourcesSettingsPage.swift in Sources */,
+				EAEEE0391DEC0B6ECB3606A4 /* SettingsPages.swift in Sources */,
 );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -2431,6 +2513,12 @@ A17F1001000000000000000B /* ForcedUpdateView.swift in Sources */,
                                 AA105005000000000000F104 /* LocalSource.swift in Sources */,
                                 1279E59B2FCA397700C9BA56 /* CachedAsyncImage.swift in Sources */,
                                 AE08652BAC34A34294246221 /* CopyTitle.swift in Sources */,
+                                A8EDC45F58E26DDCEFDEA82A /* CinematicDetail.swift in Sources */,
+                                9808704E4AEB705A81E87573 /* MediaDestination.swift in Sources */,
+                                9F381E10B6153ECAE7226CE5 /* RefreshLimiter.swift in Sources */,
+                                F69D4F076D5CB8FD06F8860F /* CircleRefresh.swift in Sources */,
+                                D5EC6CB4D02357B93617C722 /* GooeyRefresh.swift in Sources */,
+                                3AD6E27B5FE83E5416583D82 /* CardTitle.swift in Sources */,
                                 B7E6AFBC96F12550F8015ED3 /* PosterViewer.swift in Sources */,
 A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                 6AC7539852434F95B190C831 /* ScoreInputView.swift in Sources */,
@@ -2455,6 +2543,8 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                 1279E5AE2FCA397700C9BA56 /* ContentUnavailableView.swift in Sources */,
                                 1279E5AF2FCA397700C9BA56 /* VTTSubtitlesLoader.swift in Sources */,
                                 1279E5B02FCA397700C9BA56 /* HomeView.swift in Sources */,
+                                4E411D4931B5251EA88B8F86 /* BackupSettingsView.swift in Sources */,
+                                401902F346DEE7A8DA54F2F8 /* UpcomingCalendarView.swift in Sources */,
                                 1279E5B12FCA397700C9BA56 /* PlayerTimeFormat.swift in Sources */,
                                 1279E5B22FCA397700C9BA56 /* LikesSheetView.swift in Sources */,
                                 1251C4592FCAE1AA002AD0B2 /* LegalWebView.swift in Sources */,
@@ -2475,6 +2565,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                 1279E5BD2FCA397700C9BA56 /* PlayerSkipButton.swift in Sources */,
                                 1279E5BE2FCA397700C9BA56 /* WatchHistoryService.swift in Sources */,
                                 1279E5BF2FCA397700C9BA56 /* Media.swift in Sources */,
+                                C20267013032003AA6B7D9A2 /* BackupEnvelope.swift in Sources */,
                                 1279E5C02FCA397700C9BA56 /* SettingsView.swift in Sources */,
                                 1279E5C12FCA397700C9BA56 /* ProfileActivityView.swift in Sources */,
                                 1279E5C22FCA397700C9BA56 /* UserActivity.swift in Sources */,
@@ -2494,6 +2585,10 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                 1279E5D12FCA397700C9BA56 /* MALProvider.swift in Sources */,
                                 1279E5D22FCA397700C9BA56 /* View+AdaptiveSheet.swift in Sources */,
                                 1279E5D32FCA397700C9BA56 /* ModuleManager.swift in Sources */,
+                                44E484BCFA287BF4B8302762 /* BackupAccountsSection.swift in Sources */,
+                                B5A54A9FB8820760A18539EB /* BackupSections.swift in Sources */,
+                                A214BC0A52977F7154E71DEB /* BackupManager.swift in Sources */,
+                                740B208FA9436D07BF88CFAB /* ModuleCheck.swift in Sources */,
                                 1279E5D42FCA397700C9BA56 /* AniListMedia.swift in Sources */,
                                 1279E5D52FCA397700C9BA56 /* BrowseView.swift in Sources */,
                                 1279E5D62FCA397700C9BA56 /* MALDiscoveryService.swift in Sources */,
@@ -2560,7 +2655,6 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                 8F4A78588D154291F8B30330 /* AppleHomeContent.swift in Sources */,
                                 FC357250F01E1BE77E5B37C4 /* MediaCarousel.swift in Sources */,
                                 FB3055616FBE4A399FAA8A5D /* Haptics.swift in Sources */,
-                                32DA168EE48448DE9CB5FBB2 /* CustomRefreshControl.swift in Sources */,
                                 9FC65E10AF3F4044AA31F0E7 /* SettingsSearchIndex.swift in Sources */,
                                 9E2601C92E784D40961B5E9A /* MangaHomeView.swift in Sources */,
                                 9EE290864CBC47F394FC0115 /* AppModeManager.swift in Sources */,
@@ -2589,7 +2683,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
 				CA1D8B93F04008540E95C300 /* KitsuTVDBTimetableService.swift in Sources */,
 				9857225A5B00092A9CA08294 /* DiscoveryService.swift in Sources */,
 				CFDD26BCCCE08F19EDD11142 /* MediaNormalizer.swift in Sources */,
-				428E4CA25C0A426599BD0F72 /* DataSourcesSettingsPage.swift in Sources */,
+				A19D759BD6EB906CAA66B42E /* SettingsPages.swift in Sources */,
 );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -2612,7 +2706,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                 ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
                                 CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
                                 CODE_SIGN_STYLE = Automatic;
-                                CURRENT_PROJECT_VERSION = 164;
+                                CURRENT_PROJECT_VERSION = 165;
                                 ENABLE_PREVIEWS = YES;
                                 ENABLE_USER_SCRIPT_SANDBOXING = YES;
                                 GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -2630,7 +2724,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "@executable_path/Frameworks",
                                 );
                                 LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                                MARKETING_VERSION = 2.29;
+                                MARKETING_VERSION = 2.30;
                                 PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
                                 PRODUCT_NAME = "$(TARGET_NAME)";
                                 SDKROOT = appletvos;
@@ -2651,7 +2745,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                 ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
                                 CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
                                 CODE_SIGN_STYLE = Automatic;
-                                CURRENT_PROJECT_VERSION = 164;
+                                CURRENT_PROJECT_VERSION = 165;
                                 ENABLE_PREVIEWS = YES;
                                 ENABLE_USER_SCRIPT_SANDBOXING = YES;
                                 GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -2665,7 +2759,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "@executable_path/Frameworks",
                                 );
                                 LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                                MARKETING_VERSION = 2.29;
+                                MARKETING_VERSION = 2.30;
                                 PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
                                 PRODUCT_NAME = "$(TARGET_NAME)";
                                 SDKROOT = appletvos;
@@ -2772,7 +2866,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                 ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
                                 CODE_SIGN_IDENTITY = "Apple Development";
                                 CODE_SIGN_STYLE = Automatic;
-                                CURRENT_PROJECT_VERSION = 164;
+                                CURRENT_PROJECT_VERSION = 165;
                                 DEVELOPMENT_TEAM = JRMTH65Z3H;
                                 ENABLE_TESTABILITY = YES;
                                 INFOPLIST_FILE = Shirox/Info.plist;
@@ -2782,7 +2876,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "$(inherited)",
                                         "@executable_path/Frameworks",
                                 );
-                                MARKETING_VERSION = 2.29;
+                                MARKETING_VERSION = 2.30;
                                 PRODUCT_NAME = shirox;
                                 PROVISIONING_PROFILE_SPECIFIER = "";
                                 SDKROOT = iphoneos;
@@ -2818,7 +2912,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                         buildSettings = {
                                 ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
                                 COMBINE_HIDPI_IMAGES = YES;
-                                CURRENT_PROJECT_VERSION = 164;
+                                CURRENT_PROJECT_VERSION = 165;
                                 DEAD_CODE_STRIPPING = YES;
                                 INFOPLIST_FILE = Shirox/Info.plist;
                                 INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
@@ -2828,7 +2922,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "@executable_path/../Frameworks",
                                 );
                                 MACOSX_DEPLOYMENT_TARGET = 14.0;
-                                MARKETING_VERSION = 2.29;
+                                MARKETING_VERSION = 2.30;
                                 PRODUCT_NAME = shirox;
                                 SDKROOT = macosx;
                                 SUPPORTS_MACCATALYST = NO;
@@ -2845,7 +2939,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                 ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
                                 CODE_SIGN_IDENTITY = "Apple Development";
                                 CODE_SIGN_STYLE = Automatic;
-                                CURRENT_PROJECT_VERSION = 164;
+                                CURRENT_PROJECT_VERSION = 165;
                                 DEVELOPMENT_TEAM = JRMTH65Z3H;
                                 INFOPLIST_FILE = Shirox/Info.plist;
                                 INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
@@ -2854,7 +2948,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "$(inherited)",
                                         "@executable_path/Frameworks",
                                 );
-                                MARKETING_VERSION = 2.29;
+                                MARKETING_VERSION = 2.30;
                                 PRODUCT_NAME = shirox;
                                 PROVISIONING_PROFILE_SPECIFIER = "";
                                 SDKROOT = iphoneos;
@@ -2935,7 +3029,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                         buildSettings = {
                                 ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
                                 COMBINE_HIDPI_IMAGES = YES;
-                                CURRENT_PROJECT_VERSION = 164;
+                                CURRENT_PROJECT_VERSION = 165;
                                 DEAD_CODE_STRIPPING = YES;
                                 INFOPLIST_FILE = Shirox/Info.plist;
                                 INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
@@ -2945,7 +3039,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "@executable_path/../Frameworks",
                                 );
                                 MACOSX_DEPLOYMENT_TARGET = 14.0;
-                                MARKETING_VERSION = 2.29;
+                                MARKETING_VERSION = 2.30;
                                 PRODUCT_NAME = shirox;
                                 SDKROOT = macosx;
                                 SUPPORTS_MACCATALYST = NO;

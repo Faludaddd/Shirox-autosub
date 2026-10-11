@@ -10,6 +10,10 @@ struct ModuleListView: View {
     @State private var addModuleError: String?
     @State private var isAddingLocalModule = false
     @State private var isAddingJellyfinModule = false
+    /// v2.30 (original's feature): test a module by running it the way playing
+    /// something runs it — search, an episode list, a stream URL.
+    @State private var testReport: (module: ModuleDefinition, result: ModuleCheckResult)?
+    @State private var testingModuleID: String? = nil
     @FocusState private var isTextFieldFocused: Bool
 
     private let localFilesModuleURL = "https://raw.githubusercontent.com/xibrox/local-files-module/refs/heads/main/local.json"
@@ -72,6 +76,11 @@ struct ModuleListView: View {
                                 .listRowInsets(EdgeInsets())
                                 .listRowBackground(Color.clear)
                                 .contextMenu {
+                                    Button {
+                                        testModule(module)
+                                    } label: {
+                                        Label("Test Module", systemImage: "stethoscope")
+                                    }
                                     Button(role: .destructive) {
                                         removeModule(module)
                                     } label: {
@@ -108,6 +117,18 @@ struct ModuleListView: View {
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
+            .alert(
+                testReport.map { "Test: \($0.module.sourceName) " + testOutcomeTitle($0.result) } ?? "Test Module",
+                isPresented: Binding(
+                    get: { testReport != nil },
+                    set: { if !$0 { testReport = nil } }
+                ),
+                presenting: testReport
+            ) { _ in
+                Button("OK", role: .cancel) { testReport = nil }
+            } message: { report in
+                Text(Self.testOutcomeMessage(report.result))
+            }
             .toolbar {
                 ToolbarItem(placement: .automatic) {
                     Button {
@@ -443,6 +464,41 @@ struct ModuleListView: View {
     }
 
     // MARK: - Module Row
+    /// v2.30 — runs `ModuleCheck` (the original's module test) and reports
+    /// the verdict. A Cloudflare wall is reported as "needs verification", not
+    /// as a broken module.
+    private func testModule(_ module: ModuleDefinition) {
+        guard testingModuleID == nil else { return }
+        testingModuleID = module.id
+        Task { @MainActor in
+            let result = await ModuleCheck.check(module)
+            testingModuleID = nil
+            testReport = (module, result)
+        }
+    }
+
+    private func testOutcomeTitle(_ result: ModuleCheckResult) -> String {
+        switch result {
+        case .passed: return "passed"
+        case .needsVerification: return "needs verification"
+        case .failed: return "failed"
+        case .skipped: return "was skipped"
+        }
+    }
+
+    static func testOutcomeMessage(_ result: ModuleCheckResult) -> String {
+        switch result {
+        case .passed:
+            return "The module searched, listed an episode's list and reached a playable stream."
+        case .needsVerification(let host):
+            return "\(host) answered with a Cloudflare check. Pass it the next time you play something from this module — that's not a sign the module is broken."
+        case .failed(let step, let reason):
+            return "It got as far as \(step.label.lowercased()) and then: \(reason)"
+        case .skipped(let reason):
+            return reason
+        }
+    }
+
     private func moduleRow(_ module: ModuleDefinition) -> some View {
         let isActive = moduleManager.activeModule?.id == module.id
         return Button {
@@ -526,7 +582,15 @@ struct ModuleListView: View {
         }
 
         Task {
-            do { try await moduleManager.addModule(from: url) } catch { /* errorMessage already set */ }
+            do {
+                try await moduleManager.addModule(from: url)
+                // v2.30 (original's behaviour): test a module the moment it's
+                // added — a module that installs fine can still be broken.
+                if moduleManager.errorMessage == nil, let added = moduleManager.modules.last {
+                    let result = await ModuleCheck.check(added)
+                    testReport = (added, result)
+                }
+            } catch { /* errorMessage already set */ }
 
             await MainActor.run {
                 withAnimation {

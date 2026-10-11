@@ -102,6 +102,37 @@ struct UpdateLogEntry {
 
 private let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.30",
+        date: "2026-10-11",
+        added: [
+            "The original Shirox's four-folder Settings layout, with the account card header: Accounts & Tracking (drag to set the primary provider, sign in and out per service, tracking toggles), Player, Subtitles, Reader, Modules, Library, Downloads, Schedule, Notifications, Storage & Cache, Backup & Restore, App Logs, Updates, Change Log and About. The custom Data Sources tab is REMOVED \u{2014} source management is the original's: your accounts and your modules.",
+            "The original's Backup & Restore system: sectioned backups (settings, installed modules by manifest URL, watch and reading progress, the on-device library, accounts) with per-section restore \u{2014} covering this fork's provider chains, subtitle style, design mode and reader preferences too.",
+            "Module testing, the original's way: a module is tested the moment it's added, and any installed module can be tested from its row's context menu \u{2014} it runs the module the way playing something runs it (search, an episode list, a stream URL) and reports exactly where a broken one stops. A Cloudflare wall is reported as needing verification, not as a failure.",
+            "The Upcoming calendar: a floating calendar button on Home opens a week of upcoming episodes grouped by day, with a My-library filter \u{2014} the original's schedule page, alongside our own richer Schedule tab.",
+            "Gooey pull-to-refresh: pulling to refresh stretches a drop out of the Dynamic Island holding the spinner, and every screen's pulls are held to the original's few-a-minute limit."
+        ],
+        fixed: [
+            "Card titles keep their first and LAST words when they truncate \u{2014} seasons of a show differ at the end of the title, which plain truncation threw away. Long-press a card for its full title.",
+            "AniList 400 responses are read as a refused token: Accounts shows Sign in again instead of Signed in while every request is rejected.",
+            "Episode numbers now shrink to fit their circle in the episode list instead of clipping at three digits.",
+            "The screen stays on while a video plays.",
+            "The hero's scroll performance fix: the pager's pages are handed only what they show, so a scroll no longer rebuilds every hero page every frame."
+        ],
+        changed: [
+            "Home is the original's current structure: the hero carousel with stretch and parallax, provider page-turn transitions, the cinematic iPad layout, and the animated pill page indicator. Our shelves (Recently Completed, Upcoming, genre rows), Reading Mode and the Apple/Shirox presentation switch ride on top unchanged.",
+            "Player and Downloads settings follow the original's single-page layout; this fork's deeper options (gestures, hold-speed, audio, PiP, streaming, Auto Pick, data saver) live under the original page's Advanced section.",
+            "Library settings follow the original's page: list order with custom lists, card title behaviour, cinematic layout toggle, title-language matching, and the local library controls."
+        ],
+        improved: [
+            "Settings rows follow the original's design: glass icon tiles with values on the trailing edge, grouped into folders.",
+            "The toolbar's provider button and the calendar button sit on the original's glass backdrop."
+        ],
+        removed: [
+            "The custom Data Sources tab (provider dashboard, health tests, chain editor). Provider behaviour is unchanged \u{2014} the same chains run automatically \u{2014} and source management is the original's approach through Accounts and Modules."
+        ],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "2.29",
         date: "2026-09-08",
         added: [

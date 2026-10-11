@@ -1509,6 +1509,14 @@ final class AniListService {
                     error: "Bad Request",
                     responseSnippet: responseBody
                 )
+                // v2.30 (original's fix): a 400 while signed in means AniList is
+                // refusing the token — surface it as "sign in again" rather than a
+                // transient blip the app silently retries forever.
+                await MainActor.run {
+                    if AniListAuthManager.shared.isLoggedIn {
+                        AniListAuthManager.shared.needsReauthentication = true
+                    }
+                }
                 throw AniListError.httpError(400)
             default:
                 let responseBody = String(data: data, encoding: .utf8) ?? "(no body)"

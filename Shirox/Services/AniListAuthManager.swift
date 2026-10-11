@@ -10,6 +10,12 @@ final class AniListAuthManager: NSObject, ObservableObject {
     @Published var isLoggedIn = false
     @Published var username: String?
     @Published var avatarURL: String?
+    /// v2.30 (original's fix): AniList started answering a refused token with a
+    /// 400. The token is kept — a revoked token and a failing auth backend are
+    /// indistinguishable from the client — but `isLoggedIn` alone then claims a
+    /// session every request rejects. Settings shows "Sign in again" instead of
+    /// "Signed in", so the user knows what to do about it.
+    @Published var needsReauthentication = false
     @Published var userId: Int? = {
         let v = UserDefaults.standard.integer(forKey: "anilist_user_id")
         return v == 0 ? nil : v

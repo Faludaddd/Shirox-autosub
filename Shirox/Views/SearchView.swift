@@ -1871,11 +1871,13 @@ struct AniListCardView: View, Equatable {
                 // size and position as the manga poster card, so anime and
                 // manga posters render identical status text.
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(media.title.displayTitle)
+                    // v2.30 (original's CardTitle): keeps the first and last
+                    // words when the title truncates — seasons differ at the
+                    // END of a title, which plain truncation threw away.
+                    CardTitle(media.title.displayTitle, lineLimit: 2)
                         .font(.caption)
                         .fontWeight(.semibold)
                         .foregroundStyle(.white)
-                        .lineLimit(2)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     if let statusLine = media.posterStatusText {
                         Text(statusLine)

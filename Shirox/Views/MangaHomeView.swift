@@ -768,7 +768,7 @@ struct MangaSettingsView: View {
             // Section 3: Sources & Modules (universal — same as anime)
             Section {
                 NavigationLink {
-                    SourcesSettingsPage()
+                    AccountsSettingsView()
                 } label: {
                     MangaSettingsCategoryRow(icon: "person.crop.circle.badge.checkmark", title: "Sources", subtitle: "AniList, MyAnimeList, accounts")
                 }

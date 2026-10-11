@@ -15,6 +15,11 @@ final class HomeViewModel: ObservableObject {
     @Published var genreShelves: [String: [Media]] = [:]
     @Published var isLoading = false
     @Published var error: String?
+    /// v2.30 (original's home) — whose page Home is showing, driving the
+    /// provider page-turn animation. The unified chain serves the feed; the
+    /// primary tracker names the page, so switching providers in the menu
+    /// turns the page exactly as the original does.
+    @Published private(set) var feedProvider: ProviderType?
 
     private var loaded = false
     private var cancellables = Set<AnyCancellable>()
@@ -46,6 +51,7 @@ final class HomeViewModel: ObservableObject {
         guard !loaded else { return }
         isLoading = true
         error = nil
+        feedProvider = ProviderManager.shared.primary?.providerType
 
         // v2.24 — every shelf now goes through the UnifiedProviderSystem
         // chain (TVDB → MAL → AniList → Kitsu → AniDB, health-gated with

@@ -1,278 +1,975 @@
 import SwiftUI
 import Combine
-import UserNotifications
-import UniformTypeIdentifiers
-#if canImport(UIKit)
-import UIKit
-import AVKit
+
+// MARK: - Settings Nav Row (original Shirox design)
+
+/// The original app's settings row: a glass icon tile, a title, and an optional
+/// trailing value — the four-folder settings layout's building block.
+struct SettingsNavRow: View {
+    let icon: String
+    let title: String
+    var subtitle: String? = nil
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .semibold))
+                    // Adapts to the appearance: white vanished against light mode's pale glass.
+                    .foregroundStyle(.primary)
+            }
+            .frame(width: 28, height: 28)
+            .glassChrome(
+                RoundedRectangle(cornerRadius: 7, style: .continuous),
+                enabled: true,
+                tint: nil,
+                off: .ultraThinMaterial
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.14), lineWidth: 0.5)
+            )
+
+            Text(title)
+                .font(.body)
+
+            Spacer()
+
+            if let subtitle, !subtitle.isEmpty {
+                Text(subtitle)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+// MARK: - Root Settings View
+
+#if !os(tvOS)
+/// The window a sign-in sheet hangs from: the app's key window, or nil when there's none.
+@MainActor
+func keyPresentationAnchor() -> ASPresentationAnchor? {
+    #if os(macOS)
+    return NSApplication.shared.keyWindow ?? NSApplication.shared.mainWindow
+    #else
+    return UIApplication.shared.connectedScenes
+        .compactMap { $0 as? UIWindowScene }
+        .flatMap { $0.windows }
+        .first { $0.isKeyWindow }
+    #endif
+}
 #endif
 
-// MARK: - Inline nav bar helper
-//
-// Consolidates the `#if os(iOS) .navigationBarTitleDisplayMode(.inline) #endif`
-// pattern that was duplicated ~28× across the settings pages. The macOS / tvOS
-// branch is a no-op so call sites stay single-line and platform-agnostic.
-extension View {
-    @ViewBuilder
-    func inlineNavBar() -> some View {
-        #if os(iOS)
-        self.navigationBarTitleDisplayMode(.inline)
+/// A settings page's sections: grouped on a Mac, as System Settings is, where a List draws one
+/// flat full-width column; a List everywhere else.
+struct SettingsList<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        #if os(macOS)
+        Form { content }
+            .formStyle(.grouped)
         #else
-        self
+        List { content }
         #endif
     }
 }
 
+/// v2.30 — the settings root restored to the ORIGINAL Shirox four-folder layout
+/// (account card → content → data → system → about). The fork's previous
+/// flat category menu — including its custom Data Sources tab — is gone:
+/// source management is the original's, through Accounts (provider primary +
+/// sign-in) and Modules (streaming sources).
 struct SettingsView: View {
-    // The top-level settings screen is a category menu — each row pushes a
-    // dedicated settings page that owns its own `@AppStorage` bindings. The
-    // per-category `@AppStorage` / cache-size state and the inline storage UI
-    // that previously lived here were migrated to those sub-pages (Appearance,
-    // Playback, Advanced, …), so this view now holds no state of its own.
-    //
-    // #125 — A search bar at the top lets the user type a feature name and
-    // jump directly to the setting (even deep inside a sub-page). When the
-    // search text is non-empty, the category list is replaced by a results
-    // list; tapping a result pushes the containing page.
+    @ObservedObject private var aniListAuth = AniListAuthManager.shared
+    @ObservedObject private var malAuth = MALAuthManager.shared
+    @ObservedObject private var providerManager = ProviderManager.shared
+    @EnvironmentObject private var moduleManager: ModuleManager
+    #if !os(tvOS)
+    @State private var totalUsage = 0
+    #endif
 
-    @State private var searchText: String = ""
-    @State private var searchResults: [SettingsSearchEntry] = []
-    /// #125 — Drives a hidden NavigationLink for the iOS 15-compatible push
-    /// (the app's NavigationStack shim doesn't reliably honor
-    /// `navigationDestination(item:)`). Set when the user taps a search result.
-    @State private var pushedPage: SettingsPage? = nil
+    private var isAnyAccountSignedIn: Bool {
+        aniListAuth.isLoggedIn || malAuth.isLoggedIn
+    }
 
-    var body: some View {
-        // Issue #5 — SettingsView no longer wraps in its own NavigationStack.
-        // When pushed from HomeView's toolbar (the only entry point on iOS
-        // since Settings is not a bottom tab), the parent NavigationStack
-        // provides the navigation context. The previous nested NavigationStack
-        // caused duplicate back arrows and a black bar at the top.
-        Group {
-            if searchText.isEmpty {
-                categoryList
-            } else {
-                searchResultsList
+    private var accountDisplayName: String {
+        if let username = aniListAuth.username, !username.isEmpty {
+            return username
+        }
+        if let username = malAuth.username, !username.isEmpty {
+            return username
+        }
+        if aniListAuth.isLoggedIn {
+            return "AniList User"
+        }
+        if malAuth.isLoggedIn {
+            return "MyAnimeList User"
+        }
+        return "Sign In"
+    }
+
+    private var accountSubtitle: String {
+        let services = [
+            aniListAuth.isLoggedIn ? "AniList" : nil,
+            malAuth.isLoggedIn ? "MyAnimeList" : nil,
+        ].compactMap { $0 }
+        switch services.count {
+        case 0:  return "Connect AniList or MyAnimeList"
+        case 1:  return "\(services[0]) Account & Tracking"
+        default: return services.joined(separator: ", ") + ", and Tracking"
+        }
+    }
+
+    private var accountInitials: String {
+        let name = accountDisplayName
+        let parts = name.split(separator: " ")
+        if parts.count >= 2 {
+            let first = parts[0].prefix(1)
+            let second = parts[1].prefix(1)
+            return "\(first)\(second)".uppercased()
+        } else if name.count >= 2 {
+            return String(name.prefix(2)).uppercased()
+        } else if !name.isEmpty {
+            return name.uppercased()
+        }
+        return "S"
+    }
+
+    private var accountAvatarURL: String? {
+        if aniListAuth.isLoggedIn, let url = aniListAuth.avatarURL, !url.isEmpty {
+            return url
+        }
+        if malAuth.isLoggedIn, let url = malAuth.avatarURL, !url.isEmpty {
+            return url
+        }
+        return nil
+    }
+
+    @ViewBuilder
+    private var accountAvatar: some View {
+        if let url = accountAvatarURL {
+            CachedAsyncImage(urlString: url)
+                .aspectRatio(contentMode: .fill)
+                .frame(width: 52, height: 52)
+                .clipShape(Circle())
+                .overlay(Circle().strokeBorder(Color.white.opacity(0.15), lineWidth: 0.5))
+        } else if isAnyAccountSignedIn {
+            ZStack {
+                Circle()
+                    .fill(Color(red: 0.35, green: 0.75, blue: 0.98))
+                    .frame(width: 52, height: 52)
+                Text(accountInitials)
+                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
+            }
+        } else {
+            ZStack {
+                Circle()
+                    .fill(Color(red: 0.35, green: 0.75, blue: 0.98))
+                    .frame(width: 52, height: 52)
+                Image(systemName: "person.fill")
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundStyle(.white)
             }
         }
-        #if os(iOS)
-        .listStyle(.insetGrouped)
-        #endif
-        .navigationTitle("Settings")
-        .inlineNavBar()
-        .searchable(text: $searchText, prompt: "Search settings…")
-        .onChangeOf(searchText) { query in
-            searchResults = SettingsSearchIndex.search(query)
-        }
-        // #125 — Hidden NavigationLink that pushes the selected settings
-        // page. The binding flips to non-nil when a search result is tapped,
-        // and back to nil on pop. Works on iOS 15+ where
-        // `navigationDestination(item:)` isn't available.
-        .background(
-            NavigationLink(
-                destination: Group {
-                    if let page = pushedPage {
-                        settingsPageView(for: page)
-                    }
-                },
-                isActive: Binding(
-                    get: { pushedPage != nil },
-                    set: { active in if !active { pushedPage = nil } }
-                )
-            ) { EmptyView() }
-        )
-        .onAppear {
+    }
+
+    private var modulesSubtitle: String? {
+        moduleManager.activeModule?.sourceName ?? providerManager.primary?.providerType.displayName
+    }
+
+    #if !os(tvOS)
+    private var storageSubtitle: String? {
+        totalUsage > 0 ? Self.formattedBytes(totalUsage) : nil
+    }
+    #endif
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                #if os(macOS)
+                // Grouped, as the Mac's own settings are; a List there draws one long flat column.
+                Form { sections }
+                    .formStyle(.grouped)
+                #else
+                List { sections }
+                #endif
+            }
+            .softScrollEdges()
+            .navigationTitle("Settings")
             #if os(iOS)
-            PlayerPresenter.shared.resetToAppOrientation()
+            .navigationBarTitleDisplayMode(.large)
+            .onAppear {
+                PlayerPresenter.shared.resetToAppOrientation()
+                totalUsage = CacheManager.shared.totalDiskUsage
+            }
+            #elseif os(macOS)
+            .onAppear {
+                totalUsage = CacheManager.shared.totalDiskUsage
+            }
             #endif
         }
     }
 
-    // MARK: - Category List (default, no search)
-    //
-    // Issue #11 — Settings items were too spread out because each category
-    // was in its own Section (insetGrouped adds ~35pt between sections).
-    // Now consolidated into two cohesive sections so related items sit
-    // close together and the list feels tight and structured.
+    @ViewBuilder
+    private var sections: some View {
+        // Folder 1 — the account.
+        Section {
+            NavigationLink {
+                AccountsSettingsView()
+            } label: {
+                HStack(spacing: 14) {
+                    accountAvatar
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(accountDisplayName)
+                            .font(.headline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                        Text(accountSubtitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+        }
 
-    private var categoryList: some View {
-        List {
-            // Section 1: Content & Playback (Appearance, Playback, Subtitles)
-            Section {
-                NavigationLink {
-                    AppearanceSettingsPage()
-                } label: {
-                    SettingsCategoryRow(icon: "paintbrush.fill", title: "Appearance", subtitle: "Theme, accent color, motion")
-                }
-                NavigationLink {
-                    PlaybackSettingsPage()
-                } label: {
-                    SettingsCategoryRow(icon: "play.circle.fill", title: "Playback", subtitle: "Player, quality, skip, speed")
-                }
-                NavigationLink {
-                    SubtitleSettingsPage()
-                } label: {
-                    SettingsCategoryRow(icon: "captions.bubble.fill", title: "Subtitles", subtitle: "Style, color, presets, live preview")
-                }
+        // Folder 2 — content & playback.
+        Section {
+            NavigationLink {
+                AppearanceSettingsPage()
+            } label: {
+                SettingsNavRow(icon: "paintbrush.fill", title: "Appearance",
+                               subtitle: "Theme, accent, UI mode")
             }
 
-            // Section 2: Library & Tracking
-            Section {
-                NavigationLink {
-                    LibrarySettingsPage()
-                } label: {
-                    SettingsCategoryRow(icon: "books.vertical.fill", title: "Library", subtitle: "Tracking, sync, scores")
-                }
-                NavigationLink {
-                    TrackersSettingsPage()
-                } label: {
-                    SettingsCategoryRow(icon: "antenna.radiowaves.left.and.right", title: "Trackers", subtitle: "AniList, MAL, sync settings")
-                }
+            NavigationLink {
+                PlayerSettingsView()
+            } label: {
+                SettingsNavRow(icon: "play.tv", title: "Player")
             }
 
-            // Section 3: Sources & Modules
-            Section {
-                NavigationLink {
-                    SourcesSettingsPage()
-                } label: {
-                    SettingsCategoryRow(icon: "person.crop.circle.badge.checkmark", title: "Sources", subtitle: "AniList, MyAnimeList, accounts")
-                }
-                NavigationLink {
-                    DataSourcesSettingsPage()
-                } label: {
-                    SettingsCategoryRow(icon: "server.rack", title: "Data Sources", subtitle: "Provider priority, health, tests, cache")
-                }
-                NavigationLink {
-                    ModulesSettingsPage()
-                } label: {
-                    SettingsCategoryRow(icon: "puzzlepiece.extension.fill", title: "Modules", subtitle: "Streaming sources, store")
-                }
+            NavigationLink {
+                SubtitleSettingsPage()
+            } label: {
+                SettingsNavRow(icon: "captions.bubble", title: "Subtitles",
+                               subtitle: "Style, presets, live preview")
             }
 
-            // Section 4: Schedule & Notifications
-            Section {
-                NavigationLink {
-                    ScheduleSettingsPage()
-                } label: {
-                    SettingsCategoryRow(icon: "calendar", title: "Schedule", subtitle: "Airing schedules, timing")
-                }
-                NavigationLink {
-                    NotificationsSettingsPage()
-                } label: {
-                    SettingsCategoryRow(icon: "bell.fill", title: "Notifications", subtitle: "Reminders, airing alerts")
-                }
+            #if !os(tvOS)
+            NavigationLink {
+                ReaderSettingsView()
+            } label: {
+                SettingsNavRow(icon: "book", title: "Reader")
+            }
+            #endif
+
+            NavigationLink {
+                ModulesSettingsPage()
+            } label: {
+                SettingsNavRow(icon: "puzzlepiece.extension", title: "Modules",
+                               subtitle: modulesSubtitle)
+            }
+        }
+
+        // Folder 3 — library & data.
+        Section {
+            NavigationLink {
+                LibrarySettingsPage()
+            } label: {
+                SettingsNavRow(icon: "books.vertical", title: "Library",
+                               subtitle: "Lists & Matching")
             }
 
-            // Section 5: Data (v2.22 — Advanced Cache Management merged
-            // into Storage; every category clears individually there)
-            Section {
-                NavigationLink {
-                    StorageManagementPage()
-                } label: {
-                    SettingsCategoryRow(icon: "internaldrive.fill", title: "Storage", subtitle: "Downloads, caches, per-category clearing")
-                }
-                NavigationLink {
-                    BackupRestoreSettingsPage()
-                } label: {
-                    SettingsCategoryRow(icon: "externaldrive.badge.timemachine", title: "Backup & Restore", subtitle: "Export/import preferences")
-                }
-                NavigationLink {
-                    LoggerSettingsPage()
-                } label: {
-                    SettingsCategoryRow(icon: "terminal", title: "Logger", subtitle: "App logs, debug info")
-                }
+            NavigationLink {
+                DownloadsSettingsPage()
+            } label: {
+                SettingsNavRow(icon: "arrow.down.circle", title: "Downloads")
             }
 
-            // Section 6: Updates, Change Log & About (v2.22 — Updates got
-            // its own dedicated section; "Update Log" renamed to
-            // "Change Log")
-            Section {
-                NavigationLink {
-                    UpdatesSettingsPage()
-                } label: {
-                    SettingsCategoryRow(icon: "arrow.down.circle.fill", title: "Updates", subtitle: "Version, check, install, what's new")
-                }
-                NavigationLink {
-                    UpdateLogPage()
-                } label: {
-                    SettingsCategoryRow(icon: "list.bullet.clipboard.fill", title: "Change Log", subtitle: "See what's new, fixed, and changed")
-                }
-                NavigationLink {
-                    AboutSettingsPage()
-                } label: {
-                    SettingsCategoryRow(icon: "info.circle.fill", title: "About", subtitle: "Version, licenses")
-                }
+            NavigationLink {
+                ScheduleSettingsPage()
+            } label: {
+                SettingsNavRow(icon: "calendar", title: "Schedule",
+                               subtitle: "Airing schedule, timing")
+            }
+
+            NavigationLink {
+                NotificationsSettingsPage()
+            } label: {
+                SettingsNavRow(icon: "bell", title: "Notifications",
+                               subtitle: "Reminders, airing alerts")
+            }
+
+            #if !os(tvOS)
+            NavigationLink {
+                StorageManagementPage()
+            } label: {
+                SettingsNavRow(icon: "internaldrive", title: "Storage & Cache",
+                               subtitle: storageSubtitle)
+            }
+            #endif
+        }
+
+        // Folder 4 — system.
+        Section {
+            #if !os(tvOS)
+            NavigationLink {
+                BackupSettingsView()
+            } label: {
+                SettingsNavRow(icon: "arrow.up.arrow.down.circle", title: "Backup & Restore")
+            }
+            #endif
+
+            NavigationLink {
+                SettingsViewLogger()
+            } label: {
+                SettingsNavRow(icon: "terminal", title: "App Logs")
+            }
+        }
+
+        // Folder 5 — about.
+        Section {
+            NavigationLink {
+                UpdatesSettingsPage()
+            } label: {
+                SettingsNavRow(icon: "arrow.down.circle.fill", title: "Updates",
+                               subtitle: "Version, check, install")
+            }
+
+            NavigationLink {
+                UpdateLogPage()
+            } label: {
+                SettingsNavRow(icon: "list.bullet.clipboard.fill", title: "Change Log",
+                               subtitle: "What's new, fixed, and changed")
+            }
+
+            NavigationLink {
+                AboutSettingsPage()
+            } label: {
+                SettingsNavRow(icon: "info.circle.fill", title: "About",
+                               subtitle: "Version, licenses")
+            }
+
+            LabeledContent("Version") {
+                let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
+                let build   = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
+                Text("\(version) (\(build))")
+                    .foregroundStyle(.secondary)
             }
         }
     }
 
-    // MARK: - Search Results List (#125)
+    static func formattedBytes(_ bytes: Int) -> String {
+        guard bytes > 0 else { return "0 KB" }
+        if bytes >= 1_000_000 {
+            return String(format: "%.1f MB", Double(bytes) / 1_000_000)
+        }
+        return String(format: "%.0f KB", Double(bytes) / 1_000)
+    }
+}
 
-    /// Replaces the category list when the user types in the search bar.
-    /// Each row shows the setting's icon, label, and the page it lives on;
-    /// tapping pushes the page (and the destination page can use the entry's
-    /// `anchor` with a ScrollViewReader to scroll to the exact row).
-    private var searchResultsList: some View {
-        List {
-            if searchResults.isEmpty {
-                Section {
-                    VStack(spacing: 8) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 28))
-                            .foregroundStyle(.tertiary)
-                        Text("No settings match \"\(searchText)\"")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                        Text("Try a different name or check the category list above.")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                            .multilineTextAlignment(.center)
+// MARK: - Accounts & Tracking Settings
+
+/// The original's account page: the provider list (primary + sign-in) and the
+/// tracking toggles. (The original also offers Simkl sign-in and library
+/// sync/overwrite/mirror here — those arrive with the Simkl port.)
+struct AccountsSettingsView: View {
+    @ObservedObject private var aniListAuth = AniListAuthManager.shared
+    @ObservedObject private var malAuth = MALAuthManager.shared
+
+    @AppStorage("aniListTrackingEnabled") private var aniListTrackingEnabled = true
+    @AppStorage("malTrackingEnabled") private var malTrackingEnabled = true
+    @AppStorage("skipReWatchTracking") private var skipReWatchTracking = true
+    @AppStorage("rateOnFinish") private var rateOnFinish = true
+    @AppStorage("trackersEnableSync") private var trackersEnableSync = true
+    @AppStorage("trackersAutoSyncRatings") private var trackersAutoSyncRatings = true
+
+    var body: some View {
+        SettingsList {
+            ProvidersSettingsSection()
+
+            if aniListAuth.isLoggedIn || malAuth.isLoggedIn {
+                Section("Tracking") {
+                    if aniListAuth.isLoggedIn {
+                        Toggle("Track on AniList", isOn: $aniListTrackingEnabled)
+                            .tint(.secondary)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 24)
-                }
-            } else {
-                Section {
-                    ForEach(searchResults) { entry in
-                        Button {
-                            pushedPage = entry.page
-                        } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: entry.icon)
-                                    .font(.system(size: 18))
-                                    .foregroundStyle(Color.appAccent)
-                                    .frame(width: 28, alignment: .center)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(entry.label)
-                                        .font(.body)
-                                        .foregroundStyle(.primary)
-                                    Text(entry.category)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Spacer(minLength: 0)
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                                    .foregroundStyle(.tertiary)
-                            }
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
+                    if malAuth.isLoggedIn {
+                        Toggle("Track on MyAnimeList", isOn: $malTrackingEnabled)
+                            .tint(.secondary)
                     }
-                } header: {
-                    Text("\(searchResults.count) result\(searchResults.count == 1 ? "" : "s")")
-                        .font(.caption.weight(.semibold))
+                    Toggle("Sync Trackers", isOn: $trackersEnableSync)
+                        .tint(.secondary)
+                    Toggle("Auto-Sync Ratings", isOn: $trackersAutoSyncRatings)
+                        .tint(.secondary)
+                    Toggle("Never reduce progress", isOn: $skipReWatchTracking)
+                        .tint(.secondary)
+                    Toggle("Prompt to rate after finishing", isOn: $rateOnFinish)
+                        .tint(.secondary)
+                    Text("Automatically update your watch progress as you watch.")
+                        .font(.caption)
                         .foregroundStyle(.secondary)
-                        .textCase(nil)
                 }
             }
+        }
+        .softScrollEdges()
+        .navigationTitle("Accounts & Tracking")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+    }
+}
+
+// MARK: - Providers Section (original)
+
+/// The original's source management for trackers/metadata: drag to set which of
+/// AniList / MyAnimeList is primary, with sign-in right on each row.
+private struct ProvidersSettingsSection: View {
+    @ObservedObject private var manager = ProviderManager.shared
+    @ObservedObject private var malAuth = MALAuthManager.shared
+    @ObservedObject private var aniListAuth = AniListAuthManager.shared
+    #if os(iOS)
+    @State private var presentationWindow: UIWindow?
+    #endif
+
+    var body: some View {
+        Section {
+            ForEach(manager.orderedProviders, id: \.providerType) { provider in
+                HStack(spacing: 12) {
+                    Image(systemName: "line.3.horizontal")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                    CachedAsyncImage(urlString: provider.providerType.iconURL)
+                        .frame(width: 28, height: 28)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(provider.providerType.displayName)
+                            .font(.headline)
+                        Text(providerStatus(provider))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    HStack(spacing: 8) {
+                        if manager.orderedProviders.first?.providerType == provider.providerType {
+                            Text("Primary")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(Color.accentColor)
+                                .padding(.horizontal, 8).padding(.vertical, 3)
+                                .background(.primary.opacity(0.1), in: Capsule())
+                        } else if isSignedIn(provider.providerType) {
+                            Button("Make Primary") {
+                                manager.selectProvider(provider.providerType)
+                            }
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Color.accentColor)
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(Color.accentColor.opacity(0.1), in: Capsule())
+                            .buttonStyle(.plain)
+                        }
+                        #if !os(tvOS)
+                        providerAuthButton(for: provider.providerType)
+                        #endif
+                    }
+                }
+            }
+            .onMove { from, to in
+                manager.moveProvider(from: from, to: to)
+            }
+            Text("Drag to reorder. The first provider is primary; the second is used as fallback.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } header: {
+            Text("Providers")
+        }
+        #if os(iOS)
+        .environment(\.editMode, .constant(.active))
+        .onAppear {
+            presentationWindow = UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap { $0.windows }
+                .first { $0.isKeyWindow }
+        }
+        #endif
+    }
+
+    #if !os(tvOS)
+    @ViewBuilder
+    private func providerAuthButton(for type: ProviderType) -> some View {
+        let isLoggedIn = type == .anilist ? aniListAuth.isLoggedIn : malAuth.isLoggedIn
+        Button(isLoggedIn ? "Sign Out" : "Sign In") {
+            if isLoggedIn {
+                if type == .anilist { aniListAuth.logout() } else { malAuth.logout() }
+            } else {
+                #if os(iOS)
+                let anchor = presentationWindow
+                #else
+                let anchor = keyPresentationAnchor()
+                #endif
+                if let window = anchor {
+                    if type == .anilist {
+                        aniListAuth.login(presentationAnchor: window)
+                    } else {
+                        malAuth.login(presentationAnchor: window)
+                    }
+                }
+            }
+        }
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(isLoggedIn ? .red : Color.accentColor)
+        .padding(.horizontal, 8).padding(.vertical, 3)
+        .background((isLoggedIn ? Color.red : Color.accentColor).opacity(0.1), in: Capsule())
+        .buttonStyle(.plain)
+    }
+    #endif
+
+    private func isSignedIn(_ type: ProviderType) -> Bool {
+        switch type {
+        case .anilist: return aniListAuth.isLoggedIn
+        case .mal:     return malAuth.isLoggedIn
+        case .local:   return false   // not a sign-in-able provider
+        }
+    }
+
+    private func providerStatus(_ provider: any MediaProvider) -> String {
+        switch provider.providerType {
+        case .anilist:
+            guard aniListAuth.isLoggedIn else { return "Not signed in" }
+            // A token AniList has started refusing still has `isLoggedIn` true — the token is
+            // kept on purpose, since a revoked one and a failing auth backend are
+            // indistinguishable from here. Saying "Signed in" while every sync fails is the
+            // part that left people with no idea what to do about it.
+            return aniListAuth.needsReauthentication ? "Sign in again" : "Signed in"
+        case .mal:   return malAuth.isLoggedIn ? "Signed in" : "Not signed in"
+        case .local: return "Not signed in"
         }
     }
 }
 
-// MARK: - Library Settings
+// MARK: - Player Settings (original page, fork-adapted)
 
-struct LibrarySettingsView: View {
+/// The original's Player page. The engine picker (Native/MPV) and the
+/// hold-action picker (save-frame) arrive with the MPV port; quality writes
+/// this fork's `preferredVideoQuality` key, which the player reads.
+struct PlayerSettingsView: View {
+    fileprivate static var isMac: Bool {
+        #if os(macOS)
+        true
+        #else
+        false
+        #endif
+    }
+
+    @AppStorage("forceLandscape") private var forceLandscape = false
+    @AppStorage("playerLiquidGlass") private var playerLiquidGlass = true
+    @AppStorage("preferredVideoQuality") private var preferredQuality: String = "auto"
+    @AppStorage("playerSkipShort") private var skipShort: Int = 10
+    @AppStorage("playerSkipLong") private var skipLong: Int = 85
+    @AppStorage("autoNextEpisode") private var autoNextEpisode = true
+    @AppStorage("autoPauseOnControlCenter") private var pauseForControlCenter = true
+    @AppStorage("autoSkipSegments") private var autoSkipSegments = true
+    @AppStorage("watchedPercentage") private var watchedPercentage = 90.0
+
+    private let shortOptions = [5, 10, 15, 30]
+    private let longOptions  = [30, 60, 85, 90, 120, 150, 180]
+
+    var body: some View {
+        SettingsList {
+            Section("Display & Style") {
+                // A phone's: a Mac's player is a window.
+                #if !os(macOS)
+                Toggle("Force Landscape Mode", isOn: $forceLandscape)
+                    .tint(.secondary)
+                    #if os(iOS)
+                    .onChangeOf(forceLandscape) {
+                        PlayerPresenter.shared.resetToAppOrientation()
+                    }
+                    #endif
+                #endif
+
+                if #available(iOS 26.0, macOS 26.0, *) {
+                    Toggle("Liquid Glass Controls", isOn: $playerLiquidGlass)
+                        .tint(.secondary)
+                    Text("Frosted glass buttons in the video player. Turn off for solid controls.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Section(Self.isMac ? "Playback Quality" : "Playback Quality & Gestures") {
+                Picker("Preferred Quality", selection: $preferredQuality) {
+                    Text("Auto").tag("auto")
+                    Text("Highest").tag("highest")
+                    Text("1080p").tag("1080")
+                    Text("720p").tag("720")
+                    Text("480p").tag("480")
+                    Text("Lowest").tag("lowest")
+                }
+                Text("Which rendition to start on when a stream offers several. Auto lets the player adapt to your connection; a fixed choice falls back to the closest available.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                #if os(iOS)
+                Toggle("Pause for Control Center", isOn: $pauseForControlCenter)
+                    .tint(.secondary)
+                Text("Pauses while Control Center or Notification Center is open and picks up again when you close it. Leaving the app or locking the phone still plays in the background.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                #endif
+            }
+
+            Section("Skipping") {
+                Picker("Skip Duration", selection: $skipShort) {
+                    ForEach(shortOptions, id: \.self) { s in
+                        Text("\(s)s").tag(s)
+                    }
+                }
+                Picker("Long Skip Duration", selection: $skipLong) {
+                    ForEach(longOptions, id: \.self) { s in
+                        Text("\(s)s").tag(s)
+                    }
+                }
+                Toggle("Auto-Skip Segments", isOn: $autoSkipSegments)
+                    .tint(.secondary)
+                Text("Automatically skip intros, recaps, credits, and previews")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Episodes & Progress") {
+                Toggle("Auto Next Episode", isOn: $autoNextEpisode)
+                    .tint(.secondary)
+
+                Toggle("Reverse Episode List by Default", isOn: EpisodeSortManager.shared.$defaultReverseSort)
+                    .tint(.secondary)
+
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("Episode Progress Threshold")
+                        Spacer()
+                        Text("\(Int(watchedPercentage))%")
+                            .font(.headline)
+                            .monospacedDigit()
+                    }
+                    #if !os(tvOS)
+                    Slider(value: $watchedPercentage, in: 50...100, step: 1)
+                    #endif
+                }
+            }
+
+            // This fork's deeper player options, kept whole under the original page.
+            Section("Advanced") {
+                NavigationLink {
+                    PlayerGeneralSettingsPage()
+                } label: {
+                    SettingsNavRow(icon: "gearshape.fill", title: "General",
+                                   subtitle: "Speed, controls, layout")
+                }
+                NavigationLink {
+                    QualitySettingsPage()
+                } label: {
+                    SettingsNavRow(icon: "sparkles.tv.fill", title: "Quality & Data Saver",
+                                   subtitle: "Resolution, data saving")
+                }
+                NavigationLink {
+                    GesturesSettingsPage()
+                } label: {
+                    SettingsNavRow(icon: "hand.tap.fill", title: "Gestures",
+                                   subtitle: "Touch controls")
+                }
+                NavigationLink {
+                    SkipSegmentsSettingsPage()
+                } label: {
+                    SettingsNavRow(icon: "forward.end.fill", title: "Skip Segments",
+                                   subtitle: "AniSkip, IntroDB, auto-skip")
+                }
+                NavigationLink {
+                    NextEpisodeSettingsPage()
+                } label: {
+                    SettingsNavRow(icon: "arrow.right.circle.fill", title: "Next Episode",
+                                   subtitle: "Auto-play, appearance")
+                }
+                NavigationLink {
+                    HoldSpeedSettingsPage()
+                } label: {
+                    SettingsNavRow(icon: "speedometer", title: "Hold-Speed",
+                                   subtitle: "Sensitivity, multiplier")
+                }
+                NavigationLink {
+                    AudioSettingsPage()
+                } label: {
+                    SettingsNavRow(icon: "speaker.wave.2.fill", title: "Audio",
+                                   subtitle: "Surround, comfort")
+                }
+                NavigationLink {
+                    PiPSettingsPage()
+                } label: {
+                    SettingsNavRow(icon: "pip.fill", title: "Picture-in-Picture",
+                                   subtitle: "PiP, auto-pause")
+                }
+                NavigationLink {
+                    StreamingSettingsPage()
+                } label: {
+                    SettingsNavRow(icon: "dot.radiowaves.left.and.right", title: "Streaming",
+                                   subtitle: "Progress threshold")
+                }
+                NavigationLink {
+                    AutoPickSettingsPage()
+                } label: {
+                    SettingsNavRow(icon: "wand.and.stars", title: "Auto Pick",
+                                   subtitle: "Playback automation")
+                }
+            }
+        }
+        .softScrollEdges()
+        .navigationTitle("Player")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            PlayerPresenter.shared.resetToAppOrientation()
+        }
+        #endif
+    }
+}
+
+// MARK: - Reader Settings (original page, fork-adapted)
+
+#if !os(tvOS)
+/// The original's Reader page. The page-curl toggle arrives with the reader
+/// rework; this fork's full reading options live in Reading Mode's settings.
+struct ReaderSettingsView: View {
+    @AppStorage("readerLiquidGlass") private var readerLiquidGlass = true
+
+    var body: some View {
+        SettingsList {
+            if #available(iOS 26.0, macOS 26.0, *) {
+                Section {
+                    Toggle("Liquid Glass Controls", isOn: $readerLiquidGlass)
+                        .tint(.secondary)
+                } header: {
+                    Text("Style")
+                } footer: {
+                    Text("Frosted glass buttons in the manga reader. Turn off for solid controls.")
+                }
+            } else {
+                Section {
+                    Text("Liquid Glass reader controls need \(Self.systemName) 26.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Section {
+                NavigationLink {
+                    MangaSettingsView()
+                } label: {
+                    SettingsNavRow(icon: "book.fill", title: "Reading Settings",
+                                   subtitle: "Reading Mode's full options")
+                }
+            }
+        }
+        .softScrollEdges()
+        .navigationTitle("Reader")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+    }
+
+    private static var systemName: String {
+        #if os(macOS)
+        "macOS"
+        #else
+        "iOS"
+        #endif
+    }
+}
+#endif
+
+// MARK: - Modules Settings (original page)
+
+/// The original's Modules page: manage installed modules (the app's streaming
+/// and reading sources) and open the module store.
+struct ModulesSettingsPage: View {
+    enum ModuleMediaType { case manga }
+
+    var mediaType: ModuleMediaType? = nil
+
+    @EnvironmentObject private var moduleManager: ModuleManager
+    @ObservedObject private var providerManager = ProviderManager.shared
+
+    var body: some View {
+        SettingsList {
+            Section {
+                NavigationLink {
+                    ModuleListView()
+                } label: {
+                    HStack(spacing: 12) {
+                        Group {
+                            if let active = moduleManager.activeModule {
+                                CachedAsyncImage(urlString: active.iconUrl ?? "", base64String: active.iconData)
+                            } else {
+                                AsyncImage(url: URL(string: providerManager.primary?.providerType.iconURL ?? "")) { phase in
+                                    if case .success(let image) = phase {
+                                        image.resizable().aspectRatio(contentMode: .fit)
+                                    } else {
+                                        Image(systemName: "list.bullet")
+                                            .font(.title)
+                                            .foregroundStyle(Color.red)
+                                    }
+                                }
+                            }
+                        }
+                        .frame(width: 44, height: 44)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .background(Color.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(moduleManager.activeModule?.sourceName ?? providerManager.primary?.providerType.displayName ?? "AniList")
+                                .font(.headline)
+                            Text("Manage Installed Modules")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+
+            Section {
+                NavigationLink {
+                    ModuleStorePage(mediaType: mediaType)
+                } label: {
+                    SettingsNavRow(icon: "square.grid.2x2.fill", title: "Module Store",
+                                   subtitle: "Browse community modules")
+                }
+            }
+        }
+        .softScrollEdges()
+        .navigationTitle("Modules")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+    }
+}
+
+// MARK: - Library Settings (original page, fork-adapted)
+
+/// The original's Library page: list order, card behaviour, layout, matching
+/// and the on-device library. (New-episode badges arrive with that system.)
+struct LibrarySettingsPage: View {
+    @AppStorage("titleLanguagePriority") private var titlePriority = "english,romaji,native"
+    @AppStorage("localAutoTrackEnabled") private var localAutoTrackEnabled = true
+    @AppStorage("localScoreFormat") private var localScoreFormatRaw: String = ScoreFormat.point10Decimal.rawValue
+    @AppStorage(GooeyRefreshGeometry.settingKey) private var gooeyRefresh = true
+    @AppStorage(CardTitleSetting.hiddenKey) private var hideCardTitles = false
+    @AppStorage(DetailLayoutSetting.cinematicHomeKey) private var cinematicHomeLayout = true
+    @State private var showClearLocalLibrary = false
+
+    private var orderedLanguages: [String] {
+        titlePriority.components(separatedBy: ",").filter { !$0.isEmpty }
+    }
+
+    var body: some View {
+        SettingsList {
+            Section {
+                NavigationLink {
+                    LibraryListOrderView()
+                } label: {
+                    Label("List Order & Custom Lists", systemImage: "list.bullet.indent")
+                }
+            }
+
+            Section {
+                Toggle("Hide Titles on Cards", isOn: $hideCardTitles)
+                    .tint(.secondary)
+                Text("Posters from TVDB carry the show's name, so the title over them says it twice. Hold a card for its full title.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } header: {
+                Text("Cards")
+            }
+
+            if DetailLayoutSetting.isOffered {
+                Section {
+                    Toggle("Cinematic Home", isOn: $cinematicHomeLayout)
+                        .tint(.secondary)
+                } header: {
+                    Text("Layout")
+                } footer: {
+                    Text("The featured show's artwork fills the window on iPad, with the rows scrolling up over it. Turn off for the banner layout with the rows under it.")
+                }
+            }
+
+            #if os(iOS)
+            Section {
+                Toggle("Gooey Pull to Refresh", isOn: $gooeyRefresh)
+                    .tint(.secondary)
+            } footer: {
+                Text("Pulling to refresh stretches a drop out of the Dynamic Island that holds the spinner. Turn off for a frosted circle instead, as sheets always use.")
+            }
+            #endif
+
+            Section("Matching") {
+                ForEach(orderedLanguages, id: \.self) { lang in
+                    HStack {
+                        Image(systemName: "line.3.horizontal")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                        Text(lang.capitalized)
+                    }
+                }
+                .onMove { from, to in
+                    var langs = orderedLanguages
+                    langs.move(fromOffsets: from, toOffset: to)
+                    titlePriority = langs.joined(separator: ",")
+                }
+                Text("Drag to reorder title priority for display and matching.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            #if os(iOS)
+            .environment(\.editMode, .constant(.active))
+            #endif
+
+            Section {
+                Toggle("Auto-track what you watch", isOn: $localAutoTrackEnabled)
+                    .tint(.secondary)
+                Picker("Score Format", selection: $localScoreFormatRaw) {
+                    Text("100 Point").tag(ScoreFormat.point100.rawValue)
+                    Text("10 Point (Decimal)").tag(ScoreFormat.point10Decimal.rawValue)
+                    Text("10 Point").tag(ScoreFormat.point10.rawValue)
+                    Text("5 Star").tag(ScoreFormat.point5.rawValue)
+                    Text("3 Point").tag(ScoreFormat.point3.rawValue)
+                }
+                Button(role: .destructive) {
+                    showClearLocalLibrary = true
+                } label: {
+                    Label("Clear Local Library", systemImage: "trash")
+                }
+            } header: {
+                Text("Local Library")
+            } footer: {
+                Text("Your on-device library works without signing in. Auto-track keeps its Watching list in sync with what you watch.")
+            }
+            .alert("Clear Local Library", isPresented: $showClearLocalLibrary) {
+                Button("Clear", role: .destructive) { LocalLibraryManager.shared.clearAll() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This permanently removes all on-device entries and collections. AniList/MyAnimeList lists are not affected.")
+            }
+        }
+        .softScrollEdges()
+        .navigationTitle("Library")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+    }
+}
+
+// MARK: - Library List Order View (original)
+
+struct LibraryListOrderView: View {
     @AppStorage("libraryStatusOrder") private var statusOrderRaw: String = MediaListStatus.allCases.map(\.rawValue).joined(separator: ",")
 
     private var statuses: [MediaListStatus] {
@@ -312,7 +1009,8 @@ struct LibrarySettingsView: View {
                 }
             }
         }
-        .navigationTitle("Library")
+        .softScrollEdges()
+        .navigationTitle("List Order")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         .environment(\.editMode, .constant(.active))
@@ -331,5234 +1029,38 @@ struct LibrarySettingsView: View {
     }
 }
 
-// MARK: - Logger Views & Utilities
+// MARK: - Downloads Settings (original page, fork-adapted)
 
-private func logTypeColor(_ type: String) -> Color {
-    switch type {
-    case "Error":       return .red
-    case "Debug":       return .blue
-    case "Stream":      return .green
-    case "Download":    return .orange
-    case "HTMLStrings": return .purple
-    default:            return .secondary
-    }
-}
-
-private func logTypeIcon(_ type: String) -> String {
-    switch type {
-    case "Error":       return "exclamationmark.triangle.fill"
-    case "Debug":       return "ladybug.fill"
-    case "Stream":      return "play.circle.fill"
-    case "Download":    return "arrow.down.circle.fill"
-    case "HTMLStrings": return "text.alignleft"
-    default:            return "gear"
-    }
-}
-
-struct LogEntryRow: View {
-    let entry: Logger.LogEntry
-
-    private static let timeFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm:ss.SSS"
-        return f
-    }()
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                Image(systemName: logTypeIcon(entry.type))
-                    .font(.caption)
-                    .foregroundStyle(logTypeColor(entry.type))
-                Text(entry.type.uppercased())
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(logTypeColor(entry.type))
-                Spacer()
-                Text(Self.timeFormatter.string(from: entry.timestamp))
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .monospacedDigit()
-            }
-            Text(entry.message)
-                .font(.system(.caption, design: .monospaced))
-                #if !os(tvOS)
-                .textSelection(.enabled)
-                #endif
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(logTypeColor(entry.type).opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(logTypeColor(entry.type).opacity(0.18), lineWidth: 1)
-        )
-    }
-}
-
-struct SettingsViewLogger: View {
-    @State private var entries: [Logger.LogEntry] = []
-    @State private var isLoading: Bool = true
-    @State private var searchText: String = ""
-    @StateObject private var filterViewModel = LogFilterViewModel.shared
-
-    private var filteredEntries: [Logger.LogEntry] {
-        let base = searchText.isEmpty ? entries : entries.filter {
-            $0.message.localizedCaseInsensitiveContains(searchText) || $0.type.localizedCaseInsensitiveContains(searchText)
-        }
-        return base.reversed()
-    }
-
-    var body: some View {
-        Group {
-            if isLoading {
-                ProgressView("Loading logs…")
-            } else if filteredEntries.isEmpty {
-                ContentUnavailableView(
-                    entries.isEmpty ? "No Logs" : "No Results",
-                    systemImage: entries.isEmpty ? "doc.text" : "magnifyingglass",
-                    description: Text(entries.isEmpty ? "Nothing has been logged yet." : "No logs match your search.")
-                )
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 6) {
-                        ForEach(filteredEntries) { entry in
-                            LogEntryRow(entry: entry)
-                        }
-                    }
-                    .padding()
-                }
-            }
-        }
-        .searchable(text: $searchText, prompt: "Search logs")
-        .navigationTitle("Logs")
-        .inlineNavBar()
-        .onAppear { loadEntries() }
-        .toolbar {
-            ToolbarItemGroup(placement: .automatic) {
-                Menu {
-                    Button {
-                        let text = entries.map { "[\($0.type)] \($0.message)" }.joined(separator: "\n")
-                        #if os(iOS)
-                        UIPasteboard.general.string = text
-                        #endif
-                    } label: {
-                        Label("Copy to Clipboard", systemImage: "doc.on.doc")
-                    }
-                    Button(role: .destructive) {
-                        Task {
-                            await Logger.shared.clearLogsAsync()
-                            await MainActor.run { entries = [] }
-                        }
-                    } label: {
-                        Label("Clear Logs", systemImage: "trash")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                }
-
-                NavigationLink(destination: SettingsViewLoggerFilter(viewModel: filterViewModel)) {
-                    Image(systemName: "slider.horizontal.3")
-                }
-            }
-        }
-    }
-
-    private func loadEntries() {
-        Task {
-            let loaded = await Logger.shared.getLogEntriesAsync()
-            await MainActor.run {
-                self.entries = loaded
-                self.isLoading = false
-            }
-        }
-    }
-}
-
-struct SettingsViewLoggerFilter: View {
-    @ObservedObject var viewModel = LogFilterViewModel.shared
-
-    var body: some View {
-        List {
-            Section(header: Text("Log Types"), footer: Text("Choose which log categories to record. Debug and HTMLStrings can be very verbose.")) {
-                ForEach($viewModel.filters) { $filter in
-                    Toggle(isOn: $filter.isEnabled) {
-                        Label {
-                            Text(filter.type)
-                        } icon: {
-                            Image(systemName: logTypeIcon(filter.type))
-                                .foregroundStyle(logTypeColor(filter.type))
-                        }
-                    }
-                    .tint(logTypeColor(filter.type))
-                }
-            }
-        }
-        .navigationTitle("Log Filters")
-    }
-}
-
-struct LogFilter: Identifiable, Hashable {
-    let id = UUID()
-    let type: String
-    var isEnabled: Bool
-    let description: String
-}
-
-class LogFilterViewModel: ObservableObject {
-    nonisolated(unsafe) static let shared = LogFilterViewModel()
-    
-    @Published var filters: [LogFilter] = [] {
-        didSet {
-            saveFiltersToUserDefaults()
-        }
-    }
-    
-    private let userDefaultsKey = "LogFilterStates"
-    private let hardcodedFilters: [(type: String, description: String, defaultState: Bool)] = [
-        ("General", "General events and activities.", true),
-        ("Stream", "Streaming and video playback.", true),
-        ("Error", "Errors and critical issues.", true),
-        ("Debug", "Debugging and troubleshooting.", false),
-        ("Network", "Network requests and responses.", false),
-        ("Download", "HLS video downloading.", true),
-        ("HTMLStrings", "Raw HTML response strings.", false)
-    ]
-    
-    private init() {
-        loadFilters()
-    }
-    
-    func loadFilters() {
-        if let savedStates = UserDefaults.standard.dictionary(forKey: userDefaultsKey) as? [String: Bool] {
-            filters = hardcodedFilters.map {
-                LogFilter(
-                    type: $0.type,
-                    isEnabled: savedStates[$0.type] ?? $0.defaultState,
-                    description: $0.description
-                )
-            }
-        } else {
-            filters = hardcodedFilters.map {
-                LogFilter(type: $0.type, isEnabled: $0.defaultState, description: $0.description)
-            }
-        }
-    }
-    
-    func toggleFilter(for type: String) {
-        if let index = filters.firstIndex(where: { $0.type == type }) {
-            filters[index].isEnabled.toggle()
-        }
-    }
-    
-    func isFilterEnabled(for type: String) -> Bool {
-        return filters.first(where: { $0.type == type })?.isEnabled ?? true
-    }
-    
-    private func saveFiltersToUserDefaults() {
-        let states = filters.reduce(into: [String: Bool]()) { result, filter in
-            result[filter.type] = filter.isEnabled
-        }
-        UserDefaults.standard.set(states, forKey: userDefaultsKey)
-    }
-}
-
-class Logger: @unchecked Sendable {
-    static let shared = Logger()
-
-    struct LogEntry: Identifiable {
-        let id = UUID()
-        let message: String
-        let type: String
-        let timestamp: Date
-    }
-    
-    private let queue = DispatchQueue(label: "com.shirox.logger", attributes: .concurrent)
-    private var logs: [LogEntry] = []
-    private let logFileURL: URL
-    private let logFilterViewModel = LogFilterViewModel.shared
-
-    private let maxFileSize = 1024 * 512
-    private let maxLogEntries = 1000 
-    
-    private init() {
-        let documentDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        logFileURL = documentDirectory.appendingPathComponent("logs.txt")
-    }
-    
-    /// Query/fragment keys whose values must never reach the log file.
-    private static let sensitiveURLKeys: Set<String> = [
-        "access_token", "refresh_token", "id_token", "token", "api_key", "apikey",
-        "code", "client_secret", "password", "x-emby-token"
-    ]
-
-    /// Marker substituted for redacted values. Deliberately free of characters that URL
-    /// serialization would percent-encode, so the marker stays readable in the log.
-    static let redactionMarker = "REDACTED"
-
-    /// URL rendered safe for the log file: sensitive query values and any fragment are replaced
-    /// with `redactionMarker`. These logs are written to logs.txt and exported from Settings → App Logs,
-    /// which is what users paste into bug reports — so a stream URL carrying a Jellyfin `api_key`,
-    /// or an OAuth callback carrying `#access_token=…`, must not be written verbatim.
-    static func redact(_ url: URL) -> String {
-        guard var comps = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
-            return "\(url.scheme ?? "?")://\(url.host ?? "?")/\(redactionMarker)"
-        }
-        if let items = comps.queryItems {
-            comps.queryItems = items.map { item in
-                sensitiveURLKeys.contains(item.name.lowercased())
-                    ? URLQueryItem(name: item.name, value: redactionMarker)
-                    : item
-            }
-        }
-        if comps.fragment != nil { comps.fragment = redactionMarker }
-        return comps.string ?? "\(url.scheme ?? "?")://\(url.host ?? "?")\(url.path)"
-    }
-
-    func log(_ message: String, type: String = "General") {
-        guard logFilterViewModel.isFilterEnabled(for: type) else { return }
-        
-        // Deduplicate: if the last log entry has the same type + message,
-        // increment a counter instead of adding a new entry.
-        let entry = LogEntry(message: message, type: type, timestamp: Date())
-        
-        queue.async(flags: .barrier) {
-            // Check if the last entry has the same type + message (dedup)
-            if let last = self.logs.last,
-               last.type == type && last.message == message {
-                // Skip — identical to last entry. The timestamp already
-                // tells us when this started; we don't need hundreds of
-                // identical lines.
-                return
-            }
-            
-            self.logs.append(entry)
-            
-            if self.logs.count > self.maxLogEntries {
-                self.logs.removeFirst(self.logs.count - self.maxLogEntries)
-            }
-            
-            self.saveLogToFile(entry)
-            self.debugLog(entry)
-        }
-    }
-    
-    /// Structured log with context — for API requests, downloads, etc.
-    /// Automatically formats a structured message with all available context.
-    func logStructured(
-        type: String,
-        feature: String,
-        operation: String,
-        provider: String? = nil,
-        contentId: String? = nil,
-        endpoint: String? = nil,
-        httpStatus: Int? = nil,
-        error: String? = nil,
-        responseSnippet: String? = nil,
-        details: String? = nil
-    ) {
-        var parts: [String] = []
-        parts.append("[\(feature)] \(operation)")
-        if let provider { parts.append("provider=\(provider)") }
-        if let contentId { parts.append("id=\(contentId)") }
-        if let endpoint { parts.append("endpoint=\(endpoint)") }
-        if let httpStatus { parts.append("HTTP \(httpStatus)") }
-        if let error { parts.append("error: \(error)") }
-        if let responseSnippet { parts.append("response: \(responseSnippet.prefix(500))") }
-        if let details { parts.append(details) }
-        
-        log(parts.joined(separator: " | "), type: type)
-    }
-    
-    func getLogs() -> String {
-        var result = ""
-        queue.sync {
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
-            result = logs.map { "[\(dateFormatter.string(from: $0.timestamp))] [\($0.type.uppercased())]\n\($0.message)" }
-            .joined(separator: "\n\n" + String(repeating: "─", count: 20) + "\n\n")
-        }
-        return result
-    }
-    
-    func getLogsAsync() async -> String {
-        return await withCheckedContinuation { continuation in
-            queue.async {
-                let dateFormatter = DateFormatter()
-                dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
-                let result = self.logs.map { "[\(dateFormatter.string(from: $0.timestamp))] [\($0.type.uppercased())]\n\($0.message)" }
-                .joined(separator: "\n\n" + String(repeating: "─", count: 20) + "\n\n")
-                continuation.resume(returning: result)
-            }
-        }
-    }
-
-    func getLogEntriesAsync() async -> [LogEntry] {
-        return await withCheckedContinuation { continuation in
-            queue.async {
-                continuation.resume(returning: self.logs)
-            }
-        }
-    }
-
-    /// Synchronous accessor used by the Logger settings page.
-    /// Pass `nil` (or omit) to return every entry; pass a category name to
-    /// filter by `LogEntry.type` (case-insensitive).
-    func getEntries(category: String? = nil) -> [LogEntry] {
-        var result: [LogEntry] = []
-        queue.sync {
-            if let category {
-                let lowered = category.lowercased()
-                result = logs.filter { $0.type.lowercased() == lowered }
-            } else {
-                result = logs
-            }
-        }
-        return result
-    }
-
-    func clearLogs() {
-        queue.async(flags: .barrier) {
-            self.logs.removeAll()
-            try? FileManager.default.removeItem(at: self.logFileURL)
-        }
-    }
-    
-    func clearLogsAsync() async {
-        await withCheckedContinuation { continuation in
-            queue.async(flags: .barrier) {
-                self.logs.removeAll()
-                try? FileManager.default.removeItem(at: self.logFileURL)
-                continuation.resume()
-            }
-        }
-    }
-    
-    private func saveLogToFile(_ log: LogEntry) {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
-        
-        let separator = String(repeating: "─", count: 20)
-        let logString = "[\(dateFormatter.string(from: log.timestamp))] [\(log.type.uppercased())]\n\(log.message)\n\(separator)\n"
-        
-        guard let data = logString.data(using: .utf8) else {
-            return
-        }
-        
-        do {
-            if FileManager.default.fileExists(atPath: logFileURL.path) {
-                let attributes = try FileManager.default.attributesOfItem(atPath: logFileURL.path)
-                let fileSize = attributes[.size] as? UInt64 ?? 0
-                
-                if fileSize + UInt64(data.count) > maxFileSize {
-                    self.truncateLogFile()
-                }
-                
-                if let handle = try? FileHandle(forWritingTo: logFileURL) {
-                    handle.seekToEndOfFile()
-                    handle.write(data)
-                    handle.closeFile()
-                }
-            } else {
-                try data.write(to: logFileURL)
-            }
-        } catch {
-            try? data.write(to: logFileURL)
-        }
-    }
-    
-    private func truncateLogFile() {
-        do {
-            guard let content = try? String(contentsOf: logFileURL, encoding: .utf8),
-                  !content.isEmpty else {
-                return
-            }
-            
-            let separator = String(repeating: "─", count: 20)
-            let entries = content.components(separatedBy: "\n\(separator)\n")
-            guard entries.count > 10 else { return }
-            
-            let keepCount = entries.count / 2
-            let truncatedEntries = Array(entries.suffix(keepCount))
-            let truncatedContent = truncatedEntries.joined(separator: "\n\(separator)\n")
-            
-            if let truncatedData = truncatedContent.data(using: .utf8) {
-                try truncatedData.write(to: logFileURL)
-            }
-        } catch {
-            try? FileManager.default.removeItem(at: logFileURL)
-        }
-    }
-    
-    private func debugLog(_ entry: LogEntry) {
-#if DEBUG
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "dd-MM HH:mm:ss"
-        let formattedMessage = "[\(dateFormatter.string(from: entry.timestamp))] [\(entry.type)] \(entry.message)"
-        print(formattedMessage)
-#endif
-    }
-}
-
-// MARK: - Providers Settings Section
-
-private struct ProvidersSettingsSection: View {
-    @ObservedObject private var manager = ProviderManager.shared
-    @ObservedObject private var malAuth = MALAuthManager.shared
-    @ObservedObject private var aniListAuth = AniListAuthManager.shared
-    #if os(iOS)
-    @State private var presentationWindow: UIWindow?
-    #endif
-
-    var body: some View {
-        Section {
-            ForEach(manager.orderedProviders, id: \.providerType) { provider in
-                HStack(spacing: 12) {
-                    Image(systemName: "line.3.horizontal")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                    CachedAsyncImage(urlString: provider.providerType.iconURL)
-                        .frame(width: 28, height: 28)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(provider.providerType.displayName)
-                            .font(.headline)
-                        Text(providerStatus(provider))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    HStack(spacing: 8) {
-                        if manager.orderedProviders.first?.providerType == provider.providerType {
-                            Text("Primary")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(Color.accentColor)
-                                .padding(.horizontal, 8).padding(.vertical, 3)
-                                .background(.primary.opacity(0.1), in: Capsule())
-                        } else if isSignedIn(provider.providerType) {
-                            Button("Make Primary") {
-                                manager.selectProvider(provider.providerType)
-                            }
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(Color.appAccent)
-                            .padding(.horizontal, 8).padding(.vertical, 3)
-                            .background(Color.appAccent.opacity(0.1), in: Capsule())
-                            .buttonStyle(.plain)
-                        }
-                        #if os(iOS)
-                        providerAuthButton(for: provider.providerType)
-                        #endif
-                    }
-                }
-            }
-            .onMove { from, to in
-                manager.moveProvider(from: from, to: to)
-            }
-            Text("Drag to reorder. The first provider is primary; the second is used as fallback.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        } header: {
-            Text("Providers")
-        }
-        #if os(iOS)
-        .environment(\.editMode, .constant(.active))
-        .onAppear {
-            presentationWindow = UIApplication.shared.connectedScenes
-                .compactMap { $0 as? UIWindowScene }
-                .flatMap { $0.windows }
-                .first { $0.isKeyWindow }
-        }
-        #endif
-    }
-
-    #if os(iOS)
-    @ViewBuilder
-    private func providerAuthButton(for type: ProviderType) -> some View {
-        let isLoggedIn = type == .anilist ? aniListAuth.isLoggedIn : malAuth.isLoggedIn
-        Button(isLoggedIn ? "Sign Out" : "Sign In") {
-            if isLoggedIn {
-                if type == .anilist { aniListAuth.logout() } else { malAuth.logout() }
-            } else {
-                if let window = presentationWindow {
-                    if type == .anilist {
-                        aniListAuth.login(presentationAnchor: window)
-                    } else {
-                        malAuth.login(presentationAnchor: window)
-                    }
-                }
-            }
-        }
-        .font(.caption.weight(.semibold))
-        .foregroundStyle(isLoggedIn ? .red : Color.accentColor)
-        .padding(.horizontal, 8).padding(.vertical, 3)
-        .background((isLoggedIn ? Color.red : Color.accentColor).opacity(0.1), in: Capsule())
-        .buttonStyle(.plain)
-    }
-    #endif
-
-    private func isSignedIn(_ type: ProviderType) -> Bool {
-        switch type {
-        case .anilist: return aniListAuth.isLoggedIn
-        case .mal:     return malAuth.isLoggedIn
-        case .local:   return false   // not a sign-in-able provider
-        }
-    }
-
-    private func providerStatus(_ provider: any MediaProvider) -> String {
-        switch provider.providerType {
-        case .anilist: return AniListAuthManager.shared.isLoggedIn ? "Signed in" : "Not signed in"
-        case .mal: return malAuth.isLoggedIn ? "Signed in" : "Not signed in"
-        case .local: return "Not signed in"
-        }
-    }
-}
-
-// MARK: - Settings Category Row
-
-struct SettingsCategoryRow: View {
-    let icon: String
-    let title: String
-    let subtitle: String
-
-    var body: some View {
-        HStack(spacing: 16) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 11)
-                    .fill(Color.secondary.opacity(0.1))
-                    .frame(width: 42, height: 42)
-                Image(systemName: icon)
-                    .font(.system(size: 19))
-                    .foregroundStyle(Color.appAccent)
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.body.weight(.medium))
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-        }
-        .padding(.vertical, 4)
-    }
-}
-
-// MARK: - Appearance Settings Page
-
-struct AppearanceSettingsPage: View {
-    @AppStorage("appearanceMode") private var appearanceMode = "system"
-    @AppStorage("accentColorHex") private var accentColorHex = ""
-    @AppStorage("reduceMotion") private var reduceMotion = false
-    @AppStorage("glowEnabled") private var glowEnabled = true
-    @AppStorage("glowIntensity") private var glowIntensity: Double = 0.5
-    /// Issue #5 — Browse Categories layout toggle. OFF = carousels (default),
-    /// ON = grid tiles.
-    @AppStorage("browseCategoriesGridLayout") private var browseCategoriesGridLayout = false
-    /// #122 — Whether to render the Statistics grid on detail pages.
-    @AppStorage("showStatistics") private var showStatistics = true
-    // #118 (revised) — `inlineSearchOnHome` AppStorage removed. Search is now
-    // always triggered by the toolbar icon; there's no alternate mode to toggle.
-
-    private struct AccentSwatch: Identifiable {
-        let id: String
-        let hex: String
-        let title: String
-    }
-
-    private let accentSwatches: [AccentSwatch] = [
-        .init(id: "default", hex: "",        title: "Default"),
-        .init(id: "red",     hex: "#FF453A", title: "Red"),
-        .init(id: "orange",  hex: "#FF9F0A", title: "Orange"),
-        .init(id: "yellow",  hex: "#FFD60A", title: "Yellow"),
-        .init(id: "green",   hex: "#30D158", title: "Green"),
-        .init(id: "mint",    hex: "#63E6E2", title: "Mint"),
-        .init(id: "indigo",  hex: "#5E5CE6", title: "Indigo"),
-        .init(id: "purple",  hex: "#BF5AF2", title: "Purple"),
-        .init(id: "pink",    hex: "#FF375F", title: "Pink")
-    ]
-
-    private let swatchColumns = [GridItem(.adaptive(minimum: 64), spacing: 14)]
-
-    var body: some View {
-        Form {
-            Section {
-                Picker("UI Design", selection: Binding(
-                    get: { UIDesignModeManager.shared.mode },
-                    set: { UIDesignModeManager.shared.mode = $0 })) {
-                    ForEach(UIDesignModeManager.Mode.allCases) { mode in
-                        Text(mode.label).tag(mode)
-                    }
-                }
-                .tint(.appAccent)
-            } header: {
-                Text("UI Design")
-            } footer: {
-                Text(UIDesignModeManager.shared.mode.description)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Section("Theme") {
-                Picker("Appearance", selection: $appearanceMode) {
-                    Text("System").tag("system")
-                    Text("Light").tag("light")
-                    Text("Dark").tag("dark")
-                }
-                .tint(.appAccent)
-            }
-            .onAppear {
-                // Migrate away from the removed Blue preset — if the saved
-                // accent is the old Blue hex, reset to Default so the user
-                // doesn't get stuck with an unsupported colour.
-                if accentColorHex == "#0A84FF" {
-                    accentColorHex = ""
-                }
-            }
-            Section {
-                LazyVGrid(columns: swatchColumns, spacing: 14) {
-                    ForEach(accentSwatches) { swatch in
-                        accentSwatchButton(swatch)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.vertical, 6)
-            } header: {
-                Text("Accent Color")
-            } footer: {
-                Text("Tap a circle to set the app's accent. Default follows the system label color.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            // Motion section removed — was empty after Reduce Motion toggle deletion.
-            // Issue #5 — Browse Categories layout toggle + statistics toggle.
-            Section {
-                Toggle("Browse Categories as Grid", isOn: $browseCategoriesGridLayout).tint(Color.appAccent).glowEffect(isOn: browseCategoriesGridLayout)
-                Toggle("Show Statistics on Detail Pages", isOn: $showStatistics).tint(Color.appAccent).glowEffect(isOn: showStatistics)
-            } header: {
-                Text("Layout")
-            } footer: {
-                Text("Browse Categories as Grid switches the Home browse section between horizontal carousels (default) and a 2-column tile grid. Show Statistics renders the compact metadata grid on detail pages.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Section {
-                Toggle("Enable Glow", isOn: $glowEnabled).tint(Color.appAccent).glowEffect(isOn: glowEnabled)
-                if glowEnabled {
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            Text("Intensity")
-                            Spacer()
-                            Text(String(format: "%.1f", glowIntensity))
-                                .font(.caption.monospacedDigit())
-                                .foregroundStyle(.secondary)
-                        }
-                        Slider(value: $glowIntensity, in: 0.0...1.0, step: 0.1)
-                    }
-                }
-            } header: {
-                Text("Glow")
-            } footer: {
-                Text("Glow adds a soft halo around connected source icons on the Sources page.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Section {
-                Button("Reset to Default", role: .destructive) {
-                    appearanceMode = "system"
-                    accentColorHex = ""
-                    // reduceMotion removed
-                    glowEnabled = true
-                    glowIntensity = 0.5
-                    showStatistics = true
-                }
-                .tint(.appAccent)
-            }
-        }
-        .navigationTitle("Appearance")
-        .inlineNavBar()
-    }
-
-    @ViewBuilder
-    private func accentSwatchButton(_ swatch: AccentSwatch) -> some View {
-        let isSelected = accentColorHex == swatch.hex
-        Button {
-            accentColorHex = swatch.hex
-        } label: {
-            VStack(spacing: 6) {
-                ZStack {
-                    Circle()
-                        .strokeBorder(isSelected ? Color.appAccent : Color.clear, lineWidth: 2.5)
-                        .frame(width: 50, height: 50)
-                    Circle()
-                        .fill(swatchColor(swatch))
-                        .frame(width: 40, height: 40)
-                    if isSelected {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(.white)
-                    }
-                }
-                .frame(width: 50, height: 50)
-
-                Text(swatch.title)
-                    .font(.caption2)
-                    .foregroundStyle(isSelected ? Color.primary : Color.secondary)
-            }
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func swatchColor(_ swatch: AccentSwatch) -> Color {
-        if swatch.hex.isEmpty {
-            return Color.primary.opacity(0.85)
-        }
-        if let ui = UIColor(hex: swatch.hex) {
-            return Color(ui)
-        }
-        return Color.secondary.opacity(0.4)
-    }
-}
-
-// MARK: - Playback Settings Page (Hub)
-
-struct PlaybackSettingsPage: View {
-    var body: some View {
-        Form {
-            // #121 — Section headers removed from Playback sub-tab (all
-            // Settings sub-page headers are removed per the global header-
-            // removal rule, except Schedule settings which is exempt).
-            Section {
-                NavigationLink {
-                    PlayerGeneralSettingsPage()
-                } label: {
-                    SettingsCategoryRow(icon: "gearshape.fill", title: "General", subtitle: "Speed, controls, layout")
-                }
-                NavigationLink {
-                    QualitySettingsPage()
-                } label: {
-                    SettingsCategoryRow(icon: "sparkles.tv.fill", title: "Quality", subtitle: "Resolution, data saving")
-                }
-                NavigationLink {
-                    GesturesSettingsPage()
-                } label: {
-                    SettingsCategoryRow(icon: "hand.tap.fill", title: "Gestures", subtitle: "Touch, skip durations")
-                }
-                NavigationLink {
-                    SkipSegmentsSettingsPage()
-                } label: {
-                    SettingsCategoryRow(icon: "forward.end.fill", title: "Skip Segments", subtitle: "AniSkip, IntroDB, auto-skip")
-                }
-                NavigationLink {
-                    NextEpisodeSettingsPage()
-                } label: {
-                    SettingsCategoryRow(icon: "arrow.right.circle.fill", title: "Next Episode", subtitle: "Auto-play, appearance")
-                }
-                NavigationLink {
-                    HoldSpeedSettingsPage()
-                } label: {
-                    SettingsCategoryRow(icon: "speedometer", title: "Hold-Speed", subtitle: "Sensitivity, multiplier")
-                }
-                NavigationLink {
-                    AudioSettingsPage()
-                } label: {
-                    SettingsCategoryRow(icon: "speaker.wave.2.fill", title: "Audio", subtitle: "Surround, comfort, frame rate")
-                }
-                NavigationLink {
-                    PiPSettingsPage()
-                } label: {
-                    SettingsCategoryRow(icon: "pip.fill", title: "Picture-in-Picture", subtitle: "PiP, auto-pause")
-                }
-                NavigationLink {
-                    StreamingSettingsPage()
-                } label: {
-                    SettingsCategoryRow(icon: "dot.radiowaves.left.and.right", title: "Streaming", subtitle: "Progress threshold")
-                }
-            }
-        }
-        .navigationTitle("Playback")
-        .inlineNavBar()
-    }
-}
-
-// MARK: - Playback Card Helpers
-
-private struct PlaybackSettingsCard<Content: View>: View {
-    let title: String
-    @ViewBuilder var content: () -> Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .textCase(.uppercase)
-            content()
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 16)
-    }
-}
-
-private struct SettingsChip<T: Hashable>: View {
-    let title: String
-    let value: T
-    @Binding var selection: T
-
-    var body: some View {
-        Button {
-            selection = value
-        } label: {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .background(
-                    selection == value ? Color.appAccent.opacity(0.18) : Color.secondary.opacity(0.08),
-                    in: RoundedRectangle(cornerRadius: 10)
-                )
-                .foregroundStyle(selection == value ? Color.appAccent : Color.primary)
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-private func doubleLabel(_ value: Double) -> String {
-    if value == value.rounded() {
-        return "\(Int(value))x"
-    }
-    return "\(value)x"
-}
-
-// MARK: - 1. Player General Settings Page
-
-struct PlayerGeneralSettingsPage: View {
-    @AppStorage("playerPlaybackSpeed") private var playerPlaybackSpeed: Double = 1.0
-    @AppStorage("forceLandscape") private var forceLandscape = false
-    @AppStorage("showLockButton") private var showLockButton = true
-    @AppStorage("showServicesButton") private var showServicesButton = true
-    @AppStorage("preferDownloaded") private var preferDownloaded = false
-    @AppStorage("showRemainingTime") private var showRemainingTime = false
-
-    private let speedOptions: [Double] = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
-    private let speedColumns = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                PlaybackSettingsCard(title: "Playback") {
-                    Text("Default Playback Speed")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    LazyVGrid(columns: speedColumns, spacing: 8) {
-                        ForEach(speedOptions, id: \.self) { speed in
-                            SettingsChip(
-                                title: doubleLabel(speed),
-                                value: speed,
-                                selection: $playerPlaybackSpeed
-                            )
-                        }
-                    }
-                }
-                PlaybackSettingsCard(title: "Player Controls") {
-                    Toggle("Force Landscape Mode", isOn: $forceLandscape)
-                    Toggle("Show Lock Button", isOn: $showLockButton)
-                    Toggle("Show Services Button", isOn: $showServicesButton)
-                    Toggle("Prefer Downloaded", isOn: $preferDownloaded)
-                    Toggle("Show Remaining Time", isOn: $showRemainingTime)
-                }
-            }
-            .padding(.vertical, 16)
-        }
-        .navigationTitle("General")
-        .inlineNavBar()
-    }
-}
-
-// MARK: - 2. Quality Settings Page
-
-struct QualitySettingsPage: View {
-    @AppStorage("preferredVideoQuality") private var preferredVideoQuality = "auto"
-    @AppStorage("dataSavingEnabled") private var dataSavingEnabled = false
-
-    private struct QualityOption: Identifiable, Hashable {
-        let value: String
-        let label: String
-        let icon: String
-        var id: String { value }
-    }
-
-    private let qualityOptions: [QualityOption] = [
-        QualityOption(value: "auto", label: "Auto", icon: "gearshape"),
-        QualityOption(value: "360p", label: "360p", icon: "speedometer"),
-        QualityOption(value: "480p", label: "480p", icon: "speedometer"),
-        QualityOption(value: "720p", label: "720p", icon: "speedometer"),
-        QualityOption(value: "1080p", label: "1080p", icon: "speedometer"),
-        QualityOption(value: "highest", label: "Highest", icon: "trophy.fill")
-    ]
-    private let qualityColumns = [GridItem(.flexible()), GridItem(.flexible())]
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                if dataSavingEnabled {
-                    HStack(spacing: 12) {
-                        Image(systemName: "leaf.fill")
-                            .font(.title3)
-                            .foregroundStyle(Color.green)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Data Saving is On")
-                                .font(.subheadline.weight(.semibold))
-                                .lineLimit(1)
-                                .fixedSize(horizontal: true, vertical: false)
-                            Text("Streaming quality is capped at roughly 480p to reduce mobile data usage. Even if you pick a higher quality in the player, playback stays at this cap until Data Saving is turned off.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        Spacer()
-                    }
-                    .padding(16)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.green.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
-                    .padding(.horizontal, 16)
-                    .transition(.opacity)
-                }
-                PlaybackSettingsCard(title: "Streaming Quality") {
-                    Text("Preferred Video Quality")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    LazyVGrid(columns: qualityColumns, spacing: 10) {
-                        ForEach(qualityOptions) { option in
-                            Button {
-                                preferredVideoQuality = option.value
-                            } label: {
-                                HStack(spacing: 10) {
-                                    Image(systemName: option.icon)
-                                        .font(.title3)
-                                    Text(option.label)
-                                        .font(.body.weight(.semibold))
-                                        .lineLimit(1)
-                                        .fixedSize(horizontal: true, vertical: false)
-                                    Spacer(minLength: 0)
-                                    if preferredVideoQuality == option.value {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .foregroundStyle(Color.appAccent)
-                                    }
-                                }
-                                .padding(.vertical, 14)
-                                .padding(.horizontal, 14)
-                                .frame(maxWidth: .infinity)
-                                .background(
-                                    (preferredVideoQuality == option.value ? Color.appAccent.opacity(0.16) : Color.secondary.opacity(0.08)),
-                                    in: RoundedRectangle(cornerRadius: 12)
-                                )
-                                .foregroundStyle(preferredVideoQuality == option.value ? Color.appAccent : Color.primary)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    Divider()
-                    Toggle("Data Saving", isOn: $dataSavingEnabled)
-                        .lineLimit(1)
-                        .fixedSize(horizontal: true, vertical: false)
-                    Text("Caps streaming quality at roughly 480p to use less mobile data. The video player's quality picker is also locked to this cap while Data Saving is on. Downloads and local files are not affected.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .padding(.vertical, 16)
-            .animation(.easeInOut(duration: 0.2), value: dataSavingEnabled)
-        }
-        .navigationTitle("Quality")
-        .inlineNavBar()
-    }
-}
-
-// MARK: - 3. Gestures Settings Page
-
-struct GesturesSettingsPage: View {
-    @AppStorage("playerBrightnessGesture") private var brightnessGesture = true
-    @AppStorage("playerVolumeGesture") private var volumeGesture = true
-    @AppStorage("playerTwoFingerGesture") private var twoFingerGesture = true
-    @AppStorage("playerCenterTapGesture") private var centerTapGesture = true
-    @AppStorage("playerDoubleTapGesture") private var doubleTapGesture = true
-    @AppStorage("playerSkipShort") private var skipShort: Int = 10
-    @AppStorage("playerSkipLong") private var skipLong: Int = 85
-
-    private let shortOptions = [5, 10, 15, 30]
-    private let longOptions = [30, 60, 85, 90, 120, 150, 180]
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                PlaybackSettingsCard(title: "Touch Gestures") {
-                    Toggle("Brightness Gesture", isOn: $brightnessGesture)
-                    Toggle("Volume Gesture", isOn: $volumeGesture)
-                    Toggle("Two-Finger Seek", isOn: $twoFingerGesture)
-                    Toggle("Center-Tap to Toggle UI", isOn: $centerTapGesture)
-                    Toggle("Double-Tap to Seek", isOn: $doubleTapGesture)
-                }
-                PlaybackSettingsCard(title: "Skip Durations") {
-                    Picker("Skip Duration", selection: $skipShort) {
-                        ForEach(shortOptions, id: \.self) { Text("\($0)s").tag($0) }
-                    }
-                    Picker("Long Skip Duration", selection: $skipLong) {
-                        ForEach(longOptions, id: \.self) { Text("\($0)s").tag($0) }
-                    }
-                }
-            }
-            .padding(.vertical, 16)
-        }
-        .navigationTitle("Gestures")
-        .inlineNavBar()
-    }
-}
-
-// MARK: - 4. Skip Segments Settings Page
-
-struct SkipSegmentsSettingsPage: View {
-    @AppStorage("useAniSkip") private var useAniSkip = true
-    @AppStorage("useTheIntroDB") private var useTheIntroDB = false
-    @AppStorage("useIntroDB") private var useIntroDB = false
-    @AppStorage("autoSkipSegments") private var autoSkipSegments = true
-    @AppStorage("alwaysShowSkipSegments") private var alwaysShowSkipSegments = false
-    @AppStorage("fallback85s") private var fallback85s = true
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                PlaybackSettingsCard(title: "Sources") {
-                    Toggle("AniSkip", isOn: $useAniSkip)
-                    Toggle("TheIntroDB", isOn: $useTheIntroDB)
-                    Toggle("IntroDB", isOn: $useIntroDB)
-                }
-                PlaybackSettingsCard(title: "Auto-Skip") {
-                    Toggle("Auto-Skip Segments", isOn: $autoSkipSegments)
-                    Toggle("Always Show Skip Button", isOn: $alwaysShowSkipSegments)
-                }
-                PlaybackSettingsCard(title: "Skip 85s") {
-                    HStack(alignment: .top, spacing: 12) {
-                        Image(systemName: "info.circle")
-                            .foregroundStyle(.secondary)
-                            .padding(.top, 2)
-                        Text("When AniSkip has no data for an episode, fall back to skipping the first 85 seconds as the intro.")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                    }
-                    Toggle("85s Fallback", isOn: $fallback85s)
-                }
-            }
-            .padding(.vertical, 16)
-        }
-        .navigationTitle("Skip Segments")
-        .inlineNavBar()
-    }
-}
-
-// MARK: - 5. Next Episode Settings Page
-
-struct NextEpisodeSettingsPage: View {
-    @AppStorage("autoNextEpisode") private var autoNextEpisode = true
-    @AppStorage("showNextEpisodeButton") private var showNextEpisodeButton = true
-    @AppStorage("showNextEpisodeBrowserButton") private var showNextEpisodeBrowserButton = false
-    @AppStorage("usePosterForNextEpisode") private var usePosterForNextEpisode = true
-    @AppStorage("skipFillerEpisodes") private var skipFillerEpisodes = false
-    @AppStorage("nextEpisodeAppearanceThreshold") private var appearanceThreshold: Double = 90.0
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                PlaybackSettingsCard(title: "Auto-Play") {
-                    Toggle("Auto Next Episode", isOn: $autoNextEpisode)
-                    Toggle("Show Next Episode Button", isOn: $showNextEpisodeButton)
-                    Toggle("Show Episode Browser Button", isOn: $showNextEpisodeBrowserButton)
-                }
-                PlaybackSettingsCard(title: "Options") {
-                    Toggle("Use Poster Art", isOn: $usePosterForNextEpisode)
-                    Toggle("Skip Filler Episodes", isOn: $skipFillerEpisodes)
-                }
-                PlaybackSettingsCard(title: "Threshold") {
-                    HStack {
-                        Text("Appearance Threshold")
-                        Spacer()
-                        Text("\(Int(appearanceThreshold))%")
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-                    }
-                    Slider(value: $appearanceThreshold, in: 50...100, step: 5)
-                    Text("The next-episode card appears once playback reaches this percentage of the current episode.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .padding(.vertical, 16)
-        }
-        .navigationTitle("Next Episode")
-        .inlineNavBar()
-    }
-}
-
-// MARK: - 6. Hold Speed Settings Page
-
-struct HoldSpeedSettingsPage: View {
-    @AppStorage("holdSpeedEnabled") private var holdSpeedEnabled = true
-    @AppStorage("holdSpeedSensitivity") private var holdSpeedSensitivity: Double = 0.5
-    @AppStorage("holdSpeedMultiplier") private var holdSpeedMultiplier: Double = 2.0
-
-    private let multipliers: [Double] = [1.5, 2.0, 2.5, 3.0]
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                PlaybackSettingsCard(title: "Hold-to-Speed") {
-                    Toggle("Enable", isOn: $holdSpeedEnabled)
-                    if holdSpeedEnabled {
-                        Group {
-                            Divider()
-                            HStack {
-                                Text("Sensitivity")
-                                Spacer()
-                                Text("\(Int(holdSpeedSensitivity * 100))%")
-                                    .foregroundStyle(.secondary)
-                                    .monospacedDigit()
-                            }
-                            Slider(value: $holdSpeedSensitivity, in: 0.1...1.0, step: 0.1)
-                            Picker("Speed Multiplier", selection: $holdSpeedMultiplier) {
-                                ForEach(multipliers, id: \.self) { mult in
-                                    Text(doubleLabel(mult)).tag(mult)
-                                }
-                            }
-                        }
-                        .transition(.opacity)
-                    }
-                }
-            }
-            .padding(.vertical, 16)
-            .animation(.easeInOut(duration: 0.2), value: holdSpeedEnabled)
-        }
-        .navigationTitle("Hold-Speed")
-        .inlineNavBar()
-    }
-}
-
-// MARK: - 7. Audio Settings Page
-
-struct AudioSettingsPage: View {
-    @AppStorage("surroundSound") private var surroundSound = false
-    @AppStorage("comfortAudio") private var comfortAudio = "off"
-    @AppStorage("inlineFrameRate") private var inlineFrameRate: Int = 60
-
-    private let frameRateOptions: [Int] = [24, 30, 60, 120]
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                PlaybackSettingsCard(title: "Surround Sound") {
-                    Toggle("Surround Sound", isOn: $surroundSound)
-                    Text("Outputs multi-channel audio when supported by the stream and device.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                PlaybackSettingsCard(title: "Comfort Audio") {
-                    Picker("Comfort Audio", selection: $comfortAudio) {
-                        Text("Off").tag("off")
-                        Text("Medium").tag("medium")
-                        Text("Strong").tag("strong")
-                    }
-                    Text("Compresses the dynamic range so quiet sounds are louder and loud sounds are quieter.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                PlaybackSettingsCard(title: "Frame Rate") {
-                    Picker("Inline Frame Rate", selection: $inlineFrameRate) {
-                        ForEach(frameRateOptions, id: \.self) { fps in
-                            Text("\(fps) fps").tag(fps)
-                        }
-                    }
-                    Text("Target frame rate for inline (in-feed) playback.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .padding(.vertical, 16)
-        }
-        .navigationTitle("Audio")
-        .inlineNavBar()
-    }
-}
-
-// MARK: - 8. Picture-in-Picture Settings Page
-
-struct PiPSettingsPage: View {
-    @AppStorage("pipWhenLeavingApp") private var pipWhenLeavingApp = true
-    @AppStorage("autoPauseOnInterruption") private var autoPauseOnInterruption = true
-    @AppStorage("autoPauseOnControlCenter") private var autoPauseOnControlCenter = false
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                PlaybackSettingsCard(title: "Picture-in-Picture") {
-                    Toggle("PiP When Leaving App", isOn: $pipWhenLeavingApp)
-                    Text("When you swipe out of Shirox during playback, the video shrinks into a small floating window so you can keep watching while using other apps. Turn this off if you'd rather the video just pause.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                PlaybackSettingsCard(title: "Auto-Pause") {
-                    Toggle("Auto-Pause on Interruption", isOn: $autoPauseOnInterruption)
-                    Text("Pauses playback automatically when something else takes over audio — an incoming call, Siri, an alarm, or another media app starting. Playback resumes when the interruption ends if the system allows it.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Divider().opacity(0.4)
-                    Toggle("Auto-Pause on Control Center", isOn: $autoPauseOnControlCenter)
-                    Text("Pauses playback when you open Control Center or Notification Center by swiping down from the top-right or top of the screen. Playback doesn't auto-resume when you close it — tap play to continue. Opening the app switcher or going to the home screen is not affected (those use PiP instead).")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .padding(.vertical, 16)
-        }
-        .navigationTitle("Picture-in-Picture")
-        .inlineNavBar()
-    }
-}
-
-// MARK: - 9. Streaming Settings Page
-
-struct StreamingSettingsPage: View {
-    @EnvironmentObject private var moduleManager: ModuleManager
-    @AppStorage("watchedPercentage") private var watchedPercentage: Double = 90.0
-    @AppStorage("showNextEpisodeCountdown") private var showNextEpisodeCountdown = true
-    @AppStorage("autoFallbackEnabled") private var autoFallbackEnabled = false
-    @State private var perShowCount = PerShowPlaybackStore.shared.savedCount
-    @State private var showClearPerShow = false
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                // Per-Show Playback Settings card
-                PlaybackSettingsCard(title: "Per-Show Playback") {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("What this does")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .textCase(.uppercase)
-                        Text("The player remembers your playback speed for each anime individually. If you watch one anime at 1.5× and another at 1.0×, the app restores the correct speed automatically when you switch between them. No setup needed — just change the speed in the player and it saves automatically.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .padding(.bottom, 8)
-
-                    HStack {
-                        Text("Saved preferences")
-                        Spacer()
-                        Text("\(perShowCount) show\(perShowCount == 1 ? "" : "s")")
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-                    }
-                    if perShowCount > 0 {
-                        Button(role: .destructive) {
-                            showClearPerShow = true
-                        } label: {
-                            Label("Clear All Per-Show Speeds", systemImage: "trash")
-                                .font(.subheadline)
-                        }
-                    }
-                }
-
-                PlaybackSettingsCard(title: "Continue Watching") {
-                    Toggle("Show Next Episode Countdown", isOn: $showNextEpisodeCountdown)
-                        .tint(Color.appAccent)
-                    Text("Shows a countdown to the next episode's airing time on Continue Watching cards, for anime where you've watched the latest available episode.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                PlaybackSettingsCard(title: "Advanced") {
-                    Toggle("Auto-Fallback", isOn: $autoFallbackEnabled)
-                        .tint(Color.appAccent)
-                    Text("When enabled, if your selected module fails to provide a stream, the app tries another eligible anime module. Does not auto-select a module — only falls back after a failure.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    Divider().opacity(0.3)
-
-                    NavigationLink {
-                        AutoPickSettingsPage()
-                            .environmentObject(moduleManager)
-                    } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text("Auto Pick Module")
-                                    .font(.subheadline.weight(.semibold))
-                                Text("Automatically picks module + stream when you tap an episode.")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                        }
-                        .foregroundStyle(Color.appAccent)
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                PlaybackSettingsCard(title: "Progress Tracking") {
-                    HStack {
-                        Text("Progress Threshold")
-                        Spacer()
-                        Text("\(Int(watchedPercentage))%")
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-                    }
-                    Slider(value: $watchedPercentage, in: 50...100, step: 5)
-                    Text("Episodes are marked as watched once playback passes this percentage.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .padding(.vertical, 16)
-        }
-        .navigationTitle("Streaming")
-        .inlineNavBar()
-        .alert("Clear All Per-Show Speeds?", isPresented: $showClearPerShow) {
-            Button("Clear", role: .destructive) {
-                PerShowPlaybackStore.shared.clearAll()
-                perShowCount = 0
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This will reset all saved playback speeds. Each anime will start at 1.0× speed again until you change it.")
-        }
-    }
-}
-
-// MARK: - Library Settings Page
-
-struct LibrarySettingsPage: View {
-    @AppStorage("aniListTrackingEnabled") private var aniListTrackingEnabled = true
-    @AppStorage("malTrackingEnabled") private var malTrackingEnabled = true
-    @AppStorage("dualSync") private var dualSync = false
-    @AppStorage("skipReWatchTracking") private var skipReWatchTracking = true
-    @AppStorage("rateOnFinish") private var rateOnFinish = true
-    @AppStorage("localAutoTrackEnabled") private var localAutoTrackEnabled = true
-    @AppStorage("titleLanguagePriority") private var titlePriority = "english,romaji,native"
-
-    private var orderedLanguages: [String] {
-        titlePriority.components(separatedBy: ",").filter { !$0.isEmpty }
-    }
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                trackingCard
-                localLibraryCard
-                titleLanguageCard
-            }
-            .padding()
-        }
-        .navigationTitle("Library")
-        .inlineNavBar()
-    }
-
-    // MARK: - Card Header
-
-    private func cardHeader(_ title: String, systemImage: String) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: systemImage)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Color.appAccent)
-                .frame(width: 28, height: 28)
-                .background(Color.secondary.opacity(0.12),
-                            in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            Text(title)
-                .font(.headline)
-            Spacer()
-        }
-    }
-
-    // MARK: - Tracking Card
-
-    private var trackingCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            cardHeader("Tracking", systemImage: "arrow.triangle.2.circlepath")
-            VStack(spacing: 0) {
-                toggleRow("Track on AniList", isOn: $aniListTrackingEnabled)
-                rowDivider
-                toggleRow("Track on MyAnimeList", isOn: $malTrackingEnabled)
-                rowDivider
-                toggleRow("Sync edits to both services", isOn: $dualSync)
-                rowDivider
-                toggleRow("Never reduce progress", isOn: $skipReWatchTracking)
-                rowDivider
-                toggleRow("Prompt to rate after finishing", isOn: $rateOnFinish)
-            }
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondary.opacity(0.08),
-                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    // MARK: - Local Library Card
-
-    private var localLibraryCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            cardHeader("Local Library", systemImage: "internaldrive")
-            toggleRow("Auto-track what you watch", isOn: $localAutoTrackEnabled)
-            Text("Adds titles you start watching to your local library automatically.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondary.opacity(0.08),
-                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    // MARK: - Title Language Card
-
-    private var titleLanguageCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            cardHeader("Title Language Priority", systemImage: "text.alignleft")
-
-            HStack(spacing: 6) {
-                ForEach(Array(orderedLanguages.enumerated()), id: \.offset) { idx, lang in
-                    HStack(spacing: 6) {
-                        Text("\(idx + 1)")
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 18, height: 18)
-                            .background(Color.appAccent, in: Circle())
-                        Text(lang.capitalized)
-                            .font(.subheadline)
-                            .foregroundStyle(.primary)
-                    }
-                    .padding(.leading, 6)
-                    .padding(.trailing, 10)
-                    .padding(.vertical, 6)
-                    .background(Color.secondary.opacity(0.1), in: Capsule())
-
-                    if idx < orderedLanguages.count - 1 {
-                        Image(systemName: "chevron.right")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            Text("Higher-priority titles are shown first across the app.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondary.opacity(0.08),
-                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    // MARK: - Helpers
-
-    private var rowDivider: some View {
-        Divider().opacity(0.4).padding(.leading, 0)
-    }
-
-    private func toggleRow(_ title: String, isOn: Binding<Bool>) -> some View {
-        Toggle(title, isOn: isOn)
-            .padding(.vertical, 6)
-    }
-}
-
-// MARK: - Downloads Settings Page
-
+/// The original's Downloads page shape, driving this fork's download manager
+/// (concurrency, background, Wi-Fi-only). Delete-all lives in Storage & Cache.
 struct DownloadsSettingsPage: View {
     @AppStorage("maxConcurrentDownloads") private var maxConcurrentDownloads: Int = 3
-    @AppStorage("backgroundDownloadsEnabled") private var backgroundDownloadsEnabled = true
-    @AppStorage("downloadOverWiFiOnly") private var downloadOverWiFiOnly = false
-    /// Live network status under the Wi-Fi toggle (v2.13) — the toggle now
-    /// actually does something, so the page tells you which state you're in.
-    @ObservedObject private var networkMonitor = NetworkMonitor.shared
+    @AppStorage("backgroundDownloadsEnabled") private var backgroundDownloadsEnabled: Bool = true
+    @AppStorage("downloadOverWiFiOnly") private var downloadOverWiFiOnly: Bool = false
 
     var body: some View {
-        Form {
+        SettingsList {
             Section("Downloads") {
                 Picker("Concurrent Downloads", selection: $maxConcurrentDownloads) {
-                    Text("1").tag(1); Text("2").tag(2); Text("3").tag(3); Text("4").tag(4); Text("5").tag(5)
+                    ForEach(1...5, id: \.self) { count in
+                        Text("\(count)").tag(count)
+                    }
                 }
+                #if os(iOS)
                 Toggle("Background Downloads", isOn: $backgroundDownloadsEnabled)
-                    .tint(Color.appAccent)
-                Toggle("Download Over WiFi Only", isOn: $downloadOverWiFiOnly)
-                    .tint(Color.appAccent)
-                // Live status while the Wi-Fi gate is armed — no guessing
-                // whether downloads are running or waiting.
-                if downloadOverWiFiOnly {
-                    if networkMonitor.isOnCellular {
-                        Label("Downloads paused — you're on cellular", systemImage: "wifi.slash")
-                            .font(.caption)
-                            .foregroundStyle(.orange)
-                    } else {
-                        Label("On Wi-Fi — downloads run normally", systemImage: "wifi")
-                            .font(.caption)
-                            .foregroundStyle(.green)
-                    }
-                }
-            }
-            Section {
-                Text("Download Over WiFi Only keeps new downloads waiting and pauses anything already downloading the moment the device drops to cellular; everything resumes automatically from where it stopped once Wi-Fi is back. Background Downloads lets downloads keep running while you use other apps. Concurrent Downloads caps how many episodes or chapters download at the same time.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .navigationTitle("Downloads")
-        .inlineNavBar()
-    }
-}
-
-// MARK: - Notifications Settings Page
-
-struct NotificationsSettingsPage: View {
-    @AppStorage("episodeReminders") private var episodeReminders = false
-    @AppStorage("airingNotifications") private var airingNotifications = false
-    @AppStorage("episodeNotificationLeadTime") private var leadTimeRaw =
-        EpisodeNotificationManager.LeadTime.atAirtime.rawValue
-    @AppStorage("inAppToastsEnabled") private var inAppToastsEnabled = true
-    @AppStorage("phoneNotificationsEnabled") private var phoneNotificationsEnabled = true
-
-    @State private var authStatus: UNAuthorizationStatus = .notDetermined
-    @State private var pendingCount: Int = 0
-    @State private var isRefreshing = false
-    @State private var isSendingTest = false
-
-    private var leadTime: EpisodeNotificationManager.LeadTime {
-        EpisodeNotificationManager.LeadTime(rawValue: leadTimeRaw) ?? .atAirtime
-    }
-
-    private var anyEnabled: Bool { episodeReminders || airingNotifications }
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                inAppToastsCard
-                phoneNotificationsCard
-                statusCard
-                timingCard
-                manageCard
-            }
-            .padding()
-        }
-        .navigationTitle("Notifications")
-        .inlineNavBar()
-        .task { await refreshStatus() }
-    }
-
-    private var inAppToastsCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            cardHeader("In-App Toast Notifications", systemImage: "rectangle.stack.fill")
-            Toggle("Show In-App Toasts", isOn: $inAppToastsEnabled).tint(Color.appAccent).glowEffect(isOn: inAppToastsEnabled)
-            Text("Controls temporary messages that appear inside the app itself — toast banners, in-app alerts, and visual notifications. Does not affect device/lock-screen notifications.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondary.opacity(0.08),
-                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    private var phoneNotificationsCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            cardHeader("Phone Notifications", systemImage: "iphone.radiowaves.left.and.right")
-            Toggle("Enable Phone Notifications", isOn: $phoneNotificationsEnabled).tint(Color.appAccent).glowEffect(isOn: phoneNotificationsEnabled)
-            Text("Controls real system notifications that appear outside the app — Lock Screen, Notification Center, and banner alerts. Requires iOS notification permission.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            Divider().opacity(0.4)
-            episodeRemindersToggle
-            airingNotificationsToggle
-            Text("Reminders fire before an episode airs based on the timing setting below. Requires an AniList account and a connected schedule.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondary.opacity(0.08),
-                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    private var episodeRemindersToggle: some View {
-        Toggle(isOn: $episodeReminders) {
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    Image(systemName: "calendar.badge.clock")
-                        .font(.caption)
-                        .foregroundStyle(Color.appAccent)
-                    Text("Episode Reminders")
-                }
-                Text("Sends a phone notification when a new episode of an anime you're tracking is about to air.")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .tint(Color.appAccent)
-        .glowEffect(isOn: episodeReminders)
-        .disabled(!phoneNotificationsEnabled)
-    }
-
-    private var airingNotificationsToggle: some View {
-        Toggle(isOn: $airingNotifications) {
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    Image(systemName: "tv.fill")
-                        .font(.caption)
-                        .foregroundStyle(Color.appAccent)
-                    Text("Airing Notifications")
-                }
-                Text("Shows in-app alerts for upcoming episodes in the Schedule tab, even for anime you haven't tracked yet.")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .tint(Color.appAccent)
-        .glowEffect(isOn: airingNotifications)
-        .disabled(!phoneNotificationsEnabled)
-    }
-
-    // MARK: - Status
-
-    private var authStateText: String {
-        switch authStatus {
-        case .authorized:    return "Authorized"
-        case .denied:        return "Denied — enable in Settings"
-        case .notDetermined: return "Not requested yet"
-        case .provisional:   return "Provisional"
-        case .ephemeral:     return "Ephemeral"
-        @unknown default:    return "Unknown"
-        }
-    }
-
-    private var authStateColor: Color {
-        switch authStatus {
-        case .authorized, .provisional: return .green
-        case .denied:                   return .red
-        default:                        return .secondary
-        }
-    }
-
-    private var statusCard: some View {
-        VStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(Color.appAccent.opacity(0.12))
-                    .frame(width: 64, height: 64)
-                Image(systemName: "bell.fill")
-                    .font(.system(size: 28))
-                    .foregroundStyle(Color.appAccent)
-            }
-            .shadow(
-                color: (anyEnabled && Color.glowEnabled)
-                    ? Color.green.opacity(Color.glowOpacity(0.6)) : .clear,
-                radius: (anyEnabled && Color.glowEnabled)
-                    ? Color.glowRadiusSelection : 0
-            )
-
-            VStack(spacing: 4) {
-                Text("Notification Status")
-                    .font(.headline)
-                Text(authStateText)
-                    .font(.subheadline)
-                    .foregroundStyle(authStateColor)
-            }
-
-            HStack(spacing: 10) {
-                VStack(spacing: 2) {
-                    Text("\(pendingCount)")
-                        .font(.title2.bold().monospacedDigit())
-                        .foregroundStyle(Color.appAccent)
-                    Text("Pending")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-                .background(Color.secondary.opacity(0.08),
-                            in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-
-                VStack(spacing: 2) {
-                    Text(anyEnabled ? "On" : "Off")
-                        .font(.title2.bold())
-                        .foregroundStyle(anyEnabled ? .green : .secondary)
-                    Text("Enabled")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-                .background(Color.secondary.opacity(0.08),
-                            in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            }
-        }
-        .padding()
-        .frame(maxWidth: .infinity)
-        .background(Color.secondary.opacity(0.08),
-                    in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-    }
-
-    // MARK: - Timing
-
-    private var timingCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            cardHeader("Timing", systemImage: "clock.fill")
-            Picker("Lead Time", selection: $leadTimeRaw) {
-                ForEach(EpisodeNotificationManager.LeadTime.allCases, id: \.rawValue) { lt in
-                    Text(lt.displayName).tag(lt.rawValue)
-                }
-            }
-            .tint(.appAccent)
-
-            Text("How far before airtime the notification fires.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondary.opacity(0.08),
-                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    // MARK: - Manage
-
-    private var manageCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            cardHeader("Manage", systemImage: "slider.horizontal.3")
-
-            Button {
-                Task { await refreshStatus() }
-            } label: {
-                HStack {
-                    if isRefreshing {
-                        ProgressView().tint(.appAccent)
-                    } else {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    Text("Refresh Status")
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-            .tint(.appAccent)
-            .disabled(isRefreshing)
-
-            Button(role: .destructive) {
-                Task {
-                    await EpisodeNotificationManager.shared.removeAll()
-                    await refreshStatus()
-                }
-            } label: {
-                Label("Remove All Pending", systemImage: "trash")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-            .disabled(pendingCount == 0)
-
-            Button {
-                Task { await sendTestNotification() }
-            } label: {
-                HStack {
-                    if isSendingTest {
-                        ProgressView().tint(.appAccent)
-                    } else {
-                        Image(systemName: "bell.badge.fill")
-                    }
-                    Text("Send Test Notification")
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-            .tint(.appAccent)
-            .disabled(isSendingTest)
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondary.opacity(0.08),
-                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    // MARK: - Helpers
-
-    private func cardHeader(_ title: String, systemImage: String) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: systemImage)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Color.appAccent)
-                .frame(width: 28, height: 28)
-                .background(Color.secondary.opacity(0.12),
-                            in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            Text(title)
-                .font(.headline)
-            Spacer()
-        }
-    }
-
-    private func refreshStatus() async {
-        isRefreshing = true
-        defer { isRefreshing = false }
-        let center = UNUserNotificationCenter.current()
-        let settings = await center.notificationSettings()
-        authStatus = settings.authorizationStatus
-        pendingCount = await EpisodeNotificationManager.shared.pendingCount()
-    }
-
-    /// Fires a test toast via `ToastManager` and schedules a local UN notification
-    /// so the user can verify how episode-airing notifications will look and behave.
-    private func sendTestNotification() async {
-        isSendingTest = true
-        defer { isSendingTest = false }
-
-        // In-app toast preview — matches the styling used by real airing alerts.
-        ToastManager.shared.show(
-            title: "Test Notification",
-            message: "This is how notifications will appear",
-            icon: "bell.fill",
-            iconColor: .accentColor,
-            duration: 5.0
-        )
-
-        // Real local notification so the user can also see the system banner /
-        // lock-screen presentation that fires when an episode airs.
-        let content = UNMutableNotificationContent()
-        content.title = "Test Notification"
-        content.body = "This is how episode airing notifications will appear"
-        content.sound = .default
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
-        let request = UNNotificationRequest(
-            identifier: "test-\(UUID().uuidString)",
-            content: content,
-            trigger: trigger
-        )
-        try? await UNUserNotificationCenter.current().add(request)
-
-        // Pending count now includes the scheduled test — refresh so the counter reflects it.
-        await refreshStatus()
-    }
-}
-
-// MARK: - Search Settings Page
-
-struct SearchSettingsPage: View {
-    var body: some View {
-        Form {
-            Section {
-                Text("Live search is always enabled. Results appear as you type with a 500ms delay.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text("Filters are available via the filter button in the Search toolbar.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .navigationTitle("Search")
-        .inlineNavBar()
-    }
-}
-
-// MARK: - Sources Settings Page (metadata/account providers)
-
-struct SourcesSettingsPage: View {
-    @ObservedObject private var anilistAuth = AniListAuthManager.shared
-    @ObservedObject private var malAuth = MALAuthManager.shared
-    @ObservedObject private var providerManager = ProviderManager.shared
-    #if os(iOS)
-    @State private var presentationWindow: UIWindow?
-    #endif
-
-    var body: some View {
-        Form {
-            Section {
-                Text("Sources are metadata and account providers for tracking, library sync, and progress.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.vertical, 4)
-            }
-            Section {
-                sourceRow(
-                    provider: .anilist,
-                    isLoggedIn: anilistAuth.isLoggedIn,
-                    primaryName: "AniList",
-                    subText: anilistAuth.isLoggedIn
-                        ? (anilistAuth.username.map { "Connected as \($0)" } ?? "Connected")
-                        : "Not connected"
-                ) {
-                    #if os(iOS)
-                    if anilistAuth.isLoggedIn {
-                        anilistAuth.logout()
-                    } else if let window = presentationWindow {
-                        anilistAuth.login(presentationAnchor: window)
-                    }
-                    #endif
-                }
-                sourceRow(
-                    provider: .mal,
-                    isLoggedIn: malAuth.isLoggedIn,
-                    primaryName: "MyAnimeList",
-                    subText: malAuth.isLoggedIn
-                        ? (malAuth.username.map { "Connected as \($0)" } ?? "Connected")
-                        : "Not connected"
-                ) {
-                    #if os(iOS)
-                    if malAuth.isLoggedIn {
-                        malAuth.logout()
-                    } else if let window = presentationWindow {
-                        malAuth.login(presentationAnchor: window)
-                    }
-                    #endif
-                }
-            } header: {
-                Text("Accounts")
-            } footer: {
-                Text("Connect an account to sync your library, progress, and ratings.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Section("Default Provider") {
-                HStack(spacing: 12) {
-                    Image(systemName: "star.circle.fill")
-                        .font(.system(size: 22))
-                        .foregroundStyle(Color.appAccent)
-                    Text("Active")
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Text(providerManager.primary?.displayName ?? "AniList")
-                        .font(.body.weight(.semibold))
-                }
-            }
-        }
-        .navigationTitle("Sources")
-        // v2.17 — Forced update: re-check whenever the user reaches the
-        // login/sources screen (the app's login surface), per spec.
-        // v2.21 — non-forced now: with a dismissable popup, a forced check
-        // here would re-offer a dismissed update on every visit, which
-        // defeats Later. The interval gate still refreshes the verdict
-        // hourly (and on every foreground entry); a force re-offer stays
-        // available from the About page's Check for Updates button.
-        .onAppear {
-            Task { await AppUpdateManager.shared.checkForUpdates() }
-        }
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            presentationWindow = UIApplication.shared.connectedScenes
-                .compactMap { $0 as? UIWindowScene }
-                .flatMap { $0.windows }
-                .first { $0.isKeyWindow }
-        }
-        #endif
-    }
-
-    // MARK: - Source Row (reusable)
-
-    @ViewBuilder
-    private func sourceRow(
-        provider: ProviderType,
-        isLoggedIn: Bool,
-        primaryName: String,
-        subText: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 14) {
-                iconView(provider: provider, isLoggedIn: isLoggedIn)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(primaryName)
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(isLoggedIn ? Color.green : Color.secondary.opacity(0.6))
-                            .frame(width: 7, height: 7)
-                        Text(subText)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                }
-
-                Spacer(minLength: 8)
-            }
-
-            HStack {
-                Spacer()
-                Button(isLoggedIn ? "Disconnect" : "Connect", action: action)
-                    .font(.caption.weight(.semibold))
-                    .buttonStyle(.bordered)
-                    .tint(isLoggedIn ? .red : .appAccent)
-            }
-        }
-        .padding(.vertical, 6)
-    }
-
-    // MARK: - Icon View (with glow border)
-
-    @ViewBuilder
-    private func iconView(provider: ProviderType, isLoggedIn: Bool) -> some View {
-        let glowColor: Color = isLoggedIn ? .green : .red
-        // When `Color.glowEnabled` is off the glow is fully suppressed (opacity
-        // 0 + radius 0). When on, the intensity (0.0–1.0) drives BOTH the
-        // shadow radius (`20 * intensity`) and its opacity (`intensity * 1.0`)
-        // so the slider visibly grows and brightens the halo around the icon.
-        let glowOpacity: Double = Color.glowEnabled ? Color.glowOpacity(1.0) : 0
-        let glowRadius: CGFloat = Color.glowEnabled ? Color.glowRadiusLarge : 0
-
-        CachedAsyncImage(urlString: provider.iconURL)
-            .frame(width: 34, height: 34)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.secondary.opacity(0.12))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(glowColor.opacity(Color.glowEnabled ? 0.85 : 0.5), lineWidth: 1.5)
-            )
-            .shadow(color: glowColor.opacity(glowOpacity),
-                    radius: glowRadius, x: 0, y: 0)
-    }
-}
-
-// MARK: - Modules Settings Page (content/streaming sources)
-
-struct ModulesSettingsPage: View {
-    @EnvironmentObject private var moduleManager: ModuleManager
-    @State private var showAddModule = false
-    @State private var showModuleStore = false
-    @State private var moduleURL = ""
-    @State private var isAddingModule = false
-    @FocusState private var isTextFieldFocused: Bool
-    /// When `.manga`, the installed list and store are filtered to manga-only
-    /// modules. When `nil` (default, anime context), all modules are shown.
-    var mediaType: ModuleMediaType? = nil
-
-    enum ModuleMediaType { case manga }
-
-    private var filteredModules: [ModuleDefinition] {
-        switch mediaType {
-        case .manga: return moduleManager.modules.filter { $0.isManga }
-        // Batch 23 — the anime list shows modules that can actually
-        // stream anime (the ONE shared definition the watch flows and
-        // Auto Pick use). Non-manga modules that can't stream anime
-        // (novels, local playback, Jellyfin) move to their own honest
-        // section below — previously they sat in THIS list, so Settings
-        // showed "modules installed" while the watch flow correctly
-        // said "no anime modules" — the exact mismatch report.
-        case nil: return moduleManager.modules.filter { $0.isAnimeStreamModule }
-        }
-    }
-
-    /// Non-manga modules that CANNOT stream anime (novel / local
-    /// playback / Jellyfin). Still listed so the user can manage them —
-    /// just no longer counted as anime sources.
-    private var otherNonMangaModules: [ModuleDefinition] {
-        guard mediaType == nil else { return [] }
-        return moduleManager.modules.filter { !$0.isManga && !$0.isAnimeStreamModule }
-    }
-
-    var body: some View {
-        Form {
-            Section("Installed Modules") {
-                if filteredModules.isEmpty {
-                    Text("No modules installed. Add one below or browse the store.")
-                        .font(.caption).foregroundStyle(.secondary)
-                } else {
-                    ForEach(filteredModules) { module in
-                        HStack(spacing: 12) {
-                            AsyncImage(url: URL(string: module.iconUrl ?? "")) { phase in
-                                if case .success(let img) = phase { img.resizable().scaledToFill() }
-                                else { Image(systemName: "puzzlepiece.extension").foregroundStyle(.secondary) }
-                            }
-                            .frame(width: 32, height: 32)
-                            .clipShape(RoundedRectangle(cornerRadius: 7))
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(module.sourceName).font(.body.weight(.medium))
-                                if let lang = module.language {
-                                    Text(lang.uppercased()).font(.caption2).foregroundStyle(.secondary)
-                                }
-                            }
-                            Spacer()
-                            // Module health indicator — shows a colored dot
-                            // based on the module's last request status.
-                            // Green = working, Yellow = some failures,
-                            // Red = repeated failures, Orange = Cloudflare blocked.
-                            // Only shown if the module has been used at least once.
-                            if let health = moduleManager.health(for: module) {
-                                Image(systemName: health.status.icon)
-                                    .font(.system(size: 14))
-                                    .foregroundStyle(health.status.color)
-                            }
-                            if moduleManager.activeModule?.id == module.id {
-                                Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.appAccent)
-                            }
-                        }
-                        .contentShape(Rectangle())
-                        .onTapGesture { moduleManager.selectModule(module) }
-                        .shadow(
-                            color: (moduleManager.activeModule?.id == module.id && Color.glowEnabled)
-                                ? Color.appAccent.opacity(Color.glowOpacity(0.8))
-                                : .clear,
-                            radius: (moduleManager.activeModule?.id == module.id && Color.glowEnabled)
-                                ? Color.glowRadiusSelection
-                                : 0
-                        )
-                    }
-                    .onDelete { indices in
-                        // v2.15 — index the SAME array the ForEach renders.
-                        // This list shows `filteredModules` (manga filtered in or
-                        // out per page), but the old code indexed the UNfiltered
-                        // `moduleManager.modules` — with any manga module
-                        // installed alongside anime modules, every swipe-delete
-                        // removed a DIFFERENT source than the row tapped.
-                        // Snapshot first so a mid-flight module refresh can't
-                        // shift positions under the indices.
-                        let snapshot = filteredModules
-                        for i in indices where i < snapshot.count {
-                            moduleManager.removeModule(snapshot[i])
-                        }
-                    }
-                }
-            }
-            // Batch 23 — honest split: non-manga modules that can't stream
-            // anime (novels, local playback, Jellyfin) get their own
-            // section instead of masquerading as anime sources.
-            if !otherNonMangaModules.isEmpty {
-                Section {
-                    ForEach(otherNonMangaModules) { module in
-                        HStack(spacing: 12) {
-                            AsyncImage(url: URL(string: module.iconUrl ?? "")) { phase in
-                                if case .success(let img) = phase { img.resizable().scaledToFill() }
-                                else { Image(systemName: "puzzlepiece.extension").foregroundStyle(.secondary) }
-                            }
-                            .frame(width: 32, height: 32)
-                            .clipShape(RoundedRectangle(cornerRadius: 7))
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(module.sourceName).font(.body.weight(.medium))
-                                Text(module.isNovel ? "Novel source" : (module.isJellyfin ? "Jellyfin" : "Local playback"))
-                                    .font(.caption2).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                        }
-                        .contentShape(Rectangle())
-                        .onTapGesture { moduleManager.selectModule(module) }
-                    }
-                    .onDelete { indices in
-                        let snapshot = otherNonMangaModules
-                        for i in indices where i < snapshot.count {
-                            moduleManager.removeModule(snapshot[i])
-                        }
-                    }
-                } header: {
-                    Text("Other Modules")
-                } footer: {
-                    Text("These modules can't stream anime — novels, local playback and Jellyfin have their own entry points, so they never appear in the watch flow's module list.")
-                }
-            }
-            Section("Add Module") {
-                HStack(spacing: 10) {
-                    Image(systemName: "link").foregroundStyle(.secondary)
-                    TextField("Module JSON URL", text: $moduleURL)
-                        .textContentType(.URL)
-                        .autocorrectionDisabled()
-                        #if os(iOS)
-                        .textInputAutocapitalization(.never)
-                        .keyboardType(.URL)
-                        #endif
-                        .focused($isTextFieldFocused)
-                        .disabled(isAddingModule)
-                    #if os(iOS)
-                    if !isAddingModule {
-                        Button {
-                            if let clipboard = UIPasteboard.general.string {
-                                let trimmed = clipboard.trimmingCharacters(in: .whitespacesAndNewlines)
-                                if !trimmed.isEmpty { moduleURL = trimmed }
-                            }
-                        } label: {
-                            Image(systemName: "doc.on.clipboard").font(.body).foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    if !moduleURL.isEmpty && !isAddingModule {
-                        Button { moduleURL = "" } label: {
-                            Image(systemName: "xmark.circle.fill").font(.body).foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    #endif
-                    Button {
-                        addModuleInline()
-                    } label: {
-                        if isAddingModule {
-                            ProgressView().scaleEffect(0.8).frame(width: 28, height: 28)
-                        } else {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.title2)
-                                .foregroundStyle(moduleURL.isEmpty ? Color.secondary : Color.appAccent)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(moduleURL.isEmpty || isAddingModule)
-                }
-            }
-            Section {
-                Button {
-                    showModuleStore = true
-                } label: {
-                    HStack(spacing: 12) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.secondary.opacity(0.1))
-                                .frame(width: 36, height: 36)
-                            Image(systemName: "bag.fill")
-                                .font(.system(size: 16))
-                                .foregroundStyle(Color.appAccent)
-                        }
-                        Text("Browse Modules")
-                            .font(.body.weight(.medium))
-                        Spacer()
-                    }
-                    .padding(.vertical, 2)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
-            Section {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("About Modules")
-                        .font(.caption.weight(.semibold))
-                    Text("Modules are content sources for streaming and downloading anime. Providers (AniList, MAL) handle metadata and tracking.")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-        .navigationTitle("Modules")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        .environment(\.editMode, .constant(.active))
-        #endif
-        .background {
-            NavigationLink(destination: ModuleStorePage(mediaType: mediaType).environmentObject(moduleManager), isActive: $showModuleStore) {
-                EmptyView()
-            }
-            .opacity(0)
-        }
-    }
-
-    private func addModuleInline() {
-        guard let url = URL(string: moduleURL.trimmingCharacters(in: .whitespacesAndNewlines)) else {
-            ToastManager.shared.show(
-                title: "Invalid URL",
-                message: "That doesn't look like a valid module URL.",
-                icon: "exclamationmark.triangle.fill",
-                iconColor: .orange
-            )
-            return
-        }
-        isAddingModule = true
-        Task {
-            do {
-                try await moduleManager.addModule(from: url)
-                await MainActor.run {
-                    moduleURL = ""
-                    isAddingModule = false
-                    isTextFieldFocused = false
-                    ToastManager.shared.show(
-                        title: "Installed",
-                        message: "Module added to your library.",
-                        icon: "checkmark.circle.fill",
-                        iconColor: .green
-                    )
-                }
-            } catch {
-                await MainActor.run {
-                    isAddingModule = false
-                    ToastManager.shared.show(
-                        title: "Install Failed",
-                        message: error.localizedDescription,
-                        icon: "exclamationmark.triangle.fill",
-                        iconColor: .red
-                    )
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Module Store Page
-
-struct ModuleStorePage: View {
-    @EnvironmentObject private var moduleManager: ModuleManager
-    @State private var storeModules: [StoreModuleItem] = []
-    @State private var isLoading = false
-    @State private var storeError: String?
-    @State private var searchText = ""
-    @State private var moduleURL = ""
-    @State private var isInstalling = false
-    /// #130 — Layout toggle. Grid (default, 3-column) or list (1-column row).
-    @AppStorage("moduleStoreLayout") private var layout: ModuleStoreLayout = .grid
-    /// When `.manga`, the store filters to manga-type modules only.
-    var mediaType: ModulesSettingsPage.ModuleMediaType? = nil
-
-    /// #133 — cufiy.net Sora Module Library JSON endpoint. This is the
-    /// authoritative, structured source for the full module listing — every
-    /// module from `https://library.cufiy.net/library/` is available here as
-    /// a clean JSON object (no HTML scraping required). The previous
-    /// `modulesbypaul.dev` endpoint was a smaller, regex-parsed subset.
-    private let storeURL = "https://library.cufiy.net/api/modules.json"
-    private var columns: [GridItem] {
-        // #130 — Grid is 3-column, list is a single column (the list-row tile
-        // handles its own internal layout).
-        switch layout {
-        case .grid:
-            return [
-                GridItem(.flexible(), spacing: 12),
-                GridItem(.flexible(), spacing: 12),
-                GridItem(.flexible(), spacing: 12)
-            ]
-        case .list:
-            return [GridItem(.flexible(), spacing: 10)]
-        }
-    }
-
-    /// Modules shown in the "🔥 Popular Sources" section — anime-typed or
-    /// English-language sources, which are the most commonly requested.
-    private var popularSources: [StoreModuleItem] {
-        filteredModules.filter { $0.isPopularSource }
-    }
-
-    /// Modules shown in the "✨ Community Sources" section — everything else
-    /// (non-anime types and non-English languages).
-    private var communitySources: [StoreModuleItem] {
-        filteredModules.filter { !$0.isPopularSource }
-    }
-
-    /// Whether we have enough modules to justify splitting into two sections.
-    /// With fewer than 4 total modules we just show a single "All Modules" list.
-    private var shouldSplitIntoSections: Bool {
-        filteredModules.count >= 4
-    }
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 14) {
-                // Capsule-shaped search pill at the top
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                    TextField("Search modules…", text: $searchText)
-                        .font(.subheadline)
-                        #if os(iOS)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        #endif
-                    if !searchText.isEmpty {
-                        Button {
-                            searchText = ""
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 16))
-                                .foregroundStyle(.tertiary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 11)
-                .background(Color.secondary.opacity(0.1), in: Capsule())
-                .padding(.horizontal, 14)
-                .padding(.top, 12)
-
-                if isLoading {
-                    LazyVGrid(columns: columns, spacing: 12) {
-                        ForEach(0..<9, id: \.self) { _ in
-                            StoreModuleSkeletonTile()
-                        }
-                    }
-                    .padding(.horizontal, 14)
-                } else if let error = storeError {
-                    VStack(spacing: 12) {
-                        Image(systemName: "wifi.exclamationmark")
-                            .font(.system(size: 32))
-                            .foregroundStyle(.secondary)
-                        Text(error)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                        Button("Retry") { Task { await loadStore() } }
-                            .buttonStyle(.bordered)
-                            .tint(.appAccent)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 40)
-                    .padding(.horizontal, 14)
-                } else if storeModules.isEmpty {
-                    VStack(spacing: 8) {
-                        Image(systemName: "puzzlepiece.extension")
-                            .font(.system(size: 32))
-                            .foregroundStyle(.tertiary)
-                        Text("No modules available")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 40)
-                } else if filteredModules.isEmpty {
-                    VStack(spacing: 8) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 30))
-                            .foregroundStyle(.tertiary)
-                        Text("No matches for \"\(searchText)\"")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 40)
-                } else if shouldSplitIntoSections {
-                    // 🔥 Popular Sources section (anime-typed or English-language)
-                    if !popularSources.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("🔥 Popular Sources")
-                                .font(.subheadline.weight(.bold))
-                                .padding(.horizontal, 14)
-                            LazyVGrid(columns: columns, spacing: 12) {
-                                ForEach(popularSources) { mod in
-                                    StoreModuleTile(mod: mod, isInstalled: isModuleInstalled(mod), isInstalling: isInstalling, layout: layout) {
-                                        installModule(mod)
-                                    }
-                                }
-                            }
-                            .padding(.horizontal, 14)
-                        }
-                    }
-                    // ✨ Community Sources section (everything else)
-                    if !communitySources.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("✨ Community Sources")
-                                .font(.subheadline.weight(.bold))
-                                .padding(.horizontal, 14)
-                                .padding(.top, 4)
-                            LazyVGrid(columns: columns, spacing: 12) {
-                                ForEach(communitySources) { mod in
-                                    StoreModuleTile(mod: mod, isInstalled: isModuleInstalled(mod), isInstalling: isInstalling, layout: layout) {
-                                        installModule(mod)
-                                    }
-                                }
-                            }
-                            .padding(.horizontal, 14)
-                            .padding(.bottom, 24)
-                        }
-                    }
-                } else {
-                    // All Modules (fewer than 4 modules total)
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("All Modules")
-                            .font(.subheadline.weight(.bold))
-                            .padding(.horizontal, 14)
-                        LazyVGrid(columns: columns, spacing: 12) {
-                            ForEach(filteredModules) { mod in
-                                StoreModuleTile(mod: mod, isInstalled: isModuleInstalled(mod), isInstalling: isInstalling, layout: layout) {
-                                    installModule(mod)
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.bottom, 24)
-                    }
-                }
-            }
-        }
-        .background(Color.secondary.opacity(0.04))
-        .inlineNavBar()
-        .navigationTitle("Module Store")
-        .task { await loadStore() }
-        .refreshable { await loadStore() }
-        .toolbar {
-            // #130 — Grid/list view toggle. Icon shows the layout the user
-            // will switch TO (not the current one) so the tap reads as
-            // "switch to list" / "switch to grid".
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.18)) {
-                        layout = (layout == .grid) ? .list : .grid
-                    }
-                    #if os(iOS)
-                    Haptics.selection()
-                    #endif
-                } label: {
-                    Image(systemName: layout.toggleIconName)
-                        .font(.system(size: 14, weight: .medium))
-                }
-                .accessibilityLabel(layout == .grid ? "Switch to list view" : "Switch to grid view")
-            }
-        }
-    }
-
-    private var filteredModules: [StoreModuleItem] {
-        var result = storeModules
-        // Filter by media type when in manga context
-        if mediaType == .manga {
-            result = result.filter { item in
-                let type = (item.type ?? "").lowercased()
-                return type.contains("manga") || type.contains("novel")
-            }
-        }
-        if searchText.isEmpty { return result }
-        return result.filter { $0.name.lowercased().contains(searchText.lowercased()) }
-    }
-
-    private func isModuleInstalled(_ mod: StoreModuleItem) -> Bool {
-        moduleManager.modules.contains { $0.sourceName == mod.name }
-    }
-
-    private func installModule(_ mod: StoreModuleItem) {
-        guard let url = URL(string: mod.manifestUrl) else {
-            ToastManager.shared.show(
-                title: "Install Failed",
-                message: "Invalid module URL.",
-                icon: "exclamationmark.triangle.fill",
-                iconColor: .red
-            )
-            return
-        }
-        isInstalling = true
-        Task {
-            do {
-                try await moduleManager.addModule(from: url)
-                await MainActor.run {
-                    isInstalling = false
-                    ToastManager.shared.show(
-                        title: "Installed",
-                        message: "\(mod.name) is ready to use.",
-                        icon: "checkmark.circle.fill",
-                        iconColor: .green
-                    )
-                }
-            } catch {
-                await MainActor.run {
-                    isInstalling = false
-                    ToastManager.shared.show(
-                        title: "Install Failed",
-                        message: "\(mod.name): \(error.localizedDescription)",
-                        icon: "exclamationmark.triangle.fill",
-                        iconColor: .red
-                    )
-                }
-            }
-        }
-    }
-
-    /// #133 — Fetches the cufiy.net Sora Module Library JSON API
-    /// (`https://library.cufiy.net/api/modules.json`), which is the
-    /// authoritative source for the full module listing. The previous
-    /// implementation scraped the `modulesbypaul.dev` HTML with regex over
-    /// backslash-escaped JSON; the cufiy.net endpoint returns structured JSON
-    /// directly, so we get clean field names, real install counts, and
-    /// curation flags (featured / recommendation) for free.
-    ///
-    /// After fetching, modules are sorted by `popularityRank` (Miruro pinned
-    /// first, then featured → recommendation → installCount → alphabetical)
-    /// so the store opens with the most popular, best-regarded sources at
-    /// the top. This integrates with the existing Popular/Community split
-    /// (#79) — `isPopularSource` now reads the real curation flags instead
-    /// of guessing from type/language.
-    private func loadStore() async {
-        isLoading = true; storeError = nil
-        do {
-            let url = URL(string: storeURL)!
-            var request = URLRequest(url: url)
-            request.setValue("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", forHTTPHeaderField: "User-Agent")
-            // cufiy.net is a static JSON API; cache-bust every load so the
-            // user always sees the freshest module list (new modules are
-            // added frequently).
-            request.cachePolicy = .reloadIgnoringLocalCacheData
-            let (data, response) = try await URLSession.shared.data(for: request)
-            if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-                throw URLError(.badServerResponse)
-            }
-            // The API returns a top-level JSON array of module objects.
-            let modules = try JSONDecoder().decode([StoreModuleItem].self, from: data)
-            // Deduplicate by manifestUrl (the API is already clean, but a
-            // defensive dedupe keeps the listing stable if the API ever
-            // returns duplicates).
-            var seen = Set<String>()
-            let deduped = modules.filter { mod in
-                if mod.manifestUrl.isEmpty { return false }
-                if seen.contains(mod.manifestUrl) { return false }
-                seen.insert(mod.manifestUrl)
-                return true
-            }
-            // #133 — Sort by real popularity: Miruro pinned first, then
-            // featured → recommendation → installCount → alphabetical.
-            storeModules = deduped.sorted { lhs, rhs in
-                let lhsRank = lhs.popularityRank
-                let rhsRank = rhs.popularityRank
-                if lhsRank != rhsRank { return lhsRank > rhsRank }
-                return lhs.name.lowercased() < rhs.name.lowercased()
-            }
-            if storeModules.isEmpty {
-                storeError = "No modules found. The library may have changed."
-            }
-        } catch {
-            storeError = "Could not load the module library. Check your connection and try again."
-        }
-        isLoading = false
-    }
-}
-
-struct StoreModuleWrapper: Codable { let modules: [StoreModuleItem] }
-
-/// #130 — Layout preference for `ModuleStorePage`. Grid is the original
-/// 3-column tile layout; List is a single-column row layout that shows more
-/// metadata (type, language) at a glance and is easier to scan on phones.
-enum ModuleStoreLayout: String, CaseIterable {
-    case grid
-    case list
-
-    var iconName: String {
-        switch self {
-        case .grid: return "square.grid.2x2"
-        case .list: return "list.bullet"
-        }
-    }
-
-    var toggleIconName: String {
-        // Icon shows the LAYOUT YOU'LL SWITCH TO when tapped, so the user
-        // reads it as "tap to switch to list/grid".
-        switch self {
-        case .grid: return "list.bullet"        // currently grid → tap goes to list
-        case .list: return "square.grid.2x2"    // currently list → tap goes to grid
-        }
-    }
-}
-
-struct StoreModuleItem: Codable, Identifiable {
-    let id: String
-    let name: String
-    let description: String?
-    let version: String?
-    let manifestUrl: String
-    let iconUrl: String?
-    let author: String?
-    let type: String?
-    let language: String?
-
-    // #133 — Popularity / curation fields sourced from the cufiy.net Sora
-    // Module Library JSON API (`https://library.cufiy.net/api/modules.json`).
-    // All optional so legacy `modulesbypaul.dev`-style parses (which don't
-    // carry these fields) still decode without failing.
-    let installCount: Int?
-    let recommendation: Int?
-    let featured: Int?
-    let note: String?
-
-    enum CodingKeys: String, CodingKey {
-        case id, name, description, version, type, language, note
-        // cufiy.net uses `sourceName` for the display name and `manifestUrl`
-        // for the install URL. The legacy `modulesbypaul.dev` scrape used
-        // `sourceName` (parsed manually) and `jsonUrl`/`manifest_url` —
-        // we accept either spelling so both sources decode cleanly.
-        case sourceName
-        case manifestUrl
-        case manifest_url
-        case jsonUrl
-        case iconUrl
-        case icon_url
-        case author
-        case installCount
-        case recommendation
-        case featured
-    }
-
-    /// Whether this module qualifies as a "Popular Source" for the
-    /// 🔥 Popular section. #133 — Now driven by real curation data from
-    /// cufiy.net: featured > recommendation > installCount. Falls back to
-    /// the older heuristic (anime-typed or English-language) when the
-    /// curation fields are missing, so legacy parses still split sensibly.
-    var isPopularSource: Bool {
-        if let featured, featured > 0 { return true }
-        if let recommendation, recommendation > 0 { return true }
-        if let installCount, installCount >= 100 { return true }
-        // Legacy fallback.
-        let types = (type ?? "").lowercased()
-            .split(separator: "/")
-            .map { String($0).trimmingCharacters(in: .whitespaces) }
-        if types.contains("anime") { return true }
-        return (language ?? "").lowercased() == "english"
-    }
-
-    /// #133 — Composite popularity rank for ordering the store listing.
-    /// Higher = more popular. Components (in priority order):
-    ///   1. Miruro pinned to the very top (explicit user request).
-    ///   2. `featured` flag (cufiy.net editor's pick).
-    ///   3. `recommendation` score.
-    ///   4. `installCount` (clamped so a single viral hit doesn't dominate).
-    ///   5. Alphabetical tiebreaker for stable ordering.
-    var popularityRank: Int {
-        // Miruro always wins.
-        if name.lowercased() == "miruro" { return 1_000_000_000 }
-        var rank = 0
-        if let featured, featured > 0 { rank += 1_000_000 }
-        if let recommendation { rank += recommendation * 10_000 }
-        if let installCount { rank += min(installCount, 100_000) }
-        return rank
-    }
-
-    init(id: String, name: String, description: String?, version: String?, manifestUrl: String, iconUrl: String?, author: String?, type: String? = nil, language: String? = nil, installCount: Int? = nil, recommendation: Int? = nil, featured: Int? = nil, note: String? = nil) {
-        self.id = id
-        self.name = name
-        self.description = description
-        self.version = version
-        self.manifestUrl = manifestUrl
-        self.iconUrl = iconUrl
-        self.author = author
-        self.type = type
-        self.language = language
-        self.installCount = installCount
-        self.recommendation = recommendation
-        self.featured = featured
-        self.note = note
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        // cufiy.net uses `id` (short hash); legacy scrape synthesised one from
-        // the manifest URL. Accept either.
-        id = try c.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString
-        // cufiy.net: `sourceName`. Legacy: `name`. Prefer sourceName, then name.
-        if let sourceName = try c.decodeIfPresent(String.self, forKey: .sourceName), !sourceName.isEmpty {
-            name = sourceName
-        } else {
-            name = try c.decodeIfPresent(String.self, forKey: .name) ?? "Unknown"
-        }
-        description = try c.decodeIfPresent(String.self, forKey: .description)
-        version = try c.decodeIfPresent(String.self, forKey: .version)
-        // manifestUrl preferred; fall back to manifest_url / jsonUrl for the
-        // legacy scrape shape.
-        if let manifest = try c.decodeIfPresent(String.self, forKey: .manifestUrl), !manifest.isEmpty {
-            manifestUrl = manifest
-        } else if let manifest = try c.decodeIfPresent(String.self, forKey: .manifest_url), !manifest.isEmpty {
-            manifestUrl = manifest
-        } else if let jsonUrl = try c.decodeIfPresent(String.self, forKey: .jsonUrl), !jsonUrl.isEmpty {
-            manifestUrl = jsonUrl
-        } else {
-            manifestUrl = ""
-        }
-        if let icon = try c.decodeIfPresent(String.self, forKey: .iconUrl) {
-            iconUrl = icon
-        } else {
-            iconUrl = try c.decodeIfPresent(String.self, forKey: .icon_url)
-        }
-        // cufiy.net nests author under an `author` object with a `name` field.
-        // Legacy scrape stored the author name directly as a string. Handle
-        // both shapes.
-        if let authorObj = try? c.decodeIfPresent(AuthorObject.self, forKey: .author) {
-            author = authorObj.name
-        } else {
-            author = try? c.decodeIfPresent(String.self, forKey: .author)
-        }
-        type = try c.decodeIfPresent(String.self, forKey: .type)
-        language = try c.decodeIfPresent(String.self, forKey: .language)
-        installCount = try c.decodeIfPresent(Int.self, forKey: .installCount)
-        recommendation = try c.decodeIfPresent(Int.self, forKey: .recommendation)
-        featured = try c.decodeIfPresent(Int.self, forKey: .featured)
-        note = try c.decodeIfPresent(String.self, forKey: .note)
-    }
-
-    /// Nested `author` object from cufiy.net (`{ "name": "50/50", "icon": "..." }`).
-    private struct AuthorObject: Decodable {
-        let name: String?
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(id, forKey: .id)
-        try c.encode(name, forKey: .sourceName)
-        try c.encodeIfPresent(description, forKey: .description)
-        try c.encodeIfPresent(version, forKey: .version)
-        try c.encode(manifestUrl, forKey: .manifestUrl)
-        try c.encodeIfPresent(iconUrl, forKey: .iconUrl)
-        try c.encodeIfPresent(author, forKey: .author)
-        try c.encodeIfPresent(type, forKey: .type)
-        try c.encodeIfPresent(language, forKey: .language)
-        try c.encodeIfPresent(installCount, forKey: .installCount)
-        try c.encodeIfPresent(recommendation, forKey: .recommendation)
-        try c.encodeIfPresent(featured, forKey: .featured)
-        try c.encodeIfPresent(note, forKey: .note)
-    }
-}
-
-private struct StoreModuleTile: View {
-    let mod: StoreModuleItem
-    let isInstalled: Bool
-    let isInstalling: Bool
-    let onInstall: () -> Void
-    /// #130 — Which layout to render. `.grid` is the original vertical tile
-    /// (icon-top, name-below, install-button-bottom). `.list` is a horizontal
-    /// row (icon-left, metadata-center, install-button-right) that surfaces
-    /// type and language chips for at-a-glance scanning.
-    var layout: ModuleStoreLayout = .grid
-
-    @ViewBuilder
-    var body: some View {
-        switch layout {
-        case .grid: gridBody
-        case .list: listBody
-        }
-    }
-
-    // MARK: - Grid layout (original)
-
-    private var gridBody: some View {
-        VStack(spacing: 6) {
-            // Compact icon at top, centered, 40x40
-            Group {
-                if let iconUrl = mod.iconUrl, let url = URL(string: iconUrl) {
-                    AsyncImage(url: url) { phase in
-                        if case .success(let img) = phase { img.resizable().scaledToFill() }
-                        else { fallbackIcon }
-                    }
-                } else { fallbackIcon }
-            }
-            .frame(width: 40, height: 40)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
-            .padding(.top, 2)
-
-            // Name below, bold, 2-line limit, centered
-            Text(mod.name)
-                .font(.caption.weight(.semibold))
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.top, 2)
-
-            // Author caption
-            if let author = mod.author, !author.isEmpty {
-                Text(author)
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-
-            Spacer(minLength: 2)
-
-            // Install button at bottom
-            installButton
-        }
-        .padding(10)
-        .frame(maxWidth: .infinity, minHeight: 156, alignment: .top)
-        .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.secondary.opacity(0.08), lineWidth: 1)
-        )
-        // Subtle accent glow on installed tiles — mirrors the active-module
-        // glow used in `ModulesSettingsPage`. Gated by the global Glow
-        // preference and scaled by its intensity slider.
-        .shadow(
-            color: isInstalled && Color.glowEnabled
-                ? Color.appAccent.opacity(Color.glowOpacity(0.5))
-                : .clear,
-            radius: isInstalled && Color.glowEnabled
-                ? Color.glowRadiusSmall
-                : 0
-        )
-    }
-
-    // MARK: - List layout (#130)
-
-    private var listBody: some View {
-        HStack(spacing: 12) {
-            // Icon on the left, 44x44 (slightly larger than grid tile so the
-            // row reads well at the wider single-column width).
-            Group {
-                if let iconUrl = mod.iconUrl, let url = URL(string: iconUrl) {
-                    AsyncImage(url: url) { phase in
-                        if case .success(let img) = phase { img.resizable().scaledToFill() }
-                        else { fallbackIcon }
-                    }
-                } else { fallbackIcon }
-            }
-            .frame(width: 44, height: 44)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
-
-            // Center: name + author + type/language chips
-            VStack(alignment: .leading, spacing: 4) {
-                Text(mod.name)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(1)
-                if let author = mod.author, !author.isEmpty {
-                    Text(author)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                // Type + language chips — only shown in list layout where
-                // there's horizontal room for them. Helps the user scan a
-                // long store listing for the source type they need.
-                HStack(spacing: 6) {
-                    if let type = mod.type, !type.isEmpty {
-                        chipLabel(type, icon: "rectangle.stack")
-                    }
-                    if let language = mod.language, !language.isEmpty {
-                        chipLabel(language, icon: "globe")
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            // Right: install state / button
-            installButton
-                .frame(width: 84)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.secondary.opacity(0.08), lineWidth: 1)
-        )
-        .shadow(
-            color: isInstalled && Color.glowEnabled
-                ? Color.appAccent.opacity(Color.glowOpacity(0.5))
-                : .clear,
-            radius: isInstalled && Color.glowEnabled
-                ? Color.glowRadiusSmall
-                : 0
-        )
-    }
-
-    // MARK: - Shared install button
-
-    @ViewBuilder
-    private var installButton: some View {
-        if isInstalled {
-            Label("Installed", systemImage: "checkmark.circle.fill")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(.green)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.vertical, 3)
-        } else if isInstalling {
-            ProgressView()
-                .scaleEffect(0.65)
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.vertical, 3)
-        } else {
-            Button(action: onInstall) {
-                Text("Install")
-                    .font(.system(size: 10, weight: .semibold))
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(GlowingInstallButtonStyle())
-        }
-    }
-
-    private func chipLabel(_ text: String, icon: String) -> some View {
-        HStack(spacing: 3) {
-            Image(systemName: icon)
-                .font(.system(size: 8, weight: .semibold))
-            Text(text)
-                .font(.system(size: 9, weight: .medium))
-        }
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 6)
-        .padding(.vertical, 2)
-        .background(Color.secondary.opacity(0.1), in: Capsule())
-    }
-
-    private var fallbackIcon: some View {
-        Image(systemName: "puzzlepiece.extension")
-            .font(.system(size: 18))
-            .foregroundStyle(.secondary)
-            .frame(width: 40, height: 40)
-    }
-}
-
-/// Button style for the Store tile "Install" button. Mimics the system
-/// `.bordered` look (tinted capsule background + tinted label). The glow
-/// shadow was removed — it was applied to a text-heavy button which made
-/// the label feel visually overwhelming. Module/source glows elsewhere
-/// in the app are unaffected.
-private struct GlowingInstallButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .foregroundStyle(Color.appAccent)
-            .padding(.vertical, 4)
-            .padding(.horizontal, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(Color.appAccent.opacity(configuration.isPressed ? 0.30 : 0.16))
-            )
-            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
-            .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
-    }
-}
-
-private struct StoreModuleSkeletonTile: View {
-    var body: some View {
-        VStack(spacing: 6) {
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color.secondary.opacity(0.15))
-                .frame(width: 40, height: 40)
-                .padding(.top, 2)
-            RoundedRectangle(cornerRadius: 5)
-                .fill(Color.secondary.opacity(0.15))
-                .frame(height: 12)
-            RoundedRectangle(cornerRadius: 4)
-                .fill(Color.secondary.opacity(0.12))
-                .frame(width: 54, height: 9)
-            Spacer(minLength: 2)
-            RoundedRectangle(cornerRadius: 7)
-                .fill(Color.secondary.opacity(0.15))
-                .frame(height: 22)
-        }
-        .padding(10)
-        .frame(maxWidth: .infinity, minHeight: 156, alignment: .top)
-        .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.secondary.opacity(0.08), lineWidth: 1)
-        )
-        .redacted(reason: .placeholder)
-    }
-}
-
-// MARK: - Storage Management Page (v2.22 rework)
-//
-// The one place for everything the app stores. Every category is listed
-// SEPARATELY with its own size and its own Clear button — there is no
-// giant "clear everything" action by design:
-//
-//   • Offline Content — downloaded episodes/chapters. NOT cache: these are
-//     real files the user chose to keep; deleting is destructive and asks
-//     for confirmation showing exactly what goes away.
-//   • Caches — re-created automatically when needed. Safe to clear any
-//     time, no confirmation needed, sizes refresh immediately.
-//   • App Data — caches of anime/manga metadata, id mappings, the
-//     schedule backup, and small preference stores. Clearing
-//     one never touches the others.
-//   • Watch Data — continue-watching and history. Important user data:
-//     clearing asks for confirmation.
-//
-// Sizes update immediately after every clear (single refresh pass), and
-// the total card shows the sum of every category above it.
-
-struct StorageManagementPage: View {
-    @ObservedObject private var dm = DownloadManager.shared
-    @ObservedObject private var mdm = MangaDownloadManager.shared
-
-    // Offline content
-    @State private var animeDownloadSize: Int64 = 0
-    @State private var mangaDownloadSize: Int64 = 0
-
-    // Caches
-    @State private var imageCacheSize: Int = 0
-    @State private var websiteDataSize: Int = 0
-    @State private var tempFilesSize: Int = 0
-
-    // App data
-    @State private var libraryCacheSize: Int = 0
-    @State private var mangaDataSize: Int = 0
-    @State private var idMappingSize: Int = 0
-    @State private var profileCacheSize: Int = 0
-    @State private var scheduleBackupSize: Int = 0
-    @State private var searchAliasSize: Int = 0
-    @State private var episodeSortSize: Int = 0
-
-    // Watch data
-    @State private var cwSize: Int = 0
-    @State private var historySize: Int = 0
-
-    @State private var isCalculating = false
-    @State private var showDeleteAnime = false
-    @State private var showDeleteManga = false
-    @State private var showResetCW = false
-    @State private var showResetHistory = false
-
-    private var totalSize: Int64 {
-        animeDownloadSize + mangaDownloadSize
-            + Int64(imageCacheSize) + Int64(websiteDataSize) + Int64(tempFilesSize)
-            + Int64(libraryCacheSize) + Int64(mangaDataSize) + Int64(idMappingSize)
-            + Int64(profileCacheSize) + Int64(scheduleBackupSize)
-            + Int64(searchAliasSize) + Int64(episodeSortSize)
-            + Int64(cwSize) + Int64(historySize)
-    }
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 22) {
-                totalCard
-
-                sectionHeader(
-                    "Offline Content",
-                    icon: "arrow.down.circle.fill",
-                    tint: .blue,
-                    caption: "Downloaded episodes and chapters stored on this device. Deleting removes the actual offline files — you would need to re-download them to watch or read offline."
-                )
-                offlineRow(
-                    title: "Anime Episodes",
-                    icon: "tv.fill",
-                    iconColor: .blue,
-                    count: dm.items.count,
-                    size: animeDownloadSize,
-                    onDelete: dm.items.isEmpty ? nil : { showDeleteAnime = true }
-                )
-                offlineRow(
-                    title: "Manga Chapters",
-                    icon: "book.fill",
-                    iconColor: .teal,
-                    count: mdm.items.count,
-                    size: mangaDownloadSize,
-                    onDelete: mdm.items.isEmpty ? nil : { showDeleteManga = true }
-                )
-
-                sectionHeader(
-                    "Caches",
-                    icon: "internaldrive.fill",
-                    tint: .orange,
-                    caption: "Temporary data the app rebuilds automatically. Safe to clear any time — posters, images, and pages simply load again when you open them."
-                )
-                cacheRow(
-                    title: "Image Cache",
-                    detail: "Poster and artwork images.",
-                    icon: "photo.stack.fill",
-                    iconColor: .orange,
-                    size: imageCacheSize
-                ) {
-                    CacheManager.shared.clearImageCache()
-                }
-                cacheRow(
-                    title: "Website Data",
-                    detail: "WebView cookies and site storage from streaming sources.",
-                    icon: "safari.fill",
-                    iconColor: .orange,
-                    size: websiteDataSize
-                ) {
-                    Task { await CacheManager.shared.clearWebsiteData() }
-                }
-                cacheRow(
-                    title: "Temp Files",
-                    detail: "Scratch files from downloads and playback.",
-                    icon: "clock.arrow.circlepath",
-                    iconColor: .orange,
-                    size: tempFilesSize
-                ) {
-                    CacheManager.shared.clearTempFiles()
-                }
-
-                sectionHeader(
-                    "App Data",
-                    icon: "archivebox.fill",
-                    tint: .purple,
-                    caption: "Cached metadata and small preference stores. Each clears on its own — one category never touches another."
-                )
-                cacheRow(
-                    title: "Anime Data",
-                    detail: "Cached anime library and detail snapshots.",
-                    icon: "sparkles",
-                    iconColor: .purple,
-                    size: libraryCacheSize
-                ) {
-                    CacheManager.shared.clearLibraryCache()
-                }
-                cacheRow(
-                    title: "Manga Data",
-                    detail: "Cached live chapter counts for ongoing manga.",
-                    icon: "text.book.closed.fill",
-                    iconColor: .purple,
-                    size: mangaDataSize
-                ) {
-                    MangaUpdatesChapterService.shared.clearCache()
-                }
-                cacheRow(
-                    title: "Metadata — ID Mappings",
-                    detail: "AniList ↔ MyAnimeList ↔ TVDB cross-reference mappings.",
-                    icon: "link.circle.fill",
-                    iconColor: .purple,
-                    size: idMappingSize
-                ) {
-                    CacheManager.shared.clearIDMappingCache()
-                }
-                cacheRow(
-                    title: "Metadata — Profiles",
-                    detail: "Cached tracker profiles and avatars.",
-                    icon: "person.crop.circle.fill",
-                    iconColor: .purple,
-                    size: profileCacheSize
-                ) {
-                    CacheManager.shared.clearProfileCache()
-                }
-                cacheRow(
-                    title: "Schedule Backup",
-                    detail: "The last good schedule, kept for offline fallbacks.",
-                    icon: "calendar.badge.clock",
-                    iconColor: .purple,
-                    size: scheduleBackupSize
-                ) {
-                    ScheduleFallbackService.shared.clearSnapshot()
-                }
-                cacheRow(
-                    title: "Search Aliases",
-                    detail: "Remembered source-search tweaks per title.",
-                    icon: "magnifyingglass.circle.fill",
-                    iconColor: .purple,
-                    size: searchAliasSize
-                ) {
-                    CacheManager.shared.clearSearchAliases()
-                }
-                cacheRow(
-                    title: "Episode Sort Preferences",
-                    detail: "Per-series ascending/descending episode order.",
-                    icon: "arrow.up.arrow.down.circle.fill",
-                    iconColor: .purple,
-                    size: episodeSortSize
-                ) {
-                    CacheManager.shared.clearEpisodeSortPreferences()
-                }
-
-                sectionHeader(
-                    "Watch Data",
-                    icon: "eye.fill",
-                    tint: .green,
-                    caption: "Your personal progress. Clearing is permanent — a confirmation will show exactly what is removed."
-                )
-                cacheRow(
-                    title: "Continue Watching",
-                    detail: "Resume points for anime episodes.",
-                    icon: "play.circle.fill",
-                    iconColor: .green,
-                    size: cwSize,
-                    confirm: true,
-                    onClear: { showResetCW = true }
-                )
-                cacheRow(
-                    title: "Watch History",
-                    detail: "Which episodes you have already finished.",
-                    icon: "clock.fill",
-                    iconColor: .green,
-                    size: historySize,
-                    confirm: true,
-                    onClear: { showResetHistory = true }
-                )
-            }
-            .padding(.vertical, 16)
-        }
-        .background(Color(.systemGroupedBackground).ignoresSafeArea())
-        .navigationTitle("Storage")
-        .navigationBarTitleDisplayMode(.inline)
-        .task { await refreshSizes() }
-        .refreshable { await refreshSizes() }
-        .alert("Delete All Anime Episodes?", isPresented: $showDeleteAnime) {
-            Button("Delete", role: .destructive) {
-                for item in dm.items { dm.remove(item) }
-                Task { await refreshSizes() }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This permanently removes all \(dm.items.count) downloaded episode\(dm.items.count == 1 ? "" : "s") (\(formatSize(animeDownloadSize))) from this device. You can re-download them later.")
-        }
-        .alert("Delete All Manga Chapters?", isPresented: $showDeleteManga) {
-            Button("Delete", role: .destructive) {
-                for item in mdm.items { mdm.remove(item) }
-                Task { await refreshSizes() }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This permanently removes all \(mdm.items.count) downloaded chapter\(mdm.items.count == 1 ? "" : "s") (\(formatSize(mangaDownloadSize))) from this device. You can re-download them later.")
-        }
-        .alert("Reset Continue Watching?", isPresented: $showResetCW) {
-            Button("Reset", role: .destructive) {
-                CacheManager.shared.clearContinueWatching()
-                Task { await refreshSizes() }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Every resume point is erased — playback starts from episode 1 for all anime. Downloaded files are not affected.")
-        }
-        .alert("Reset Watch History?", isPresented: $showResetHistory) {
-            Button("Reset", role: .destructive) {
-                CacheManager.shared.clearWatchHistory()
-                Task { await refreshSizes() }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Your finished-episode records are erased. This does not change your AniList or MyAnimeList lists and does not delete downloads.")
-        }
-    }
-
-    // MARK: - Total card
-
-    private var totalCard: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(Color.appAccent.opacity(0.12))
-                        .frame(width: 50, height: 50)
-                    Image(systemName: "internaldrive.fill")
-                        .font(.system(size: 22))
-                        .foregroundStyle(Color.appAccent)
-                }
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Total Used by Shirox+")
-                        .font(.headline)
-                    Text(formatSize(totalSize))
-                        .font(.title2.weight(.bold).monospacedDigit())
-                        .foregroundStyle(.primary)
-                }
-                Spacer()
-            }
-            if isCalculating {
-                HStack(spacing: 6) {
-                    ProgressView().scaleEffect(0.7)
-                    Text("Calculating…")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, alignment: .center)
-            }
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(.secondarySystemGroupedBackground))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-        )
-        .padding(.horizontal, 16)
-    }
-
-    // MARK: - Section header
-
-    private func sectionHeader(_ title: String, icon: String, tint: Color, caption: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(tint)
-                Text(title)
-                    .font(.title3.weight(.bold))
-                Spacer()
-            }
-            Text(caption)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.horizontal, 16)
-    }
-
-    // MARK: - Rows
-
-    /// Offline (downloaded) row — count + size, destructive Delete with
-    /// confirmation supplied by the caller.
-    private func offlineRow(
-        title: String,
-        icon: String,
-        iconColor: Color,
-        count: Int,
-        size: Int64,
-        onDelete: (() -> Void)?
-    ) -> some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(iconColor.opacity(0.12))
-                        .frame(width: 46, height: 46)
-                    Image(systemName: icon)
-                        .font(.system(size: 20))
-                        .foregroundStyle(iconColor)
-                }
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(.headline)
-                    HStack(spacing: 6) {
-                        Text("\(count) item\(count == 1 ? "" : "s")")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text("·")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text(formatSize(size))
-                            .font(.caption.weight(.semibold).monospacedDigit())
-                            .foregroundStyle(.primary)
-                    }
-                }
-                Spacer()
-            }
-            if let onDelete {
-                Button(action: onDelete) {
-                    Label("Delete All", systemImage: "trash")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.red)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(Color.red.opacity(0.1))
-                        )
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(.secondarySystemGroupedBackground))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-        )
-        .padding(.horizontal, 16)
-    }
-
-    /// Cache/app-data row — individual Clear button, immediate size
-    /// refresh. `confirm: true` rows route through a destructive
-    /// confirmation instead of clearing directly.
-    private func cacheRow(
-        title: String,
-        detail: String,
-        icon: String,
-        iconColor: Color,
-        size: Int,
-        confirm: Bool = false,
-        onClear: (() -> Void)? = nil
-    ) -> some View {
-        let clearAction: () -> Void = onClear ?? {}
-        return VStack(spacing: 10) {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(iconColor.opacity(0.12))
-                        .frame(width: 46, height: 46)
-                    Image(systemName: icon)
-                        .font(.system(size: 20))
-                        .foregroundStyle(iconColor)
-                }
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
-                        Text(title)
-                            .font(.headline)
-                        Spacer(minLength: 0)
-                        Text(formatSize(size))
-                            .font(.subheadline.weight(.semibold).monospacedDigit())
-                            .foregroundStyle(size > 0 ? .primary : .secondary)
-                    }
-                    Text(detail)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            Button {
-                Haptics.light()
-                if confirm {
-                    clearAction()
-                } else {
-                    clearAction()
-                    Task { await refreshSizes() }
-                }
-            } label: {
-                Label("Clear", systemImage: confirm ? "trash" : "trash")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(confirm ? .red : Color.appAccent)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 9)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill((confirm ? Color.red : Color.appAccent).opacity(0.1))
-                    )
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(.secondarySystemGroupedBackground))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-        )
-        .padding(.horizontal, 16)
-    }
-
-    // MARK: - Helpers
-
-    private func refreshSizes() async {
-        await MainActor.run { isCalculating = true }
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let animeDir = docs.appendingPathComponent("Downloads")
-        let mangaDir = docs.appendingPathComponent("MangaDownloads")
-        let anime = directorySize(at: animeDir)
-        let manga = directorySize(at: mangaDir)
-        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-        let scheduleBackup = (try? FileManager.default.attributesOfItem(
-            atPath: caches.appendingPathComponent("schedule-fallback-snapshot.json").path))?[.size] as? Int ?? 0
-        let cache = CacheManager.shared
-        let image = await cache.imageCacheSize
-        await MainActor.run {
-            animeDownloadSize = anime
-            mangaDownloadSize = manga
-            imageCacheSize = image
-            websiteDataSize = cache.websiteDataSize
-            tempFilesSize = cache.tempFilesSize
-            libraryCacheSize = cache.libraryCacheSize
-            mangaDataSize = MangaUpdatesChapterService.diskCacheBytes()
-            idMappingSize = cache.idMappingSize
-            profileCacheSize = cache.profileCacheSize
-            scheduleBackupSize = scheduleBackup
-            searchAliasSize = cache.searchAliasSize
-            episodeSortSize = cache.episodeSortSize
-            cwSize = cache.continueWatchingSize
-            historySize = cache.watchHistorySize
-            isCalculating = false
-        }
-    }
-
-    private func directorySize(at url: URL) -> Int64 {
-        let fm = FileManager.default
-        guard let enumerator = fm.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey], options: [.skipsHiddenFiles]) else { return 0 }
-        var total: Int64 = 0
-        for case let fileURL as URL in enumerator {
-            if let size = try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize {
-                total += Int64(size)
-            }
-        }
-        return total
-    }
-
-    private func formatSize(_ bytes: Int64) -> String {
-        let formatter = ByteCountFormatter()
-        formatter.allowedUnits = [.useKB, .useMB, .useGB]
-        formatter.countStyle = .file
-        return formatter.string(fromByteCount: bytes)
-    }
-
-    private func formatSize(_ bytes: Int) -> String {
-        if bytes <= 0 { return "0 KB" }
-        let f = ByteCountFormatter()
-        f.allowedUnits = [.useMB, .useKB]
-        f.countStyle = .file
-        return f.string(fromByteCount: Int64(bytes))
-    }
-}
-
-// MARK: - Subtitle Settings Page
-
-/// v2.15 — this page now edits the SAME `SubtitleSettingsManager` the player
-/// renders from. Previously it wrote a parallel set of UserDefaults keys that
-/// no player code ever read, while its preview rendered through its own
-/// stroke implementation — so the preview could (and did) drift from actual
-/// playback ("configure yellow bold subs, player shows white ones"). Both
-/// surfaces now share one state object and one caption renderer
-/// (`SubtitleCaptionText`), making this page fully WYSIWYG: what the landscape
-/// preview shows is byte-for-byte what the player renders.
-struct SubtitleSettingsPage: View {
-    @ObservedObject private var settings = SubtitleSettingsManager.shared
-
-    @State private var previewImageURL: String?
-    @State private var showLandscapePreview = false
-
-    private let quickColors: [(name: String, color: Color)] = [
-        ("white", .white), ("yellow", .yellow), ("cyan", .cyan),
-        ("pink", .pink), ("green", .green), ("black", .black)
-    ]
-    private let strokeColorOptions = ["none", "black", "white", "gray"]
-    private let fontDesignOptions: [(label: String, value: String)] = [
-        ("Default", "default"),
-        ("Rounded", "rounded"),
-        ("Serif", "serif"),
-        ("Monospaced", "monospaced")
-    ]
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                masterToggleCard
-                rendererCard
-                quickPresetsCard
-                livePreviewCard
-                appearanceControlsCard
-                typographyCard
-                timingCard
-                positionCard
-                effectsCard
-
-                Text("All changes apply live during playback — adjust them from the captions button in the player for instant feedback.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 8)
-            }
-            .padding()
-        }
-        .navigationTitle("Subtitles")
-        .inlineNavBar()
-        .onAppear {
-            Task {
-                let trending = try? await AniListService.shared.browse(category: .trending, page: 1)
-                if let random = trending?.randomElement() {
-                    previewImageURL = random.bannerImage ?? random.coverImage.extraLarge ?? random.coverImage.large
-                }
-            }
-        }
-        #if os(iOS)
-        .fullScreenCover(isPresented: $showLandscapePreview) {
-            // Renders the caption through the REAL PlayerSubtitleOverlay — the
-            // exact component playback uses — over a real anime still.
-            LandscapeSubtitlePreview(backdropImageURL: previewImageURL)
-        }
-        #endif
-    }
-
-    // MARK: - Master Toggle Card
-
-    private var masterToggleCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Toggle(isOn: $settings.enabled) {
-                Label("Show Subtitles", systemImage: "captions.bubble.fill")
-                    .font(.headline)
-            }
-            .tint(.appAccent)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    // MARK: - Renderer Card (Batch 23, item 7)
-
-    /// Subtitle style: Apple's default subtitle UI vs the app's custom
-    /// styling. Genuinely selectable, persisted, and honored by the player
-    /// (embedded tracks render natively with Apple's look in System mode;
-    /// the styled overlay is the renderer in Custom mode).
-    private var rendererCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label("Subtitle Style", systemImage: "paintbrush")
-                .font(.headline)
-
-            Picker("Subtitle Style", selection: $settings.useSystemRenderer) {
-                Text("Apple Default").tag(true)
-                Text("Shirox Custom").tag(false)
-            }
-            .pickerStyle(.segmented)
-
-            Text(settings.useSystemRenderer
-                 ? "Apple Default: embedded subtitles render with the system's native look; external subtitle files render with the system's default caption style."
-                 : "Shirox Custom: every subtitle renders through the app's styled overlay — all the appearance controls below apply.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    // MARK: - Quick Presets Card (Batch 25 — visual preset carousel)
-
-    /// Six one-tap styles. Each tile renders the preset's name through the
-    /// REAL `SubtitleCaptionText` in that preset's own style — the tiles
-    /// cannot lie about what applying them does.
-    private var quickPresetsCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("Style Presets", systemImage: "wand.and.stars")
-                .font(.headline)
-
-            Text("Tap a style to apply it instantly — every tile is a live render of that style.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(SubtitleStyle.presets, id: \.name) { preset in
-                        presetTile(preset)
-                    }
-                }
-                .padding(.vertical, 2)
-            }
-
-            if settings.presetName.isEmpty {
-                Text("Custom — the appearance controls below are tuned by hand.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    private func presetTile(_ preset: (name: String, style: SubtitleStyle)) -> some View {
-        let isSelected = settings.presetName.caseInsensitiveCompare(preset.name) == .orderedSame
-        return Button {
-            settings.applyPreset(named: preset.name)
-            Haptics.light()
-        } label: {
-            VStack(spacing: 6) {
-                ZStack(alignment: .topTrailing) {
-                    ZStack {
-                        LinearGradient(
-                            colors: [Color.black, Color(white: 0.18)],
-                            startPoint: .top, endPoint: .bottom)
-                        // The preset's own look, rendering its own name.
-                        SubtitleCaptionText(text: preset.name, style: preset.style)
-                            .padding(.horizontal, 6)
-                    }
-                    .frame(width: 108, height: 58)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    if isSelected {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(Color.appAccent)
-                            .background(Circle().fill(.thinMaterial))
-                            .offset(x: 4, y: -4)
-                    }
-                }
-                Text(preset.name)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(isSelected ? Color.appAccent : .primary)
-                    .lineLimit(1)
-            }
-        }
-        .buttonStyle(.plain)
-    }
-
-    // MARK: - Live Preview Card
-
-    /// The card itself stays a clean anime still (a scaled-down caption always
-    /// lied about true playback size — v2.11 lesson). The fullscreen landscape
-    /// test is where the caption renders at 1:1 through the actual player
-    /// overlay, on the picture itself.
-    private var livePreviewCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Label("Live Preview", systemImage: "eye")
-                    .font(.headline)
-                Spacer()
-                if previewImageURL == nil {
-                    ProgressView()
-                        .scaleEffect(0.7)
-                }
-            }
-
-            ZStack {
-                Group {
-                    if let url = previewImageURL {
-                        CachedAsyncImage(urlString: url)
-                            .frame(height: 200)
-                            .clipped()
-                    } else {
-                        LinearGradient(colors: [Color.black, Color.gray.opacity(0.3)], startPoint: .top, endPoint: .bottom)
-                            .frame(height: 200)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 200)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-
-                // Subtle legibility scrim behind the overlaid button.
-                LinearGradient(
-                    colors: [Color.black.opacity(0.0), Color.black.opacity(0.45)],
-                    startPoint: .center,
-                    endPoint: .bottom
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-
-                Button {
-                    Haptics.light()
-                    showLandscapePreview = true
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "rectangle.landscape.rotate")
-                            .font(.system(size: 15, weight: .semibold))
-                        Text("Test in Landscape")
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(.ultraThinMaterial, in: Capsule())
-                    .background(Capsule().fill(Color.black.opacity(0.35)))
-                }
-                .buttonStyle(.plain)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                .padding(.bottom, 12)
-            }
-            .frame(height: 200)
-
-            Text("Opens a fullscreen, landscape-only preview that renders your caption through the player's actual subtitle overlay — true size, true position, no scaling.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .id("landscapePreview")
-    }
-
-    // MARK: - Appearance Controls Card
-
-    private var appearanceControlsCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Label("Appearance", systemImage: "textformat")
-                .font(.headline)
-
-            #if !os(tvOS)
-            ColorPicker("Text Color", selection: $settings.foregroundColor)
-                .id("subtitleColor")
-
-            // Quick swatches — one tap beats hunting through the color wheel.
-            HStack(spacing: 10) {
-                ForEach(quickColors, id: \.name) { entry in
-                    Button {
-                        settings.foregroundColor = entry.color
-                    } label: {
-                        Circle()
-                            .fill(entry.color)
-                            .frame(width: 26, height: 26)
-                            .overlay(
-                                Circle().strokeBorder(
-                                    settings.foregroundColor == entry.color ? Color.appAccent : Color.white.opacity(0.25),
-                                    lineWidth: settings.foregroundColor == entry.color ? 2.5 : 1
-                                )
-                            )
-                    }
-                    .buttonStyle(.plain)
-                }
-                Spacer()
-            }
-            #endif
-
-            Picker("Stroke Color", selection: $settings.strokeColorName) {
-                ForEach(strokeColorOptions, id: \.self) { Text($0.capitalized).tag($0) }
-            }
-            .tint(.appAccent)
-
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text("Stroke Width")
-                    Spacer()
-                    Text(String(format: "%.1f", settings.strokeWidth))
-                        .foregroundStyle(.secondary)
-                }
-                Slider(value: $settings.strokeWidth, in: 0...4, step: 0.5)
-                    .tint(.appAccent)
-                    .disabled(settings.strokeColorName == "none")
-                Text("Outline around each letter. With no stroke, the player auto-outlines for legibility. Disabled subtitles get a soft glow instead.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text("Font Size")
-                    Spacer()
-                    Text("\(Int(settings.fontSize))pt")
-                        .foregroundStyle(.secondary)
-                }
-                Slider(value: $settings.fontSize, in: 12...48, step: 1)
-                    .tint(.appAccent)
-            }
-            .id("subtitleFontSize")
-
-            Toggle("Bold Text", isOn: $settings.boldText)
-                .tint(.appAccent)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    // MARK: - Typography Card
-
-    private var typographyCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Label("Typography", systemImage: "textformat.size")
-                .font(.headline)
-
-            Picker("Font Design", selection: $settings.fontDesignName) {
-                ForEach(fontDesignOptions, id: \.value) { option in
-                    Text(option.label).tag(option.value)
-                }
-            }
-            .tint(.appAccent)
-
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text("Line Spacing")
-                    Spacer()
-                    Text(String(format: "%.2fx", settings.lineSpacingMultiplier))
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
-                Slider(value: $settings.lineSpacingMultiplier, in: 0.8...2.0, step: 0.05)
-                    .tint(.appAccent)
-                Text("Multiplier applied between caption lines. 1.0 = default, 2.0 = double-spaced.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text("Max Width")
-                    Spacer()
-                    Text("\(Int(settings.maxWidthPercent))%")
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
-                Slider(value: $settings.maxWidthPercent, in: 50...100, step: 1)
-                    .tint(.appAccent)
-                Text("Maximum width of the caption block, as a percentage of the player width.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    // MARK: - Timing Card
-
-    private var timingCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Label("Timing", systemImage: "clock")
-                .font(.headline)
-
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text("Subtitle Delay")
-                    Spacer()
-                    Text(String(format: "%+.1fs", settings.delaySeconds))
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
-                Slider(value: $settings.delaySeconds, in: -5...5, step: 0.1)
-                    .tint(.appAccent)
-                Text("Negative values show subtitles earlier, positive values later.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Button {
-                    withAnimation(.easeInOut(duration: 0.18)) {
-                        settings.delaySeconds = 0
-                    }
-                } label: {
-                    Label("Reset to 0s", systemImage: "arrow.counterclockwise")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .tint(.appAccent)
-                .disabled(settings.delaySeconds == 0)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .id("subtitleDelay")
-    }
-
-    // MARK: - Position & Background Card
-
-    private var positionCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Label("Position & Background", systemImage: "arrow.up.and.down.text.horizontal")
-                .font(.headline)
-
-            Toggle("Background", isOn: $settings.backgroundEnabled)
-                .tint(.appAccent)
-
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text("Bottom Padding")
-                    Spacer()
-                    Text("\(Int(settings.bottomPadding))pt")
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
-                Slider(value: $settings.bottomPadding, in: 20...200, step: 5)
-                    .tint(.appAccent)
-                Text("Distance between the caption and the bottom edge of the player.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text("Vertical Nudge")
-                    Spacer()
-                    Text(String(format: "%+.0f", settings.verticalOffset))
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
-                Slider(value: $settings.verticalOffset, in: -100...100, step: 1)
-                    .tint(.appAccent)
-                HStack {
-                    Text("Top")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Text("Bottom")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                Text("Fine-tune on top of the bottom padding: negative lifts the caption toward the top of the screen, positive pushes it down.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Button {
-                    withAnimation(.easeInOut(duration: 0.18)) {
-                        settings.verticalOffset = 0
-                    }
-                } label: {
-                    Label("Reset to 0", systemImage: "arrow.counterclockwise")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .tint(.appAccent)
-                .disabled(settings.verticalOffset == 0)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .id("subtitlePosition")
-    }
-
-    // MARK: - Effects Card
-
-    private var effectsCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Label("Effects", systemImage: "sparkles")
-                .font(.headline)
-
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text("Text Opacity")
-                    Spacer()
-                    Text("\(Int((settings.textOpacity * 100).rounded()))%")
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
-                Slider(value: $settings.textOpacity, in: 0.5...1.0, step: 0.05)
-                    .tint(.appAccent)
-                Text("Dims the entire caption. Useful for non-intrusive subtitles over bright scenes.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text("Drop Shadow")
-                    Spacer()
-                    Text(String(format: "%.1fpt", settings.shadowOffset))
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
-                Slider(value: $settings.shadowOffset, in: 0...10, step: 0.5)
-                    .tint(.appAccent)
-                Text("Directional shadow behind the caption. 0 disables it.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text("Glow")
-                    Spacer()
-                    Text(String(format: "%.1fpt", settings.shadowRadius))
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
-                Slider(value: $settings.shadowRadius, in: 0...8, step: 0.5)
-                    .tint(.appAccent)
-                Text("Soft blur halo around the caption. This is the classic subtitle soft shadow.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-}
-
-// MARK: - Landscape Subtitle Preview
-
-#if os(iOS)
-/// Fullscreen, landscape-only preview — v2.15 renders the caption through the
-/// REAL `PlayerSubtitleOverlay` (the same component, the same settings object,
-/// and the same positioning math playback uses), so this is a true
-/// what-you-see-is-what-you-get test. Previously it re-implemented caption
-/// rendering with its own stroke logic reading keys the player never touched.
-struct LandscapeSubtitlePreview: View {
-    /// Optional anime artwork (banner or cover URL) shown behind the caption.
-    var backdropImageURL: String? = nil
-
-    @ObservedObject private var settings = SubtitleSettingsManager.shared
-    @Environment(\.dismiss) private var dismiss
-    @State private var hasAppliedLandscapeLock = false
-
-    /// Sample cue spanning the whole preview so the caption is always "active".
-    private static let sampleCue = SubtitleCue(
-        start: -10, end: 3600,
-        text: "The journey of a thousand miles begins with a single step."
-    )
-
-    var body: some View {
-        ZStack {
-            backdropView
-
-            // THE player overlay — identical rendering path to playback.
-            PlayerSubtitleOverlay(
-                cues: settings.enabled ? [Self.sampleCue] : [],
-                currentTime: 1,
-                showControls: false,
-                settings: settings
-            )
-            .allowsHitTesting(false)
-
-            // Top-trailing Done button — the ONLY chrome.
-            VStack {
-                HStack {
-                    Spacer()
-                    Button {
-                        dismiss()
-                    } label: {
-                        Text("Done")
-                            .font(.headline)
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 18)
-                            .padding(.vertical, 8)
-                            .background(.ultraThinMaterial, in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 10)
-                Spacer()
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-
-            if !settings.enabled {
-                Text("Subtitles are turned off — enable them above to preview.")
-                    .font(.footnote.weight(.medium))
-                    .foregroundStyle(.white.opacity(0.85))
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(.ultraThinMaterial, in: Capsule())
-                    .frame(maxHeight: .infinity, alignment: .center)
-            }
-        }
-        .statusBarHidden()
-        .onAppear {
-            #if !targetEnvironment(macCatalyst)
-            PlayerPresenter.shared.updateOrientationLock(.landscape, shouldRotate: true)
-            hasAppliedLandscapeLock = true
-            #endif
-        }
-        .onDisappear {
-            #if !targetEnvironment(macCatalyst)
-            if hasAppliedLandscapeLock {
-                PlayerPresenter.shared.updateOrientationLock(.portrait, shouldRotate: true)
-            }
-            #endif
-        }
-    }
-
-    // MARK: - Backdrop
-
-    @ViewBuilder
-    private var backdropView: some View {
-        GeometryReader { geo in
-            if let urlString = backdropImageURL, !urlString.isEmpty, let url = URL(string: urlString) {
-                ZStack {
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .scaledToFill()
-                        case .failure, .empty:
-                            gradientPlaceholder
-                        @unknown default:
-                            gradientPlaceholder
-                        }
-                    }
-                    Color.black.opacity(0.45)
-                }
-                .frame(width: geo.size.width, height: geo.size.height)
-                .clipped()
-            } else {
-                gradientPlaceholder
-            }
-        }
-    }
-
-    private var gradientPlaceholder: some View {
-        LinearGradient(
-            colors: [
-                Color(red: 0.04, green: 0.04, blue: 0.06),
-                Color(red: 0.10, green: 0.09, blue: 0.13)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-        .ignoresSafeArea()
-    }
-}
-#endif
-
-
-// MARK: - Updates Settings Page (v2.22)
-//
-// The dedicated Updates section. Everything update-related moved here from
-// the About page: current app version (with the 5-tap demo trigger),
-// available version, Check for Updates with all six honest check states,
-// update/download options (the full popup flow — in-app IPA download,
-// verification, LiveContainer handoff, copy/share), the What's New
-// changelog, and a link into the Change Log.
-
-struct UpdatesSettingsPage: View {
-    @ObservedObject private var updateManager = AppUpdateManager.shared
-
-    private var version: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "-"
-    }
-    private var build: String {
-        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "-"
-    }
-
-    /// "just now" / "3 minutes ago" … for the last successful check.
-    private var lastCheckedText: String? {
-        guard let date = updateManager.lastSuccessfulCheck else { return nil }
-        return RelativeDateTimeFormatter().localizedString(for: date, relativeTo: Date())
-    }
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                versionCard
-                updateStatusCard
-                changeLogCard
-            }
-            .padding()
-        }
-        .background(Color(.systemGroupedBackground).ignoresSafeArea())
-        .navigationTitle("Updates")
-        .inlineNavBar()
-    }
-
-    // MARK: - Version card
-
-    private var versionCard: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 14) {
-                ZStack {
-                    Circle()
-                        .fill(Color.appAccent.opacity(0.12))
-                        .frame(width: 50, height: 50)
-                    Image(systemName: "arrow.down.circle.fill")
-                        .font(.system(size: 22))
-                        .foregroundStyle(Color.appAccent)
-                }
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Current Version")
-                        .font(.headline)
-                    Text("\(version) (\(build))")
-                        .font(.title3.weight(.bold).monospacedDigit())
-                    if let last = lastCheckedText {
-                        Text("Checked \(last) ago")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                Spacer()
-            }
-            Text("Updates are never forced — you can always keep using Shirox+ and install new versions whenever you're ready. Checks run automatically on launch and hourly after that. The version comparison is exact: the same version never prompts.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            // v2.23 — explicit, clearly-labeled popup preview (replaces the
-            // hidden 5-tap trigger that caused false update popups).
-            Button {
-                Haptics.selection()
-                updateManager.presentPreview()
-            } label: {
-                HStack(spacing: 7) {
-                    Image(systemName: "eye")
-                        .font(.system(size: 13, weight: .semibold))
-                    Text("Preview the update popup")
-                        .font(.subheadline.weight(.semibold))
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.tertiary)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.appAccent.opacity(0.08))
-                )
-                .foregroundStyle(Color.appAccent)
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(.secondarySystemGroupedBackground))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-        )
-    }
-
-    // MARK: - Update status card
-
-    /// Renders every AppUpdateManager.CheckState distinctly — honest
-    /// states only. "Up to date" appears only after a REAL successful
-    /// comparison; a failed check gets its own retry state instead of a
-    /// fake green checkmark. When an update is known (offered OR
-    /// dismissed) the card also shows the version pair and the update
-    /// actions.
-    @ViewBuilder
-    private var updateStatusCard: some View {
-        VStack(spacing: 14) {
-            HStack(spacing: 12) {
-                statusIcon
-
-                VStack(alignment: .leading, spacing: 4) {
-                    switch updateManager.state {
-                    case .idle:
-                        Text("Version not checked yet")
-                            .font(.headline)
-                        Text("Tap Check for Updates below.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                    case .checking:
-                        Text("Checking for updates…")
-                            .font(.headline)
-                        Text("Asking three update servers for the latest version.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                    case .current:
-                        Text("You're up to date")
-                            .font(.headline)
-                            .foregroundStyle(.green)
-                        Text("Version \(version) (\(build))" + (lastCheckedText.map { " · checked \($0) ago" } ?? ""))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                    case .failed:
-                        Text("Couldn't verify version")
-                            .font(.headline)
-                            .foregroundStyle(.orange)
-                        Text("All update servers were unreachable. Your connection or the servers may be down — this is not the same as being up to date.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                    case .available(let update):
-                        Text("Update Available")
-                            .font(.headline)
-                        HStack(spacing: 6) {
-                            Text(update.currentVersion)
-                                .font(.subheadline.weight(.semibold).monospacedDigit())
-                                .foregroundStyle(.secondary)
-                            Image(systemName: "arrow.right")
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-                            Text(update.newVersion)
-                                .font(.subheadline.weight(.bold).monospacedDigit())
-                                .foregroundStyle(Color.appAccent)
-                        }
-                        if update.isCritical {
-                            // v2.22 — advisory only, never a lockout.
-                            Label("Strongly recommended — you're several versions behind", systemImage: "exclamationmark.triangle.fill")
-                                .font(.caption)
-                                .foregroundStyle(.orange)
-                        }
-                        Text(update.changelog)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(4)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                    case .dismissed(let update):
-                        Text("Update available — dismissed")
-                            .font(.headline)
-                        Text("Version \(update.newVersion) · you dismissed the prompt, but you can still install it below.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-
-                Spacer()
-            }
-
-            if updateManager.availableUpdate != nil || isDismissedState {
-                // v2.21/v2.22 — The full update popup (progress,
-                // verification, LiveContainer handoff, copy/share).
-                Button {
-                    Haptics.light()
-                    updateManager.presentUpdateFlow()
-                } label: {
-                    Label(updateButtonTitle, systemImage: "arrow.down.circle.fill")
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(Color.appAccent, in: RoundedRectangle(cornerRadius: 12))
-                }
-                .buttonStyle(.plain)
-            }
-
-            Button {
-                Task {
-                    await updateManager.checkForUpdates(force: true)
-                }
-            } label: {
-                Label(
-                    updateManager.state == .failed ? "Retry Check" : "Check for Updates",
-                    systemImage: "arrow.clockwise"
-                )
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.appAccent)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .background(Color.appAccent.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
-            }
-            .buttonStyle(.plain)
-            .disabled(updateManager.isChecking)
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(.secondarySystemGroupedBackground))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-        )
-    }
-
-    private var isDismissedState: Bool {
-        if case .dismissed = updateManager.state { return true }
-        return false
-    }
-
-    private var updateButtonTitle: String {
-        if case .dismissed(let update) = updateManager.state {
-            return "Install \(update.newVersion)"
-        }
-        return "Update Now"
-    }
-
-    /// Leading icon for the update card, per state.
-    @ViewBuilder
-    private var statusIcon: some View {
-        ZStack {
-            Circle()
-                .fill(statusIconTint.opacity(0.12))
-                .frame(width: 44, height: 44)
-            switch updateManager.state {
-            case .checking:
-                ProgressView()
-                    .frame(width: 22, height: 22)
-            case .current:
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 22))
-                    .foregroundStyle(.green)
-            case .failed:
-                Image(systemName: "wifi.exclamationmark")
-                    .font(.system(size: 20))
-                    .foregroundStyle(.orange)
-            case .available:
-                Image(systemName: "arrow.up.circle.fill")
-                    .font(.system(size: 22))
-                    .foregroundStyle(.orange)
-            case .dismissed:
-                Image(systemName: "bell.slash.fill")
-                    .font(.system(size: 20))
-                    .foregroundStyle(.secondary)
-            case .idle:
-                Image(systemName: "questionmark.circle.fill")
-                    .font(.system(size: 22))
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private var statusIconTint: Color {
-        switch updateManager.state {
-        case .checking: return .secondary
-        case .current: return .green
-        case .failed, .available: return .orange
-        case .dismissed, .idle: return .secondary
-        }
-    }
-
-    // MARK: - Change Log card
-
-    /// The full history of previous app changes, one clean page.
-    private var changeLogCard: some View {
-        NavigationLink {
-            UpdateLogPage()
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "list.bullet.clipboard.fill")
-                    .font(.system(size: 18))
-                    .foregroundStyle(Color.appAccent)
-                    .frame(width: 36, height: 36)
-                    .background(Color.appAccent.opacity(0.1), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Change Log")
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                    Text("Everything added, fixed, and changed — release by release.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.leading)
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(14)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color(.secondarySystemGroupedBackground))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-// MARK: - About Settings Page
-
-struct AboutSettingsPage: View {
-
-    private var version: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "-"
-    }
-    private var build: String {
-        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "-"
-    }
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                heroCard
-                legalCard
-            }
-            .padding()
-        }
-        .navigationTitle("About")
-        .inlineNavBar()
-    }
-
-    // MARK: - Hero Card
-
-    private var heroCard: some View {
-        VStack(spacing: 14) {
-            // #94 — Single clean app icon: just the bundled `app-logo` asset
-            // in a rounded rect. No gradient background, no extra frame, no
-            // SF-Symbol fallback wrapping — the image speaks for itself.
-            Image("app-logo")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 80, height: 80)
-                .clipShape(RoundedRectangle(cornerRadius: 18))
-
-            VStack(spacing: 4) {
-                Text("Shirox+")
-                    .font(.system(size: 28, weight: .bold))
-                Text("Version \(version) (\(build))")
-                    .font(.subheadline.monospacedDigit())
-                    .foregroundStyle(.secondary)
-            }
-
-            HStack(spacing: 8) {
-                Label("Anime", systemImage: "sparkles")
-                Label("Manga", systemImage: "book.fill")
-                Label("Tracking", systemImage: "checkmark.seal.fill")
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(Color.secondary.opacity(0.1), in: Capsule())
-        }
-        .padding(24)
-        .frame(maxWidth: .infinity)
-        .background(Color.secondary.opacity(0.08),
-                    in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-    }
-
-    // MARK: - Legal Card
-
-    private var legalCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 10) {
-                Image(systemName: "doc.text.fill")
-                    .foregroundStyle(Color.appAccent)
-                Text("Legal")
-                    .font(.headline)
-                Spacer()
-            }
-            .padding(.bottom, 8)
-
-            legalLink("Imprint", icon: "person.text.rectangle") { LegalWebView(page: .imprint) }
-            Divider().opacity(0.4)
-            legalLink("Data Privacy", icon: "hand.raised.fill") { LegalWebView(page: .privacy) }
-            Divider().opacity(0.4)
-            legalLink("Contributors", icon: "person.3.fill") { LegalWebView(page: .contributors) }
-            Divider().opacity(0.4)
-            legalLink("Licenses", icon: "scroll.fill") { LegalWebView(page: .licenses) }
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondary.opacity(0.08),
-                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    private func legalLink<Destination: View>(
-        _ title: String,
-        icon: String,
-        @ViewBuilder destination: () -> Destination
-    ) -> some View {
-        NavigationLink {
-            destination()
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .frame(width: 24)
-                    .foregroundStyle(Color.appAccent)
-                Text(title)
-                    .foregroundStyle(.primary)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
-            .contentShape(Rectangle())
-            .padding(.vertical, 10)
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-// MARK: - Trackers Settings Page
-
-struct TrackersSettingsPage: View {
-    @ObservedObject private var anilistAuth = AniListAuthManager.shared
-    @ObservedObject private var malAuth = MALAuthManager.shared
-    @AppStorage("trackersEnableSync") private var enableSync = true
-    @AppStorage("trackersAutoSyncRatings") private var autoSyncRatings = false
-    #if os(iOS)
-    @State private var presentationWindow: UIWindow?
-    #endif
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                connectionCard(
-                    providerType: .anilist,
-                    isConnected: anilistAuth.isLoggedIn,
-                    onToggle: {
-                        #if os(iOS)
-                        if anilistAuth.isLoggedIn {
-                            anilistAuth.logout()
-                        } else if let window = presentationWindow {
-                            anilistAuth.login(presentationAnchor: window)
-                        }
-                        #endif
-                    }
-                )
-
-                connectionCard(
-                    providerType: .mal,
-                    isConnected: malAuth.isLoggedIn,
-                    onToggle: {
-                        #if os(iOS)
-                        if malAuth.isLoggedIn {
-                            malAuth.logout()
-                        } else if let window = presentationWindow {
-                            malAuth.login(presentationAnchor: window)
-                        }
-                        #endif
-                    }
-                )
-
-                // Sync toggles card
-                VStack(alignment: .leading, spacing: 14) {
-                    Label("Sync", systemImage: "arrow.triangle.2.circlepath")
-                        .font(.headline)
-                    Toggle("Enable Sync", isOn: $enableSync)
-                    Text("When on, your library changes (status, progress, score) are pushed to AniList and MyAnimeList automatically. Turn this off if you want to edit your library locally without affecting your online accounts. Both anime and manga entries are synced.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Divider().opacity(0.4)
-                    Toggle("Auto Sync Ratings", isOn: $autoSyncRatings)
-                    Text("After you finish an episode (or read the final chapter of a manga), prompts you to rate it and pushes that rating to your connected tracker. Disable if you'd rather rate things manually.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding()
-                .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            }
-            .padding()
-        }
-        .navigationTitle("Trackers")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            presentationWindow = UIApplication.shared.connectedScenes
-                .compactMap { $0 as? UIWindowScene }
-                .flatMap { $0.windows }
-                .first { $0.isKeyWindow }
-        }
-        #endif
-    }
-
-    private func connectionCard(
-        providerType: ProviderType,
-        isConnected: Bool,
-        onToggle: @escaping () -> Void
-    ) -> some View {
-        HStack(spacing: 14) {
-            CachedAsyncImage(urlString: providerType.iconURL)
-                .frame(width: 48, height: 48)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
-                .shadow(
-                    color: isConnected && Color.glowEnabled
-                        ? Color.green.opacity(Color.glowIntensity) : .clear,
-                    radius: isConnected && Color.glowEnabled
-                        ? Color.glowRadiusSelection : 0
-                )
-
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(isConnected ? Color.green : Color.red)
-                        .frame(width: 8, height: 8)
-                    Text(providerType.displayName)
-                        .font(.headline)
-                }
-                Text(isConnected ? "Connected" : "Not connected")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            #if os(iOS)
-            Button(isConnected ? "Sign Out" : "Sign In", action: onToggle)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(isConnected ? Color.red : Color.appAccent)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(
-                    (isConnected ? Color.red : Color.appAccent).opacity(0.12),
-                    in: Capsule()
-                )
-                .buttonStyle(.plain)
-            #else
-            Text(isConnected ? "Signed In" : "Signed Out")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(isConnected ? .green : .secondary)
-            #endif
-        }
-        .padding()
-        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-}
-
-// MARK: - Backup & Restore Settings Page
-
-struct BackupRestoreSettingsPage: View {
-    @State private var showShareSheet = false
-    @State private var backupFileURL: URL?
-    @State private var showImporter = false
-    @State private var statusMessage: String?
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                // Hero card
-                VStack(spacing: 10) {
-                    Image(systemName: "externaldrive.badge.timemachine")
-                        .font(.system(size: 40))
-                        .foregroundStyle(Color.appAccent)
-                    Text("Backup & Restore")
-                        .font(.title2.bold())
-                    Text("Export your app preferences to a JSON file, or restore from a previous backup. Only String, Int, Double, and Bool values are included.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-
-                // Export card
-                VStack(alignment: .leading, spacing: 14) {
-                    Label("Export", systemImage: "arrow.up.doc")
-                        .font(.headline)
-                    Text("Creates a JSON backup of all serializable preferences (String/Int/Double/Bool) from UserDefaults and opens the system share sheet.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Button {
-                        exportBackup()
-                    } label: {
-                        Label("Export Backup", systemImage: "square.and.arrow.up")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(.appAccent)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding()
-                .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-
-                // Import card
-                VStack(alignment: .leading, spacing: 14) {
-                    Label("Import", systemImage: "arrow.down.doc")
-                        .font(.headline)
-                    Text("Restore preferences from a previously-exported JSON backup. Existing values for matching keys will be overwritten.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Button {
-                        showImporter = true
-                    } label: {
-                        Label("Import Backup", systemImage: "square.and.arrow.down")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(.appAccent)
-                    if let msg = statusMessage {
-                        Text(msg)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding()
-                .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            }
-            .padding()
-        }
-        .navigationTitle("Backup & Restore")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showShareSheet) {
-            if let url = backupFileURL {
-                ShareSheet(items: [url])
-                    // #100 — Frosted-glass backdrop so the sheet picks up the
-                    // content underneath instead of sitting on a flat card.
-                    .background(.ultraThinMaterial)
-            }
-        }
-        #endif
-        .fileImporter(
-            isPresented: $showImporter,
-            allowedContentTypes: [.json]
-        ) { result in
-            switch result {
-            case .success(let url):
-                importBackup(from: url)
-            case .failure:
-                statusMessage = "Could not import backup file."
-            }
-        }
-    }
-
-    private func exportBackup() {
-        let defaults = UserDefaults.standard
-        var serializable: [String: Any] = [:]
-        for (key, value) in defaults.dictionaryRepresentation() {
-            // Filter to serializable types only — Bool must be checked before
-            // Int/Double because NSNumber booleans also bridge to those types.
-            if let v = value as? Bool {
-                serializable[key] = v
-            } else if let v = value as? Int {
-                serializable[key] = v
-            } else if let v = value as? Double {
-                serializable[key] = v
-            } else if let v = value as? String {
-                serializable[key] = v
-            } else {
-                continue
-            }
-        }
-
-        guard JSONSerialization.isValidJSONObject(serializable) else {
-            statusMessage = "Cannot serialize preferences."
-            return
-        }
-
-        do {
-            let data = try JSONSerialization.data(withJSONObject: serializable, options: [.prettyPrinted, .sortedKeys])
-            let timestamp = Int(Date().timeIntervalSince1970)
-            let url = FileManager.default.temporaryDirectory
-                .appendingPathComponent("ShiroxBackup-\(timestamp).json")
-            try data.write(to: url)
-            backupFileURL = url
-            statusMessage = "Backup created — tap share to save it."
-            #if os(iOS)
-            showShareSheet = true
-            #endif
-        } catch {
-            statusMessage = "Export failed: \(error.localizedDescription)"
-        }
-    }
-
-    private func importBackup(from url: URL) {
-        let accessing = url.startAccessingSecurityScopedResource()
-        defer {
-            if accessing { url.stopAccessingSecurityScopedResource() }
-        }
-        do {
-            let data = try Data(contentsOf: url)
-            guard let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                statusMessage = "Invalid backup file."
-                return
-            }
-            let defaults = UserDefaults.standard
-            var restored = 0
-            for (key, value) in dict {
-                // Same Bool-first ordering as export.
-                if let v = value as? Bool {
-                    defaults.set(v, forKey: key); restored += 1
-                } else if let v = value as? Int {
-                    defaults.set(v, forKey: key); restored += 1
-                } else if let v = value as? Double {
-                    defaults.set(v, forKey: key); restored += 1
-                } else if let v = value as? String {
-                    defaults.set(v, forKey: key); restored += 1
-                }
-            }
-            statusMessage = "Restored \(restored) preference\(restored == 1 ? "" : "s")."
-        } catch {
-            statusMessage = "Import failed: \(error.localizedDescription)"
-        }
-    }
-}
-
-// MARK: - Logger Settings Page
-
-struct LoggerSettingsPage: View {
-    enum Category: String, CaseIterable, Identifiable {
-        case all = "All"
-        case error = "Error"
-        case warning = "Warning"
-        case debug = "Debug"
-        case info = "Info"
-        case stream = "Stream"
-        var id: String { rawValue }
-    }
-
-    @State private var entries: [Logger.LogEntry] = []
-    @State private var selectedCategory: Category = .all
-
-    private var filteredEntries: [Logger.LogEntry] {
-        let base: [Logger.LogEntry]
-        if selectedCategory == .all {
-            base = entries
-        } else {
-            base = entries.filter { $0.type.lowercased() == selectedCategory.rawValue.lowercased() }
-        }
-        return base.reversed()
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(Category.allCases) { cat in
-                        Button {
-                            selectedCategory = cat
-                            reload()
-                        } label: {
-                            Text(cat.rawValue)
-                                .font(.caption.weight(.semibold))
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(
-                                    selectedCategory == cat
-                                        ? Color.appAccent.opacity(0.15)
-                                        : Color.secondary.opacity(0.1),
-                                    in: Capsule()
-                                )
-                                .foregroundStyle(selectedCategory == cat ? Color.appAccent : .primary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal)
-                .padding(.vertical, 10)
-            }
-
-            Divider()
-
-            if filteredEntries.isEmpty {
-                ContentUnavailableView(
-                    "No Logs",
-                    systemImage: "doc.text",
-                    description: Text("No log entries match this filter.")
-                )
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 8) {
-                        ForEach(filteredEntries) { entry in
-                            logRow(entry)
-                        }
-                    }
-                    .padding()
-                }
-            }
-        }
-        .navigationTitle("Logger")
-        .inlineNavBar()
-        .onAppear { reload() }
-        .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                Button {
-                    copyAllLogs()
-                } label: {
-                    Image(systemName: "doc.on.doc.fill")
-                }
-                Button {
-                    reload()
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                }
-                Button(role: .destructive) {
-                    clear()
-                } label: {
-                    Image(systemName: "trash")
-                }
-            }
-        }
-    }
-
-    private func logRow(_ entry: Logger.LogEntry) -> some View {
-        let color = logTypeColor(entry.type)
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Text(entry.type.uppercased())
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(color, in: Capsule())
-                Spacer()
-                Text(entry.timestamp, style: .time)
-                    .font(.caption2.monospacedDigit())
-                    .foregroundStyle(.secondary)
-            }
-            Text(entry.message)
-                .font(.system(.caption, design: .monospaced))
-                #if !os(tvOS)
-                .textSelection(.enabled)
+                    .tint(.secondary)
                 #endif
-                .frame(maxWidth: .infinity, alignment: .leading)
+                Toggle("Download Over Wi-Fi Only", isOn: $downloadOverWiFiOnly)
+                    .tint(.secondary)
+                Text("Background Downloads keeps unfinished transfers alive when you leave the app or lock the phone. Wi-Fi Only pauses every download on cellular and resumes by itself back on Wi-Fi.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
-        .padding(10)
-        .background(color.opacity(0.06), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(color.opacity(0.18), lineWidth: 1)
-        )
-    }
-
-    private func reload() {
-        entries = Logger.shared.getEntries(category: selectedCategory == .all ? nil : selectedCategory.rawValue)
-    }
-
-    private func clear() {
-        Logger.shared.clearLogs()
-        entries = []
-    }
-
-    private func copyAllLogs() {
+        .softScrollEdges()
+        .navigationTitle("Downloads")
         #if os(iOS)
-        let allEntries = Logger.shared.getEntries(category: nil)
-        let formatter = DateFormatter()
-        formatter.dateStyle = .short
-        formatter.timeStyle = .medium
-        let formatted = allEntries.map { entry in
-            "[\(entry.type.uppercased())] \(formatter.string(from: entry.timestamp)) — \(entry.message)"
-        }.joined(separator: "\n")
-        UIPasteboard.general.string = formatted
-        Haptics.light()
-        ToastManager.shared.show(
-            title: "Logs Copied",
-            message: "\(allEntries.count) entries copied to clipboard",
-            icon: "checkmark.circle.fill",
-            iconColor: .green
-        )
+        .navigationBarTitleDisplayMode(.inline)
         #endif
     }
 }
-
-// MARK: - Share Sheet (UIActivityViewController wrapper)
-
-#if os(iOS)
-struct ShareSheet: UIViewControllerRepresentable {
-    let items: [Any]
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: items, applicationActivities: nil)
-    }
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
-}
-#endif
