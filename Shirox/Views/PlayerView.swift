@@ -336,7 +336,10 @@ struct PlayerView: View {
     }
 
     var body: some View {
-        ZStack {
+        // body is split into three separately type-checked pieces (layers ZStack, lifecycle
+        // modifiers, sheet/shortcut tail): the merged single expression was past the
+        // type-checker's reasonable-time budget (CI time-outs rounds 5–7).
+        let layers = ZStack {
             Color.black.ignoresSafeArea()
                 #if os(iOS)
                 .alert("Save Frame", isPresented: $showFrameSaveAlert) {
@@ -445,6 +448,7 @@ struct PlayerView: View {
                 stallRetryOverlay
             }
         }
+        let withLifecycle = layers
         .ignoresSafeArea()
         .onPreferenceChange(Skip85ButtonFramePreferenceKey.self) { frame in
             if frame != .zero { skip85ButtonFrame = frame }
@@ -616,6 +620,7 @@ struct PlayerView: View {
             }
         }
         #endif
+        return withLifecycle
         .sheet(isPresented: $showSubtitleSettings) {
             subtitleSettingsSheet
         }
