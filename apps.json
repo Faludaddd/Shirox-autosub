@@ -28,8 +28,9 @@
       "versions": [
         {
           "version": "2.31",
-          "date": "2026-10-12",
-          "localizedDescription": "v2.31 — The parity release: the original Shirox's best systems, on top of everything this fork already does. MPV playback engine with automatic fallback (mkv/webm/avi and more now play), scrambled/disguised stream unscrambling, zstd and browser-impersonation fetch. The original Home design (hero carousel, gooey refresh, page-turn, Upcoming calendar). The original Library: genre filters, list memory, new-episode badges, poster grid with progress bars, the full entry editor (rewatches, dates, notes, custom lists), and whole-library Sync/Overwrite/Mirror between AniList and MAL with full destructive-run previews. First-run onboarding checklist and a launch animation. Backup & Restore of preferences, modules, progress, local library and (opt-in) accounts. Modules are tested the moment they're added. Also fixed: saving an entry no longer wipes your MAL rating. The Data Sources tab is gone from Settings (its AnimeSchedule token row moved to Sources); the Schedule tab and its chain are untouched."
+          "date": "2026-10-11",
+          "localizedDescription": "v2.31 — The parity release: the original Shirox's best systems, on top of everything this fork already does. MPV playback engine with automatic fallback (mkv/webm/avi and more now play), scrambled/disguised stream unscrambling, zstd and browser-impersonation fetch. The original Home design (hero carousel, gooey refresh, page-turn, Upcoming calendar). The original Library: genre filters, list memory, new-episode badges, poster grid with progress bars, the full entry editor (rewatches, dates, notes, custom lists), and whole-library Sync/Overwrite/Mirror between AniList and MAL with full destructive-run previews. First-run onboarding checklist and a launch animation. Backup & Restore of preferences, modules, progress, local library and (opt-in) accounts. Modules are tested the moment they're added. Also fixed: saving an entry no longer wipes your MAL rating. The Data Sources tab is gone from Settings (its AnimeSchedule token row moved to Sources); the Schedule tab and its chain are untouched.",
+          "size": 26178486
         },
         {
           "version": "2.30",
