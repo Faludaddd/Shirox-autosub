@@ -69,6 +69,7 @@ final class ToastManager: ObservableObject {
     // consistently with the rest of the app's toasts.
     enum ToastType {
         case success
+        case warning
         case error
     }
 
@@ -77,6 +78,9 @@ final class ToastManager: ObservableObject {
         case .success:
             show(title: "Success", message: message,
                  icon: "checkmark.circle.fill", iconColor: .green, duration: duration)
+        case .warning:
+            show(title: "Heads Up", message: message,
+                 icon: "exclamationmark.triangle.fill", iconColor: .orange, duration: duration)
         case .error:
             show(title: "Error", message: message,
                  icon: "exclamationmark.triangle.fill", iconColor: .red, duration: duration)

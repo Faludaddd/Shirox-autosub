@@ -1854,7 +1854,6 @@ struct PlayerView: View {
             lastWatchedAt: .now,
             thumbnailUrl: context.thumbnailUrl
         )
-        item.simklTitle = context.simklTitle
         item.playlistKey = currentStream.playlistKey
         if context.isLocalPlayback {
             // Resume from our own persistent copy, not the transient picker URL.
@@ -3694,7 +3693,7 @@ struct PlayerView: View {
         currentStream = next
         engine?.waitsToMinimizeStalling = !isLocalPlayback
         if let ctx = currentContext {
-            currentContext = PlayerContext(mediaTitle: ctx.mediaTitle, episodeNumber: ctx.episodeNumber, episodeTitle: ctx.episodeTitle, imageUrl: ctx.imageUrl, aniListID: ctx.aniListID, malID: ctx.malID, moduleId: ctx.moduleId, totalEpisodes: ctx.totalEpisodes, availableEpisodes: ctx.availableEpisodes, isAiring: ctx.isAiring, resumeFrom: ctx.resumeFrom, detailHref: ctx.detailHref, episodeHref: ctx.episodeHref, streamTitle: next.title, workingDetailHref: ctx.workingDetailHref, thumbnailUrl: ctx.thumbnailUrl, simklTitle: ctx.simklTitle)
+            currentContext = PlayerContext(mediaTitle: ctx.mediaTitle, episodeNumber: ctx.episodeNumber, episodeTitle: ctx.episodeTitle, imageUrl: ctx.imageUrl, aniListID: ctx.aniListID, malID: ctx.malID, moduleId: ctx.moduleId, totalEpisodes: ctx.totalEpisodes, availableEpisodes: ctx.availableEpisodes, isAiring: ctx.isAiring, resumeFrom: ctx.resumeFrom, detailHref: ctx.detailHref, episodeHref: ctx.episodeHref, streamTitle: next.title, workingDetailHref: ctx.workingDetailHref, thumbnailUrl: ctx.thumbnailUrl)
         }
         subtitleCues = []
         assScript = nil
@@ -3736,8 +3735,7 @@ struct PlayerView: View {
                 totalEpisodes: ctx.totalEpisodes, availableEpisodes: episodeNumber,
                 isAiring: ctx.isAiring, resumeFrom: ctx.resumeFrom,
                 detailHref: ctx.detailHref, episodeHref: ctx.episodeHref, streamTitle: ctx.streamTitle,
-                workingDetailHref: ctx.workingDetailHref, thumbnailUrl: ctx.thumbnailUrl,
-                simklTitle: ctx.simklTitle
+                workingDetailHref: ctx.workingDetailHref, thumbnailUrl: ctx.thumbnailUrl
             )
         }
         saveProgress()
@@ -3789,7 +3787,7 @@ struct PlayerView: View {
             // "Up Next N+1" placeholder if auto-next fails or is disabled. Use the pre-bump value
             // (or nil if it was bumped), so isLastEpisode relies on totalEpisodes instead.
             let nextAvailableEpisodes = preSwapAvailableEpisodes.flatMap { $0 < episodeNumber ? nil : $0 }
-            currentContext = PlayerContext(mediaTitle: ctx.mediaTitle, episodeNumber: episodeNumber, episodeTitle: nil, imageUrl: ctx.imageUrl, aniListID: ctx.aniListID, malID: ctx.malID, moduleId: ctx.moduleId, totalEpisodes: ctx.totalEpisodes, availableEpisodes: nextAvailableEpisodes, isAiring: ctx.isAiring, resumeFrom: nil, detailHref: ctx.detailHref, episodeHref: episodeHref, streamTitle: ctx.streamTitle, workingDetailHref: ctx.workingDetailHref, thumbnailUrl: nil, simklTitle: ctx.simklTitle)
+            currentContext = PlayerContext(mediaTitle: ctx.mediaTitle, episodeNumber: episodeNumber, episodeTitle: nil, imageUrl: ctx.imageUrl, aniListID: ctx.aniListID, malID: ctx.malID, moduleId: ctx.moduleId, totalEpisodes: ctx.totalEpisodes, availableEpisodes: nextAvailableEpisodes, isAiring: ctx.isAiring, resumeFrom: nil, detailHref: ctx.detailHref, episodeHref: episodeHref, streamTitle: ctx.streamTitle, workingDetailHref: ctx.workingDetailHref, thumbnailUrl: nil)
         }
         audioOptions = []
         hlsQualities = []

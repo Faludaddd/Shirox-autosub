@@ -280,7 +280,8 @@ final class DownloadManager: NSObject, ObservableObject {
             subtitleHeaders: stream.subtitleHeaders.isEmpty ? nil : stream.subtitleHeaders,
             state: .pending,
             progress: 0,
-            createdAt: Date()
+            createdAt: Date(),
+            subtitleTracks: Self.subtitleTracks(of: stream)
         )
 
         items.append(item)
@@ -330,6 +331,14 @@ final class DownloadManager: NSObject, ObservableObject {
         }
 
         processQueue()
+    }
+
+    /// The stream's subtitle tracks, to keep with its download.
+    nonisolated static func subtitleTracks(of stream: StreamResult) -> [DownloadedSubtitle]? {
+        let tracks = (stream.allSubtitles ?? []).map {
+            DownloadedSubtitle(title: $0.title, url: $0.url, headers: $0.headers.isEmpty ? nil : $0.headers)
+        }
+        return tracks.isEmpty ? nil : tracks
     }
 
     /// Downloads a subtitle file to disk and stores its relative path on the item.
@@ -537,6 +546,7 @@ final class DownloadManager: NSObject, ObservableObject {
         guard let idx = items.firstIndex(where: { $0.id == id }) else { return }
         items[idx].streamURL = stream.url
         items[idx].headers = stream.headers
+        items[idx].subtitleTracks = Self.subtitleTracks(of: stream)
         items[idx].subtitleURL = stream.subtitleURL
         items[idx].subtitleHeaders = stream.subtitleHeaders.isEmpty ? nil : stream.subtitleHeaders
         items[idx].error = nil
@@ -840,12 +850,47 @@ final class DownloadManager: NSObject, ObservableObject {
             let url = downloadDir.appendingPathComponent(relPath)
             return FileManager.default.fileExists(atPath: url.path) ? url.absoluteString : nil
         }
+        // Every track saved with the download, offered in the player's subtitle menu.
+        let localTracks: [SubtitleTrack] = (item.subtitleTracks ?? []).compactMap { track in
+            guard let path = track.relativePath else { return nil }
+            let url = downloadDir.appendingPathComponent(path)
+            return FileManager.default.fileExists(atPath: url.path)
+                ? SubtitleTrack(title: track.title, url: url, headers: [:]) : nil
+        }
         return StreamResult(
             title: item.episodeTitle ?? "Episode \(item.episodeNumber)",
             url: playURL,
             headers: [:],
-            subtitle: localSubtitle
+            subtitle: localSubtitle,
+            allSubtitles: localTracks.isEmpty ? nil : localTracks
         )
+    }
+
+    /// Keeps a subtitle file the viewer supplied with a download, so it's in the menu every time
+    /// the episode plays, not only for the session it was imported in. Copied into the downloads
+    /// folder, so deleting the download deletes it too. Returns the track to show now.
+    /// (Upstream additionally renames kept files to match the finished video's filename — the
+    /// in-app menu resolves by relativePath either way, so the stable name is kept here.)
+    @discardableResult
+    func attachSubtitle(from fileURL: URL, title: String, to itemID: UUID) -> SubtitleTrack? {
+        guard let idx = items.firstIndex(where: { $0.id == itemID }) else { return nil }
+        let ext = fileURL.pathExtension.isEmpty ? "srt" : fileURL.pathExtension
+        let name = "\(itemID.uuidString)-user-\(UUID().uuidString.prefix(8)).\(ext)"
+        let dest = downloadDir.appendingPathComponent(name)
+        do {
+            try FileManager.default.copyItem(at: fileURL, to: dest)
+        } catch {
+            Logger.shared.log("[Subtitles] Couldn't keep an imported subtitle with the download: \(error)", type: "Error")
+            return nil
+        }
+        var tracks = items[idx].subtitleTracks ?? []
+        tracks.append(DownloadedSubtitle(title: title, url: dest, headers: nil, relativePath: name))
+        items[idx].subtitleTracks = tracks
+        persist()
+        if let path = items[idx].subtitleTracks?.last?.relativePath {
+            return SubtitleTrack(title: title, url: downloadDir.appendingPathComponent(path), headers: [:])
+        }
+        return SubtitleTrack(title: title, url: dest, headers: [:])
     }
 
     func item(for episodeHref: String, streamTitle: String?) -> DownloadItem? {

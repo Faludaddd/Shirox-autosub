@@ -7,6 +7,17 @@ enum DownloadState: String, Codable {
     case failed
 }
 
+/// A subtitle file kept alongside a downloaded episode: either fetched with the stream at
+/// download time or imported by the viewer over a finished download. `relativePath` is set
+/// once the file lands in the downloads folder; nil entries are skipped at play time.
+struct DownloadedSubtitle: Codable, Equatable {
+    let title: String
+    let url: URL
+    var headers: [String: String]?
+    /// Relative to the downloads folder; nil until fetched.
+    var relativePath: String?
+}
+
 struct DownloadItem: Identifiable, Codable {
     let id: UUID
     
@@ -88,6 +99,9 @@ struct DownloadItem: Identifiable, Codable {
     // File Info
     var fileName: String?
     var relativeSubtitlePath: String?
+    /// Every subtitle track saved with the download — fetched from the stream or imported
+    /// later. Offered in the player's subtitle menu on every play of the local file.
+    var subtitleTracks: [DownloadedSubtitle]? = nil
     
     // Timing
     let createdAt: Date

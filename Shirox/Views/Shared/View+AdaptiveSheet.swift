@@ -63,12 +63,47 @@ extension View {
         if #available(iOS 16, macOS 13, *) {
             #if os(macOS)
                 self.toolbarBackground(.hidden, for: .windowToolbar)
+            #elseif os(iOS)
+                // From iPadOS 18 the tab bar floats at the top. Before that it runs along the
+                // bottom, where a hidden background left its items over the content.
+                if UIDevice.current.userInterfaceIdiom == .pad, #available(iOS 18, *) {
+                    self
+                        .toolbarBackground(.hidden, for: .navigationBar)
+                        .toolbarBackground(.hidden, for: .tabBar)
+                } else {
+                    self.toolbarBackground(.hidden, for: .navigationBar)
+                }
             #else
                 self.toolbarBackground(.hidden, for: .navigationBar)
             #endif
         } else {
             self
         }
+    }
+
+    // MARK: - Safe Area Leading Preference Key
+
+    struct SafeAreaLeadingKey: PreferenceKey {
+        nonisolated(unsafe) static var defaultValue: CGFloat = 0
+        static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+    }
+
+    /// Reports the container's leading safe-area inset into `leadingInset` — Home content that
+    /// ignores that safe area pads itself back by it. A Mac's Home keeps that safe area (it's
+    /// the sidebar), so there's nothing to pad; see the call site's `#if` guard.
+    func observeSafeAreaLeading(_ leadingInset: Binding<CGFloat>) -> some View {
+        self
+            .background {
+                GeometryReader { proxy in
+                    Color.clear
+                        .preference(key: SafeAreaLeadingKey.self, value: proxy.safeAreaInsets.leading)
+                        .onAppear { leadingInset.wrappedValue = proxy.safeAreaInsets.leading }
+                        .onChange(of: proxy.safeAreaInsets.leading) { newInset in leadingInset.wrappedValue = newInset }
+                }
+            }
+            .onPreferenceChange(SafeAreaLeadingKey.self) { newInset in
+                leadingInset.wrappedValue = newInset
+            }
     }
 
     @ViewBuilder
@@ -145,47 +180,34 @@ extension View {
 extension View {
     /// Drop-in for the `.background(NavigationLink(isActive:) { EmptyView() })` hack.
     /// Drives push navigation from an optional: set the item to push, clear it to pop.
-    @ViewBuilder
     func navigationDestinationCompat<V, D: View>(
         item: Binding<V?>,
         @ViewBuilder destination: @escaping (V) -> D
     ) -> some View {
-        #if os(iOS)
-        // IMPORTANT: on iOS the app shims `NavigationStack` over `NavigationView`
-        // (see Shared/NavigationStack.swift), and `NavigationView` silently ignores
-        // `navigationDestination(...)` — the destination builds but never pushes. Drive
-        // the push with a hidden `NavigationLink(isActive:)`, which `NavigationView` honors.
-        self.background(
-            NavigationLink(
-                destination: Group { if let v = item.wrappedValue { destination(v) } },
-                isActive: Binding(
-                    get: { item.wrappedValue != nil },
-                    set: { if !$0 { item.wrappedValue = nil } }
-                )
-            ) { EmptyView() }
-        )
-        #else
-        // macOS/tvOS use the real SwiftUI.NavigationStack via the shim.
-        if #available(macOS 13, tvOS 16, *) {
-            let isPresented = Binding<Bool>(
-                get: { item.wrappedValue != nil },
-                set: { if !$0 { item.wrappedValue = nil } }
-            )
-            self.navigationDestination(isPresented: isPresented) {
-                if let v = item.wrappedValue { destination(v) }
-            }
+        navigationDestinationCompat(isPresented: Binding<Bool>(
+            get: { item.wrappedValue != nil },
+            set: { if !$0 { item.wrappedValue = nil } }
+        )) {
+            if let v = item.wrappedValue { destination(v) }
+        }
+    }
+
+    /// Pushes `destination` while `isPresented` is true. From iOS 16 / macOS 13 / tvOS 16 the
+    /// app's `NavigationStack` is the real one, which honours `navigationDestination`; before,
+    /// it's a `NavigationView`, which ignores that, so a hidden `NavigationLink` pushes instead.
+    /// Attach it outside lazy containers (List, LazyVStack): a destination inside one is ignored.
+    @ViewBuilder
+    func navigationDestinationCompat<D: View>(
+        isPresented: Binding<Bool>,
+        @ViewBuilder destination: @escaping () -> D
+    ) -> some View {
+        if #available(iOS 16, macOS 13, tvOS 16, *) {
+            self.navigationDestination(isPresented: isPresented, destination: destination)
         } else {
             self.background(
-                NavigationLink(
-                    destination: Group { if let v = item.wrappedValue { destination(v) } },
-                    isActive: Binding(
-                        get: { item.wrappedValue != nil },
-                        set: { if !$0 { item.wrappedValue = nil } }
-                    )
-                ) { EmptyView() }
+                NavigationLink(destination: destination(), isActive: isPresented) { EmptyView() }
             )
         }
-        #endif
     }
 }
 

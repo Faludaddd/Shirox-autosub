@@ -4,8 +4,8 @@ import SwiftUI
 /// plus a pill for each signed-in provider. Hidden when only one source exists (logged out:
 /// only My Library; logged in to one service: it + My Library).
 struct LibrarySourceSwitcher: View {
-    @Binding var selected: LibrarySource
-    var onSelect: (LibrarySource) -> Void
+    let selected: LibrarySource
+    let onSelect: (LibrarySource) -> Void
 
     @ObservedObject private var anilistAuth = AniListAuthManager.shared
     @ObservedObject private var malAuth = MALAuthManager.shared

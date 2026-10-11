@@ -121,6 +121,20 @@ struct Media: Identifiable, Codable, Equatable, Hashable, Sendable {
         }
     }
 
+    /// Episodes released so far, falling back to the announced total when none have aired.
+    ///
+    /// `nextAiringEpisode.episode - 1` is the aired count, and callers preferred it so an
+    /// ongoing season doesn't advertise episodes nobody can watch yet. But it evaluates to 0
+    /// for a season whose *first* episode hasn't aired, and the `?? episodes` chains this
+    /// replaces treated that 0 as a real answer — the `??` never fired because the left side
+    /// was non-nil. An announced-but-unaired season therefore reported 0 episodes: the detail
+    /// page showed "Episode count not available" and the library entry synced as 0/0 even
+    /// though AniList knew the full count. Only accept the aired count once it is positive.
+    var airedOrAnnouncedEpisodes: Int? {
+        if let aired = nextAiringEpisode.map({ $0.episode - 1 }), aired > 0 { return aired }
+        return episodes
+    }
+
     /// Unified poster status line — "[Status], [count]" (e.g. "Airing, 8",
     /// "Finished, 12"). Replaces the old either/or poster logic ("N ep" when a
     /// count existed, otherwise the bare status word), which rendered

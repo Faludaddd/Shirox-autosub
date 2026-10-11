@@ -55,6 +55,10 @@
         </array>
         <key>NSLocalNetworkUsageDescription</key>
         <string>Shirox+ uses the local network to discover and cast to Chromecast devices.</string>
+        <key>NSPhotoLibraryAddUsageDescription</key>
+        <string>Shirox saves video frames and manga pages to your Photos library when you ask it to.</string>
+        <key>NSPhotoLibraryUsageDescription</key>
+        <string>Shirox finds or creates a Shirox album to organize saved video frames and manga pages in Photos.</string>
         <key>UIApplicationSceneManifest</key>
         <dict>
                 <key>UIApplicationSupportsMultipleScenes</key>

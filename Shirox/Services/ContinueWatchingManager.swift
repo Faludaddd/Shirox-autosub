@@ -974,9 +974,36 @@ import Combine
         }
     }
 
+    /// Whether the automatic (player-driven) push may write to the remote services for this
+    /// title — the per-title "track by hand" override blocks it. A title known to one service
+    /// is checked on the other through the id mapping, so a MAL-only entry is honored too.
+    private func automaticTrackingAllowed(aniListID: Int?, malID: Int?) async -> Bool {
+        var aniListID = aniListID
+        var malID = malID
+        if aniListID == nil, let mid = malID {
+            aniListID = await IDMappingService.shared.anilistId(forMALId: mid)
+        } else if malID == nil, let aid = aniListID {
+            malID = await IDMappingService.shared.malId(forAnilistId: aid)
+        }
+        let preferences = AniListMappingManager.shared
+        if let aid = aniListID, !preferences.automaticTrackingEnabled(provider: .anilist, mediaId: aid) {
+            return false
+        }
+        if let mid = malID, !preferences.automaticTrackingEnabled(provider: .mal, mediaId: mid) {
+            return false
+        }
+        return true
+    }
+
     /// Pushes episode progress to AniList and MAL, replicating the player's full tracking logic.
     /// Handles .completed (rewatch), .repeating, and .current status correctly for both services.
-    func pushRemoteProgress(ep rawEp: Int, context: MarkContext) async {
+    /// - Parameter automatic: true when the push comes from the player's own episode-completion
+    ///   flow (not a user-visible progress edit); per-title "track by hand" overrides suppress it.
+    func pushRemoteProgress(ep rawEp: Int, context: MarkContext, automatic: Bool = false) async {
+        if automatic, !(await automaticTrackingAllowed(aniListID: context.aniListID, malID: context.malID)) {
+            LocalLibraryManager.shared.recordWatched(context: context, episode: rawEp)
+            return
+        }
         let aniListEnabled = Self.trackingPref("aniListTrackingEnabled", default: true)
         let malEnabled     = Self.trackingPref("malTrackingEnabled", default: true)
         let skipRewatch    = Self.trackingPref("skipReWatchTracking", default: true)

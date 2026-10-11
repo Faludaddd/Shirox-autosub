@@ -1875,8 +1875,7 @@ struct AniListCardView: View, Equatable {
                     // words when the title truncates — seasons differ at the
                     // END of a title, which plain truncation threw away.
                     CardTitle(media.title.displayTitle, lineLimit: 2)
-                        .font(.caption)
-                        .fontWeight(.semibold)
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     if let statusLine = media.posterStatusText {
