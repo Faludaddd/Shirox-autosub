@@ -135,12 +135,7 @@ struct SettingsView: View {
                 NavigationLink {
                     SourcesSettingsPage()
                 } label: {
-                    SettingsCategoryRow(icon: "person.crop.circle.badge.checkmark", title: "Sources", subtitle: "AniList, MyAnimeList, accounts")
-                }
-                NavigationLink {
-                    DataSourcesSettingsPage()
-                } label: {
-                    SettingsCategoryRow(icon: "server.rack", title: "Data Sources", subtitle: "Provider priority, health, tests, cache")
+                    SettingsCategoryRow(icon: "person.crop.circle.badge.checkmark", title: "Sources", subtitle: "AniList, MyAnimeList, providers, tokens")
                 }
                 NavigationLink {
                     ModulesSettingsPage()
@@ -2294,6 +2289,12 @@ struct SourcesSettingsPage: View {
     @ObservedObject private var anilistAuth = AniListAuthManager.shared
     @ObservedObject private var malAuth = MALAuthManager.shared
     @ObservedObject private var providerManager = ProviderManager.shared
+    @ObservedObject private var providers = UnifiedProviderSystem.shared
+    // Provider credentials relocated from the removed Data Sources tab.
+    @State private var animescheduleToken = ""
+    @State private var anidbClientName = ""
+    @State private var anidbClientVersion = ""
+    @State private var loadedCredentials = false
     #if os(iOS)
     @State private var presentationWindow: UIWindow?
     #endif
@@ -2358,6 +2359,37 @@ struct SourcesSettingsPage: View {
                         .font(.body.weight(.semibold))
                 }
             }
+            Section {
+                AnimeScheduleTokenRow(token: $animescheduleToken)
+            } header: {
+                Text("Schedule Provider")
+            } footer: {
+                Text("AnimeSchedule is the schedule chain's second source (AniChart first). Optional — without a token the chain simply moves on to MAL.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Section {
+                AniDBCredentialsRow(clientName: $anidbClientName, clientVersion: $anidbClientVersion)
+            } header: {
+                Text("AniDB Client (optional)")
+            } footer: {
+                Text("AniDB's HTTP API only answers registered client names. Only useful if you have your own registration.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Section {
+                Picker("Search Database", selection: searchDatabaseBinding) {
+                    ForEach(UnifiedProviderSystem.searchCapableProviders, id: \.rawValue) { kind in
+                        Text(kind.displayName).tag(kind)
+                    }
+                }
+            } header: {
+                Text("Search Database")
+            } footer: {
+                Text("Kitsu (default) is an anime-only database that stays live while AniList and MyAnimeList have outages. Whichever is picked, the others still back it up automatically. Manga search always tries MangaBaka first.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .navigationTitle("Sources")
         // v2.17 — Forced update: re-check whenever the user reaches the
@@ -2368,6 +2400,7 @@ struct SourcesSettingsPage: View {
         // hourly (and on every foreground entry); a force re-offer stays
         // available from the About page's Check for Updates button.
         .onAppear {
+            loadProviderCredentials()
             Task { await AppUpdateManager.shared.checkForUpdates() }
         }
         #if os(iOS)
@@ -2382,6 +2415,24 @@ struct SourcesSettingsPage: View {
     }
 
     // MARK: - Source Row (reusable)
+
+    /// The search database picker's binding, reading/writing UnifiedProviderSystem's
+    /// effective primary (preserved from the removed Data Sources tab).
+    private var searchDatabaseBinding: Binding<MetaProviderKind> {
+        Binding(
+            get: { providers.effectiveSearchPrimary },
+            set: { providers.searchPrimary = $0 }
+        )
+    }
+
+    /// Loads the provider credential fields once per appearance of the page.
+    private func loadProviderCredentials() {
+        guard !loadedCredentials else { return }
+        animescheduleToken = AnimeScheduleProvider.shared.apiToken
+        anidbClientName = AniDBProvider.shared.clientName
+        anidbClientVersion = AniDBProvider.shared.clientVersion
+        loadedCredentials = true
+    }
 
     @ViewBuilder
     private func sourceRow(
@@ -5574,3 +5625,105 @@ struct ShareSheet: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 #endif
+
+// MARK: - Provider credential rows (relocated from the removed Data Sources tab)
+
+/// AnimeSchedule API token — the provider's v3 API requires a free token
+/// from an AnimeSchedule account (their terms forbid embedding app tokens
+/// in public code, so the app ships without one by design).
+private struct AnimeScheduleTokenRow: View {
+    @Binding var token: String
+    @State private var showHelp = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "key.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.appAccent)
+                Text("AnimeSchedule API Token (optional)")
+                    .font(.caption.weight(.semibold))
+                Spacer()
+                Button {
+                    withAnimation { showHelp.toggle() }
+                } label: {
+                    Image(systemName: "questionmark.circle")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+            }
+            if showHelp {
+                Text("Create a free account at animeschedule.net, open Account → API, create an application, and paste its token here. AnimeSchedule's terms require every app to use its own token — Shirox ships without one, so the provider activates only when you add yours.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            TextField("Paste your application token", text: $token)
+                .font(.caption)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(Color.secondary.opacity(0.1),
+                            in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .onChangeOf(token) { newValue in
+                    AnimeScheduleProvider.shared.apiToken = newValue
+                }
+        }
+        .padding(12)
+        .background(Color.secondary.opacity(0.05),
+                    in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+    }
+}
+
+/// AniDB client identity — AniDB's HTTP API only answers registered
+/// client names, so users with their own registration fill it in here.
+private struct AniDBCredentialsRow: View {
+    @Binding var clientName: String
+    @Binding var clientVersion: String
+    @State private var showHelp = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "person.text.rectangle")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.appAccent)
+                Text("AniDB Client Identity (optional)")
+                    .font(.caption.weight(.semibold))
+                Spacer()
+                Button {
+                    withAnimation { showHelp.toggle() }
+                } label: {
+                    Image(systemName: "questionmark.circle")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+            }
+            if showHelp {
+                Text("AniDB's HTTP API rejects anonymous clients. If you have a client name + version registered with AniDB (wiki.anidb.net → API), enter them here and the provider will genuinely serve detail records. Without them it honestly reports as unavailable and the chain skips it.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            HStack(spacing: 10) {
+                TextField("Client name", text: $clientName)
+                    .font(.caption)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                TextField("Version", text: $clientVersion)
+                    .font(.caption)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                    .frame(maxWidth: 110)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(Color.secondary.opacity(0.1),
+                        in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .onChangeOf(clientName) { AniDBProvider.shared.clientName = $0 }
+            .onChangeOf(clientVersion) { AniDBProvider.shared.clientVersion = $0 }
+        }
+        .padding(12)
+        .background(Color.secondary.opacity(0.05),
+                    in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+    }
+}

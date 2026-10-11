@@ -818,10 +818,6 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */ = {isa = PBXBui
 		C7FE61B972DA2C48C57591BF /* MediaNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BC087EE9207079BA4AE569E /* MediaNormalizer.swift */; };
 		3C1C0993803DE1CF8E98086F /* MediaNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BC087EE9207079BA4AE569E /* MediaNormalizer.swift */; };
 		CFDD26BCCCE08F19EDD11142 /* MediaNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BC087EE9207079BA4AE569E /* MediaNormalizer.swift */; };
-		428E4CA25C0A426599BD0F72 /* DataSourcesSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1490E05108E643F9959205B8 /* DataSourcesSettingsPage.swift */; };
-		64C9B0B46E3949C8BC2B072A /* DataSourcesSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1490E05108E643F9959205B8 /* DataSourcesSettingsPage.swift */; };
-		CA904BD67DF8446FB1813485 /* DataSourcesSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1490E05108E643F9959205B8 /* DataSourcesSettingsPage.swift */; };
-		D97B2063009A40478A165DEF /* DataSourcesSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1490E05108E643F9959205B8 /* DataSourcesSettingsPage.swift */; };
                 102EE2C1DD9BD993FDC45312 /* PlaybackEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60B798231DDDA4482EFD7DF /* PlaybackEngine.swift */; };
                 4B83CA001513C5586B4DA164 /* PlaybackEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60B798231DDDA4482EFD7DF /* PlaybackEngine.swift */; };
                 A00137A45A0CEF5CE53358BD /* PlaybackEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60B798231DDDA4482EFD7DF /* PlaybackEngine.swift */; };
@@ -1177,7 +1173,6 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
 		57A8B6E2BAB5A3203C6082B6 /* KitsuTVDBTimetableService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KitsuTVDBTimetableService.swift; sourceTree = "<group>"; };
 		787DB5DB440C0962E4829173 /* DiscoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoveryService.swift; sourceTree = "<group>"; };
 		0BC087EE9207079BA4AE569E /* MediaNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaNormalizer.swift; sourceTree = "<group>"; };
-		1490E05108E643F9959205B8 /* DataSourcesSettingsPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataSourcesSettingsPage.swift; sourceTree = "<group>"; };
                 D60B798231DDDA4482EFD7DF /* PlaybackEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlaybackEngine.swift; sourceTree = "<group>"; };
                 976920C598CE1A6C087D952F /* AVPlayerEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AVPlayerEngine.swift; sourceTree = "<group>"; };
                 CEF7675FF198EE0091C6488D /* MPVEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MPVEngine.swift; sourceTree = "<group>"; };
@@ -1543,7 +1538,6 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */,
                 85C82CA86B694094A25519CA /* Settings */ = {
                         isa = PBXGroup;
                         children = (
-                                1490E05108E643F9959205B8 /* DataSourcesSettingsPage.swift */,
                         );
                         path = Settings;
                         sourceTree = "<group>";
@@ -1977,7 +1971,6 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
 				7BD992FAF791273F7D197180 /* KitsuTVDBTimetableService.swift in Sources */,
 				ECF92469546E4EA9B13C5225 /* DiscoveryService.swift in Sources */,
 				3818E7F611B5E389D80B2BDD /* MediaNormalizer.swift in Sources */,
-				D97B2063009A40478A165DEF /* DataSourcesSettingsPage.swift in Sources */,
 );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -2239,7 +2232,6 @@ A17F1001000000000000000A /* ForcedUpdateView.swift in Sources */,
 				F21D7E9C441DD0767B8663A8 /* KitsuTVDBTimetableService.swift in Sources */,
 				8EFBEAEAC00EEC727100E47D /* DiscoveryService.swift in Sources */,
 				C7FE61B972DA2C48C57591BF /* MediaNormalizer.swift in Sources */,
-				CA904BD67DF8446FB1813485 /* DataSourcesSettingsPage.swift in Sources */,
 );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -2503,7 +2495,6 @@ A17F1001000000000000000B /* ForcedUpdateView.swift in Sources */,
 				E620FEBA7ECAA92F33F791C8 /* KitsuTVDBTimetableService.swift in Sources */,
 				72D1E8AE4231910B316CA554 /* DiscoveryService.swift in Sources */,
 				3C1C0993803DE1CF8E98086F /* MediaNormalizer.swift in Sources */,
-				64C9B0B46E3949C8BC2B072A /* DataSourcesSettingsPage.swift in Sources */,
 );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
@@ -2768,7 +2759,6 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
 				CA1D8B93F04008540E95C300 /* KitsuTVDBTimetableService.swift in Sources */,
 				9857225A5B00092A9CA08294 /* DiscoveryService.swift in Sources */,
 				CFDD26BCCCE08F19EDD11142 /* MediaNormalizer.swift in Sources */,
-				428E4CA25C0A426599BD0F72 /* DataSourcesSettingsPage.swift in Sources */,
 );
                         runOnlyForDeploymentPostprocessing = 0;
                 };
