@@ -16,6 +16,8 @@ struct ModuleListView: View {
     /// something runs it — search, an episode list, a stream URL.
     @State private var testReport: (module: ModuleDefinition, result: ModuleCheckResult)?
     @State private var testingModuleID: String? = nil
+    /// v2.32 — the module whose details page is open (icon tap on a row).
+    @State private var detailModule: ModuleDefinition?
     @FocusState private var isTextFieldFocused: Bool
 
     private let localFilesModuleURL = "https://raw.githubusercontent.com/xibrox/local-files-module/refs/heads/main/local.json"
@@ -78,6 +80,11 @@ struct ModuleListView: View {
                                 .listRowInsets(EdgeInsets())
                                 .listRowBackground(Color.clear)
                                 .contextMenu {
+                                    Button {
+                                        detailModule = module
+                                    } label: {
+                                        Label("Module Details", systemImage: "info.circle")
+                                    }
                                     Button {
                                         testModule(module)
                                     } label: {
@@ -159,6 +166,11 @@ struct ModuleListView: View {
         .onChangeOf(moduleURL) { _ in
             addModuleError = nil
             moduleManager.errorMessage = nil
+        }
+        // v2.32 — tapping a module's icon opens its details page; the rest of
+        // the row keeps its select/deactivate behavior.
+        .navigationDestinationCompat(item: $detailModule) { module in
+            ModuleDetailView(source: .installed(module))
         }
     }
 
@@ -481,7 +493,7 @@ struct ModuleListView: View {
         }
     }
 
-    private static func testOutcomeTitle(_ result: ModuleCheckResult) -> String {
+    static func testOutcomeTitle(_ result: ModuleCheckResult) -> String {
         switch result {
         case .passed: return "passed"
         case .needsVerification: return "needs verification"
@@ -514,12 +526,30 @@ struct ModuleListView: View {
             }
         } label: {
             HStack(spacing: 14) {
-                Group {
-                    CachedAsyncImage(urlString: module.iconUrl ?? "", base64String: module.iconData)
-                        .frame(width: 44, height: 44)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+                // v2.32 — the icon is its own tap target now: it opens the
+                // module's details page. Everything else in the row still
+                // selects / stays selected.
+                Button {
+                    detailModule = module
+                    #if os(iOS)
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    #endif
+                } label: {
+                    Group {
+                        CachedAsyncImage(urlString: module.iconUrl ?? "", base64String: module.iconData)
+                            .frame(width: 44, height: 44)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+                    }
+                    .overlay(alignment: .bottomTrailing) {
+                        Image(systemName: "info.circle.fill")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Color.appAccent)
+                            .offset(x: 5, y: 5)
+                    }
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Details for \(module.sourceName)")
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(module.sourceName).font(.headline)

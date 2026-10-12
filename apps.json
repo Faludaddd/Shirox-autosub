@@ -27,10 +27,14 @@
       },
       "versions": [
         {
+          "version": "2.32",
+          "date": "2026-10-12",
+          "localizedDescription": "v2.32 — The polish pass. Module Details: tapping a module's icon in the Module Store or the module list opens a dedicated page (author, version, install status, install / set active / test / update / remove, Copy Link and Open Link of the real manifest URL). Onboarding's Add-a-source step now opens the Module Store directly. Find File on a completed download really finds it — the Files app opens at the episode (Finder on Mac), and a missing or unreadable file is reported honestly. Long-press menus are back on the anime cards (home shelves, Search, Browse) as one shared menu with View on AniList. The manga home rides on the newer home design (accent-underlined headers, shared shelves, gooey refresh). Theme fixes: the carousel Watch/Read buttons follow your accent with readable text in every appearance, section headers and See all buttons too. The stray scroll-edge hairline around category rows is gone. The Change Log tab is merged into Updates as version-number buttons that open each release's notes. The duplicate floating calendar over the Schedule tab is removed — the tab itself is untouched."
+        },
+        {
           "version": "2.31",
-          "date": "2026-10-11",
-          "localizedDescription": "v2.31 — The parity release: the original Shirox's best systems, on top of everything this fork already does. MPV playback engine with automatic fallback (mkv/webm/avi and more now play), scrambled/disguised stream unscrambling, zstd and browser-impersonation fetch. The original Home design (hero carousel, gooey refresh, page-turn, Upcoming calendar). The original Library: genre filters, list memory, new-episode badges, poster grid with progress bars, the full entry editor (rewatches, dates, notes, custom lists), and whole-library Sync/Overwrite/Mirror between AniList and MAL with full destructive-run previews. First-run onboarding checklist and a launch animation. Backup & Restore of preferences, modules, progress, local library and (opt-in) accounts. Modules are tested the moment they're added. Also fixed: saving an entry no longer wipes your MAL rating. The Data Sources tab is gone from Settings (its AnimeSchedule token row moved to Sources); the Schedule tab and its chain are untouched.",
-          "size": 26178486
+          "date": "2026-10-12",
+          "localizedDescription": "v2.31 — The parity release: the original Shirox's best systems, on top of everything this fork already does. MPV playback engine with automatic fallback (mkv/webm/avi and more now play), scrambled/disguised stream unscrambling, zstd and browser-impersonation fetch. The original Home design (hero carousel, gooey refresh, page-turn, Upcoming calendar). The original Library: genre filters, list memory, new-episode badges, poster grid with progress bars, the full entry editor (rewatches, dates, notes, custom lists), and whole-library Sync/Overwrite/Mirror between AniList and MAL with full destructive-run previews. First-run onboarding checklist and a launch animation. Backup & Restore of preferences, modules, progress, local library and (opt-in) accounts. Modules are tested the moment they're added. Also fixed: saving an entry no longer wipes your MAL rating. The Data Sources tab is gone from Settings (its AnimeSchedule token row moved to Sources); the Schedule tab and its chain are untouched."
         },
         {
           "version": "2.30",

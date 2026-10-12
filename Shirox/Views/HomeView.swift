@@ -210,16 +210,11 @@ struct HomeView: View {
             // The provider banner sits above everything, so a switch that
             // quietly falls back is always explained.
             .safeAreaInset(edge: .top, spacing: 0) { ProviderStatusBanner() }
-            #if os(iOS)
-            .overlay(alignment: .bottomTrailing) {
-                CalendarButton { showUpcoming = true }
-                    .zoomSource(HomeToolbarCalendar.calendarID, in: calendarZoom, cornerRadius: 26)
-                    // Centred over the tab bar's search button, which sits 21pt in and is 62 across.
-                    .padding(.trailing, 26)
-                    .padding(.bottom, 12)
-            }
-            #endif
-            // A page, growing out of the calendar button on its way in.
+            // v2.32 — the floating calendar button is gone from iOS: the tab bar's
+            // own Schedule tab (the original feature) already lives in exactly the
+            // corner the floating button hovered over, so the two calendar icons
+            // stacked. Upcoming stays reachable on iPadOS/Mac through the toolbar.
+            // A page, growing out of the toolbar button on its way in.
             .navigationDestinationCompat(isPresented: $showUpcoming) {
                 UpcomingCalendarView()
                     .zoomingOut(of: HomeToolbarCalendar.calendarID, in: calendarZoom)
@@ -426,26 +421,6 @@ enum HomeToolbarCalendar {
     static let calendarID = "upcomingCalendar"
 }
 
-#if os(iOS)
-/// The Upcoming calendar, floating in Home's bottom corner above the tab bar.
-private struct CalendarButton: View {
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: "calendar")
-                .font(.system(size: 19, weight: .semibold))
-                .foregroundStyle(.primary)
-                .frame(width: 52, height: 52)
-                .glassChrome(Circle(), enabled: true, off: .ultraThinMaterial)
-                .shadow(color: .black.opacity(0.18), radius: 10, y: 4)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Upcoming")
-    }
-}
-#endif
-
 /// Home turning to another provider's page: the arriving page slides in from
 /// the side it sits on in the menu's order while the leaving one sinks back
 /// where it is, both through a blur.
@@ -585,9 +560,12 @@ private struct FeaturedCarousel: View {
                                         Image(systemName: "play.fill").font(.footnote.weight(.semibold))
                                         Text("Watch").fontWeight(.semibold)
                                     }
-                                    .foregroundStyle(platformBackground)
+                                    // v2.32 — theme-aware: the accent fill with its
+                                    // paired foreground reads identically in light and
+                                    // dark, and follows the user's accent color.
+                                    .foregroundStyle(Color.appAccentForeground)
                                     .frame(width: 130, height: 42)
-                                    .background(Color.primary, in: RoundedRectangle(cornerRadius: 12))
+                                    .background(Color.appAccent, in: RoundedRectangle(cornerRadius: 12))
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -845,10 +823,12 @@ private struct MacFeaturedCarousel: View {
             } label: {
                 Label("Watch", systemImage: "play.fill")
                     .font(.body.weight(.semibold))
-                    .foregroundStyle(.black)
+                    // v2.32 — theme-aware accent button (was hardcoded
+                    // black-on-white, which ignored the selected appearance).
+                    .foregroundStyle(Color.appAccentForeground)
                     .padding(.horizontal, 18)
                     .frame(height: 36)
-                    .background(Color.white, in: Capsule())
+                    .background(Color.appAccent, in: Capsule())
             }
             .buttonStyle(.plain)
             .padding(.top, 4)
@@ -1005,10 +985,12 @@ private struct CinematicHome<Rows: View>: View {
                                 Text("Watch")
                                     .font(.system(size: 15, weight: .bold))
                             }
-                            .foregroundStyle(Color.black)
+                            // v2.32 — theme-aware accent button (was hardcoded
+                            // black-on-white, which ignored the selected appearance).
+                            .foregroundStyle(Color.appAccentForeground)
                             .padding(.horizontal, 26)
                             .frame(height: 46)
-                            .background(Color.white, in: Capsule())
+                            .background(Color.appAccent, in: Capsule())
                             .contentShape(Capsule())
                         }
                         .buttonStyle(HomePressStyle())
@@ -1310,7 +1292,7 @@ private struct AnimeSection: View {
                         Image(systemName: "chevron.right")
                             .font(.caption.weight(.semibold))
                     }
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.appAccent)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
                     .background(.ultraThinMaterial, in: Capsule())
@@ -1330,6 +1312,8 @@ private struct AnimeSection: View {
                 }
                 .buttonStyle(HomePressStyle())
                 .frame(width: cardWidth)
+                // v2.32 — the unified long-press menu every card surface shares.
+                .unifiedCardMenu(media)
             }
         }
     }

@@ -215,6 +215,54 @@ final class ModuleManager: ObservableObject {
         if didUpdate { saveToStorage() }
     }
 
+    /// v2.32 — the outcome of a targeted, per-module update check (the module
+    /// details page). Honest about every case; nothing is invented.
+    enum ModuleUpdateOutcome {
+        /// A newer manifest was fetched and installed; carries the new version.
+        case updated(String)
+        /// The manifest matches what's installed — already current.
+        case upToDate
+        /// This module has no stored manifest URL (e.g. restored from a
+        /// backup that predates the field), so there's nothing to check.
+        case noManifestURL
+        /// The manifest couldn't be fetched or decoded; carries the reason.
+        case failed(String)
+    }
+
+    /// v2.32 — updates ONE module from its stored manifest URL, the same
+    /// single-module path `checkForUpdates` walks for the whole list. Used by
+    /// the module details page's "Check for Update" action.
+    func updateModule(_ module: ModuleDefinition) async -> ModuleUpdateOutcome {
+        guard let jsonUrlStr = module.jsonUrl, let jsonURL = URL(string: jsonUrlStr) else {
+            return .noManifestURL
+        }
+        do {
+            let (data, _) = try await URLSession.shared.data(from: jsonURL)
+            var fresh = try JSONDecoder().decode(ModuleDefinition.self, from: data)
+            guard fresh.version != module.version else {
+                return .upToDate
+            }
+            fresh.jsonUrl = jsonUrlStr
+            await cacheAssets(for: &fresh)
+            if let index = modules.firstIndex(where: { $0.id == module.id }) {
+                let wasActive = activeModule?.id == module.id
+                modules[index] = fresh
+                if wasActive { selectModule(fresh) }
+                saveToStorage()
+                Logger.shared.log(
+                    "[ModuleManager] Updated module: \(fresh.sourceName) \(module.version) → \(fresh.version)",
+                    type: "Module")
+                return .updated(fresh.version)
+            }
+            return .upToDate
+        } catch {
+            Logger.shared.log(
+                "[ModuleManager] Update check failed for \(module.sourceName): \(error.localizedDescription)",
+                type: "Error")
+            return .failed(error.localizedDescription)
+        }
+    }
+
     // MARK: - Asset Caching
 
     private func cacheAssets(for module: inout ModuleDefinition) async {

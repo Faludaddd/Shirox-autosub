@@ -140,6 +140,9 @@ struct MetadataPillRow: View {
         }
         .frame(height: height)
         .allowsHitTesting(allowsHitTesting)
+        // v2.32 — the row draws its own edge fades; the system's scroll-edge
+        // effect on top of them rendered as a stray line at the row's ends.
+        .hideScrollEdgeEffect()
         .mask {
             if edgeFades {
                 HStack(spacing: 0) {

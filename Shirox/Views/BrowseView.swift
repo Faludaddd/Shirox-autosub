@@ -87,6 +87,9 @@ struct BrowseView: View {
                             }
                             .contentShape(Rectangle())
                             .buttonStyle(BrowseCardPressStyle())
+                            // v2.32 — the unified long-press menu every
+                            // card surface shares.
+                            .unifiedCardMenu(media)
                         }
 
                         // Infinite scroll sentinel

@@ -34,7 +34,6 @@ enum SettingsPage: Hashable {
     case notifications
     case storage
     case updates
-    case changeLog
     case backup
     case logger
     case about
@@ -129,9 +128,9 @@ enum SettingsSearchIndex {
         .init("Clear Image Cache", aliases: ["delete images", "free space", "image cache", "artwork cache"], category: "Storage", page: .storage, anchor: "clearImageCache", icon: "photo.stack"),
         .init("Reset Continue Watching", aliases: ["clear continue watching", "reset progress", "cw reset", "resume points"], category: "Storage", page: .storage, anchor: "resetCW", icon: "arrow.counterclockwise"),
 
-        // Updates (v2.22 — dedicated section)
-        .init("Updates", aliases: ["new version", "check for updates", "install update", "update now", "updater", "whats new"], category: "Updates", page: .updates, anchor: "updates", icon: "arrow.down.circle.fill"),
-        .init("Change Log", aliases: ["update log", "changelog", "what changed", "release notes", "previous changes"], category: "Updates", page: .changeLog, anchor: "changeLog", icon: "list.bullet.clipboard.fill"),
+        // Updates (v2.32 — the Change Log search entry merged in here too:
+        // one Updates experience owns version checking AND release history)
+        .init("Updates", aliases: ["update", "new version", "check for updates", "install update", "update now", "updater", "change log", "changelog", "what changed", "what's new", "release notes", "previous changes", "version history"], category: "Updates", page: .updates, anchor: "updates", icon: "arrow.down.circle.fill"),
 
         .init("Backup & Restore", aliases: ["export settings", "import settings", "backup json"], category: "Backup & Restore", page: .backup, anchor: "backup", icon: "externaldrive.badge.timemachine"),
         .init("Logger", aliases: ["logs", "debug log", "app logs"], category: "Logger", page: .logger, anchor: "logger", icon: "terminal"),
@@ -240,7 +239,6 @@ func settingsPageView(for page: SettingsPage) -> some View {
     case .notifications: NotificationsSettingsPage()
     case .storage:       StorageManagementPage()
     case .updates:       UpdatesSettingsPage()
-    case .changeLog:     UpdateLogPage()
     case .backup:        BackupRestoreSettingsPage()
     case .logger:        LoggerSettingsPage()
     case .about:         AboutSettingsPage()

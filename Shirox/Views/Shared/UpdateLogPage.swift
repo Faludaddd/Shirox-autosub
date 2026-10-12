@@ -1,58 +1,79 @@
 import SwiftUI
 
-/// Change Log page (v2.22 — renamed from "Update Log").
-/// Shows a clean, organized log of everything that has been Added,
-/// Fixed, Changed, and Improved in the app. Each entry is grouped by
-/// version and category so users can easily find what changed.
-struct UpdateLogPage: View {
-    @Environment(\.dismiss) private var dismiss
+// MARK: - Version Changelog (v2.32 — the unified Updates experience)
+//
+// ONE version's release notes, opened by tapping that version's button in
+// Settings → Updates. The change-log DATA (the `logEntries` below) is the
+// app's real release history — nothing is fabricated; a release with no
+// recorded notes says so honestly.
+//
+// This replaces the old standalone Change Log tab: the listing of versions
+// now lives inside the Updates page (one place for update checking, install
+// and release history), and this view is the per-version detail it opens.
+struct VersionChangelogView: View {
+    let entry: UpdateLogEntry
+
+    /// True for the version the device is running — shown as a badge in the
+    /// version list and next to the title here.
+    var isInstalledVersion = false
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                ForEach(logEntries, id: \.version) { entry in
-                    versionSection(entry)
+            VStack(alignment: .leading, spacing: 20) {
+                header
+                if entry.isEmpty {
+                    Text("No release notes were recorded for this version.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16)
+                } else {
+                    if !entry.added.isEmpty {
+                        categorySection(title: "Features", icon: "plus.circle.fill", color: .green, items: entry.added)
+                    }
+                    if !entry.improved.isEmpty {
+                        categorySection(title: "Improvements", icon: "sparkles", color: .purple, items: entry.improved)
+                    }
+                    if !entry.fixed.isEmpty {
+                        categorySection(title: "Fixes", icon: "checkmark.circle.fill", color: .blue, items: entry.fixed)
+                    }
+                    if !entry.changed.isEmpty {
+                        categorySection(title: "Changes", icon: "arrow.triangle.2.circlepath.circle.fill", color: .orange, items: entry.changed)
+                    }
+                    if !entry.removed.isEmpty {
+                        categorySection(title: "Removed", icon: "minus.circle.fill", color: .red, items: entry.removed)
+                    }
+                    if !entry.other.isEmpty {
+                        categorySection(title: "Other Changes", icon: "ellipsis.circle.fill", color: .gray, items: entry.other)
+                    }
                 }
                 Spacer().frame(height: 32)
             }
             .padding(.vertical, 16)
         }
-        .navigationTitle("Change Log")
+        .navigationTitle("v\(entry.version)")
         #if os(iOS)
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         #endif
     }
 
-    @ViewBuilder
-    private func versionSection(_ entry: UpdateLogEntry) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Version header
-            HStack(spacing: 8) {
-                Text("v\(entry.version)")
-                    .font(.title2.weight(.bold))
-                Text(entry.date)
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 16)
-
-            // Categories
-            if !entry.added.isEmpty {
-                categorySection(title: "Added", icon: "plus.circle.fill", color: .green, items: entry.added)
-            }
-            if !entry.fixed.isEmpty {
-                categorySection(title: "Fixed", icon: "checkmark.circle.fill", color: .blue, items: entry.fixed)
-            }
-            if !entry.changed.isEmpty {
-                categorySection(title: "Changed", icon: "arrow.triangle.2.circlepath.circle.fill", color: .orange, items: entry.changed)
-            }
-            if !entry.improved.isEmpty {
-                categorySection(title: "Improved", icon: "sparkles", color: .purple, items: entry.improved)
-            }
-            if !entry.removed.isEmpty {
-                categorySection(title: "Removed", icon: "minus.circle.fill", color: .red, items: entry.removed)
+    private var header: some View {
+        HStack(spacing: 10) {
+            Text("v\(entry.version)")
+                .font(.title2.weight(.bold))
+            Text(entry.date)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+            if isInstalledVersion {
+                Text("Installed")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.green)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color.green.opacity(0.12), in: Capsule())
             }
         }
+        .padding(.horizontal, 16)
     }
 
     @ViewBuilder
@@ -98,9 +119,42 @@ struct UpdateLogEntry {
     let improved: [String]
     let removed: [String]
     let other: [String]
+
+    /// A release with nothing recorded in any category.
+    var isEmpty: Bool {
+        added.isEmpty && fixed.isEmpty && changed.isEmpty
+            && improved.isEmpty && removed.isEmpty && other.isEmpty
+    }
 }
 
-private let logEntries: [UpdateLogEntry] = [
+/// The app's real release history — the ONE data source the unified Updates
+/// page's version buttons and the per-version changelog views read from.
+let logEntries: [UpdateLogEntry] = [
+    UpdateLogEntry(
+        version: "2.32",
+        date: "2026-10-12",
+        added: [
+            "Module Details — tapping a module's icon in the Module Store or the module list opens a dedicated page: icon, name, author, version, install status, and the actions the module system really supports (install, set as active source, deactivate, test, per-module update check, remove). Copy Link and Open Link use the module's actual manifest URL; a failed link or install is reported, never silent. Returning from the page brings the store back exactly where you left it — search text, scroll position and all.",
+            "Onboarding's \"Add a source\" step now lands you directly in the Module Store instead of the raw sources list — the step says \"install a module\", so that's where you start. A Paste URL button in the corner opens the full sources screen (URL paste, local files, Jellyfin) for everything the store doesn't list, and the checklist behind it keeps ticking itself as you go.",
+            "The unified Updates page: version history now lives inside Settings → Updates as clean version-number buttons (v2.32, v2.31, …) — the installed release carries its own badge, every button opens that version's notes grouped into Features, Improvements, Fixes, Changes, Removed and Other Changes, and the separate Change Log tab is gone (the notes it held are the same data, now in one place)."
+        ],
+        fixed: [
+            "Find File on a completed download actually finds the file now: it opens the Files app at the downloaded episode (the app's Documents folder is file-sharing enabled), or Finder with the file selected on Mac. A file that's been deleted, moved or made unreadable is reported honestly with its expected location and Copy Path / Share options — before, the button opened a generic document picker that navigated nowhere.",
+            "Long-press is back on the anime cards: the v2.31 home shelves had lost their context menus in the port. Every poster surface — the home shelves, Search results and the Browse/See All grids — now shares one unified menu (Add to Planning / Watching / Completed, View on AniList), which works with touch, right-click and track-press and never fires on a tap, scroll or swipe.",
+            "The stray line around the category/pill rows is gone: the system's hard scroll-edge cut on horizontally scrolling sections (the crisp hairline it draws at a shelf's ends) is softened on the shelves and hidden on the pill rows, which draw their own edge fades.",
+            "Theme consistency: the Watch/Read buttons on every carousel (home hero, manga home, iPad cinematic page, Mac page) now use the accent color with its paired foreground — readable in light and dark, following your accent — instead of the old primary-inverted fill whose text could stay black through an appearance switch. Home's section headers return to the accent-underlined design, and the See all buttons follow the accent too."
+        ],
+        changed: [
+            "The manga home page now rides on the same newer home design the anime home got in v2.31 — the shared section headers (accent underline), the shared shelf machinery with soft scroll edges, gooey pull-to-refresh, and the hero allowed under the status bar exactly like the anime home. Same data chain, same fallbacks, newer presentation.",
+            "The floating calendar button is gone from the iPhone home: it arrived with the v2.31 home port and stacked a second calendar icon right above the tab bar's own Schedule tab. The original Schedule tab, its schedule and reminders, and the Upcoming calendar on iPad/Mac are untouched."
+        ],
+        improved: [
+            "Module updates are per-module: the details page's Check for Update re-fetches just that module's manifest and tells you which of updated, up-to-date, or failed happened — the same honest outcomes the whole-list refresh reports.",
+            "Searching Settings for \"changelog\", \"release notes\" or \"what changed\" now finds the unified Updates page — the entry points at the one place release history lives."
+        ],
+        removed: [],
+        other: []
+    ),
     UpdateLogEntry(
         version: "2.31",
         date: "2026-10-12",

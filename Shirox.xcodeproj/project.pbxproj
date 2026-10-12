@@ -932,6 +932,9 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */ = {isa = PBXBui
                 2574425F6B22B4EFA5A86F68 /* BackupSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9C13EC9284BDE33426F544 /* BackupSettingsView.swift */; };
                 36C5577AAF572DAABAF75403 /* BackupSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9C13EC9284BDE33426F544 /* BackupSettingsView.swift */; };
                 2263F4A7A5462D335E8E79E4 /* BackupSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9C13EC9284BDE33426F544 /* BackupSettingsView.swift */; };
+                3060DCF8E615DAE82E24799C /* ModuleDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12CBA308398B918A32C02BCA /* ModuleDetailView.swift */; };
+                53C941644A4AE6E614421254 /* ModuleDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12CBA308398B918A32C02BCA /* ModuleDetailView.swift */; };
+                1C62D4433BB7BDF9533182F2 /* ModuleDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12CBA308398B918A32C02BCA /* ModuleDetailView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1266,6 +1269,7 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */ = {isa = PBXFileReference;
                 ACE835409264EC5D7A0A37E9 /* BackupAccountsSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BackupAccountsSection.swift; sourceTree = "<group>"; };
                 B45FB1CBCC2BBFC796878D71 /* ModuleCheck.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ModuleCheck.swift; sourceTree = "<group>"; };
                 AA9C13EC9284BDE33426F544 /* BackupSettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BackupSettingsView.swift; sourceTree = "<group>"; };
+                12CBA308398B918A32C02BCA /* ModuleDetailView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ModuleDetailView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1653,6 +1657,7 @@ A17F1001000000000000000D /* ForcedUpdateView.swift */,
                                 1279E4DE2FCA397700C9BA56 /* HomeView.swift */,
                                 1279E4DF2FCA397700C9BA56 /* LibraryView.swift */,
                                 1279E4E02FCA397700C9BA56 /* ModuleListView.swift */,
+                                12CBA308398B918A32C02BCA /* ModuleDetailView.swift */,
                                 1279E4E12FCA397700C9BA56 /* ModuleStreamPickerView.swift */,
                                 1279E4E22FCA397700C9BA56 /* PlayerView.swift */,
                                 1279E4E32FCA397700C9BA56 /* SearchView.swift */,
@@ -2094,6 +2099,7 @@ B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
                         isa = PBXSourcesBuildPhase;
                         buildActionMask = 2147483647;
                         files = (
+                                1C62D4433BB7BDF9533182F2 /* ModuleDetailView.swift in Sources */,
                                 09901E99B5F43E1B4DE0CF72 /* BackupEnvelope.swift in Sources */,
                                 D3D0A152D30CB909560B9CEC /* BackupManager.swift in Sources */,
                                 ED045516917060449D6EB5B0 /* BackupSections.swift in Sources */,
@@ -2374,6 +2380,7 @@ A17F1001000000000000000A /* ForcedUpdateView.swift in Sources */,
                         isa = PBXSourcesBuildPhase;
                         buildActionMask = 2147483647;
                         files = (
+                                53C941644A4AE6E614421254 /* ModuleDetailView.swift in Sources */,
                                 28205746E58C1568AB680211 /* BackupEnvelope.swift in Sources */,
                                 D142AB480EDE6D03F2A32219 /* BackupManager.swift in Sources */,
                                 8A46F19DF6B0B8C2E655236E /* BackupSections.swift in Sources */,
@@ -2656,6 +2663,7 @@ A17F1001000000000000000B /* ForcedUpdateView.swift in Sources */,
                         isa = PBXSourcesBuildPhase;
                         buildActionMask = 2147483647;
                         files = (
+                                3060DCF8E615DAE82E24799C /* ModuleDetailView.swift in Sources */,
                                 FB157A299403D6BF6BC1D083 /* LibrarySyncPlanner.swift in Sources */,
                                 E905B6BA7539F65C8321C3DD /* LibrarySyncService.swift in Sources */,
                                 1D7E00496481B46D86C0E530 /* SyncTargets.swift in Sources */,
@@ -2954,7 +2962,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                 ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
                                 CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
                                 CODE_SIGN_STYLE = Automatic;
-                                CURRENT_PROJECT_VERSION = 166;
+                                CURRENT_PROJECT_VERSION = 167;
                                 ENABLE_PREVIEWS = YES;
                                 ENABLE_USER_SCRIPT_SANDBOXING = YES;
                                 GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -2972,7 +2980,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "@executable_path/Frameworks",
                                 );
                                 LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                                MARKETING_VERSION = 2.31;
+                                MARKETING_VERSION = 2.32;
                                 PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
                                 PRODUCT_NAME = "$(TARGET_NAME)";
                                 SDKROOT = appletvos;
@@ -2993,7 +3001,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                 ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
                                 CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
                                 CODE_SIGN_STYLE = Automatic;
-                                CURRENT_PROJECT_VERSION = 166;
+                                CURRENT_PROJECT_VERSION = 167;
                                 ENABLE_PREVIEWS = YES;
                                 ENABLE_USER_SCRIPT_SANDBOXING = YES;
                                 GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -3007,7 +3015,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "@executable_path/Frameworks",
                                 );
                                 LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                                MARKETING_VERSION = 2.31;
+                                MARKETING_VERSION = 2.32;
                                 PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
                                 PRODUCT_NAME = "$(TARGET_NAME)";
                                 SDKROOT = appletvos;
@@ -3114,7 +3122,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                 ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
                                 CODE_SIGN_IDENTITY = "Apple Development";
                                 CODE_SIGN_STYLE = Automatic;
-                                CURRENT_PROJECT_VERSION = 166;
+                                CURRENT_PROJECT_VERSION = 167;
                                 DEVELOPMENT_TEAM = JRMTH65Z3H;
                                 ENABLE_TESTABILITY = YES;
                                 INFOPLIST_FILE = Shirox/Info.plist;
@@ -3124,7 +3132,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "$(inherited)",
                                         "@executable_path/Frameworks",
                                 );
-                                MARKETING_VERSION = 2.31;
+                                MARKETING_VERSION = 2.32;
                                 PRODUCT_NAME = shirox;
                                 PROVISIONING_PROFILE_SPECIFIER = "";
                                 SDKROOT = iphoneos;
@@ -3160,7 +3168,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                         buildSettings = {
                                 ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
                                 COMBINE_HIDPI_IMAGES = YES;
-                                CURRENT_PROJECT_VERSION = 166;
+                                CURRENT_PROJECT_VERSION = 167;
                                 DEAD_CODE_STRIPPING = YES;
                                 INFOPLIST_FILE = Shirox/Info.plist;
                                 INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
@@ -3170,7 +3178,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "@executable_path/../Frameworks",
                                 );
                                 MACOSX_DEPLOYMENT_TARGET = 14.0;
-                                MARKETING_VERSION = 2.31;
+                                MARKETING_VERSION = 2.32;
                                 PRODUCT_NAME = shirox;
                                 SDKROOT = macosx;
                                 SUPPORTS_MACCATALYST = NO;
@@ -3187,7 +3195,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                 ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
                                 CODE_SIGN_IDENTITY = "Apple Development";
                                 CODE_SIGN_STYLE = Automatic;
-                                CURRENT_PROJECT_VERSION = 166;
+                                CURRENT_PROJECT_VERSION = 167;
                                 DEVELOPMENT_TEAM = JRMTH65Z3H;
                                 INFOPLIST_FILE = Shirox/Info.plist;
                                 INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
@@ -3196,7 +3204,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "$(inherited)",
                                         "@executable_path/Frameworks",
                                 );
-                                MARKETING_VERSION = 2.31;
+                                MARKETING_VERSION = 2.32;
                                 PRODUCT_NAME = shirox;
                                 PROVISIONING_PROFILE_SPECIFIER = "";
                                 SDKROOT = iphoneos;
@@ -3277,7 +3285,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                         buildSettings = {
                                 ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
                                 COMBINE_HIDPI_IMAGES = YES;
-                                CURRENT_PROJECT_VERSION = 166;
+                                CURRENT_PROJECT_VERSION = 167;
                                 DEAD_CODE_STRIPPING = YES;
                                 INFOPLIST_FILE = Shirox/Info.plist;
                                 INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
@@ -3287,7 +3295,7 @@ A17F1001000000000000000C /* ForcedUpdateView.swift in Sources */,
                                         "@executable_path/../Frameworks",
                                 );
                                 MACOSX_DEPLOYMENT_TARGET = 14.0;
-                                MARKETING_VERSION = 2.31;
+                                MARKETING_VERSION = 2.32;
                                 PRODUCT_NAME = shirox;
                                 SDKROOT = macosx;
                                 SUPPORTS_MACCATALYST = NO;

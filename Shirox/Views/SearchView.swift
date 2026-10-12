@@ -396,6 +396,9 @@ struct SearchView: View {
                                 .equatable()
                         }
                         .buttonStyle(CardPressStyle())
+                        // v2.32 — the unified long-press menu (mode-aware:
+                        // Reading-status vocabulary in Reading Mode).
+                        .unifiedCardMenu(media, isManga: isMangaMode)
                     }
                 } else {
                     ForEach(vm.moduleResults) { item in

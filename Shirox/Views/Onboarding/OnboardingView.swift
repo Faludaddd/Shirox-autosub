@@ -22,6 +22,9 @@ struct OnboardingView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var showSources = false
+    /// v2.32 — the manual paste-URL page pushed inside the sources sheet, for
+    /// local files, Jellyfin, or a module URL the store doesn't list.
+    @State private var showManualAdd = false
     /// The step the sources screen grows out of.
     @Namespace private var sourcesZoom
     #if os(iOS)
@@ -72,7 +75,7 @@ struct OnboardingView: View {
                         title: "Add a source",
                         detail: hasSource
                             ? "\(moduleManager.modules.count) connected"
-                            : "A module, a Jellyfin server, or files on this device",
+                            : "Pick one from the Module Store — or paste a URL, use Jellyfin, or play local files",
                         isDone: hasSource,
                         isRequired: true
                     ) { showSources = true }
@@ -113,10 +116,30 @@ struct OnboardingView: View {
         }
         .background(platformBackground.ignoresSafeArea())
         .sheet(isPresented: $showSources) {
-            // The real sources screen, not a copy of it: whatever it gains later, onboarding
-            // gains too, and there's one code path to keep correct.
+            // v2.32 — the sheet lands DIRECTLY in the Module Store: the step
+            // says "install a module", so that's where the user should be,
+            // never left hunting for the store themselves. The store's own
+            // Install buttons do the work; a leading "Paste URL" button opens
+            // the full sources screen (URL paste, local files, Jellyfin) for
+            // the cases the store doesn't cover. Whatever installs, the
+            // checklist row behind this sheet ticks itself live; Done (or a
+            // back trip) returns to the exact step the user left.
             NavigationStack {
-                ModuleListView(showsDone: true)
+                ModuleStorePage(showsDone: true)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button {
+                                showManualAdd = true
+                            } label: {
+                                Label("Paste URL", systemImage: "link")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(Color.appAccent)
+                            }
+                        }
+                    }
+                    .navigationDestinationCompat(isPresented: $showManualAdd) {
+                        ModuleListView(showsDone: false)
+                    }
             }
             .environmentObject(moduleManager)
             .zoomingOut(of: "sources", in: sourcesZoom)

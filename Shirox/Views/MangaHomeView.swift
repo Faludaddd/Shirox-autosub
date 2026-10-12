@@ -19,6 +19,7 @@ struct MangaHomeContent: View {
     @State private var readerContext: ReaderContext?
     @State private var crNavTarget: ContinueReadingNavTarget?
     @AppStorage("mangaBrowseCategoriesGridLayout") private var browseCategoriesGridLayout = false
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
         Group {
@@ -39,6 +40,12 @@ struct MangaHomeContent: View {
                     }
                 }
             } else {
+                // v2.32 — the manga home rides on the SAME newer home design
+                // the anime home got in v2.31: hero under the top edge, gooey
+                // pull-to-refresh, soft scroll edges, and the HomeRowHeader /
+                // HomeShelf sections (accent-underlined headers, shared shelf
+                // machinery, the unified long-press menu). Previously this page
+                // still rendered the pre-v2.29 section design.
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
                         // Batch 23 — honest notice when the disk snapshot
@@ -86,7 +93,8 @@ struct MangaHomeContent: View {
                         }
                         #endif
 
-                        // 3. BROWSE — manga shelves or grid
+                        // 3. BROWSE — manga shelves or grid, on the shared
+                        //    section components the anime home uses.
                         if browseCategoriesGridLayout {
                             mangaBrowseGrid
                         } else {
@@ -99,9 +107,17 @@ struct MangaHomeContent: View {
                         Spacer().frame(height: 28)
                     }
                 }
-                .refreshable { await vm.reload() }
+                .softScrollEdges(vm.trending.isEmpty ? .all : [.bottom, .leading, .trailing])
+                .hideScrollEdgeEffect(vm.trending.isEmpty ? [] : .top)
                 .coordinateSpace(name: "mangaHomeScroll")
-                .ignoresSafeArea(edges: .top)
+                .gooeyRefreshable(fallback: .custom) { await vm.reload() }
+                // Only the hero is allowed under the status bar — the same
+                // rule the anime home follows.
+                #if os(macOS) || targetEnvironment(macCatalyst)
+                .ignoresSafeArea(edges: vm.trending.isEmpty ? [] : [.top])
+                #else
+                .ignoresSafeArea(edges: vm.trending.isEmpty ? [] : [.top, .leading])
+                #endif
             }
         }
         .task { await vm.load() }
@@ -126,7 +142,8 @@ struct MangaHomeContent: View {
                 } label: {
                     MangaPosterCard(media: media)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(MangaCardPressStyle())
+                .unifiedCardMenu(media, isManga: true)
             }
         }
         .padding(.horizontal, 16)
@@ -346,8 +363,10 @@ enum MangaSnapshotStore {
 
 // MARK: - MangaSection
 //
-// Manga equivalent of `AnimeSection`. Same horizontal-strip layout: header
-// row (icon + title) + horizontal scroll of poster cards. Tapping a card
+// v2.32 — rebuilt on the same newer section components the anime home's
+// AnimeSection uses: HomeRowHeader (heavy title + accent underline) and
+// HomeShelf (the shared horizontal-shelf machinery, soft scroll edges),
+// with the unified long-press menu on every card. Tapping a card still
 // pushes `AniListMangaDetailView`.
 
 struct MangaSection: View {
@@ -367,58 +386,18 @@ struct MangaSection: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.title3.weight(.bold))
-                .padding(.horizontal, 16)
-
-            if items.isEmpty {
-                Text("No titles available.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 16)
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        ForEach(items) { media in
-                            NavigationLink {
-                                AniListMangaDetailView(mediaId: media.id, preloadedMedia: media)
-                            } label: {
-                                MangaPosterCard(media: media)
-                                    .equatable()
-                                    .frame(width: cardWidth)
-                            }
-                            .buttonStyle(CardPressStyle())
-                            .contextMenu {
-                                Button {
-                                    Task {
-                                        try? await AniListLibraryService.shared.updateEntry(
-                                            mediaId: media.id, status: .planning, progress: 0, score: nil, type: .manga)
-                                    }
-                                } label: {
-                                    Label("Add to Planning", systemImage: "bookmark")
-                                }
-                                Button {
-                                    Task {
-                                        try? await AniListLibraryService.shared.updateEntry(
-                                            mediaId: media.id, status: .current, progress: 0, score: nil, type: .manga)
-                                    }
-                                } label: {
-                                    Label("Add to Reading", systemImage: "book.circle")
-                                }
-                                Button {
-                                    Task {
-                                        try? await AniListLibraryService.shared.updateEntry(
-                                            mediaId: media.id, status: .completed, progress: 0, score: nil, type: .manga)
-                                    }
-                                } label: {
-                                    Label("Mark as Completed", systemImage: "checkmark.circle")
-                                }
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 16)
+        VStack(alignment: .leading, spacing: 14) {
+            HomeRowHeader(title: title)
+            HomeShelf(items: items) { media in
+                NavigationLink {
+                    AniListMangaDetailView(mediaId: media.id, preloadedMedia: media)
+                } label: {
+                    MangaPosterCard(media: media)
+                        .equatable()
                 }
+                .buttonStyle(MangaCardPressStyle())
+                .frame(width: cardWidth)
+                .unifiedCardMenu(media, isManga: true)
             }
         }
     }
@@ -500,11 +479,14 @@ struct MangaPosterCard: View, Equatable {
 
 // MARK: - CardPressStyle
 
-private struct CardPressStyle: ButtonStyle {
+/// The manga home's press feedback — the same scale/opacity response the
+/// anime home's HomePressStyle gives its cards.
+struct MangaCardPressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.96 : 1)
-            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? 0.94 : 1.0)
+            .opacity(configuration.isPressed ? 0.88 : 1.0)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 
@@ -565,7 +547,7 @@ struct MangaLibraryView: View {
                             } label: {
                                 mangaLibraryCard(entry)
                             }
-                            .buttonStyle(CardPressStyle())
+                            .buttonStyle(MangaCardPressStyle())
                             .contextMenu {
                                 ForEach(MediaListStatus.allCases) { status in
                                     if status != entry.status {
@@ -797,13 +779,14 @@ struct MangaSettingsView: View {
                 }
             }
 
-            // Section 6: Change Log (universal)
-            // (v2.22 — renamed from "Update Log")
+            // Section 6: What's New (v2.32 — the old standalone Change Log page
+            // is merged into the unified Updates experience; this row opens
+            // that same page, so release history has ONE home app-wide)
             Section {
                 NavigationLink {
-                    UpdateLogPage()
+                    UpdatesSettingsPage()
                 } label: {
-                    MangaSettingsCategoryRow(icon: "list.bullet.clipboard.fill", title: "Change Log", subtitle: "See what's new, fixed, and changed")
+                    MangaSettingsCategoryRow(icon: "arrow.down.circle.fill", title: "What's New", subtitle: "Updates, version history, what changed")
                 }
             }
 

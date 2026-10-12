@@ -197,8 +197,9 @@ struct MediaCarousel: View {
                                     .padding(.horizontal, 8)
                             }
 
-                            // The original button: fixed 130×42, filled
-                            // with the primary color, corner radius 12.
+                            // v2.32 — theme-aware: accent fill with its paired
+                            // foreground reads identically in light and dark and
+                            // follows the user's selected accent color.
                             NavigationLink {
                                 if isManga {
                                     AniListMangaDetailView(mediaId: currentMedia.id, preloadedMedia: currentMedia)
@@ -212,9 +213,9 @@ struct MediaCarousel: View {
                                     Text(isManga ? "Read" : "Watch")
                                         .fontWeight(.semibold)
                                 }
-                                .foregroundStyle(platformBackground)
+                                .foregroundStyle(Color.appAccentForeground)
                                 .frame(width: 130, height: 42)
-                                .background(Color.primary, in: RoundedRectangle(cornerRadius: 12))
+                                .background(Color.appAccent, in: RoundedRectangle(cornerRadius: 12))
                             }
                             .buttonStyle(.plain)
                         }
@@ -583,10 +584,13 @@ private struct MacMediaCarousel: View {
                                         Text(isManga ? "Read" : "Watch").fontWeight(.semibold)
                                             .lineLimit(1)
                                     }
-                                    .foregroundStyle(platformBackground)
+                                    // v2.32 — theme-aware accent button (was
+                                    // primary-inverted, whose background-resolved
+                                    // text could go stale on appearance changes).
+                                    .foregroundStyle(Color.appAccentForeground)
                                     .frame(height: 36)
                                     .padding(.horizontal, 14)
-                                    .background(Color.primary, in: RoundedRectangle(cornerRadius: 10))
+                                    .background(Color.appAccent, in: RoundedRectangle(cornerRadius: 10))
                                 }
                                 .buttonStyle(.plain)
                             }

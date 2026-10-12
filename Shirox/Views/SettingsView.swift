@@ -180,19 +180,15 @@ struct SettingsView: View {
                 }
             }
 
-            // Section 6: Updates, Change Log & About (v2.22 — Updates got
-            // its own dedicated section; "Update Log" renamed to
-            // "Change Log")
+            // Section 6: Updates & About (v2.32 — the Change Log tab is
+            // merged INTO Updates: its version buttons open the per-version
+            // notes, so there's one Updates experience, not two pages for
+            // the same history)
             Section {
                 NavigationLink {
                     UpdatesSettingsPage()
                 } label: {
                     SettingsCategoryRow(icon: "arrow.down.circle.fill", title: "Updates", subtitle: "Version, check, install, what's new")
-                }
-                NavigationLink {
-                    UpdateLogPage()
-                } label: {
-                    SettingsCategoryRow(icon: "list.bullet.clipboard.fill", title: "Change Log", subtitle: "See what's new, fixed, and changed")
                 }
                 NavigationLink {
                     AboutSettingsPage()
@@ -3010,16 +3006,24 @@ struct ModulesSettingsPage: View {
 
 struct ModuleStorePage: View {
     @EnvironmentObject private var moduleManager: ModuleManager
+    @Environment(\.dismiss) private var dismiss
     @State private var storeModules: [StoreModuleItem] = []
     @State private var isLoading = false
     @State private var storeError: String?
     @State private var searchText = ""
     @State private var moduleURL = ""
     @State private var isInstalling = false
+    /// v2.32 — the module whose details page is open (icon tap on a tile).
+    /// Push navigation, so the store keeps its scroll position, search text
+    /// and loaded listing while the details page is open and when it pops.
+    @State private var detailItem: StoreModuleItem?
     /// #130 — Layout toggle. Grid (default, 3-column) or list (1-column row).
     @AppStorage("moduleStoreLayout") private var layout: ModuleStoreLayout = .grid
     /// When `.manga`, the store filters to manga-type modules only.
     var mediaType: ModulesSettingsPage.ModuleMediaType? = nil
+    /// v2.32 — in a sheet (onboarding), a Done button closes it. Off in the
+    /// Settings stack, where the nav bar's back button is the way out.
+    var showsDone = false
 
     /// #133 — cufiy.net Sora Module Library JSON endpoint. This is the
     /// authoritative, structured source for the full module listing — every
@@ -3145,9 +3149,9 @@ struct ModuleStorePage: View {
                                 .padding(.horizontal, 14)
                             LazyVGrid(columns: columns, spacing: 12) {
                                 ForEach(popularSources) { mod in
-                                    StoreModuleTile(mod: mod, isInstalled: isModuleInstalled(mod), isInstalling: isInstalling, layout: layout) {
-                                        installModule(mod)
-                                    }
+                                    StoreModuleTile(mod: mod, isInstalled: isModuleInstalled(mod), isInstalling: isInstalling, layout: layout,
+                                                    onInstall: { installModule(mod) },
+                                                    onOpenDetails: { detailItem = mod })
                                 }
                             }
                             .padding(.horizontal, 14)
@@ -3162,9 +3166,9 @@ struct ModuleStorePage: View {
                                 .padding(.top, 4)
                             LazyVGrid(columns: columns, spacing: 12) {
                                 ForEach(communitySources) { mod in
-                                    StoreModuleTile(mod: mod, isInstalled: isModuleInstalled(mod), isInstalling: isInstalling, layout: layout) {
-                                        installModule(mod)
-                                    }
+                                    StoreModuleTile(mod: mod, isInstalled: isModuleInstalled(mod), isInstalling: isInstalling, layout: layout,
+                                                    onInstall: { installModule(mod) },
+                                                    onOpenDetails: { detailItem = mod })
                                 }
                             }
                             .padding(.horizontal, 14)
@@ -3179,9 +3183,9 @@ struct ModuleStorePage: View {
                             .padding(.horizontal, 14)
                         LazyVGrid(columns: columns, spacing: 12) {
                             ForEach(filteredModules) { mod in
-                                StoreModuleTile(mod: mod, isInstalled: isModuleInstalled(mod), isInstalling: isInstalling, layout: layout) {
-                                    installModule(mod)
-                                }
+                                StoreModuleTile(mod: mod, isInstalled: isModuleInstalled(mod), isInstalling: isInstalling, layout: layout,
+                                                onInstall: { installModule(mod) },
+                                                onOpenDetails: { detailItem = mod })
                             }
                         }
                         .padding(.horizontal, 14)
@@ -3195,7 +3199,21 @@ struct ModuleStorePage: View {
         .navigationTitle("Module Store")
         .task { await loadStore() }
         .refreshable { await loadStore() }
+        // v2.32 — a tile's icon opens the module's details page. Push
+        // navigation keeps the store's search text, scroll position and
+        // loaded listing intact for the return trip.
+        .navigationDestinationCompat(item: $detailItem) { mod in
+            ModuleDetailView(source: .store(mod))
+        }
         .toolbar {
+            // v2.32 — in a sheet (onboarding), Done closes the store.
+            ToolbarItem(placement: .confirmationAction) {
+                if showsDone {
+                    Button("Done") { dismiss() }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.appAccent)
+                }
+            }
             // #130 — Grid/list view toggle. Icon shows the layout the user
             // will switch TO (not the current one) so the tap reads as
             // "switch to list" / "switch to grid".
@@ -3515,6 +3533,8 @@ private struct StoreModuleTile: View {
     let isInstalled: Bool
     let isInstalling: Bool
     let onInstall: () -> Void
+    /// v2.32 — tapping the module's icon opens the details page.
+    var onOpenDetails: (() -> Void)? = nil
     /// #130 — Which layout to render. `.grid` is the original vertical tile
     /// (icon-top, name-below, install-button-bottom). `.list` is a horizontal
     /// row (icon-left, metadata-center, install-button-right) that surfaces
@@ -3533,19 +3553,13 @@ private struct StoreModuleTile: View {
 
     private var gridBody: some View {
         VStack(spacing: 6) {
-            // Compact icon at top, centered, 40x40
-            Group {
-                if let iconUrl = mod.iconUrl, let url = URL(string: iconUrl) {
-                    AsyncImage(url: url) { phase in
-                        if case .success(let img) = phase { img.resizable().scaledToFill() }
-                        else { fallbackIcon }
-                    }
-                } else { fallbackIcon }
-            }
-            .frame(width: 40, height: 40)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
-            .padding(.top, 2)
+            // Compact icon at top, centered, 40x40 — its own tap target,
+            // opening the module's details page (v2.32).
+            iconButton
+                .frame(width: 40, height: 40)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+                .padding(.top, 2)
 
             // Name below, bold, 2-line limit, centered
             Text(mod.name)
@@ -3593,18 +3607,12 @@ private struct StoreModuleTile: View {
     private var listBody: some View {
         HStack(spacing: 12) {
             // Icon on the left, 44x44 (slightly larger than grid tile so the
-            // row reads well at the wider single-column width).
-            Group {
-                if let iconUrl = mod.iconUrl, let url = URL(string: iconUrl) {
-                    AsyncImage(url: url) { phase in
-                        if case .success(let img) = phase { img.resizable().scaledToFill() }
-                        else { fallbackIcon }
-                    }
-                } else { fallbackIcon }
-            }
-            .frame(width: 44, height: 44)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+            // row reads well at the wider single-column width) — its own tap
+            // target, opening the module's details page (v2.32).
+            iconButton
+                .frame(width: 44, height: 44)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
 
             // Center: name + author + type/language chips
             VStack(alignment: .leading, spacing: 4) {
@@ -3691,6 +3699,33 @@ private struct StoreModuleTile: View {
         .padding(.horizontal, 6)
         .padding(.vertical, 2)
         .background(Color.secondary.opacity(0.1), in: Capsule())
+    }
+
+    // MARK: - The icon (tap = details, v2.32)
+
+    @ViewBuilder
+    private var iconButton: some View {
+        Group {
+            if let action = onOpenDetails {
+                Button(action: action) { iconImage }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Details for \(mod.name)")
+            } else {
+                iconImage
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var iconImage: some View {
+        if let iconUrl = mod.iconUrl, let url = URL(string: iconUrl) {
+            AsyncImage(url: url) { phase in
+                if case .success(let img) = phase { img.resizable().scaledToFill() }
+                else { fallbackIcon }
+            }
+        } else {
+            fallbackIcon
+        }
     }
 
     private var fallbackIcon: some View {
@@ -4975,7 +5010,9 @@ struct UpdatesSettingsPage: View {
             VStack(spacing: 16) {
                 versionCard
                 updateStatusCard
-                changeLogCard
+                // v2.32 — the Change Log tab merged in: the SAME releases,
+                // as clean version buttons that open the per-version notes.
+                versionHistoryCard
             }
             .padding()
         }
@@ -5239,44 +5276,91 @@ struct UpdatesSettingsPage: View {
         }
     }
 
-    // MARK: - Change Log card
+    // MARK: - Version History (v2.32 — the Change Log, merged in)
 
-    /// The full history of previous app changes, one clean page.
-    private var changeLogCard: some View {
-        NavigationLink {
-            UpdateLogPage()
-        } label: {
-            HStack(spacing: 12) {
+    /// Every release the app has recorded, newest first, as clean
+    /// version-number buttons. Tapping one pushes that version's notes
+    /// (`VersionChangelogView`); the installed version is marked so it's
+    /// never confused with an available update.
+    private var versionHistoryCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
                 Image(systemName: "list.bullet.clipboard.fill")
-                    .font(.system(size: 18))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Color.appAccent)
-                    .frame(width: 36, height: 36)
-                    .background(Color.appAccent.opacity(0.1), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Change Log")
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                    Text("Everything added, fixed, and changed — release by release.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.leading)
-                }
+                Text("Version History")
+                    .font(.headline)
                 Spacer()
-                Image(systemName: "chevron.right")
+                Text("What changed, release by release")
                     .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
             }
-            .padding(14)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color(.secondarySystemGroupedBackground))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-            )
+
+            if logEntries.isEmpty {
+                Text("No release notes recorded yet.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 2)
+            } else {
+                // The wrap layout keeps buttons full-width and scannable on
+                // phones while stacking cleanly on iPad.
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                    ForEach(Array(logEntries.enumerated()), id: \.element.version) { _, entry in
+                        NavigationLink {
+                            VersionChangelogView(entry: entry, isInstalledVersion: entry.version == version)
+                        } label: {
+                            versionButton(entry)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
         }
-        .buttonStyle(.plain)
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(.secondarySystemGroupedBackground))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        )
+    }
+
+    /// One version-number button: the version, its date, an Installed badge
+    /// for the running release, and the push chevron.
+    private func versionButton(_ entry: UpdateLogEntry) -> some View {
+        HStack(spacing: 10) {
+            Text("v\(entry.version)")
+                .font(.subheadline.weight(.bold).monospacedDigit())
+                .foregroundStyle(Color.appAccent)
+            Text(entry.date)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if entry.version == version {
+                Text("Installed")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.green)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(Color.green.opacity(0.12), in: Capsule())
+            }
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 11)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.appAccent.opacity(0.06))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
+        )
+        .contentShape(Rectangle())
     }
 }
 

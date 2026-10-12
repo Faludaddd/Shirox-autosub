@@ -210,8 +210,11 @@ struct HomeRowHeader<Trailing: View>: View {
                     Text(title)
                         .font(.title2.weight(.heavy))
                         .tracking(0.3)
+                    // v2.32 — accent-underlined (v2.29's design): the section headers
+                    // follow the user's selected accent color instead of a plain
+                    // primary-colored bar.
                     RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.primary)
+                        .fill(Color.appAccent)
                         .frame(width: 36, height: 3)
                 }
                 Spacer()
@@ -247,6 +250,11 @@ struct HomeShelf<Item: Identifiable, Card: View>: View {
                 }
                 .padding(.horizontal, 16)
             }
+            // v2.32 — soften the system's scroll-edge cut so the shelf's cards
+            // fade out instead of ending at a crisp hairline seam (the stray
+            // "line" the default hard edge effect draws on either side of a
+            // horizontally scrolling section).
+            .softScrollEdges()
             #endif
         }
     }
