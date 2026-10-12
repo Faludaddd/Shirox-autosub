@@ -869,6 +869,13 @@ struct RecommendationsSection: View {
         return fetchedRecommendations
     }
 
+    /// v2.35 — poster size, size-class aware: iPhone keeps the classic
+    /// 2:3 poster at a larger, easier-to-see size; iPad/Mac gets an even
+    /// wider card. The aspect ratio is unchanged everywhere.
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    private var posterWidth: CGFloat { sizeClass == .regular ? 170 : 148 }
+    private var posterHeight: CGFloat { posterWidth * 1.5 }
+
     var body: some View {
         Group {
             if !displayRecommendations.isEmpty {
@@ -876,7 +883,7 @@ struct RecommendationsSection: View {
                     sectionHeader
                     if isExpanded {
                         ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 12) {
+                            HStack(spacing: 14) {
                                 ForEach(displayRecommendations) { rec in
                                     if let media = rec.mediaRecommendation {
                                         NavigationLink {
@@ -885,11 +892,20 @@ struct RecommendationsSection: View {
                                             recommendationCard(media)
                                         }
                                         .buttonStyle(.plain)
+                                        // v2.35 — the SAME unified long-press
+                                        // menu every other anime/manga card
+                                        // surface shares (Planning / Watching /
+                                        // Completed / View on AniList). Works
+                                        // in both the collapsed and expanded
+                                        // section states — expanding no longer
+                                        // drops the context menu.
+                                        .unifiedCardMenu(mapToMedia(media), isManga: isManga)
                                     }
                                 }
                             }
                             .padding(.horizontal, 16)
                         }
+                        .softScrollEdges()
                     }
                 }
                 .padding(.top, 8)
@@ -949,8 +965,8 @@ struct RecommendationsSection: View {
     private func recommendationCard(_ media: AniListMedia) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             CachedAsyncImage(urlString: media.coverImage.extraLarge ?? media.coverImage.large ?? "")
-                .frame(width: 110, height: 165)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .frame(width: posterWidth, height: posterHeight)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .overlay(alignment: .topTrailing) {
                     if let score = media.averageScore {
                         HStack(spacing: 2) {
@@ -969,15 +985,15 @@ struct RecommendationsSection: View {
                 .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
 
             Text(media.title.displayTitle)
-                .font(.caption.weight(.semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.primary)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
-                .frame(width: 110, alignment: .leading)
+                .frame(width: posterWidth, alignment: .leading)
 
             if let year = media.seasonYear {
                 Text(String(year))
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.secondary)
             }
         }

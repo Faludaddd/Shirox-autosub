@@ -39,6 +39,12 @@ struct HomeView: View {
     @State private var leadingInset: CGFloat = 0
     @AppStorage("browseCategoriesGridLayout") private var browseCategoriesGridLayout = false
     @AppStorage(GooeyRefreshGeometry.settingKey) private var gooeyRefresh = true
+    /// v2.35 — the Home header's onboarding shortcut appears while setup
+    /// is still pending (skipped or unfinished), and retires itself the
+    /// moment the guide is completed. Same state the Notifications tab's
+    /// Get Started card reads — one flag, one truth.
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @AppStorage("onboardingWasSkipped") private var onboardingWasSkipped = false
     @AppStorage(DetailLayoutSetting.cinematicHomeKey) private var cinematicHome = true
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
@@ -150,7 +156,6 @@ struct HomeView: View {
                         // chain, keeps its own period selection, and its See
                         // All pages THE SAME chart+period query.
                         ChartSection(chart: .topAnime)
-                            .tourAnchor("home.charts")
                         AnimeSection(title: "Trending Now", items: vm.trending, query: .category(.trending))
                         ChartSection(chart: .topMovies)
                         ChartSection(chart: .mostFavorited)
@@ -176,9 +181,13 @@ struct HomeView: View {
         NavigationStack {
             Group {
                 if appMode.mode == .reading {
+                    // v2.35 — the leading safe-area inset flows in so the
+                    // manga hero's info stack sits exactly where the anime
+                    // hero's does on iPad (beside the sidebar).
                     MangaHomeContent(
                         progressManager: mangaProgress,
-                        anilistAuth: anilistAuth
+                        anilistAuth: anilistAuth,
+                        leadingInset: leadingInset
                     )
                 } else {
                     animeHomeContent
@@ -189,6 +198,42 @@ struct HomeView: View {
             .navigationBarTitleDisplayMode(designMode.isApple ? .large : .inline)
             .modifier(DesignModeNavBarModifier())
             .toolbar {
+                // v2.35 — the onboarding shortcut: a small Shirox-mark
+                // badge beside the existing header icons, shown ONLY while
+                // setup is pending (skipped or unfinished). Tapping it
+                // opens the SAME interactive onboarding the Settings
+                // Getting Started card and the Notifications tab's Get
+                // Started card present (one flow controller, one state).
+                // The mark is the app's own (the same template image the
+                // splash draws), so it reads as a custom Shirox icon, not
+                // a stock system glyph.
+                // (The ToolbarItem itself is unconditional — a conditional
+                // ToolbarItem needs ToolbarContentBuilder.buildIf, iOS 16+;
+                // the deployment target is iOS 15 — so the CONTENT is what
+                // comes and goes.)
+                ToolbarItem(placement: .topBarLeading) {
+                    if !hasCompletedOnboarding || onboardingWasSkipped {
+                        Button {
+                            Haptics.selection()
+                            OnboardingFlowController.shared.begin()
+                        } label: {
+                            Image("ShiroMark")
+                                .renderingMode(.template)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 17, height: 17)
+                                .padding(4.5)
+                                .background(
+                                    Circle().fill(Color.appAccent.opacity(0.16))
+                                )
+                                .overlay(
+                                    Circle().strokeBorder(Color.appAccent.opacity(0.35), lineWidth: 1)
+                                )
+                                .foregroundStyle(Color.appAccent)
+                        }
+                        .accessibilityLabel("Getting Started")
+                    }
+                }
                 // Mode-toggle icon — the ONLY way to switch between Anime and
                 // Reading Mode. The icon reflects the OPPOSITE mode so the
                 // user knows what tapping will do.
@@ -499,11 +544,22 @@ private extension AnyTransition {
 
 // MARK: - Featured Carousel (full width, indicator below)
 
-private struct FeaturedCarousel: View {
+/// v2.35 — internal (was private): the manga home reuses THE SAME hero
+/// carousel as the anime home, so both modes share one implementation.
+/// `isManga` flips the action button to Read and routes taps to the manga
+/// detail page; `scrollSpace` names the coordinate space the pull/stretch
+/// is measured in (each home owns its own).
+struct FeaturedCarousel: View {
     let items: [Media]
     var isRefreshing: Bool = false
     var onRefresh: (() async -> Void)? = nil
     var leadingInset: CGFloat = 0
+    /// Manga mode: "Read" button + manga detail destination, everything
+    /// else identical to the anime hero.
+    var isManga: Bool = false
+    /// The named coordinate space of the enclosing home ScrollView — the
+    /// hero's pull-down stretch is measured against it.
+    var scrollSpace: String = "homeScroll"
 
     @State private var selectedTab = HeroPages.middle
     @State private var hasTriggeredThreshold = false
@@ -584,7 +640,6 @@ private struct FeaturedCarousel: View {
                                                 .padding(.horizontal, 8)
                                                 .padding(.vertical, 3)
                                                 .background(Color.primary.opacity(0.1), in: Capsule())
-                                                .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
                                         }
                                     }
                                     .allowsHitTesting(false)
@@ -601,11 +656,15 @@ private struct FeaturedCarousel: View {
                                 }
 
                                 NavigationLink {
-                                    MediaDestination(media: currentMedia)
+                                    if isManga {
+                                        AniListMangaDetailView(mediaId: currentMedia.id, preloadedMedia: currentMedia)
+                                    } else {
+                                        MediaDestination(media: currentMedia)
+                                    }
                                 } label: {
                                     HStack(spacing: 6) {
-                                        Image(systemName: "play.fill").font(.footnote.weight(.semibold))
-                                        Text("Watch").fontWeight(.semibold)
+                                        Image(systemName: isManga ? "book.fill" : "play.fill").font(.footnote.weight(.semibold))
+                                        Text(isManga ? "Read" : "Watch").fontWeight(.semibold)
                                     }
                                     // v2.32 — theme-aware: the accent fill with its
                                     // paired foreground reads identically in light and
@@ -658,7 +717,7 @@ private struct FeaturedCarousel: View {
                 // on every frame of a scroll. Handed up, it changes the hero only when it does.
                 GeometryReader { geo in
                     Color.clear.preference(key: HeroPlacementKey.self, value: HeroPlacement(
-                        pull: max(0, geo.frame(in: .named("homeScroll")).minY),
+                        pull: max(0, geo.frame(in: .named(scrollSpace)).minY),
                         midX: geo.frame(in: .global).midX))
                 }
             }
@@ -686,7 +745,7 @@ private struct FeaturedCarousel: View {
             }
         }
         #elseif !os(tvOS)
-        MacFeaturedCarousel(items: realItems)
+        MacFeaturedCarousel(items: realItems, isManga: isManga)
         #endif
     }
 }
@@ -758,6 +817,8 @@ private struct HeroPager: View {
 /// the pointer is on it. It turns by itself every few seconds, but not under the pointer.
 private struct MacFeaturedCarousel: View {
     let items: [Media]
+    /// Manga mode: "Read" button + the manga detail destination.
+    var isManga: Bool = false
     @State private var currentIndex = 0
     @State private var isHovering = false
     @State private var timer: Timer?
@@ -866,9 +927,13 @@ private struct MacFeaturedCarousel: View {
             }
 
             NavigationLink {
-                MediaDestination(media: media)
+                if isManga {
+                    AniListMangaDetailView(mediaId: media.id, preloadedMedia: media)
+                } else {
+                    MediaDestination(media: media)
+                }
             } label: {
-                Label("Watch", systemImage: "play.fill")
+                Label(isManga ? "Read" : "Watch", systemImage: isManga ? "book.fill" : "play.fill")
                     .font(.body.weight(.semibold))
                     // v2.32 — theme-aware accent button (was hardcoded
                     // black-on-white, which ignored the selected appearance).
@@ -1139,11 +1204,18 @@ private struct PageIndicator: View {
         HStack(spacing: 4) {
             ForEach(0..<numberOfPages, id: \.self) { index in
                 Capsule()
-                    .fill(index == currentPage ? Color.primary : Color.primary.opacity(0.25))
+                    // v2.35 — the active dot follows the SELECTED THEME's
+                    // accent color (was plain primary). Color.appAccent is
+                    // resolved live from the accentColorHex preference the
+                    // root view observes, so a theme change re-renders the
+                    // dots immediately — no hardcoded color anywhere.
+                    .fill(index == currentPage ? Color.appAccent : Color.primary.opacity(0.25))
                     .frame(width: index == currentPage ? 20 : 5, height: 5)
                     .animation(.easeInOut(duration: 0.25), value: currentPage)
             }
         }
+        .accessibilityElement()
+        .accessibilityLabel("Page \(currentPage + 1) of \(numberOfPages)")
     }
 }
 
@@ -1282,7 +1354,6 @@ private struct FeaturedCard: View {
                             .padding(.horizontal, 7)
                             .padding(.vertical, 3)
                             .background(Color.primary.opacity(0.1), in: Capsule())
-                            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
                             .lineLimit(1)
                     }
                 }
@@ -1487,6 +1558,8 @@ enum ScheduleSettings {
     private static let windowDaysKey    = "scheduleWindowDays"
     private static let defaultModeKey   = "scheduleDefaultMode"
     private static let defaultUseUTCKey = "scheduleDefaultUseUTC"
+    private static let hideOnaKey       = "scheduleHideOna"
+    private static let animeOnlyKey     = "scheduleAnimeOnly"
 
     /// Look-ahead window in days (7/14/21/30). Defaults to 7.
     static var windowDays: Int {
@@ -1509,6 +1582,20 @@ enum ScheduleSettings {
         UserDefaults.standard.bool(forKey: defaultUseUTCKey)
     }
 
+    /// v2.35 — Hide ONA: exclude ONA-format entries from the schedule.
+    /// Regular TV anime are NEVER affected (the filter matches the exact
+    /// format label "ONA" only).
+    static var hideOna: Bool {
+        UserDefaults.standard.bool(forKey: hideOnaKey)
+    }
+
+    /// v2.35 — Show Anime Only: exclude non-anime media types (Western TV,
+    /// manga releases, and music-video entries — anything that isn't a
+    /// narrative anime program).
+    static var animeOnly: Bool {
+        UserDefaults.standard.bool(forKey: animeOnlyKey)
+    }
+
     static func setWindowDays(_ days: Int) {
         let clamped = [7, 14, 21, 30].contains(days) ? days : 7
         UserDefaults.standard.set(clamped, forKey: windowDaysKey)
@@ -1518,6 +1605,12 @@ enum ScheduleSettings {
     }
     static func setDefaultUseUTC(_ flag: Bool) {
         UserDefaults.standard.set(flag, forKey: defaultUseUTCKey)
+    }
+    static func setHideOna(_ flag: Bool) {
+        UserDefaults.standard.set(flag, forKey: hideOnaKey)
+    }
+    static func setAnimeOnly(_ flag: Bool) {
+        UserDefaults.standard.set(flag, forKey: animeOnlyKey)
     }
 }
 
@@ -1536,11 +1629,11 @@ struct ScheduleView: View {
     @State private var entries: [UnifiedScheduleEntry] = []
     @State private var isLoading = false
     @State private var loadError: String?
-    /// v2.22 — Honest source notice. Non-nil when the schedule is being
-    /// served by a backup source (Jikan) or the offline snapshot because
-    /// AniList was unavailable. Rendered as a slim banner under the date
-    /// selector so the page NEVER goes blank while any source works.
-    @State private var sourceNotice: String?
+    // v2.35 — the recurring backup-source banner ("AniChart is unreachable
+    // — showing … from X") is GONE. With the merged multi-source fetch
+    // every working source contributes silently; source health stays
+    // visible in the Data Sources page and the debug log, not in the
+    // user's face on every refresh.
     @ObservedObject private var appMode = AppModeManager.shared
 
     // Manga schedule state — populated when appMode.mode == .reading.
@@ -1560,6 +1653,10 @@ struct ScheduleView: View {
     @AppStorage("scheduleWindowDays")    private var windowDays: Int = 7
     @AppStorage("scheduleDefaultMode")   private var mode:   ScheduleMode = .anime
     @AppStorage("scheduleDefaultUseUTC") private var useUTC: Bool         = false
+    // v2.35 — the two schedule content filters (edited in
+    // ScheduleSettingsPage, applied live here).
+    @AppStorage("scheduleHideOna")       private var hideOna: Bool       = false
+    @AppStorage("scheduleAnimeOnly")     private var animeOnly: Bool     = false
 
     // Calendar navigation. `monthStart` is the first day of the currently displayed
     // month; `selectedDate` is the day whose episodes are shown below the grid. Both
@@ -1603,6 +1700,8 @@ struct ScheduleView: View {
                 .refreshable { await scheduleLoad(force: true) }
                 .onChange(of: mode) { _ in Task { await load() } }
                 .onChange(of: windowDays) { _ in Task { await load() } }
+                .onChange(of: hideOna) { _ in Task { await load() } }
+                .onChange(of: animeOnly) { _ in Task { await load() } }
                 .onChange(of: useUTC) { _ in resetCalendarToToday() }
                 .onChange(of: appMode.mode) { _ in Task { await scheduleLoad() } }
         }
@@ -1906,35 +2005,6 @@ struct ScheduleView: View {
     // changes. The full Schedule pipeline (cards → countdown → notify →
     // notifications) is preserved untouched.
 
-    /// v2.22 — Slim banner shown while a backup source (Jikan or the
-    /// offline snapshot) is serving the schedule. Honest about where the
-    /// data comes from without taking over the page.
-    private func scheduleSourceNotice(_ text: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "wifi.exclamationmark")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.orange)
-            Text(text)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(3)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.orange.opacity(0.08))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.orange.opacity(0.2), lineWidth: 1)
-        )
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-    }
-
     @ViewBuilder
     private var scheduleContent: some View {
         let buckets = buildBuckets()
@@ -1946,11 +2016,6 @@ struct ScheduleView: View {
                 switch windowDays {
                 case 30:  dateSelector1Month(buckets: buckets, countByDay: countByDay)
                 default:  dateSelectorWeeks(buckets: buckets, countByDay: countByDay, dayCount: windowDays)
-                }
-
-                // v2.22 — Backup-source notice (Jikan / offline snapshot).
-                if let notice = sourceNotice {
-                    scheduleSourceNotice(notice)
                 }
 
                 // ─── ANIME CARDS (identical for all ranges) ─────────────
@@ -2054,6 +2119,10 @@ struct ScheduleView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
             }
+            // v2.35 — the day pills are category pills too: soften the
+            // system's hard scroll-edge cut at the row's ends (the same
+            // treatment the home shelves got in v2.32).
+            .softScrollEdges()
             .onAppear {
                 proxy.scrollTo(today, anchor: .center)
             }
@@ -2226,28 +2295,30 @@ struct ScheduleView: View {
 
     // MARK: - Loading
 
-    /// Fetches schedule entries from the source(s) selected by `mode`, starting at the
-    /// beginning of today (not the current moment) so episodes that aired earlier today
-    /// stay visible. Combined mode fetches both sources concurrently via `async let`.
+    /// Fetches schedule entries for the configured window, starting at the
+    /// beginning of today (not the current moment) so episodes that aired
+    /// earlier today stay visible.
     ///
-    /// #93 — For the anime source, we first probe `AniListService`'s in-memory
-    /// cache (populated by the splash preload). If the cache has fresh data
-    /// covering this exact window we skip the network call entirely — so when
-    /// the preload completed during the 3.5s splash, `ScheduleView` renders
-    /// instantly with no spinner.
+    /// v2.35 — the MERGED fetch: every configured schedule source runs
+    /// concurrently and every source that answers contributes entries
+    /// (priority-ordered, deduplicated) — one failing or partial source
+    /// can neither block the others nor truncate the week. The AniList
+    /// in-memory cache probe (the #93 splash-preload optimization) lives
+    /// inside the AniList leg now, so a warm cache still renders instantly.
+    /// The disk snapshot of the last good schedule (≤ 48h) is the final
+    /// fallback; the page only shows the error state when EVERY source
+    /// failed AND no snapshot exists. All source outcomes are logged.
     ///
-    /// v2.24 — The unified schedule chain: AniChart (AniList's own airing
-    /// chart backend) → AnimeSchedule → MAL (Jikan) → AniList, all through
-    /// the centralized provider system (health-gated, deduped, cached —
-    /// every screen shares one request). The disk snapshot of the last
-    /// good schedule (≤ 48h) is the final fallback. The page only shows
-    /// the error state when EVERY source failed; while a backup source
-    /// serves data a slim notice explains where it came from. Successful
-    /// loads (any source) refresh the snapshot.
+    /// v2.35 — the selected day is PRESERVED across refreshes: the day
+    /// only changes when the user taps a different day (or toggles the
+    /// timezone, which resets intentionally). Pull-to-refresh reloads the
+    /// data under the current selection.
+    ///
+    /// v2.35 — the Hide ONA / Show Anime Only filters (Schedule Settings)
+    /// are applied to the fetched entries before bucketing.
     private func load() async {
         isLoading = true
         loadError = nil
-        sourceNotice = nil
         defer { isLoading = false }
 
         // Fetch window is always anchored to local-midnight today (independent of the
@@ -2260,63 +2331,47 @@ struct ScheduleView: View {
         let endTs = startTs + max(windowDays, 1) * 86_400
 
         var fetched: [UnifiedScheduleEntry] = []
-        // Batch 23 — distinguishes "a LIVE backup provider served the page"
-        // (MAL/AniList/AnimeSchedule — fresh, real data worth persisting)
-        // from "the DISK snapshot itself served the page" (re-saving it
-        // would just re-stamp stale data as fresh). The old flag conflated
-        // the two: when MAL served as backup nothing was persisted, so the
-        // day MAL ALSO died the snapshot was empty/stale and the page hit
-        // the hard error wall with real data nowhere to be found.
+        // Batch 23 — distinguishes "a LIVE provider served the page" from
+        // "the DISK snapshot itself served the page" (re-saving it would
+        // just re-stamp stale data as fresh).
         var servedFromDiskSnapshot = false
 
-        // ── The unified provider chain (AniChart → AnimeSchedule → MAL →
-        //    AniList), with the AniList in-memory cache checked first so a
-        //    completed splash preload still renders instantly. ──────────
-        if let cached = AniListService.shared.cachedAiringSchedules(from: startTs, to: endTs) {
-            fetched = cached.map { UnifiedScheduleEntry(item: $0) }
-        } else {
-            do {
-                let result = try await UnifiedProviderSystem.shared.scheduleEntries(from: startTs, to: endTs)
-                fetched = result.entries
-                // Honest source notice when a backup (non-primary) source
-                // served the schedule.
-                if let source = result.source, source != .anichart {
-                    switch source {
-                    case .animeschedule:
-                        sourceNotice = "AniChart is unreachable — showing this week's timetable from AnimeSchedule."
-                    case .mal:
-                        sourceNotice = "AniChart and AnimeSchedule are unreachable — showing this week's airing list from MyAnimeList."
-                    case .anilist:
-                        sourceNotice = "Showing this week's airing schedule from AniList."
-                    case .kitsu:
-                        sourceNotice = "AniChart, AnimeSchedule, MAL and AniList are all unreachable — showing this week's real air times from Kitsu + TVDB."
-                    default:
-                        break
-                    }
-                }
-            } catch {
-                Logger.shared.log("[Schedule] provider chain failed (\(error.localizedDescription)) — trying offline snapshot", type: "Provider")
-                // ── Final fallback: disk snapshot of the last good schedule. ─
-                if let cached = ScheduleFallbackService.shared.cachedSnapshot(from: startTs, to: endTs) {
-                    fetched = cached.entries
-                    servedFromDiskSnapshot = true
-                    let f = RelativeDateTimeFormatter()
-                    sourceNotice = "Offline mode — showing the schedule saved \(f.localizedString(for: cached.storedAt, relativeTo: Date())) ago. Pull to refresh."
-                }
+        do {
+            fetched = try await UnifiedProviderSystem.shared.scheduleEntriesMerged(from: startTs, to: endTs)
+        } catch {
+            Logger.shared.log("[Schedule] merged fetch failed (\(error.localizedDescription)) — trying offline snapshot", type: "Provider")
+            // ── Final fallback: disk snapshot of the last good schedule. ─
+            if let cached = ScheduleFallbackService.shared.cachedSnapshot(from: startTs, to: endTs) {
+                fetched = cached.entries
+                servedFromDiskSnapshot = true
             }
         }
 
-        // Only error out when every source produced nothing.
-        if fetched.isEmpty && loadError == nil && sourceNotice == nil {
+        // Only error out when every source produced nothing AND no
+        // snapshot bridged the outage.
+        if fetched.isEmpty && loadError == nil {
             loadError = "Schedule sources are all unreachable right now. Check your connection and try again."
         }
 
         // Defensive filter: drop anything that fell before the start of today.
         fetched = fetched.filter { $0.airingAt >= startTs }
+
+        // v2.35 — the user's content filters (Schedule Settings), applied
+        // to the merged results before bucketing. Both filters compose:
+        // ONA entries drop when Hide ONA is on (a "TV" anime is never
+        // touched — the comparison is against the exact format label),
+        // and non-anime media types (Western TV, manga releases, music
+        // videos) drop when Show Anime Only is on.
+        if hideOna || animeOnly {
+            fetched = fetched.filter { entry in
+                if hideOna, entry.isOna { return false }
+                if animeOnly, !entry.isAnimeProgram { return false }
+                return true
+            }
+        }
+
         // Sort by popularity (desc) first, then airing time (asc) for ties so the
-        // most popular shows surface to the top of each day's section. Jikan
-        // entries carry a members/score-based popularity so they sort sensibly
-        // within their days too.
+        // most popular shows surface to the top of each day's section.
         entries = fetched.sorted {
             if $0.popularity != $1.popularity {
                 return $0.popularity > $1.popularity
@@ -2325,17 +2380,16 @@ struct ScheduleView: View {
         }
 
         // Persist the last good schedule so future outages have real data
-        // to fall back on. Batch 23: a LIVE source counts — including a
-        // backup provider (the page just showed real MAL/AniList data, so
-        // that's strictly better data than whatever the snapshot held). Only
-        // the disk-snapshot-served case is excluded: re-saving it would
+        // to fall back on. A LIVE source counts — only the
+        // disk-snapshot-served case is excluded: re-saving it would
         // re-stamp stale data as just-saved.
         if !entries.isEmpty, !servedFromDiskSnapshot {
             ScheduleFallbackService.shared.storeSnapshot(entries, from: startTs, to: endTs)
         }
 
-        // Reset the calendar to today after every reload.
-        resetCalendarToToday()
+        // v2.35 — NO calendar reset here. Refreshing preserves the user's
+        // selected day; the day changes only on an explicit tap (or the
+        // intentional timezone reset in the useUTC change handler).
 
         // Refresh the pending-notification set so the bells reflect current state.
         scheduledIds = await EpisodeNotificationManager.shared.scheduledScheduleIds()
@@ -3378,6 +3432,8 @@ private struct GenreFlowLayout: View {
 struct ScheduleSettingsPage: View {
     @State private var windowDays: Int        = ScheduleSettings.windowDays
     @State private var defaultUseUTC: Bool    = ScheduleSettings.defaultUseUTC
+    @State private var hideOna: Bool          = ScheduleSettings.hideOna
+    @State private var animeOnly: Bool        = ScheduleSettings.animeOnly
 
     var body: some View {
         Form {
@@ -3395,6 +3451,21 @@ struct ScheduleSettingsPage: View {
                 Text("Window Range")
             } footer: {
                 Text("How many days ahead to fetch and display in the schedule. AniList airing data covers the full window.")
+            }
+
+            Section {
+                Toggle("Hide ONA", isOn: $hideOna)
+                    .onChange(of: hideOna) { value in
+                        ScheduleSettings.setHideOna(value)
+                    }
+                Toggle("Show Anime Only", isOn: $animeOnly)
+                    .onChange(of: animeOnly) { value in
+                        ScheduleSettings.setAnimeOnly(value)
+                    }
+            } header: {
+                Text("Content Filters")
+            } footer: {
+                Text("Hide ONA removes original net animation (web-exclusive series) from the schedule — regular TV anime are never affected. Show Anime Only hides non-anime media types such as music videos and western shows. Both filters apply to the merged schedule results and persist across restarts; the day you have selected is preserved when they change.")
             }
 
             Section {

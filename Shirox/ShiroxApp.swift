@@ -596,14 +596,11 @@ private struct RootTabView: View {
             selectedTab = 2
             #endif
         }
-        // v2.34 — the guided tour overlay, the setup cover, the live
-        // tour-anchor frames and the tab-switch hook live together in one
-        // small ViewModifier: RootTabView's body was already at the
-        // type-checker's ceiling, and this keeps the big expression to
-        // v2.33's size.
+        // v2.35 — the onboarding cover hosting lives in one small
+        // ViewModifier (RootTabView's body is at the type-checker's
+        // ceiling; this keeps the big expression small).
         .modifier(OnboardingFlowHost(cover: $showOnboardingCover,
-                                      moduleManager: moduleManager,
-                                      selectTab: { tab in selectedTab = tab }))
+                                      moduleManager: moduleManager))
         .onOpenURL { url in
             guard url.scheme == "shirox" else { return }
             AniListAuthManager.shared.handleCallback(url: url)
@@ -696,44 +693,30 @@ private struct RootTabView: View {
     }
 }
 
-// MARK: - Onboarding flow host (v2.34)
+// MARK: - Onboarding flow host (v2.35)
 
 /// Everything RootTabView adds for onboarding, in one small expression of
-/// its own: the spotlight tour overlay (over the REAL app), the full-screen
-/// loading/setup cover, the live tour-anchor preference feed, and the
-/// cover-up / cover-down reaction to the flow's phase. Split out of
-/// RootTabView's body — the main body was at the type-checker's ceiling.
+/// its own: the full-screen loading/guide cover and the cover-up /
+/// cover-down reaction to the flow's phase. Split out of RootTabView's
+/// body — the main body is at the type-checker's ceiling.
 private struct OnboardingFlowHost: ViewModifier {
     @Binding var cover: Bool
     let moduleManager: ModuleManager
-    let selectTab: (Int) -> Void
 
     @ObservedObject private var flow = OnboardingFlowController.shared
 
     func body(content: Content) -> some View {
         content
-            // The tour's spotlights land on the actual interface — the
-            // overlay sits above the whole tab structure.
-            .overlay {
-                if flow.phase == .tour {
-                    GuidedTourOverlay()
-                }
-            }
-            // Loading and setup present the full-screen cover instead.
+            // Loading and the guide present the full-screen cover.
             .fullScreenCoverCompat(isPresented: $cover) {
                 OnboardingView()
                     .environmentObject(moduleManager)
             }
-            // Live tour-anchor frames from the real view tree.
-            .onPreferenceChange(TourAnchorKey.self) { rects in
-                flow.anchorRects = rects
-            }
-            // The cover is up exactly while the flow is loading or in setup.
+            // The cover is up exactly while the flow is loading or in the
+            // guide.
             .onReceive(flow.$phase) { phase in
                 cover = (phase == .loading || phase == .setup)
             }
-            // Tour steps switch the real tab they describe.
-            .onAppear { flow.selectTab = selectTab }
     }
 }
 

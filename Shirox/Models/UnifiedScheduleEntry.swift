@@ -41,6 +41,28 @@ enum ScheduleMode: String, Codable, Hashable, Sendable {
 /// A single upcoming episode, normalized across anime (AniList) and Western TV (TVMaze) sources.
 struct UnifiedScheduleEntry: Identifiable, Hashable, Codable, Sendable {
 
+    // MARK: Content filters (v2.35 Schedule Settings)
+
+    /// True when this entry is an ONA (original net animation) — the exact
+    /// format label, case-insensitive. Regular TV anime ("TV", "TV_SHORT")
+    /// and every other format are NOT ONAs and never match this.
+    var isOna: Bool {
+        guard let format else { return false }
+        return format.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() == "ONA"
+    }
+
+    /// True when this entry is a narrative anime program (TV, TV_SHORT,
+    /// MOVIE, OVA, ONA, SPECIAL). Music-video entries ("MUSIC") and
+    /// non-anime sources (Western TV, manga releases) are NOT anime
+    /// programs — the Show Anime Only filter drops them.
+    var isAnimeProgram: Bool {
+        guard source == .anime else { return false }
+        guard let format else { return true }
+        let f = format.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        return f != "MUSIC" && f != "MUSIC_VIDEO"
+    }
+
+
     /// Unique entry id (AniList airing-schedule id for anime; TVMaze episode id for Western).
     let id: Int
     /// Which source the entry came from.

@@ -330,103 +330,23 @@ struct DownloadDetailView: View {
     }
 
     private func shareFile(_ url: URL) {
-        Haptics.light()
-        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let root = scene.windows.first?.rootViewController else { return }
-        root.present(UIActivityViewController(activityItems: [url], applicationActivities: nil), animated: true)
+        // v2.35 — the shared implementation (also used by the Downloads
+        // rows' long-press menus).
+        DownloadItemFileActions.share(url)
     }
 
-    /// v2.32 — the Find File outcome that needs the user's attention (file
-    /// missing, or the Files app couldn't be opened). Nil when there's
-    /// nothing to say.
-    @State private var findFileAlert: FindFileAlert?
+    /// v2.32/v2.35 — the Find File outcome that needs the user's attention
+    /// (file missing, or the Files app couldn't be opened). Nil when
+    /// there's nothing to say. The shared DownloadItemFileActions model —
+    /// the same alerts the Downloads rows' long-press menus present.
+    @State private var findFileAlert: DownloadItemFileActions.FindFileAlert?
 
-    /// A Find File problem: what happened, where the file was expected, and
-    /// whether a share sheet is still possible (the file exists but the Files
-    /// app wouldn't take the trip).
-    private struct FindFileAlert: Identifiable {
-        let id = UUID()
-        let title: String
-        let message: String
-        let filePath: String?
-        let canShare: Bool
-    }
-
-    /// Reveals the downloaded file in the system's file browser.
-    ///
-    /// iOS: the app's Documents folder is file-sharing enabled
-    /// (`UIFileSharingEnabled`), so the Files app can be opened directly at
-    /// the file through the `shareddocuments://` URL scheme. When that trip
-    /// can't be made (no Files app, or the system refuses the URL), the user
-    /// gets an honest panel with the absolute path, a Copy Path action and —
-    /// when the file itself is fine — a Share fallback.
-    ///
-    /// iPadOS/Mac (Catalyst): Finder/Files reveals and selects the file for
-    /// real through NSWorkspace.
+    /// Reveals the downloaded file in the system's file browser (Files on
+    /// iOS, Finder on Mac Catalyst). v2.35 — delegates to the ONE shared
+    /// implementation in DownloadItemFileActions (also used by the
+    /// Downloads rows' long-press menus), presenting its honest outcome.
     private func findFile(_ url: URL) {
-        Haptics.light()
-
-        // 1. The file has to be on disk — a cleaned-up or never-finished
-        //    download gets an honest explanation instead of a dead trip.
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),
-              !isDirectory.boolValue else {
-            findFileAlert = FindFileAlert(
-                title: "File Not Found",
-                message: "The download's file is no longer on this device. It may have been deleted from the Files app or removed by a system cleanup. The download's entry still lists it — delete the entry and download again if you still want the episode.",
-                filePath: url.path,
-                canShare: false)
-            UINotificationFeedbackGenerator().notificationOccurred(.warning)
-            return
-        }
-
-        // 2. It has to be readable — a file we can't open is a permissions
-        //    problem, reported as one.
-        guard FileManager.default.isReadableFile(atPath: url.path) else {
-            findFileAlert = FindFileAlert(
-                title: "Can't Open File",
-                message: "The file exists but this app isn't allowed to read it. Its location is shown below.",
-                filePath: url.path,
-                canShare: false)
-            UINotificationFeedbackGenerator().notificationOccurred(.warning)
-            return
-        }
-
-        #if targetEnvironment(macCatalyst)
-        // Catalyst: a real Finder reveal, with the file selected.
-        NSWorkspace.shared.activateFileViewerSelecting([url])
-        #else
-        // iOS: open the Files app at the file. "shareddocuments:///…" addresses
-        // an item inside this app's file-sharing Documents container, relative
-        // to Documents. The path is built from the actual URL so nothing is
-        // assumed about where the download lives.
-        let docsPrefix = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].path + "/"
-        let relative = url.path.hasPrefix(docsPrefix)
-            ? String(url.path.dropFirst(docsPrefix.count))
-            : url.lastPathComponent
-        let encoded = relative.split(separator: "/").map { $0.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? String($0) }.joined(separator: "/")
-
-        if let filesURL = URL(string: "shareddocuments:///\(encoded)") {
-            UIApplication.shared.open(filesURL) { opened in
-                // The completion runs on the main queue. If the system
-                // wouldn't take the trip, fall back to the honest panel.
-                if !opened { mainActorFallback(url) }
-            }
-        } else {
-            mainActorFallback(url)
-        }
-        #endif
-    }
-
-    /// The panel shown when the Files app couldn't be opened: what happened,
-    /// the absolute path, and a Share fallback (the file itself is fine).
-    private func mainActorFallback(_ url: URL) {
-        findFileAlert = FindFileAlert(
-            title: "Couldn't Open the Files App",
-            message: "The file is safe on this device; the Files app just couldn't be brought up at its location. Its full path is below — you can copy it, or share the file straight from here.",
-            filePath: url.path,
-            canShare: true)
-        UINotificationFeedbackGenerator().notificationOccurred(.warning)
+        findFileAlert = DownloadItemFileActions.find(url)
     }
 }
 

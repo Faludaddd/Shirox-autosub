@@ -1148,25 +1148,145 @@ final class UnifiedProviderSystem: ObservableObject {
             operation: "timetable",
             cacheKey: "\(startTs)-\(endTs)",
             cacheTTL: 5 * 60) { kind in
-            switch kind {
-            case .anichart:
-                return try await AniChartProvider.shared.entries(from: startTs, to: endTs)
-            case .animeschedule:
-                return try await AnimeScheduleProvider.shared.entries(from: startTs, to: endTs)
-            case .mal:
-                return try await ScheduleFallbackService.shared.jikanSchedule(from: startTs, to: endTs)
-            case .anilist:
-                let items = try await AniListService.shared.airingSchedules(from: startTs, to: endTs)
-                return items.map { UnifiedScheduleEntry(item: $0) }
-            case .kitsu:
-                // Batch 26 — the synthesis fallback: discovery list + TVDB
-                // air times (both live while AniList and MAL are down).
-                return try await KitsuTVDBTimetableService.shared.entries(from: startTs, to: endTs)
-            default:
-                return nil
-            }
+            try await self.scheduleLeg(kind, from: startTs, to: endTs)
         }
         return (value.value, value.servedBy)
+    }
+
+    /// One schedule source's leg, factored so the first-source-wins chain and
+    /// the merged fetch below share the exact same per-source requests.
+    private func scheduleLeg(_ kind: MetaProviderKind, from startTs: Int, to endTs: Int) async throws -> [UnifiedScheduleEntry]? {
+        switch kind {
+        case .anichart:
+            return try await AniChartProvider.shared.entries(from: startTs, to: endTs)
+        case .animeschedule:
+            return try await AnimeScheduleProvider.shared.entries(from: startTs, to: endTs)
+        case .mal:
+            return try await ScheduleFallbackService.shared.jikanSchedule(from: startTs, to: endTs)
+        case .anilist:
+            // The in-memory cache probe first: when the splash preload (or a
+            // very recent fetch) already holds this exact window, the AniList
+            // leg is instant and offline-free — the same optimization the
+            // old short-circuit in ScheduleView.load() provided.
+            if let cached = AniListService.shared.cachedAiringSchedules(from: startTs, to: endTs) {
+                return cached.map { UnifiedScheduleEntry(item: $0) }
+            }
+            let items = try await AniListService.shared.airingSchedules(from: startTs, to: endTs)
+            return items.map { UnifiedScheduleEntry(item: $0) }
+        case .kitsu:
+            // Batch 26 — the synthesis fallback: discovery list + TVDB
+            // air times (both live while AniList and MAL are down).
+            return try await KitsuTVDBTimetableService.shared.entries(from: startTs, to: endTs)
+        default:
+            return nil
+        }
+    }
+
+    /// v2.35 — the MERGED schedule fetch. Every configured schedule source
+    /// runs CONCURRENTLY and every source that answers contributes its
+    /// entries — one failing or partial source can neither block the others
+    /// nor truncate the result. This replaces first-source-wins as the
+    /// Schedule tab's fetch: AniChart's single 100-entry page was silently
+    /// dropping the rest of a busy week, and whenever the first source in
+    /// the chain was up-but-incomplete the other sources were never asked.
+    ///
+    /// Merge rules:
+    /// • Sources are queried in the user's configured schedule order — that
+    ///   order is also the DEDUP priority: when two sources report the same
+    ///   show + episode, the higher-priority source's entry wins.
+    /// • Dedup key: AniList media id when both sides have one, else the
+    ///   normalized title — combined with the episode number, so a show
+    ///   airing several episodes in the window keeps each of them.
+    /// • Health machinery is preserved per source: cooldown-skipped and
+    ///   recently-failed sources sit out (logged), successes and failures
+    ///   are recorded exactly like a chain walk.
+    /// • Result is disk-cached for 5 minutes (shared with every screen).
+    /// Throws only when EVERY source failed — the caller falls back to its
+    /// snapshot and reports honestly.
+    func scheduleEntriesMerged(from startTs: Int, to endTs: Int) async throws -> [UnifiedScheduleEntry] {
+        let fullKey = "schedule|timetable-merged|\(startTs)-\(endTs)"
+        if let cached = ProviderCacheStore.read([UnifiedScheduleEntry].self, key: fullKey, domain: .schedule, ttl: 5 * 60) {
+            return cached
+        }
+
+        // The configured chain order = merge priority.
+        let order = activeChain(for: .schedule)
+
+        // Query every source concurrently; collect (index, entries, latency)
+        // for the ones that answered so merge priority can be applied
+        // afterwards. Child tasks never throw — a failed source simply
+        // contributes nothing (its failure is recorded for the health
+        // system + log, exactly like a chain walk would).
+        var collected: [(index: Int, kind: MetaProviderKind, entries: [UnifiedScheduleEntry], latencyMs: Int)] = []
+        var askedAny = false
+
+        await withTaskGroup(of: (Int, MetaProviderKind, [UnifiedScheduleEntry], Int)?.self) { group in
+            for (index, kind) in order.enumerated() {
+                if shouldSkip(kind) {
+                    Logger.shared.log("[Providers] \(kind.displayName) skipped timetable-merged: \(statuses[kind]?.note ?? "cooling down")", type: "Provider")
+                    continue
+                }
+                if isOperationFailureCached(kind, operation: "timetable") {
+                    Logger.shared.log("[Providers] \(kind.displayName) skipped timetable-merged: recent failure (negative cache)", type: "Provider")
+                    continue
+                }
+                askedAny = true
+                group.addTask { [weak self] in
+                    guard let self else { return nil }
+                    do {
+                        let started = Date()
+                        guard let entries = try await self.scheduleLeg(kind, from: startTs, to: endTs), !entries.isEmpty else {
+                            return nil
+                        }
+                        let latency = Int(Date().timeIntervalSince(started) * 1000)
+                        return (index, kind, entries, latency)
+                    } catch {
+                        if !ProviderManager.isCancellationError(error) {
+                            await self.recordFailure(kind, error: error)
+                            await self.recordOperationFailure(kind, operation: "timetable")
+                            Logger.shared.log("[Providers] \(kind.displayName) failed timetable-merged: \(ProviderErrorMapper.brief(error))", type: "Provider")
+                        }
+                        return nil
+                    }
+                }
+            }
+            for await result in group {
+                if let (index, kind, entries, latencyMs) = result {
+                    collected.append((index, kind, entries, latencyMs))
+                }
+            }
+        }
+
+        guard !collected.isEmpty else {
+            throw ProviderChainError.allProvidersFailed(lastReason: askedAny ? nil : "no schedule sources enabled")
+        }
+
+        // Record successes + log AFTER the group (recordSuccess touches
+        // published state; this method is MainActor-isolated so the calls
+        // stay on the actor).
+        collected.sort { $0.index < $1.index }
+        for (_, kind, entries, latencyMs) in collected {
+            recordSuccess(kind, latencyMs: latencyMs)
+            Logger.shared.log("[Providers] timetable-merged: \(kind.displayName) contributed \(entries.count) entries", type: "Provider")
+        }
+
+        // Merge with priority dedup: earlier in the configured order wins.
+        var seen = Set<String>()
+        var merged: [UnifiedScheduleEntry] = []
+        for (_, _, entries, _) in collected {
+            for entry in entries {
+                let mediaKey = entry.aniListMediaId.map { "al:\($0)" }
+                    ?? "t:\(entry.title.lowercased().trimmingCharacters(in: .whitespacesAndNewlines))"
+                let key = "\(mediaKey)#e\(entry.episode)"
+                if seen.insert(key).inserted {
+                    merged.append(entry)
+                }
+            }
+        }
+
+        ProviderCacheStore.write(merged, key: fullKey, domain: .schedule)
+        Logger.shared.log("[Providers] timetable-merged: \(merged.count) entries from \(collected.count) source(s)", type: "Provider")
+        return merged
     }
 
     // MARK: - Test Provider (real requests, measured latency)

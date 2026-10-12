@@ -44,6 +44,11 @@ struct SettingsView: View {
     /// (the app's NavigationStack shim doesn't reliably honor
     /// `navigationDestination(item:)`). Set when the user taps a search result.
     @State private var pushedPage: SettingsPage? = nil
+    /// v2.35 — the Getting Started card's Hide state (persists across
+    /// launches). Hiding only dismisses the Settings card; onboarding stays
+    /// reachable through the Home header shortcut and the Notifications
+    /// tab's Get Started card.
+    @AppStorage("settingsGettingStartedHidden") private var gettingStartedHidden = false
     /// v2.33 — the search field lives behind a top-right toolbar icon
     /// instead of an always-visible `.searchable` row: tapping the
     /// magnifying glass reveals (and focuses) the field; tapping it again
@@ -187,18 +192,34 @@ struct SettingsView: View {
 
     private var categoryList: some View {
         List {
-            // Section 0: Accounts & Tracking (v2.33) — the profile-oriented
-            // header at the VERY top of Settings: the signed-in user's real
-            // avatar, name and connected tracking services, or a friendly
-            // sign-in prompt for logged-out users. Tapping opens the existing
-            // Accounts & Tracking page (login, logout, linking, sync — the
-            // page itself is unchanged).
+            // Section 0 (v2.35): Accounts & Tracking — ONE cohesive card
+            // (avatar + account + tracking strip, no disclosure arrow), and
+            // directly below it the Getting Started card (Replay / Hide).
+            // Both sit above every other settings category.
             Section {
-                NavigationLink {
-                    TrackersSettingsPage()
-                } label: {
-                    AccountsProfileHeaderRow()
+                VStack(spacing: 12) {
+                    AccountsProfileCard {
+                        // Same destination the old NavigationLink pushed —
+                        // through the page-push mechanism the search results
+                        // use, so there's no list chevron anywhere.
+                        pushedPage = .trackers
+                    }
+                    if !gettingStartedHidden {
+                        GettingStartedCard(
+                            onReplay: {
+                                Haptics.light()
+                                OnboardingFlowController.shared.begin()
+                            },
+                            onHide: {
+                                Haptics.selection()
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    gettingStartedHidden = true
+                                }
+                            }
+                        )
+                    }
                 }
+                .padding(.vertical, 4)
             }
             .listRowBackground(Color.clear)
             .listRowInsets(EdgeInsets())
@@ -297,16 +318,9 @@ struct SettingsView: View {
                 } label: {
                     SettingsCategoryRow(icon: "info.circle.fill", title: "About", subtitle: "Version, licenses")
                 }
-                // v2.34 — the way back into the interactive guide: the same
-                // tour + setup flow a fresh install runs, resuming wherever
-                // the user last stopped.
-                Button {
-                    Haptics.light()
-                    OnboardingFlowController.shared.begin()
-                } label: {
-                    SettingsCategoryRow(icon: "sparkles", title: "Getting Started", subtitle: "Replay the guided tour and finish setup")
-                }
-                .buttonStyle(.plain)
+                // v2.35 — Getting Started moved to the TOP of Settings
+                // (directly below Accounts & Tracking), redesigned as its
+                // own card with Replay + Hide actions.
             }
         }
     }
@@ -5610,14 +5624,32 @@ struct AboutSettingsPage: View {
 
 // MARK: - Trackers Settings Page
 
-// MARK: - Accounts & Tracking profile header (v2.33)
+// MARK: - Accounts & Tracking card (v2.35)
 
-/// The top-of-Settings profile header: the signed-in user's REAL avatar,
-/// name and connected tracking services — or a polished sign-in prompt for
+/// The top-of-Settings profile card: the signed-in user's REAL avatar, name
+/// and connected tracking services — or a polished sign-in prompt for
 /// logged-out users. The avatar and name come straight from the account
 /// managers (fetched live from the signed-in service, nothing fabricated).
-/// The row itself is the NavigationLink to the Accounts & Tracking page.
-struct AccountsProfileHeaderRow: View {
+/// v2.35 — the Accounts & Tracking card: ONE cohesive, intentionally
+/// designed component (the v2.33 header row was replaced — its
+/// NavigationLink chevron, uneven padding and disconnected tracking
+/// information made the section read as parts placed together).
+///
+/// Design contract:
+///   • NO disclosure arrow anywhere — the card is a plain button; the
+///     trailing "Manage" label is the affordance (and nothing is left
+///     gaping where the chevron used to be);
+///   • the avatar (54pt, accent ring) aligns on ONE centerline with the
+///     account text stack — no stretched, cramped or oversized pieces;
+///   • a hairline divider separates the profile block from the tracking
+///     strip, so account info and tracking state read as one unit with
+///     two rows (not two cards);
+///   • fixed paddings (16) and one corner radius (16) shared with the
+///     Getting Started card below — the two top cards are a family;
+///   • identical geometry signed-in and signed-out, light and dark.
+struct AccountsProfileCard: View {
+    var onOpen: () -> Void
+
     @ObservedObject private var anilistAuth = AniListAuthManager.shared
     @ObservedObject private var malAuth = MALAuthManager.shared
 
@@ -5642,76 +5674,97 @@ struct AccountsProfileHeaderRow: View {
     }
 
     var body: some View {
-        if let account = presenter {
-            HStack(spacing: 14) {
-                avatarView(url: account.avatar)
-                    .frame(width: 56, height: 56)
-                    .clipShape(Circle())
-                    .overlay(
-                        Circle().strokeBorder(Color.appAccent.opacity(0.4), lineWidth: 2)
-                    )
-                    .shadow(
-                        color: Color.glowEnabled ? Color.appAccent.opacity(Color.glowOpacity(0.3)) : .clear,
-                        radius: Color.glowRadiusSelection
-                    )
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(account.name)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                    if !connectedServices.isEmpty {
-                        Text("\(connectedServices.joined(separator: " · ")) connected")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+        Button(action: onOpen) {
+            VStack(alignment: .leading, spacing: 0) {
+                // ── Profile block: avatar + account, one centerline ─────
+                HStack(spacing: 14) {
+                    if let account = presenter {
+                        avatarView(url: account.avatar)
+                            .frame(width: 54, height: 54)
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle().strokeBorder(Color.appAccent.opacity(0.35), lineWidth: 2)
+                            )
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(account.name)
+                                .font(.headline)
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+                            Text(accountSubtitle)
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                    } else {
+                        Image(systemName: "person.crop.circle.badge.plus")
+                            .font(.system(size: 30, weight: .medium))
+                            .foregroundStyle(Color.appAccent)
+                            .frame(width: 54, height: 54)
+                            .background(Circle().fill(Color.appAccent.opacity(0.10)))
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Sign In")
+                                .font(.headline)
+                                .foregroundStyle(.primary)
+                            Text("Connect a tracker to sync your library and progress")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
-                    Text("Accounts & Tracking")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color.appAccent)
+                    Spacer(minLength: 0)
                 }
-                Spacer(minLength: 8)
-            }
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color.appAccent.opacity(0.10))
-            )
-            .padding(.horizontal, 16)
-            .padding(.vertical, 6)
-        } else {
-            HStack(spacing: 14) {
-                Image(systemName: "person.crop.circle.badge.plus")
-                    .font(.system(size: 34, weight: .medium))
-                    .foregroundStyle(Color.appAccent)
-                    .frame(width: 56, height: 56)
-                    .background(Circle().fill(Color.appAccent.opacity(0.10)))
+                .frame(minHeight: 54, alignment: .center)
+                .padding(.bottom, 13)
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Sign In")
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                    Text("Connect AniList or MyAnimeList to sync your library and progress")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
+                // ── Tracking strip: the section's identity + the action ─
+                Divider()
+                    .padding(.horizontal, 2)
+                    .padding(.bottom, 11)
+
+                HStack(spacing: 8) {
+                    Image(systemName: "person.2.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.appAccent)
                     Text("Accounts & Tracking")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(Color.appAccent)
+                    Spacer(minLength: 8)
+                    Text(trackingSummary)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                    Text("Manage")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(Color.appAccent)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Color.appAccent.opacity(0.12), in: Capsule())
                 }
-                Spacer(minLength: 8)
             }
-            .padding(14)
+            .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color.secondary.opacity(0.08))
+                    .fill(Color.appAccent.opacity(0.08))
             )
-            .padding(.horizontal, 16)
-            .padding(.vertical, 6)
+            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
+        .buttonStyle(.plain)
+        .accessibilityHint("Opens the Accounts and Tracking page")
+    }
+
+    private var accountSubtitle: String {
+        let services = connectedServices
+        if services.isEmpty { return "No tracking service connected" }
+        return services.joined(separator: " · ") + " connected"
+    }
+
+    /// Honest one-line tracking state for the strip ("2 of 2 services"
+    /// style), so the card's bottom row always says something true.
+    private var trackingSummary: String {
+        let count = connectedServices.count
+        if count == 0 { return "Not connected" }
+        return count == 1 ? "1 service" : "\(count) services"
     }
 
     /// The real avatar, or the person placeholder while it hasn't loaded.
@@ -5721,11 +5774,88 @@ struct AccountsProfileHeaderRow: View {
             CachedAsyncImage(urlString: url)
         } else {
             Image(systemName: "person.crop.circle.fill")
-                .font(.system(size: 52, weight: .regular))
+                .font(.system(size: 50, weight: .regular))
                 .foregroundStyle(Color.secondary.opacity(0.4))
-                .frame(width: 56, height: 56)
+                .frame(width: 54, height: 54)
                 .background(Circle().fill(Color.secondary.opacity(0.10)))
         }
+    }
+}
+
+// MARK: - Getting Started card (v2.35)
+
+/// The custom-designed Getting Started section: a deliberate card, not an
+/// ordinary settings row. Two clearly distinct actions — Replay (accent,
+/// filled) reopens the SAME interactive onboarding a fresh install runs
+/// (resuming where the user last stopped); Hide (secondary) dismisses just
+/// this card, persistently, without touching any account, tracking or
+/// setup state. Onboarding stays reachable after hiding through the Home
+/// header shortcut and the Notifications tab's Get Started card.
+struct GettingStartedCard: View {
+    var onReplay: () -> Void
+    var onHide: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Color.appAccent)
+                    .frame(width: 36, height: 36)
+                    .background(Color.appAccent.opacity(0.12), in: Circle())
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Getting Started")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Text("Replay the interactive guide and finish setting up Shirox.")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+
+            HStack(spacing: 10) {
+                Button(action: onReplay) {
+                    Label("Replay", systemImage: "play.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.appAccentForeground)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 38)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(Color.appAccent)
+                        )
+                }
+                .buttonStyle(.springPress)
+                .accessibilityLabel("Replay the onboarding guide")
+
+                Button(action: onHide) {
+                    Label("Hide", systemImage: "eye.slash")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 38)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(Color.secondary.opacity(0.14))
+                        )
+                }
+                .buttonStyle(.springPress)
+                .accessibilityLabel("Hide the Getting Started card")
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(.secondarySystemGroupedBackground))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.07), lineWidth: 1)
+        )
     }
 }
 

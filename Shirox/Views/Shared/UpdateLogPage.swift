@@ -17,94 +17,203 @@ struct VersionChangelogView: View {
     /// version list and next to the title here.
     var isInstalledVersion = false
 
+    /// The categories this release actually has content for, in display
+    /// order — sections with nothing recorded never render.
+    private var visibleCategories: [(title: String, icon: String, color: Color, items: [String])] {
+        [
+            ("Features", "plus.circle.fill", .green, entry.added),
+            ("Improvements", "sparkles", .purple, entry.improved),
+            ("Fixes", "checkmark.circle.fill", .blue, entry.fixed),
+            ("Changes", "arrow.triangle.2.circlepath.circle.fill", .orange, entry.changed),
+            ("Removed", "minus.circle.fill", .red, entry.removed),
+            ("Other Changes", "ellipsis.circle.fill", .gray, entry.other),
+        ]
+        .filter { !$0.items.isEmpty }
+    }
+
+    private var totalNotes: Int {
+        entry.added.count + entry.improved.count + entry.fixed.count
+            + entry.changed.count + entry.removed.count + entry.other.count
+    }
+
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                header
+            VStack(alignment: .leading, spacing: 18) {
+                headerCard
+
                 if entry.isEmpty {
-                    Text("No release notes were recorded for this version.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 16)
+                    emptyCard
                 } else {
-                    if !entry.added.isEmpty {
-                        categorySection(title: "Features", icon: "plus.circle.fill", color: .green, items: entry.added)
-                    }
-                    if !entry.improved.isEmpty {
-                        categorySection(title: "Improvements", icon: "sparkles", color: .purple, items: entry.improved)
-                    }
-                    if !entry.fixed.isEmpty {
-                        categorySection(title: "Fixes", icon: "checkmark.circle.fill", color: .blue, items: entry.fixed)
-                    }
-                    if !entry.changed.isEmpty {
-                        categorySection(title: "Changes", icon: "arrow.triangle.2.circlepath.circle.fill", color: .orange, items: entry.changed)
-                    }
-                    if !entry.removed.isEmpty {
-                        categorySection(title: "Removed", icon: "minus.circle.fill", color: .red, items: entry.removed)
-                    }
-                    if !entry.other.isEmpty {
-                        categorySection(title: "Other Changes", icon: "ellipsis.circle.fill", color: .gray, items: entry.other)
+                    ForEach(visibleCategories, id: \.title) { category in
+                        categoryCard(
+                            title: category.title,
+                            icon: category.icon,
+                            color: category.color,
+                            items: category.items)
                     }
                 }
-                Spacer().frame(height: 32)
+                Spacer().frame(height: 28)
             }
-            .padding(.vertical, 16)
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
         }
+        .background(backgroundColor.ignoresSafeArea())
         .navigationTitle("v\(entry.version)")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
     }
 
-    private var header: some View {
-        HStack(spacing: 10) {
-            Text("v\(entry.version)")
-                .font(.title2.weight(.bold))
-            Text(entry.date)
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.secondary)
-            if isInstalledVersion {
-                Text("Installed")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.green)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(Color.green.opacity(0.12), in: Capsule())
+    // MARK: Header — version, date and status as one clear hierarchy
+
+    private var headerCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text("v\(entry.version)")
+                    .font(.system(.largeTitle, design: .rounded).weight(.heavy))
+                    .monospacedDigit()
+                    .foregroundStyle(Color.appAccent)
+                if isInstalledVersion {
+                    Label("Installed", systemImage: "checkmark.circle.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.green)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.green.opacity(0.12), in: Capsule())
+                }
+            }
+
+            HStack(spacing: 8) {
+                Image(systemName: "calendar")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Text(formattedDate)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+
+            if !entry.isEmpty {
+                // One-glance summary: how much changed, and in what.
+                Text("\(totalNotes) note\(totalNotes == 1 ? "" : "s") across \(visibleCategories.count) categor\(visibleCategories.count == 1 ? "y" : "ies") — \(visibleCategories.map(\.title).joined(separator: ", ")).")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(.horizontal, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(18)
+        .background(cardFill)
+        .overlay(cardStroke)
     }
 
-    @ViewBuilder
-    private func categorySection(title: String, icon: String, color: Color, items: [String]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
+    /// The date as recorded, humanized when it parses ("Oct 12, 2026") and
+    /// shown verbatim when it doesn't — never invented.
+    private var formattedDate: String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        guard let date = f.date(from: entry.date) else { return entry.date }
+        let out = DateFormatter()
+        out.dateStyle = .long
+        out.timeStyle = .none
+        return out.string(from: date)
+    }
+
+    private var emptyCard: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "doc.text.magnifyingglass")
+                .font(.system(size: 30))
+                .foregroundStyle(.tertiary)
+            Text("No release notes were recorded for this version.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 34)
+        .padding(.horizontal, 18)
+        .background(cardFill)
+        .overlay(cardStroke)
+    }
+
+    // MARK: Category cards — clearly separated, one concern per card
+
+    private func categoryCard(title: String, icon: String, color: Color, items: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Section header: the tinted icon + title + item count, on the
+            // category's own subtle tint — the visual anchor that keeps
+            // six possible categories distinguishable at a glance.
+            HStack(spacing: 10) {
                 Image(systemName: icon)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(color)
+                    .frame(width: 26, height: 26)
+                    .background(color.opacity(0.14), in: Circle())
                 Text(title)
                     .font(.headline)
+                Spacer(minLength: 8)
+                Text("\(items.count)")
+                    .font(.caption.weight(.bold))
+                    .monospacedDigit()
                     .foregroundStyle(color)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(color.opacity(0.12), in: Capsule())
             }
             .padding(.horizontal, 16)
+            .padding(.top, 14)
+            .padding(.bottom, 6)
 
-            VStack(alignment: .leading, spacing: 6) {
-                ForEach(items, id: \.self) { item in
-                    HStack(alignment: .top, spacing: 8) {
-                        Text("•")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+            // The notes: one row each, separated by hairlines that respect
+            // the card's leading alignment — scannable on every width.
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                    HStack(alignment: .top, spacing: 10) {
+                        Circle()
+                            .fill(color.opacity(0.55))
+                            .frame(width: 5, height: 5)
+                            .padding(.top, 7)
                         Text(item)
                             .font(.subheadline)
                             .foregroundStyle(.primary)
                             .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .padding(.leading, 16)
-                    .padding(.trailing, 16)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 9)
+                    if index < items.count - 1 {
+                        Divider()
+                            .padding(.leading, 37)
+                    }
                 }
             }
+            .padding(.bottom, 8)
         }
+        .background(cardFill)
+        .overlay(cardStroke)
+    }
+
+    // MARK: Surfaces (theme + light/dark aware on every platform)
+
+    private var backgroundColor: Color {
+        #if canImport(UIKit)
+        Color(.systemGroupedBackground)
+        #else
+        Color(NSColor.controlBackgroundColor)
+        #endif
+    }
+
+    private var cardFill: some ShapeStyle {
+        #if canImport(UIKit)
+        Color(.secondarySystemGroupedBackground)
+        #else
+        Color(NSColor.controlBackgroundColor).opacity(0.9)
+        #endif
+    }
+
+    private var cardStroke: some View {
+        RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .strokeBorder(Color.primary.opacity(0.07), lineWidth: 1)
     }
 }
 
@@ -130,6 +239,40 @@ struct UpdateLogEntry {
 /// The app's real release history — the ONE data source the unified Updates
 /// page's version buttons and the per-version changelog views read from.
 let logEntries: [UpdateLogEntry] = [
+    UpdateLogEntry(
+        version: "2.35",
+        date: "2026-10-13",
+        added: [
+            "Schedule Settings gains two persistent content filters: Hide ONA (removes original net animation — regular TV anime are never touched) and Show Anime Only (hides non-anime media types such as music videos and western shows). Both apply to the merged schedule results, work together with refresh and date selection, keep the day you selected, and persist across restarts.",
+            "The redesigned changelog: tapping a version in Settings → Updates opens a polished, modern release-notes page — a clear header card (version, humanized date, Installed badge, one-glance summary), each category (Features, Improvements, Fixes, Changes, Removed, Other Changes) as its own tinted card with icon, count and hairline-separated rows, theme- and appearance-aware on iPhone, iPad and Mac. Every recorded field is preserved.",
+            "Getting Started now leads Settings: directly below Accounts & Tracking sits a custom-designed card with two clearly distinct actions — Replay (reopens the full interactive guide, resuming where you left off) and Hide (dismisses just this card, persistently, without touching accounts or setup). After hiding, the guide stays reachable from the Home header shortcut and the Notifications tab.",
+            "A Getting Started shortcut beside the Home header icons: while setup is pending (skipped or unfinished), a small Shirox-mark badge appears in the header — the app's own mark in the accent color, sized with the other icons, opening the same interactive guide every other entry point opens. It retires itself the moment the guide is completed.",
+            "The Accounts & Tracking section is one cohesive, intentionally designed card now: the avatar, account name and connected services on a single alignment, a hairline divider into a tracking strip with an honest service count and a Manage chip — no disclosure arrow anywhere, consistent heights, paddings and one corner radius, in light and dark alike.",
+            "Search's Recommended for You is a consistent three-poster rail: card width is computed from the available space so exactly three complete posters fit on every device (more remain a swipe away — the pool isn't truncated), all cards share the same size, 2:3 ratio, corner radius and alignment, and the section follows window size changes live."
+        ],
+        fixed: [
+            "Update detection works again: the manifest's newest version entries carry no per-entry download URL, which made the old decoder throw for every entry on every source — every check 'failed' and genuinely-newer releases were never reported. The field is now optional, and the update flow resolves to the canonical rolling beta release the build workflow always uploads (version comparison, URL validation and fail-closed parsing all unchanged). Both scenarios verified against the real live manifest: same version → quietly up to date; older install → the update is offered and Update Now retrieves the right IPA.",
+            "Downloaded episodes play on a normal tap: tapping a completed download now opens its local file in the app's real player (resuming from saved progress, HLS bundles through the local proxy, subtitles attached — no network re-fetch, no detour through a detail page). The long-press menu carries the full action set: Play, Share File, Find File, Delete. In-progress and failed downloads keep their detail navigation.",
+            "Refreshing the Schedule preserves the day you selected: the reload no longer snaps the calendar back to today — the day changes only when you tap a different day (or toggle the timezone, which is an intentional reset).",
+            "The recurring 'AniChart is unreachable…' popup is gone from the Schedule: with the merged fetch there is no single backup source to explain, so the banner (which reappeared on every refresh during an outage) is removed. Source health stays visible in Data Sources and the debug log.",
+            "Expanding an anime's Recommendations no longer breaks long-press: every recommendation card carries the same unified context menu as the home shelves (Add to Planning / Watching / Completed, View on AniList), while a normal tap still opens it. Works with touch, right-click and track-press, without firing on a tap or scroll.",
+            "The stray thin line around the category pills is gone for real this time: the actual source was the 0.5pt capsule strokeBorder drawn around every pill (not the scroll-edge effect v2.32 treated) — the hairline is removed from the shared pill, the home hero chips, the cinematic chips and the detail-card chips on both the Anime and Manga homes, without touching any legitimate divider."
+        ],
+        changed: [
+            "The Schedule fetch is now a MERGE: every configured source (AniChart, AnimeSchedule, MAL/Jikan, AniList, Kitsu+TVDB) runs concurrently and each one that answers contributes entries — priority-ordered, deduplicated by AniList id (title when absent) plus episode. One failing or partial source can no longer drop shows the others report (AniChart's single 100-entry page was silently truncating busy weeks), a total failure still falls back to the saved snapshot, and the Ona/anime-only filters apply to the merged results.",
+            "Onboarding is the interactive tab-based guide again — rebuilt on the familiar tab concept, substantially reworked: five clearly selectable section tabs (Welcome, Discover, Library, Alerts, Setup) with live completion ticks, Next/Back/Skip, real trending artwork on Discover, the real tracker sign-in on Library, the simulated notification demo on Alerts, and the four honest setup cards with the day/night theme scene and the real appearance selector on Setup. Progress resumes where you left it; the spotlight tour of v2.34 is retired."
+        ],
+        improved: [
+            "The manga home is the anime home's twin now: the same hero carousel (dimensions, parallax, stretch, logo-title, genre pills, accent Read button, indicator dots, Mac variant), the same gooey pull-to-refresh wiring (and when the gooey drop is off, the hero's own circle refresh), and an in-place refresh that keeps the shelves visible while fresh data lands instead of blanking the page.",
+            "Carousel indicator dots follow the selected theme's accent color on both homes — and update immediately when the accent changes.",
+            "Recommendation posters are bigger and easier to see: 148pt on iPhone and 170pt on iPad/Mac (still 2:3, still sharp), with more breathing room and softened scroll edges.",
+            "Find File's honest problem reporting is shared by the download list and the detail page now — one implementation, identical behavior everywhere."
+        ],
+        removed: [
+            "The spotlight guided tour (v2.34's onboarding presentation) — the tab-based guide replaces it as the one onboarding experience every entry point opens."
+        ],
+        other: []
+    ),
     UpdateLogEntry(
         version: "2.34",
         date: "2026-10-12",

@@ -519,44 +519,106 @@ struct SearchView: View {
 
                 // Item 17: Recommendations
                 if !recommendations.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Text("Recommended for You")
-                                .font(.title3.weight(.bold))
-                            Spacer()
-                        }
-                        .padding(.horizontal, 16)
-
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            LazyHStack(spacing: 12) {
-                                ForEach(recommendations) { media in
-                                    NavigationLink {
-                                        if isMangaMode {
-                                            AniListMangaDetailView(mediaId: media.id, preloadedMedia: media)
-                                        } else {
-                                            AniListDetailView(mediaId: media.id, preloadedMedia: media)
-                                        }
-                                    } label: {
-                                        VStack(alignment: .leading, spacing: 6) {
-                                            CachedAsyncImage(urlString: media.coverImage.extraLarge ?? media.coverImage.large ?? "")
-                                                .aspectRatio(2/3, contentMode: .fill)
-                                                .frame(width: 110, height: 165)
-                                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                                            Text(media.title.displayTitle)
-                                                .font(.caption.weight(.semibold))
-                                                .lineLimit(2)
-                                                .frame(width: 110, alignment: .leading)
-                                        }
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                            .padding(.horizontal, 16)
-                        }
-                    }
+                    recommendedForYouSection
                 }
             }
         }
+    }
+
+    /// The measured width of the rail's container (corrected on first
+    /// layout + every resize, e.g. iPad split view). Starts at a nominal
+    /// width so the very first frame is already close.
+    @State private var recommendedRailWidth: CGFloat = 0
+
+    /// v2.35 — "Recommended for You", redesigned as a consistent 3-up rail.
+    ///
+    /// The card width is COMPUTED from the available width — exactly three
+    /// complete posters fit the section on every device (iPhone, iPad, Mac
+    /// windows), with the same spacing between cards and at the edges.
+    /// More recommendations remain one horizontal swipe away (the data
+    /// source still returns up to 12 — the LAYOUT pages them, it doesn't
+    /// truncate the pool). Every card shares the same width, height, 2:3
+    /// aspect ratio, corner radius and alignment; a missing poster image
+    /// renders the standard CachedAsyncImage placeholder inside the same
+    /// fixed frame, so card dimensions never change.
+    private var recommendedForYouSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Recommended for You")
+                    .font(.title3.weight(.bold))
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+
+            GeometryReader { geo in
+                recommendedRail(cardWidth: recommendedCardWidth(for: geo.size.width))
+                    .onAppear { recommendedRailWidth = geo.size.width }
+                    .onChange(of: geo.size.width) { recommendedRailWidth = $0 }
+            }
+            .frame(height: recommendedRailHeight)
+        }
+    }
+
+    /// Exactly three visible cards: the width is what remains after the two
+    /// inner gaps and the symmetric edge insets, divided by three (guarded
+    /// against a degenerate zero-width first pass).
+    private func recommendedCardWidth(for available: CGFloat) -> CGFloat {
+        let edgeInset: CGFloat = 16
+        let gap: CGFloat = 12
+        return max((available - 2 * edgeInset - 2 * gap) / 3, 80)
+    }
+
+    /// The rail's total height: poster (1.5 × card width) + title block,
+    /// derived from the same width math so the GeometryReader's explicit
+    /// height always matches its content — on every device and window size.
+    private var recommendedRailHeight: CGFloat {
+        let width = recommendedRailWidth > 0 ? recommendedRailWidth : nominalSectionWidth
+        let cardWidth = recommendedCardWidth(for: width)
+        return ceil(cardWidth * 1.5) + 46
+    }
+
+    /// Pre-layout estimate of the section width (replaced by the real
+    /// measurement on the first frame).
+    private var nominalSectionWidth: CGFloat {
+        #if canImport(UIKit)
+        return UIScreen.main.bounds.width
+        #else
+        return 720
+        #endif
+    }
+
+    private func recommendedRail(cardWidth: CGFloat) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            LazyHStack(spacing: 12) {
+                ForEach(recommendations) { media in
+                    NavigationLink {
+                        if isMangaMode {
+                            AniListMangaDetailView(mediaId: media.id, preloadedMedia: media)
+                        } else {
+                            AniListDetailView(mediaId: media.id, preloadedMedia: media)
+                        }
+                    } label: {
+                        VStack(alignment: .leading, spacing: 6) {
+                            CachedAsyncImage(urlString: media.coverImage.extraLarge ?? media.coverImage.large ?? "")
+                                .aspectRatio(2/3, contentMode: .fill)
+                                .frame(width: cardWidth, height: cardWidth * 1.5)
+                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            Text(media.title.displayTitle)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.primary)
+                                .lineLimit(2)
+                                .multilineTextAlignment(.leading)
+                                .frame(width: cardWidth, alignment: .leading)
+                        }
+                        .frame(width: cardWidth)
+                    }
+                    .buttonStyle(.plain)
+                    .unifiedCardMenu(media, isManga: isMangaMode)
+                }
+            }
+            .padding(.horizontal, 16)
+        }
+        .softScrollEdges()
     }
 
     @State private var recommendations: [Media] = []

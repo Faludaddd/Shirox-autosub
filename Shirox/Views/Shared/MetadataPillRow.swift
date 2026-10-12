@@ -75,11 +75,13 @@ struct MetadataPillView: View {
                             ? Color.primary.opacity(0.06)
                             : Color.primary.opacity(0.12))
         )
-        .overlay(
-            Capsule().strokeBorder(
-                Color.primary.opacity(pill.isOverflow ? 0.12 : 0.2),
-                lineWidth: 0.5)
-        )
+        // v2.35 — the 0.5pt capsule strokeBorder is GONE. On both homes'
+        // category pill rows that hairline read as a stray thin line
+        // around/beside every pill (most visible over the hero gradient,
+        // where the sub-pixel border anti-aliases into a crisp seam).
+        // The fill alone carries the pill shape — cleaner on every
+        // surface, and nothing legitimate (the edge fades, the scroll
+        // containers, real dividers elsewhere) is touched.
         .accessibilityElement(children: .combine)
         .accessibilityLabel(pill.text)
     }

@@ -89,6 +89,12 @@ final class AppUpdateManager: ObservableObject {
 
     // MARK: - Manifest sources
 
+    /// The canonical IPA location. The build workflow uploads every green
+    /// build to the rolling `beta` release — this URL ALWAYS serves the
+    /// newest shipped version, which is exactly what an update flow wants.
+    /// It is also the URL the app's own AltStore-style source resolves to.
+    static let canonicalDownloadURL = URL(string: "https://github.com/Faludaddd/Shirox-autosub/releases/download/beta/Shirox.ipa")!
+
     private struct ManifestSource {
         enum Kind {
             case raw        // plain JSON body
@@ -264,16 +270,28 @@ final class AppUpdateManager: ObservableObject {
             return
         }
 
-        // URL validation guards EVERY path that constructs UpdateInfo
-        // below (available AND dismissed) — `info(from:)` force-unwraps
-        // nothing, but it does need a parseable URL, and the manifest is
-        // remote data we never fully trust. A bad URL is an honest
-        // "couldn't verify", never a crash (v2.12).
-        guard Self.isValidDownloadURL(latest.downloadURL),
-              URL(string: latest.downloadURL) != nil else {
-            Logger.shared.log("[Update] manifest downloadURL failed validation: \(latest.downloadURL)", type: "Error")
-            state = .failed
-            return
+        // A newer version exists. Resolve the download URL:
+        //   1. a per-entry URL from the manifest, when present and valid;
+        //   2. otherwise the canonical rolling beta release (the workflow
+        //      re-uploads the newest IPA there on every green build, and the
+        //      manifest hasn't carried per-entry URLs since v2.29).
+        // v2.35 — this is the root cause of the "updates never detected"
+        // bug: the manifest's version entries carry NO `downloadURL` field
+        // (only version / date / localizedDescription / size — the CI fills
+        // the size), so the OLD decoder's non-optional `downloadURL` threw
+        // keyNotFound for EVERY entry on EVERY source — every check "failed"
+        // and genuinely-newer releases were never reported. The field is now
+        // optional with the canonical-URL fallback, and a manifest-provided
+        // URL that fails validation falls back to the canonical URL too
+        // (with a log) instead of failing the whole check.
+        var downloadURL = Self.canonicalDownloadURL
+        let manifestURL = latest.effectiveDownloadURL
+        if !manifestURL.isEmpty {
+            if Self.isValidDownloadURL(manifestURL), let explicit = URL(string: manifestURL) {
+                downloadURL = explicit
+            } else {
+                Logger.shared.log("[Update] manifest downloadURL failed validation: \(manifestURL) — using the canonical beta release URL", type: "Error")
+            }
         }
 
         // A newer version exists. Don't re-prompt for one the user already
@@ -282,11 +300,11 @@ final class AppUpdateManager: ObservableObject {
         // and a forced check (About "Check for Updates", demo mode) can
         // re-offer it.
         if !force, latest.version == lastDismissedVersion {
-            state = .dismissed(info(from: latest))
+            state = .dismissed(info(from: latest, downloadURL: downloadURL))
             return
         }
 
-        let info = info(from: latest)
+        let info = info(from: latest, downloadURL: downloadURL)
         state = .available(info)
         postUpdateNotification(info)
         gateVisible = true
@@ -360,18 +378,12 @@ final class AppUpdateManager: ObservableObject {
 
     // MARK: - Manifest fetching
 
-    private func info(from entry: VersionEntry) -> UpdateInfo {
-        // The caller (checkForUpdates) validates + parses the URL before
-        // reaching this point, so the parse below succeeds by construction.
-        // The defensive fallback (release page) keeps a broken invariant
-        // from ever becoming a crash (v2.12).
-        let url = URL(string: entry.downloadURL)
-            ?? URL(string: "https://github.com/Faludaddd/Shirox-autosub/releases/tag/beta")!
+    private func info(from entry: VersionEntry, downloadURL: URL) -> UpdateInfo {
         return UpdateInfo(
             newVersion: entry.version,
             currentVersion: currentVersion,
             changelog: entry.localizedDescription,
-            downloadURL: url,
+            downloadURL: downloadURL,
             isCritical: Self.isCriticalGap(entry.version, vs: currentVersion),
             releaseDate: Self.parseDate(entry.date)
         )
@@ -463,7 +475,28 @@ final class AppUpdateManager: ObservableObject {
         let version: String
         let date: String
         let localizedDescription: String
-        let downloadURL: String
+        /// v2.35 — OPTIONAL. The manifest has not carried per-entry download
+        /// URLs since v2.29 (the CI only fills `size`); requiring the key
+        /// failed decoding for every entry and broke update detection. When
+        /// absent, the canonical rolling beta release URL is used instead.
+        let downloadURL: String?
+
+        /// The effective URL string ("" when the manifest has none).
+        var effectiveDownloadURL: String { downloadURL ?? "" }
+
+        enum CodingKeys: String, CodingKey {
+            case version, date, localizedDescription
+            case downloadURL = "downloadURL"
+            case size
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            version = try c.decode(String.self, forKey: .version)
+            date = (try? c.decode(String.self, forKey: .date)) ?? ""
+            localizedDescription = (try? c.decode(String.self, forKey: .localizedDescription)) ?? ""
+            downloadURL = try? c.decodeIfPresent(String.self, forKey: .downloadURL)
+        }
     }
     private struct GitHubContentEnvelope: Decodable {
         let content: String

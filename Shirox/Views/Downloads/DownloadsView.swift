@@ -2,6 +2,11 @@ import Combine
 
 #if os(iOS)
 import SwiftUI
+#if canImport(AppKit)
+// Catalyst builds: NSWorkspace (the Finder reveal in the shared download
+// file actions) needs AppKit.
+import AppKit
+#endif
 
 /// Downloads tab — v2.14 full layout rework.
 ///
@@ -23,6 +28,170 @@ import SwiftUI
 ///     for that title, with a per-show "Delete All";
 ///   - the module/source is demoted to a caption on rows — in a downloads
 ///     list you care about WHAT you downloaded, not which source served it.
+// MARK: - Download file actions (v2.35 — shared by the download rows and
+// the download detail page)
+//
+// ONE implementation of the things a completed download can do, used by
+// both surfaces so the list rows and the detail page behave identically:
+//   • play(_:)   — plays the downloaded episode's LOCAL file through the
+//                  app's real player (no network re-fetch: DownloadManager
+//                  resolves the on-disk file, the HLS proxy for HLS
+//                  bundles, and the locally attached subtitles), resuming
+//                  from saved progress exactly like an episode tapped in
+//                  the detail page;
+//   • share(_:)  — the system share sheet on the local file;
+//   • find(_:)   — reveals the file in Files / Finder, with honest
+//                  problem reporting when the file is missing/unreadable;
+//   • localFileURL(for:) — the download's on-disk location, if any.
+enum DownloadItemFileActions {
+
+    /// The download's local file URL (Documents/Downloads/<fileName>), or
+    /// nil when the item has no finished file name.
+    static func localFileURL(for item: DownloadItem) -> URL? {
+        guard let fileName = item.fileName else { return nil }
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        return docs.appendingPathComponent("Downloads").appendingPathComponent(fileName)
+    }
+
+    /// Plays a downloaded item from its local file. Mirrors the exact path
+    /// DetailView uses for a tapped downloaded episode: resolve the stream
+    /// (nil → the file is gone → honest toast), look up saved progress
+    /// (skip resume at ≥95% so tapping a finished episode restarts it),
+    /// build the PlayerContext, present the real player.
+    static func play(_ item: DownloadItem) {
+        Task { @MainActor in
+            guard let stream = await DownloadManager.shared.getStream(for: item) else {
+                ToastManager.shared.show(
+                    title: "Download",
+                    message: "The downloaded file is missing — remove the entry and download again to play offline.",
+                    icon: "exclamationmark.triangle.fill",
+                    iconColor: .orange)
+                return
+            }
+
+            // Saved progress for this exact episode (anchored on its
+            // unique href so a downloaded S2 E5 never inherits S1 E5's
+            // resume position when the numbers collide).
+            let saved = ContinueWatchingManager.shared.items.first {
+                $0.matchesEpisode(number: item.episodeNumber, href: item.episodeHref)
+                    && (
+                        ($0.aniListID != nil && $0.aniListID == item.aniListID)
+                        || ($0.mediaTitle == item.mediaTitle && $0.moduleId == item.moduleId)
+                    )
+            }
+            let resumeSeconds: Double? = {
+                guard let s = saved, s.totalSeconds > 0 else { return nil }
+                return (s.watchedSeconds / s.totalSeconds) < 0.95 ? s.watchedSeconds : nil
+            }()
+
+            let context = PlayerContext(
+                mediaTitle: item.mediaTitle,
+                episodeNumber: item.episodeNumber,
+                episodeTitle: item.episodeTitle,
+                imageUrl: item.imageUrl,
+                aniListID: item.aniListID,
+                malID: item.aniListID.flatMap { IDMappingService.shared.cachedMalId(forAnilistId: $0) },
+                moduleId: item.moduleId,
+                totalEpisodes: saved?.totalEpisodes,
+                availableEpisodes: saved?.availableEpisodes,
+                isAiring: saved?.isAiring,
+                resumeFrom: resumeSeconds,
+                detailHref: item.detailHref,
+                episodeHref: item.episodeHref,
+                streamTitle: item.streamTitle,
+                workingDetailHref: item.detailHref,
+                thumbnailUrl: nil
+            )
+            PlayerPresenter.shared.presentPlayer(
+                stream: stream,
+                context: context,
+                onFinished: nil
+            )
+        }
+    }
+
+    /// Presents the system share sheet on a downloaded file.
+    static func share(_ url: URL) {
+        Haptics.light()
+        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let root = scene.windows.first?.rootViewController else { return }
+        root.present(UIActivityViewController(activityItems: [url], applicationActivities: nil), animated: true)
+    }
+
+    /// A Find File problem: what happened, where the file was expected, and
+    /// whether a share sheet is still possible.
+    struct FindFileAlert: Identifiable {
+        let id = UUID()
+        let title: String
+        let message: String
+        let filePath: String?
+        let canShare: Bool
+    }
+
+    /// Reveals a downloaded file in the system's file browser (Files app on
+    /// iOS, Finder on Mac Catalyst). Returns an honest problem description
+    /// when the file is missing/unreadable or the trip can't be made,
+    /// instead of failing silently.
+    static func find(_ url: URL) -> FindFileAlert? {
+        Haptics.light()
+
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),
+              !isDirectory.boolValue else {
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            return FindFileAlert(
+                title: "File Not Found",
+                message: "The download's file is no longer on this device. It may have been deleted from the Files app or removed by a system cleanup. The download's entry still lists it — delete the entry and download again if you still want the episode.",
+                filePath: url.path,
+                canShare: false)
+        }
+
+        guard FileManager.default.isReadableFile(atPath: url.path) else {
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            return FindFileAlert(
+                title: "Can't Open File",
+                message: "The file exists but this app isn't allowed to read it. Its location is shown below.",
+                filePath: url.path,
+                canShare: false)
+        }
+
+        #if targetEnvironment(macCatalyst)
+        NSWorkspace.shared.activateFileViewerSelecting([url])
+        return nil
+        #else
+        // The Files app opens at the file through the shareddocuments://
+        // scheme, addressed relative to this app's Documents container.
+        let docsPrefix = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].path + "/"
+        let relative = url.path.hasPrefix(docsPrefix)
+            ? String(url.path.dropFirst(docsPrefix.count))
+            : url.lastPathComponent
+        let encoded = relative.split(separator: "/").map { $0.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? String($0) }.joined(separator: "/")
+
+        if let filesURL = URL(string: "shareddocuments:///\(encoded)") {
+            UIApplication.shared.open(filesURL) { opened in
+                if !opened {
+                    // The system wouldn't take the trip — report it honestly.
+                    DispatchQueue.main.async {
+                        ToastManager.shared.show(
+                            title: "Find File",
+                            message: "Couldn't open the Files app. The file is at \(url.path)",
+                            icon: "exclamationmark.triangle.fill",
+                            iconColor: .orange)
+                    }
+                }
+            }
+        } else {
+            return FindFileAlert(
+                title: "Can't Open File",
+                message: "The file's location couldn't be turned into a Files app address. Its path is shown below.",
+                filePath: url.path,
+                canShare: true)
+        }
+        return nil
+        #endif
+    }
+}
+
 struct DownloadsView: View {
     @ObservedObject private var dm = DownloadManager.shared
     @ObservedObject private var mdm = MangaDownloadManager.shared
@@ -1049,7 +1218,11 @@ struct AnimeShowDownloadsView: View {
     @EnvironmentObject private var moduleManager: ModuleManager
     @Environment(\.dismiss) private var dismiss
     @AppStorage("downloadOverWiFiOnly") private var wifiOnly = false
-    @State private var confirmingDeleteAll = false
+        /// v2.35 — a Find File problem reported from the episode rows'
+    /// long-press menu (missing/unreadable file), presented as an honest
+    /// alert with Copy Path / Share where they're possible.
+    @State private var findFileAlert: DownloadItemFileActions.FindFileAlert?
+@State private var confirmingDeleteAll = false
 
     private var items: [DownloadItem] {
         dm.items.filter { $0.mediaTitle == title && $0.moduleId == moduleId }
@@ -1132,13 +1305,37 @@ struct AnimeShowDownloadsView: View {
             if !completed.isEmpty {
                 Section("Episodes") {
                     ForEach(completed) { item in
-                        NavigationLink {
-                            DownloadDetailView(item: item)
+                        // v2.35 — a completed download plays on a NORMAL
+                        // TAP (its local file, through the app's real
+                        // player); the long-press context menu carries the
+                        // full action set (Play, Share, Find File, Delete).
+                        // In-progress and failed rows below keep their
+                        // detail-page navigation — only finished episodes
+                        // make sense to play directly.
+                        Button {
+                            DownloadItemFileActions.play(item)
                         } label: {
                             AnimeDownloadRow(item: item, waitingForWifi: wifiGated)
                         }
                         .buttonStyle(.plain)
                         .contextMenu {
+                            Button {
+                                DownloadItemFileActions.play(item)
+                            } label: {
+                                Label("Play", systemImage: "play.fill")
+                            }
+                            if let url = DownloadItemFileActions.localFileURL(for: item) {
+                                Button {
+                                    DownloadItemFileActions.share(url)
+                                } label: {
+                                    Label("Share File", systemImage: "square.and.arrow.up")
+                                }
+                                Button {
+                                    findFileAlert = DownloadItemFileActions.find(url)
+                                } label: {
+                                    Label("Find File", systemImage: "folder")
+                                }
+                            }
                             Button(role: .destructive) { dm.remove(item) } label: {
                                 Label("Delete", systemImage: "trash")
                             }
@@ -1194,6 +1391,28 @@ struct AnimeShowDownloadsView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Deletes every episode for this series — including any still downloading — and removes the files from this device.")
+        }
+        // v2.35 — Find File's honest outcomes from the episode rows'
+        // long-press menu (missing/unreadable file), with Copy Path /
+        // Share where they're still possible.
+        .alert(item: $findFileAlert) { alert in
+            if alert.canShare, let path = alert.filePath {
+                let url = URL(fileURLWithPath: path)
+                return Alert(
+                    title: Text(alert.title),
+                    message: Text(alert.message + "\n\n" + path),
+                    primaryButton: .default(Text("Share File")) { DownloadItemFileActions.share(url) },
+                    secondaryButton: .default(Text("Copy Path")) {
+                        UIPasteboard.general.string = path
+                    }
+                )
+            } else {
+                return Alert(
+                    title: Text(alert.title),
+                    message: Text(alert.message + ((alert.filePath?.isEmpty == false) ? "\n\n" + alert.filePath! : "")),
+                    dismissButton: .default(Text("OK"))
+                )
+            }
         }
     }
 

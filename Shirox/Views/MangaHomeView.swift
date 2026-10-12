@@ -15,11 +15,19 @@ import SwiftUI
 struct MangaHomeContent: View {
     @ObservedObject var progressManager: MangaProgressManager
     @ObservedObject var anilistAuth: AniListAuthManager
+    /// v2.35 — the iPad sidebar inset, handed in by the parent HomeView so
+    /// the hero matches the anime home's placement.
+    var leadingInset: CGFloat = 0
     @StateObject private var vm = MangaHomeViewModel()
     @State private var readerContext: ReaderContext?
     @State private var crNavTarget: ContinueReadingNavTarget?
     @AppStorage("mangaBrowseCategoriesGridLayout") private var browseCategoriesGridLayout = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /// v2.35 — the SAME pull-to-refresh machinery the anime home uses:
+    /// the gooey setting (when off, the hero's own circle refresh carries
+    /// it instead), the isRefreshing flag, and the RefreshLimiter gate.
+    @AppStorage(GooeyRefreshGeometry.settingKey) private var gooeyRefresh = true
+    @State private var isRefreshing = false
 
     var body: some View {
         Group {
@@ -76,12 +84,22 @@ struct MangaHomeContent: View {
                             .padding(.top, 8)
                         }
 
-                        // 1. HERO — manga featured carousel (same component as
-                        //    anime, but fed manga Media items). `isManga: true`
-                        //    flips the action button to "Read" and routes taps
-                        //    to the manga detail page.
+                        // 1. HERO — v2.35: THE SAME FeaturedCarousel the
+                        //    anime home renders (same card dimensions,
+                        //    parallax, stretch, logo-title, genre pills,
+                        //    accent action button, indicator dots, Mac
+                        //    variant). `isManga: true` flips the button to
+                        //    Read and routes taps to the manga detail page;
+                        //    the pull/refresh wiring mirrors anime 1:1.
                         if !vm.trending.isEmpty {
-                            MediaCarousel(items: vm.trending, isManga: true, scrollSpace: "mangaHomeScroll")
+                            FeaturedCarousel(
+                                items: vm.trending,
+                                isRefreshing: isRefreshing,
+                                onRefresh: gooeyRefresh ? nil : heroRefresh,
+                                leadingInset: leadingInset,
+                                isManga: true,
+                                scrollSpace: "mangaHomeScroll"
+                            )
                         }
 
                         // 2. CONTINUE READING — horizontal strip of in-progress
@@ -117,7 +135,7 @@ struct MangaHomeContent: View {
                 .softScrollEdges(vm.trending.isEmpty ? .all : [.bottom, .leading, .trailing])
                 .hideScrollEdgeEffect(vm.trending.isEmpty ? [] : .top)
                 .coordinateSpace(name: "mangaHomeScroll")
-                .gooeyRefreshable(fallback: .custom) { await vm.reload() }
+                .gooeyRefreshable(fallback: .custom) { await performRefresh() }
                 // Only the hero is allowed under the status bar — the same
                 // rule the anime home follows.
                 #if os(macOS) || targetEnvironment(macCatalyst)
@@ -134,6 +152,31 @@ struct MangaHomeContent: View {
         }
         .continueReadingNavigation($crNavTarget)
         #endif
+    }
+
+    // MARK: - Refresh (v2.35 — the anime home's exact semantics)
+
+    /// The hero's circle-refresh path (used when the gooey drop is OFF):
+    /// rate-limited through the same shared RefreshLimiter the anime home
+    /// uses, then the full refresh.
+    private func heroRefresh() async {
+        guard RefreshLimiter.shared.allow() else { return }
+        await performRefresh()
+    }
+
+    /// Mirrors the anime home's performRefresh: the refresh flag drives
+    /// the hero's circle indicator, the reload happens IN PLACE (the
+    /// shelves keep their current content while the fresh data arrives —
+    /// no blanking), and the flag lowers with the same short settle the
+    /// anime home uses.
+    private func performRefresh() async {
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        await vm.reload()
+        try? await Task.sleep(nanoseconds: 300_000_000)
+        withAnimation(.easeOut(duration: 0.25)) {
+            isRefreshing = false
+        }
     }
 
     // MARK: - Grid layout (item 9)
@@ -182,15 +225,14 @@ final class MangaHomeViewModel: ObservableObject {
     private var lastFailedRoundAt: Date?
     private let failureBackoff: TimeInterval = 30
 
-    /// Pull-to-refresh entry point: clears the guard that `load()` uses
-    /// (skip when already populated) so a refresh genuinely re-fetches —
-    /// including when the SNAPSHOT served the last render (its notice's
-    /// "Pull to refresh" promise must actually work).
+    /// Pull-to-refresh entry point (v2.35 — the anime home's exact
+    /// behavior): re-fetches IN PLACE — `force` bypasses the
+    /// already-populated guard so a refresh genuinely re-fetches (the
+    /// snapshot notice's "Pull to refresh" promise holds), while the
+    /// current shelves STAY VISIBLE until each one's fresh data lands.
+    /// The old implementation blanked all four shelves first, so the hero
+    /// vanished on every refresh — visibly different from the anime home.
     func reload() async {
-        trending = []
-        popular = []
-        topRated = []
-        latest = []
         await load(force: true)
     }
 

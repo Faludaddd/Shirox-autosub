@@ -1,34 +1,52 @@
 import SwiftUI
 import AuthenticationServices
 
-/// The onboarding experience (v2.34 — the interactive rebuild).
+/// The onboarding experience (v2.35 — the interactive TAB-BASED rebuild).
 ///
-/// The flow has two presentations, both driven by `OnboardingFlowController`:
+/// The guide returns to the familiar tab-based concept the app's onboarding
+/// always had (pages you move between, a clear sense of where you are),
+/// rebuilt as one modern, genuinely interactive flow rather than a
+/// sequence of static slides:
 ///
-///   • the TOUR — a spotlight overlay over the REAL app (see GuidedTour.swift),
-///     showing the actual tabs, charts and controls in place;
-///   • this view, the SETUP phase — a full-screen cover holding, in order:
-///     the simulated notification demonstration, the interactive day/night
-///     theme demonstration (with the real theme selector), and the setup
-///     checklist (module, tracking, notifications, theme).
+///   ┌──────────────────────────────────────────────┐
+///   │  Welcome · Discover · Library · Alerts · Setup│  ← the tab bar
+///   ├──────────────────────────────────────────────┤
+///   │  the selected tab's live content              │
+///   │  (real actions, real state, real demos)       │
+///   ├──────────────────────────────────────────────┤
+///   │   ◀ Back            Next / Finish       Skip  │
+///   └──────────────────────────────────────────────┘
 ///
-/// The old generic introductory slides are gone — the tour replaces them
-/// with the actual interface, so there is nothing left to explain in the
-/// abstract. The rules the flow honors:
+///   • Welcome — the mark, what Shirox is, and the one honest premise
+///     (bring your own library);
+///   • Discover — what the Home tab serves, previewed with REAL trending
+///     artwork when the loader warmed it (honest placeholder otherwise);
+///   • Library & Tracking — the tracker story + the real AniList sign-in
+///     action, reflecting live account state;
+///   • Alerts — the simulated notification demonstration (banners slide
+///     down while the demo badge climbs; labelled DEMO, fully local);
+///   • Get Started — the four setup cards (module, tracking,
+///     notifications, theme) with real completion state and real actions,
+///     the interactive day/night theme scene, and the REAL appearance
+///     selector.
 ///
-///   • Next / Back / Skip / Finish — nothing is required to finish (the app
-///     genuinely works without an account or notifications);
-///   • completion persists (`hasCompletedOnboarding`); skipping flags
-///     `onboardingWasSkipped` so the Notifications tab keeps offering the
-///     guide through its "Get Started" card, and the next run resumes where
-///     this one stopped;
-///   • setup states are honest: a card only shows as complete when its real
-///     requirement actually holds (modules installed, tracker signed in,
-///     notification permission granted, an explicit theme choice made);
-///   • demo state is tutorial-only — the simulated banner/badge counts live
-///     in the demo view and can never touch the real notification counts;
-///   • reopening the guide later never touches saved settings or account
+/// Rules the flow honors:
+///   • Tabs are genuinely interactive: every tab is tappable with a clear
+///     selected state, tabs can be visited in any order, and Next/Back
+///     walk the same order; the selected tab animates with a spring.
+///   • Nothing is required to finish — Skip is always available (and
+///     remembered); finishing persists `hasCompletedOnboarding`, skipping
+///     flags `onboardingWasSkipped` so the Notifications tab, the Home
+///     header shortcut and Settings' Getting Started card keep a way back
+///     in.
+///   • Setup states are honest: a card only shows as complete when its
+///     real requirement actually holds (modules installed, tracker signed
+///     in, notification permission granted, an explicit theme choice).
+///   • Demo state is tutorial-only — the simulated banner/badge counts
+///     live in the demo view and can never touch the real counts.
+///   • Reopening the guide later never touches saved settings or account
 ///     state beyond the four setup actions the user takes themselves.
+///   • Reduce Motion swaps the transitions for plain fades.
 struct OnboardingView: View {
     @ObservedObject private var flow = OnboardingFlowController.shared
     @EnvironmentObject private var moduleManager: ModuleManager
@@ -60,6 +78,7 @@ struct OnboardingView: View {
     private var hasTheme: Bool { flow.themeStepComplete }
 
     private var accent: Color { .appAccent }
+    private var isLastTab: Bool { flow.setupPage == OnboardingFlowController.guideTabCount - 1 }
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -75,8 +94,8 @@ struct OnboardingView: View {
             case .loading:
                 OnboardingLoadingScreen()
             case .setup:
-                setupFlow
-            case .inactive, .tour:
+                guideFlow
+            case .inactive:
                 // Defensive: the cover should only be up for loading/setup.
                 Color.clear.onAppear { dismiss() }
             }
@@ -92,17 +111,17 @@ struct OnboardingView: View {
         #endif
     }
 
-    // MARK: - Setup flow (the three setup pages)
+    // MARK: - The tab-based guide
 
-    private var setupFlow: some View {
+    private var guideFlow: some View {
         VStack(spacing: 0) {
-            topBar
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
+            tabBar
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
                 .padding(.bottom, 4)
 
             ZStack {
-                setupPage
+                guidePage
                     .id(flow.setupPage)
                     .transition(
                         reduceMotion
@@ -161,32 +180,68 @@ struct OnboardingView: View {
         notificationState = await NotificationAuthState.current()
     }
 
-    // MARK: - Chrome
+    // MARK: - Tab bar (the guide's sections, clearly selectable)
 
-    private var topBar: some View {
-        HStack {
-            HStack(spacing: 6) {
-                ForEach(0..<3, id: \.self) { index in
-                    Capsule()
-                        .fill(index == flow.setupPage ? accent : Color.secondary.opacity(0.3))
-                        .frame(width: index == flow.setupPage ? 22 : 7, height: 7)
-                        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: flow.setupPage)
-                }
+    /// One compact, scrollable row of section tabs — the structural spine
+    /// the old onboarding had (its pages), made genuinely interactive:
+    /// every tab is tappable, the selected tab carries the accent fill,
+    /// and tabs that hold a setup step show a completion tick when that
+    /// step is actually done. The tick is HONEST state, not decoration.
+    private var tabBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                tabChip(index: 0, title: "Welcome", icon: "hand.wave.fill", done: nil)
+                tabChip(index: 1, title: "Discover", icon: "sparkles.rectangle.stack.fill", done: nil)
+                tabChip(index: 2, title: "Library", icon: "books.vertical.fill", done: hasTracker)
+                tabChip(index: 3, title: "Alerts", icon: "bell.badge.fill", done: notificationsOn)
+                tabChip(index: 4, title: "Setup", icon: "checklist", done: setupAllDone)
             }
-            Spacer()
-            Button {
-                flow.skip()
-            } label: {
-                Text("Skip")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Skip setup for now")
+            .padding(.vertical, 4)
         }
     }
+
+    /// True when every optional setup card reads complete (the module card
+    /// is the required one — the Setup tab's tick appears when all four
+    /// are done).
+    private var setupAllDone: Bool {
+        hasSource && hasTracker && notificationsOn && hasTheme
+    }
+
+    private func tabChip(index: Int, title: String, icon: String, done: Bool?) -> some View {
+        let isSelected = flow.setupPage == index
+        return Button {
+            Haptics.selection()
+            withAnimation(reduceMotion ? .easeInOut(duration: 0.15) : .spring(response: 0.35, dampingFraction: 0.85)) {
+                flow.goToSetupPage(index)
+            }
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 11, weight: .semibold))
+                Text(title)
+                    .font(.caption.weight(.bold))
+                if done == true {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(isSelected ? Color.appAccentForeground : .green)
+                }
+            }
+            .foregroundStyle(isSelected ? Color.appAccentForeground : .primary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                Capsule().fill(isSelected ? accent : Color.secondary.opacity(0.10))
+            )
+            .overlay(
+                Capsule().strokeBorder(isSelected ? Color.clear : Color.secondary.opacity(0.15), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(title) tab\(isSelected ? ", selected" : "")")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    // MARK: - Chrome
 
     private var bottomBar: some View {
         HStack(spacing: 12) {
@@ -205,13 +260,13 @@ struct OnboardingView: View {
             }
 
             Button {
-                if flow.setupPage == 2 {
+                if isLastTab {
                     flow.finish()
                 } else {
                     flow.goToSetupPage(flow.setupPage + 1)
                 }
             } label: {
-                Text(flow.setupPage == 2
+                Text(isLastTab
                      ? (hasSource ? "Start Watching" : "Finish")
                      : "Next")
                     .font(.headline)
@@ -224,29 +279,158 @@ struct OnboardingView: View {
                     .foregroundStyle(Color.appAccentForeground)
             }
             .buttonStyle(.springPress)
-            .accessibilityLabel(flow.setupPage == 2 ? "Finish setup" : "Next page")
+            .accessibilityLabel(isLastTab ? "Finish setup" : "Next page")
+
+            if !isLastTab {
+                Button {
+                    flow.skip()
+                } label: {
+                    Text("Skip")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 56, height: 48)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Skip setup for now")
+            }
         }
     }
 
     // MARK: - Pages
 
     @ViewBuilder
-    private var setupPage: some View {
+    private var guidePage: some View {
         switch flow.setupPage {
-        case 0: notificationsPage
-        case 2: themePage
-        default: checklistPage
+        case 0: welcomePage
+        case 1: discoverPage
+        case 2: libraryPage
+        case 3: alertsPage
+        default: setupPage
         }
     }
 
-    /// Page 0 — the simulated notification demonstration.
-    private var notificationsPage: some View {
+    /// Tab 1 — Welcome.
+    private var welcomePage: some View {
         onboardingScroll {
-            Text("See it before you set it up")
+            Image("ShiroMark")
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 74, height: 74)
+                .foregroundStyle(accent)
+                .padding(.bottom, 6)
+
+            Text("Welcome to Shirox")
                 .font(.system(size: 27, weight: .bold))
                 .multilineTextAlignment(.center)
 
-            Text("A quick look at how Shirox keeps you posted — entirely simulated, nothing is being sent to your device.")
+            Text("Shirox doesn't host any content. Connect a source and it becomes your library — tracked, downloaded and played on this device. This short guide shows you where everything lives; setup takes two taps on the last tab.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.top, 8)
+
+            VStack(spacing: 10) {
+                guideHighlight(icon: "square.grid.2x2.fill", text: "Anime and manga from the modules you choose")
+                guideHighlight(icon: "person.crop.circle.badge.checkmark", text: "Progress synced to AniList or MyAnimeList")
+                guideHighlight(icon: "arrow.down.circle.fill", text: "Offline downloads that play anywhere")
+            }
+            .padding(.top, 20)
+        }
+    }
+
+    /// Tab 2 — Discover: what Home serves, with REAL trending artwork when
+    /// the loader warmed it.
+    private var discoverPage: some View {
+        onboardingScroll {
+            Text("Discover what's worth watching")
+                .font(.system(size: 27, weight: .bold))
+                .multilineTextAlignment(.center)
+
+            Text("Trending and popular shelves, Top Charts with daily-to-yearly windows, genre rankings, hidden gems, and the full airing schedule — built from your connected sources.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.top, 8)
+                .padding(.bottom, 18)
+
+            if !flow.demoMedia.isEmpty {
+                // A real slice of the actual Home hero: live trending
+                // artwork the loader warmed through the app's own caches.
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(flow.demoMedia.prefix(8)) { media in
+                            CachedAsyncImage(urlString: media.coverImage.extraLarge ?? media.coverImage.large ?? "")
+                                .aspectRatio(2/3, contentMode: .fill)
+                                .frame(width: 96, height: 144)
+                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        }
+                    }
+                }
+                .softScrollEdges()
+                .padding(.horizontal, -24)
+                .padding(.bottom, 6)
+            } else {
+                // Honest placeholder — nothing warmed, nothing faked.
+                HStack(spacing: 10) {
+                    ForEach(0..<3, id: \.self) { _ in
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color.secondary.opacity(0.10))
+                            .frame(width: 96, height: 144)
+                    }
+                }
+                .padding(.bottom, 6)
+            }
+
+            VStack(spacing: 10) {
+                guideHighlight(icon: "flame.fill", text: "Trending Now, All-Time Popular, Top Rated and Upcoming shelves")
+                guideHighlight(icon: "chart.bar.fill", text: "Top Anime and genre charts with a Daily–Yearly window")
+                guideHighlight(icon: "calendar", text: "The Schedule tab — every airing this week, day by day")
+            }
+            .padding(.top, 16)
+        }
+    }
+
+    /// Tab 3 — Library & Tracking, with the real sign-in action.
+    private var libraryPage: some View {
+        onboardingScroll {
+            Text("Your library, tracked")
+                .font(.system(size: 27, weight: .bold))
+                .multilineTextAlignment(.center)
+
+            Text("One library for anime and manga. Connect a tracker and your progress, scores and lists stay in sync everywhere — watching on this device updates AniList or MyAnimeList instantly.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.top, 8)
+                .padding(.bottom, 18)
+
+            VStack(spacing: 10) {
+                guideHighlight(icon: "books.vertical.fill", text: "Planning, Watching, Completed — your statuses, sortable and filterable")
+                guideHighlight(icon: "arrow.triangle.2.circlepath", text: "Two-way sync with AniList and MyAnimeList")
+                guideHighlight(icon: "bell.badge.fill", text: "New-episode reminders for the shows you follow")
+            }
+
+            stepRow(
+                icon: "person.crop.circle.badge.checkmark",
+                title: hasTracker ? "Tracking connected" : "Connect Tracking",
+                detail: trackerDetail,
+                isDone: hasTracker,
+                isRequired: false,
+                action: signInToAniList
+            )
+            .padding(.top, 18)
+        }
+    }
+
+    /// Tab 4 — Alerts: the simulated notification demonstration.
+    private var alertsPage: some View {
+        onboardingScroll {
+            Text("Never miss an episode")
+                .font(.system(size: 27, weight: .bold))
+                .multilineTextAlignment(.center)
+
+            Text("See it before you set it up — a quick look at how Shirox keeps you posted. Entirely simulated; nothing is being sent to your device.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -255,38 +439,86 @@ struct OnboardingView: View {
 
             SimulatedNotificationDemo(media: flow.demoMedia)
 
-            Text("Enable the real thing from the checklist — one step away.")
+            Text("Enable the real thing on the Setup tab — one step away.")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
                 .padding(.top, 18)
         }
     }
 
-    /// Page 2 — the interactive day/night theme demonstration with the real
-    /// appearance selector.
-    private var themePage: some View {
+    /// Tab 5 — Setup: the four cards with real state and actions, plus the
+    /// interactive theme scene and the REAL appearance selector.
+    private var setupPage: some View {
         onboardingScroll {
-            Text("Choose your look")
+            Text("Set up Shirox")
                 .font(.system(size: 27, weight: .bold))
                 .multilineTextAlignment(.center)
 
-            Text("Drag the sun and the moon, or tap the scene. Picking an option below applies it for real — and you can change it any time in Settings › Appearance.")
+            Text("Everything here is optional except the first. Each card reflects its real state and does its real action.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.top, 8)
                 .padding(.bottom, 22)
 
+            VStack(spacing: 10) {
+                stepRow(
+                    icon: "square.grid.2x2.fill",
+                    title: "Add a Module",
+                    detail: hasSource
+                        ? "\(moduleManager.modules.count) module\(moduleManager.modules.count == 1 ? "" : "s") connected"
+                        : "Pick one from the Module Store — or paste a URL, use Jellyfin, or play local files",
+                    isDone: hasSource,
+                    isRequired: true
+                ) { showSources = true }
+
+                stepRow(
+                    icon: "person.crop.circle.badge.checkmark",
+                    title: "Connect Tracking",
+                    detail: trackerDetail,
+                    isDone: hasTracker,
+                    isRequired: false,
+                    action: signInToAniList
+                )
+
+                stepRow(
+                    icon: "bell.badge.fill",
+                    title: "Enable Notifications",
+                    detail: notificationDetail,
+                    isDone: notificationsOn,
+                    isRequired: false,
+                    action: { showPermissionSheet = true }
+                )
+
+                stepRow(
+                    icon: "circle.lefthalf.filled",
+                    title: "Choose Your Theme",
+                    detail: hasTheme ? "Chosen — change it any time in Settings" : "Try the day/night scene and pick a look",
+                    isDone: hasTheme,
+                    isRequired: false,
+                    action: {
+                        // The scene opens matching the app's current real
+                        // look — the selector right below writes the
+                        // actual preference.
+                        dayNight = (colorScheme == .dark) ? 1 : 0
+                    }
+                )
+            }
+
+            // The interactive day/night scene + the REAL selector — the
+            // illustration is pure demo; the buttons below write the same
+            // preference Settings › Appearance writes.
             ThemeDemoScene(dayNight: $dayNight)
+                .padding(.top, 24)
 
             themeSelector
-                .padding(.top, 22)
+                .padding(.top, 14)
         }
     }
 
     /// The REAL selector — writes the app's actual appearance preference
-    /// (the same one Settings › Appearance uses), and only an explicit pick
-    /// marks the theme step complete.
+    /// (the same one Settings › Appearance uses), and only an explicit
+    /// pick marks the theme step complete.
     private var themeSelector: some View {
         VStack(spacing: 10) {
             HStack(spacing: 10) {
@@ -339,67 +571,7 @@ struct OnboardingView: View {
         .accessibilityLabel("\(title) appearance")
     }
 
-    /// Page 2 — the setup checklist: the four things that make Shirox
-    /// yours, each with its real completion state and its real action.
-    private var checklistPage: some View {
-        onboardingScroll {
-            Text("Set up Shirox")
-                .font(.system(size: 27, weight: .bold))
-                .multilineTextAlignment(.center)
-
-            Text("Shirox doesn't host any content. Connect a source and it becomes your library — tracked, downloaded and played on this device. Everything here is optional except the first.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.top, 8)
-                .padding(.bottom, 22)
-
-            VStack(spacing: 10) {
-                stepRow(
-                    icon: "square.grid.2x2.fill",
-                    title: "Add a Module",
-                    detail: hasSource
-                        ? "\(moduleManager.modules.count) module\(moduleManager.modules.count == 1 ? "" : "s") connected"
-                        : "Pick one from the Module Store — or paste a URL, use Jellyfin, or play local files",
-                    isDone: hasSource,
-                    isRequired: true
-                ) { showSources = true }
-
-                stepRow(
-                    icon: "person.crop.circle.badge.checkmark",
-                    title: "Connect Tracking",
-                    detail: trackerDetail,
-                    isDone: hasTracker,
-                    isRequired: false,
-                    action: signInToAniList
-                )
-
-                stepRow(
-                    icon: "bell.badge.fill",
-                    title: "Enable Notifications",
-                    detail: notificationDetail,
-                    isDone: notificationsOn,
-                    isRequired: false,
-                    action: { showPermissionSheet = true }
-                )
-
-                stepRow(
-                    icon: "circle.lefthalf.filled",
-                    title: "Choose Your Theme",
-                    detail: hasTheme ? "Chosen — change it any time in Settings" : "Try the day/night demo and pick a look",
-                    isDone: hasTheme,
-                    isRequired: false,
-                    action: { flow.goToSetupPage(2) }
-                )
-            }
-
-            Text("You can change any of this later in Settings.")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-                .multilineTextAlignment(.center)
-                .padding(.top, 24)
-        }
-    }
+    // MARK: - Shared page pieces
 
     private var trackerDetail: String {
         if aniListAuth.isLoggedIn && malAuth.isLoggedIn { return "AniList and MyAnimeList" }
@@ -416,7 +588,27 @@ struct OnboardingView: View {
         }
     }
 
-    // MARK: - Page scaffolding
+    /// A compact one-line highlight — the guide's content atom (no giant
+    /// empty cards, no decorative filler).
+    private func guideHighlight(icon: String, text: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(accent)
+                .frame(width: 24)
+            Text(text)
+                .font(.subheadline)
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.secondary.opacity(0.07))
+        )
+    }
 
     private func onboardingScroll<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
         ScrollView {
@@ -424,14 +616,14 @@ struct OnboardingView: View {
                 content()
             }
             .padding(.horizontal, 24)
-            .padding(.top, 18)
+            .padding(.top, 12)
             .padding(.bottom, 24)
             .frame(maxWidth: .infinity)
         }
         .frame(maxHeight: .infinity)
     }
 
-    // MARK: - Steps (the checklist's live rows)
+    // MARK: - Setup cards (live rows with real actions)
 
     @ViewBuilder
     private func stepRow(

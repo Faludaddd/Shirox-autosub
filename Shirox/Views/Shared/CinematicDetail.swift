@@ -481,6 +481,5 @@ struct CinematicChip: View {
             .foregroundStyle(.white.opacity(0.85))
             .padding(.horizontal, 14).padding(.vertical, 7)
             .background(.ultraThinMaterial, in: Capsule())
-            .overlay(Capsule().strokeBorder(Color.white.opacity(0.12), lineWidth: 0.5))
     }
 }
