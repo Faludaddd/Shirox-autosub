@@ -454,6 +454,7 @@ struct ChartSection: View {
 
     // MARK: Header
 
+    @ViewBuilder
     private var header: some View {
         if nativeStyle {
             // The Apple presentation's plain system header — the same
