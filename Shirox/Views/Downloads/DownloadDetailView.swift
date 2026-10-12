@@ -78,7 +78,7 @@ struct DownloadDetailView: View {
         .alert(item: $findFileAlert) { alert in
             if alert.canShare, let path = alert.filePath {
                 let url = URL(fileURLWithPath: path)
-                Alert(
+                return Alert(
                     title: Text(alert.title),
                     message: Text(alert.message + "\n\n" + path),
                     primaryButton: .default(Text("Share File")) { shareFile(url) },
@@ -87,7 +87,7 @@ struct DownloadDetailView: View {
                     }
                 )
             } else {
-                Alert(
+                return Alert(
                     title: Text(alert.title),
                     message: Text(alert.message + ((alert.filePath?.isEmpty == false) ? "\n\n" + alert.filePath! : "")),
                     dismissButton: .default(Text("OK"))
