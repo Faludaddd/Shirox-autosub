@@ -30,7 +30,7 @@
           "version": "2.34",
           "date": "2026-10-12",
           "localizedDescription": "v2.34 — The interactive onboarding release. The generic intro slides are gone: onboarding is now a spotlight-guided tour of the REAL app — it dims the interface and zooms between the actual tabs (Home, Library, Search, Downloads, Schedule), the live Top Charts shelf, and the bell + gear toolbar, with Next/Back/Skip and tap-to-continue, switching to each real tab as it's explained. Setup follows with a simulated notification demonstration (banners slide down while the demo badge climbs 1-5 — never touching real counts), an interactive day/night theme scene (drag the sun down, the moon up; System/Light/Dark apply for real), and a four-card checklist — Add a Module, Connect Tracking, Enable Notifications (real system permission prompt with honest granted/denied states), Choose Your Theme. Animated Tab Icons (Settings - Appearance - Motion) pop the real tab bar icons on selection and spin the Settings gear, off automatically under Reduce Motion, which the gooey pull-to-refresh now respects too. A conditional loading screen appears only when onboarding has genuine asset work (fresh install), and the whole flow pauses and resumes across launches.",
-          "size": 0
+          "size": 26487180
         },
         {
           "version": "2.33",
