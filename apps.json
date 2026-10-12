@@ -30,7 +30,7 @@
           "version": "2.33",
           "date": "2026-10-12",
           "localizedDescription": "v2.33 — The discovery release. Top Charts with time windows: Top Anime, Top Movies and Most Favorited on Home, each with a period chip (Daily / Weekly / Monthly / Quarterly / Yearly) that runs a real windowed AniList query — plus fifteen genre charts (Top Romance, Top Action, Top Isekai and more), Top Airing, Hidden Gems, Underrated, and Top Manga on the manga home. A rebuilt onboarding flow (Welcome, Discover, Library, Downloads, Schedule & Notifications, then the live setup checklist) with Next/Back/Skip/Finish that follows your theme and never nags. The Notifications screen gains a welcome banner and a Get Started with Shirox card that reopens the guide after a skip. Accounts & Tracking now leads Settings with your real profile picture and account name, and Settings search moved behind a top-right toolbar icon. Library and Home open the same anime detail page, the duplicate Library notifications bell is gone, and Home's rows load lazily as you scroll.",
-          "size": 0
+          "size": 26355736
         },
         {
           "version": "2.32",
