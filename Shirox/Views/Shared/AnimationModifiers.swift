@@ -286,9 +286,9 @@ enum TabIconAnimator {
 
         func visit(_ view: UIView) {
             let size = view.bounds.size
-            let plausibleIcon = size.width >= 10, size.width <= 44,
-                                  size.height >= 10, size.height <= 44,
-                                  abs(view.center.x - slotCenterX) < tabBar.bounds.width / CGFloat(count)
+            let plausibleIcon = size.width >= 10 && size.width <= 44
+                && size.height >= 10 && size.height <= 44
+                && abs(view.center.x - slotCenterX) < tabBar.bounds.width / CGFloat(count)
             if plausibleIcon {
                 let distance = abs(view.center.x - slotCenterX)
                 if best.map({ distance < $0.distance }) ?? true {
