@@ -18,9 +18,29 @@ cd build
 
 echo "--- Resolving Swift Package Dependencies ---"
 
-xcodebuild -resolvePackageDependencies \
-   -project "$WORKING_LOCATION/$APPLICATION_NAME.xcodeproj" \
-   -scheme "$SCHEME_NAME"
+# GitHub's release-asset CDN intermittently 504s the large binary
+# xcframework zips (MPVKit, libass, ffmpeg...). SwiftPM caches every
+# successful download in ~/Library/Caches/org.swift.swiftpm, so retrying
+# converges: each attempt only needs the assets that haven't landed yet.
+RESOLVE_TRIES=6
+RESOLVE_OK=0
+for i in $(seq 1 $RESOLVE_TRIES); do
+    if xcodebuild -resolvePackageDependencies \
+       -project "$WORKING_LOCATION/$APPLICATION_NAME.xcodeproj" \
+       -scheme "$SCHEME_NAME"; then
+        echo "--- Package resolution succeeded on attempt $i ---"
+        RESOLVE_OK=1
+        break
+    fi
+    echo "--- Resolve attempt $i/$RESOLVE_TRIES failed (CDN 504 flake?) ---"
+    if [ "$i" -lt "$RESOLVE_TRIES" ]; then
+        sleep $((i * 20))
+    fi
+done
+if [ "$RESOLVE_OK" -ne 1 ]; then
+    echo "Error: package resolution failed after $RESOLVE_TRIES attempts"
+    exit 1
+fi
 
 echo "--- Building $APPLICATION_NAME for iOS ---"
 
