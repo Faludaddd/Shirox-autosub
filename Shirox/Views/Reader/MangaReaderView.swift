@@ -942,12 +942,8 @@ struct MangaReaderView: View {
 }
 
 // MARK: - Safe indexing
-
-private extension Array {
-    subscript(safe index: Int) -> Element? {
-        indices.contains(index) ? self[index] : nil
-    }
-}
+// (v2.34: the app's one shared `[safe:]` subscript lives in
+// AnimationModifiers.swift — this file's private copy collided with it.)
 
 // MARK: - Auto-scroll driver
 

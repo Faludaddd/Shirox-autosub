@@ -261,7 +261,7 @@ private struct TourAnchorModifier: ViewModifier {
 // MARK: - Tour steps
 
 /// What a step's spotlight points at.
-enum TourTarget {
+enum TourTarget: Equatable {
     /// A bottom-bar tab item (exact slot geometry on iPhone; the top tab-bar
     /// region on iPad; a card everywhere tabs aren't in a bar).
     case tab(Int)
@@ -666,11 +666,4 @@ struct GuidedTourOverlay: View {
                         removal: .opacity))
     }
 }
-
-// MARK: - Small helpers
-
-extension Array {
-    subscript(safe index: Int) -> Element? {
-        indices.contains(index) ? self[index] : nil
-    }
-}
+// (The app's shared `[safe:]` array subscript lives in AnimationModifiers.swift.)

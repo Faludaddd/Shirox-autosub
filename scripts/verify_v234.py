@@ -155,7 +155,7 @@ requires(re.search(r"static let steps: \[TourStep\]", gt), "TourStepCatalog.step
 requires('tourAnchor("home.charts")' in hv, "HomeView anchors the Top Anime shelf")
 requires('GuidedTourOverlay()' in app, "RootTabView hosts the tour overlay")
 requires("TourAnchorKey.self" in app, "RootTabView collects tour anchors")
-requires("fullScreenCoverCompat(isPresented: $showOnboardingCover)" in app, "RootTabView presents the setup cover")
+requires("fullScreenCoverCompat(isPresented: $cover)" in app and "OnboardingFlowHost(cover: $showOnboardingCover" in app, "RootTabView (via OnboardingFlowHost) presents the setup cover")
 requires("OnboardingFlowController.shared.begin()" in app, "App begins the flow after splash")
 requires("TabIconAnimator.animateSelection" in app, "RootTabView hooks the tab icon animator")
 requires("#if os(iOS)\n            TabIconAnimator" in app or "#if os(iOS)" in app, "TabIconAnimator call platform-gated")

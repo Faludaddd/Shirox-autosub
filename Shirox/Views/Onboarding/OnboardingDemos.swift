@@ -17,7 +17,11 @@ enum OnboardingAssetLoader {
     /// artwork), or can the flow skip the loading screen entirely?
     ///
     /// Fresh installs have no shelf snapshot → real work. Returning users
-    /// have a snapshot and cached posters → straight to the tour.
+    /// have a snapshot and cached posters → straight to the tour. Runs on
+    /// the main actor (its caller is there anyway) because
+    /// `CachedAsyncImage.cachedImageData` is main-actor isolated — the
+    /// handful of small disk reads is a one-time, sub-frame cost.
+    @MainActor
     static func decide() async -> (needsLoad: Bool, media: [Media]) {
         guard let snapshot = SnapshotStore.loadHomeShelves(ignoreTTL: true),
               let trending = snapshot.trending, !trending.isEmpty else {
@@ -26,10 +30,8 @@ enum OnboardingAssetLoader {
         let candidates = Array(trending.prefix(posterCount))
         let urls = candidates.compactMap { $0.coverImage.best }
         // Everything already on disk? Then there is nothing to show a
-        // loading screen for. (Disk reads stay off the main thread.)
-        let cachedCount = await Task.detached(priority: .userInitiated) {
-            urls.filter { CachedAsyncImage.cachedImageData(for: $0) != nil }.count
-        }.value
+        // loading screen for.
+        let cachedCount = urls.filter { CachedAsyncImage.cachedImageData(for: $0) != nil }.count
         let needed = min(3, urls.count)
         return (cachedCount < needed, candidates)
     }
@@ -65,13 +67,12 @@ enum OnboardingAssetLoader {
         let deadline = Date().addingTimeInterval(12)
         for url in urls {
             guard Date() < deadline else { break }
-            let options: KingfisherOptionsInfo = [.downloadTimeout(6)]
             _ = try? await withCheckedThrowingContinuation { (cont: CheckedContinuation<KFCrossPlatformImage?, Error>) in
                 guard let requestURL = URL(string: url) else {
                     cont.resume(returning: nil)
                     return
                 }
-                KingfisherManager.shared.retrieveImage(with: requestURL, options: options) { result in
+                KingfisherManager.shared.retrieveImage(with: requestURL) { result in
                     switch result {
                     case .success(let value): cont.resume(returning: value.image)
                     case .failure(let error): cont.resume(throwing: error)
@@ -173,7 +174,7 @@ struct SimulatedNotificationDemo: View {
     private var banners: [DemoBannerContent] {
         let first = media.first?.title.displayTitle ?? "Example Series"
         let second = media.dropFirst().first?.title.displayTitle ?? "Another Series"
-        let moduleName = ModuleManager.shared.modules.first?.name ?? "Your first module"
+        let moduleName = ModuleManager.shared.modules.first?.sourceName ?? "Your first module"
         return [
             DemoBannerContent(id: 0, icon: "tv.fill", tint: .accentColor,
                               title: "New Episode",
@@ -716,7 +717,10 @@ struct NotificationPermissionSheet: View {
             // again, so be honest and take the user to Settings instead.
             #if os(iOS)
             if let url = URL(string: UIApplication.openSettingsURLString) {
-                UIApplication.shared.open(url)
+                // Explicit completionHandler selects the synchronous
+                // overload — this is an async context, and a bare open(url)
+                // would resolve to the async one.
+                UIApplication.shared.open(url, options: [:], completionHandler: nil)
             }
             #endif
             return

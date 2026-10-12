@@ -255,23 +255,23 @@ enum TabIconAnimator {
             .compactMap { $0 as? UIWindowScene }
             .flatMap { $0.windows }
         for window in windows where window.isKeyWindow {
-            if let bar = Self.firstSubview(of: UITabBar.self, in: window) {
+            if let bar: UITabBar = firstSubview(of: UITabBar.self, in: window) {
                 return bar
             }
         }
         // Fall back to any window at all (e.g. during transitions).
         for window in windows {
-            if let bar = Self.firstSubview(of: UITabBar.self, in: window) {
+            if let bar: UITabBar = firstSubview(of: UITabBar.self, in: window) {
                 return bar
             }
         }
         return nil
     }
 
-    private static func firstSubview(of kind: AnyClass, in view: UIView) -> UIView? {
-        if view.isKind(of: kind) { return view }
+    private static func firstSubview<T: UIView>(of kind: T.Type, in view: UIView) -> T? {
+        if let match = view as? T { return match }
         for subview in view.subviews {
-            if let found = firstSubview(of: kind, in: subview) { return found }
+            if let found: T = firstSubview(of: kind, in: subview) { return found }
         }
         return nil
     }
@@ -302,3 +302,15 @@ enum TabIconAnimator {
     }
 }
 #endif
+
+// MARK: - Safe array indexing (shared)
+
+/// The app's ONE safe-subscript extension (v2.34): the tour controller, the
+/// onboarding demos, and the manga reader all index bounded collections
+/// through it. It replaces MangaReaderView's old file-private copy, which
+/// collided with the module-level one.
+extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
+    }
+}
