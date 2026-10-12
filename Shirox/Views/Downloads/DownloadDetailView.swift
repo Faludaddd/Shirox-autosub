@@ -76,7 +76,8 @@ struct DownloadDetailView: View {
         // v2.32 — Find File's honest outcomes: missing file, unreadable file,
         // or the Files app refusing the trip (then with Copy Path / Share).
         .alert(item: $findFileAlert) { alert in
-            if alert.canShare, let path = alert.filePath, let url = URL(fileURLWithPath: path) {
+            if alert.canShare, let path = alert.filePath {
+                let url = URL(fileURLWithPath: path)
                 Alert(
                     title: Text(alert.title),
                     message: Text(alert.message + "\n\n" + path),
@@ -403,7 +404,7 @@ struct DownloadDetailView: View {
         let relative = url.path.hasPrefix(docsPrefix)
             ? String(url.path.dropFirst(docsPrefix.count))
             : url.lastPathComponent
-        let encoded = relative.split(separator: "/").map { $0.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? $0 }.joined(separator: "/")
+        let encoded = relative.split(separator: "/").map { $0.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? String($0) }.joined(separator: "/")
 
         if let filesURL = URL(string: "shareddocuments:///\(encoded)") {
             UIApplication.shared.open(filesURL) { opened in

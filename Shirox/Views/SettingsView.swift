@@ -3149,9 +3149,10 @@ struct ModuleStorePage: View {
                                 .padding(.horizontal, 14)
                             LazyVGrid(columns: columns, spacing: 12) {
                                 ForEach(popularSources) { mod in
-                                    StoreModuleTile(mod: mod, isInstalled: isModuleInstalled(mod), isInstalling: isInstalling, layout: layout,
+                                    StoreModuleTile(mod: mod, isInstalled: isModuleInstalled(mod), isInstalling: isInstalling,
                                                     onInstall: { installModule(mod) },
-                                                    onOpenDetails: { detailItem = mod })
+                                                    onOpenDetails: { detailItem = mod },
+                                                    layout: layout)
                                 }
                             }
                             .padding(.horizontal, 14)
@@ -3166,9 +3167,10 @@ struct ModuleStorePage: View {
                                 .padding(.top, 4)
                             LazyVGrid(columns: columns, spacing: 12) {
                                 ForEach(communitySources) { mod in
-                                    StoreModuleTile(mod: mod, isInstalled: isModuleInstalled(mod), isInstalling: isInstalling, layout: layout,
+                                    StoreModuleTile(mod: mod, isInstalled: isModuleInstalled(mod), isInstalling: isInstalling,
                                                     onInstall: { installModule(mod) },
-                                                    onOpenDetails: { detailItem = mod })
+                                                    onOpenDetails: { detailItem = mod },
+                                                    layout: layout)
                                 }
                             }
                             .padding(.horizontal, 14)
@@ -3183,9 +3185,10 @@ struct ModuleStorePage: View {
                             .padding(.horizontal, 14)
                         LazyVGrid(columns: columns, spacing: 12) {
                             ForEach(filteredModules) { mod in
-                                StoreModuleTile(mod: mod, isInstalled: isModuleInstalled(mod), isInstalling: isInstalling, layout: layout,
+                                StoreModuleTile(mod: mod, isInstalled: isModuleInstalled(mod), isInstalling: isInstalling,
                                                 onInstall: { installModule(mod) },
-                                                onOpenDetails: { detailItem = mod })
+                                                onOpenDetails: { detailItem = mod },
+                                                layout: layout)
                             }
                         }
                         .padding(.horizontal, 14)
