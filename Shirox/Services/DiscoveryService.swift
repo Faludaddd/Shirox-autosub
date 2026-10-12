@@ -46,6 +46,11 @@ struct DiscoveryGenre: Identifiable, Hashable, Codable {
         DiscoveryGenre(id: "music", displayName: "Music", anilistName: "Music", malGenreId: 19),
         DiscoveryGenre(id: "historical", displayName: "Historical", anilistName: "Historical", malGenreId: 13),
         DiscoveryGenre(id: "mecha", displayName: "Mecha", anilistName: "Mecha", malGenreId: 18),
+        // v2.33 — Isekai joins the taxonomy for the Top Charts. AniList
+        // indexes it as a TAG (genre_in returns empty there, the same
+        // hand-off Historical has always had), while MAL carries it as a
+        // real genre (id 62) — so the chain serves it from the MAL leg.
+        DiscoveryGenre(id: "isekai", displayName: "Isekai", anilistName: "Isekai", malGenreId: 62),
     ]
 
     /// Names the Kitsu category-to-genre classifier accepts (Kitsu mixes
@@ -295,13 +300,9 @@ final class DiscoveryService {
     }
 
     // MARK: - Home genre shelves
-
-    /// The genres shown as Home shelves. Deliberately a small, stable set
-    /// (the page also carries six standard shelves); each shelf and its
-    /// See All page share ONE query — the same genre, the same chain, the
-    /// same cache (page 1 of the See All grid IS the shelf).
-    static let homeShelfGenres: [DiscoveryGenre] = {
-        ["action", "fantasy", "romance", "drama", "comedy", "science-fiction"]
-            .compactMap { DiscoveryGenre.bySlug($0) }
-    }()
+    // v2.33 — `homeShelfGenres` (the six fixed genre shelves) moved to the
+    // Top Chart system: the genre rows on Home are `TopChart.genreCharts`
+    // (fifteen genres, period-windowed, lazily loaded through the same
+    // chain). The genre taxonomy itself (`catalog`) is unchanged and still
+    // powers Surprise Me and every genre See All page.
 }

@@ -17,10 +17,8 @@ struct LibraryView: View {
     @ObservedObject private var providerManager = ProviderManager.shared
     @State private var showProfile = false
     /// What sheets grow out of: an entry's row for its edit sheet, the account chip for the
-    /// profile and notifications, the sort menu for collections.
+    /// profile sheet, the sort menu for collections.
     @Namespace private var sheetZoom
-    @State private var showNotifications = false
-    @StateObject private var profileVM = ProfileViewModel()
     @State private var searchText = ""
     @AppStorage("librarySortOrder") private var sortOrderRaw: String = LibrarySortOrder.score.rawValue
     @AppStorage("librarySortAscending") private var sortAscending = false
@@ -59,22 +57,15 @@ struct LibraryView: View {
     @State private var resolvingMangaId: Int? = nil
     @State private var pendingAniListMangaMedia: Media? = nil
     @State private var aniListMangaLinkActive = false
-    /// Drives the hidden DetailView NavigationLink for anime entries
-    /// tapped in the Library list/grid. When the user taps an anime
-    /// that has no linked module source, we asynchronously resolve the
-    /// title through an installed anime module (see `openAnime`) and
-    /// push DetailView directly — so the user lands on a page WITH
-    /// episodes, instead of the episode-less AniListDetailView.
-    @State private var pendingAnimeDetailItem: SearchItem? = nil
-    @State private var pendingAnimeDetailModuleId: String? = nil
-    @State private var animeDetailLinkActive = false
     /// Drives the hidden AniListDetailView NavigationLink for anime
-    /// entries tapped in the Library list/grid (when no linked module).
+    /// entries tapped in the Library list/grid. v2.33 — anime taps ALWAYS
+    /// land on AniListDetailView now: the same shared detail page Home,
+    /// Search and Browse push (MediaDestination), with its full metadata,
+    /// recommendations, images and actions. AniListDetailView resolves
+    /// episodes and streams itself, so nothing the old module-first
+    /// shortcut provided is lost — the two entry points are one page now.
     @State private var pendingAnimeMedia: Media? = nil
     @State private var animeLinkActive = false
-    /// Media ID of the anime currently being resolved through a module
-    /// (drives the row spinner overlay during async resolution).
-    @State private var resolvingAnimeId: Int? = nil
     #if os(iOS)
     @State private var presentationWindow: UIWindow?
     #endif
@@ -551,27 +542,10 @@ struct LibraryView: View {
         .hidden()
     }
 
-    /// Hidden link for anime DetailView (the page WITH episodes). Driven
-    /// by `openAnime` after async module resolution succeeds — pushes
-    /// DetailView with the resolved SearchItem + moduleId so the user
-    /// lands directly on the episode list, not the stats-only
-    /// AniListDetailView.
-    @ViewBuilder private var animeDetailNavLink: some View {
-        NavigationLink(
-            destination: Group {
-                if let item = pendingAnimeDetailItem {
-                    DetailView(item: item, moduleId: pendingAnimeDetailModuleId)
-                }
-            },
-            isActive: $animeDetailLinkActive
-        ) { EmptyView() }
-        .hidden()
-    }
-
-    /// Hidden link for anime entries without a linked module: opens
-    /// AniListDetailView (which has its own data loading — no module
-    /// href needed). This prevents the blank page that occurred when
-    /// pushing DetailView with an empty href.
+    /// Hidden link for anime rows: opens the AniList-backed detail — the
+    /// SAME page Home navigates to (MediaDestination), which has its own
+    /// data loading (no module href needed) and resolves episodes,
+    /// recommendations and streams itself.
     @ViewBuilder private var animeNavLink: some View {
         NavigationLink(
             destination: Group {
@@ -598,30 +572,15 @@ struct LibraryView: View {
         }
     }
 
-    /// Anime entries: ALWAYS navigate to DetailView (the page with episodes).
-    /// If the entry has a linked module, use it directly. If not, open the
-    /// AniList-backed detail which has its own data loading (doesn't need a
-    /// module href). NEVER route to a module-less DetailView with an empty
-    /// href (blank page — DetailViewModel.load() guards on it) — every anime
-    /// tap from Library lands on a working page, every time, no exceptions.
+    /// v2.33 — Anime entries navigate to AniListDetailView — the exact
+    /// same shared detail page Home, Search and Browse open
+    /// (MediaDestination(media:)). One detail experience from every entry
+    /// point: full metadata, recommendations, images and actions, with
+    /// episodes and streams resolved by the page itself. The back button
+    /// pops to whichever screen pushed (Library here), because the push
+    /// rides this screen's own NavigationStack.
     private func openAnime(_ entry: LibraryEntry) {
         newEpisodes.markOpened(entry)
-        // Branch 1: entry already has a linked module source — go
-        // straight to DetailView with that module (no resolution needed).
-        if let source = entry.localSource, source.kind == .module,
-           let href = source.detailHref, !href.isEmpty {
-            pendingAnimeDetailItem = SearchItem(
-                title: entry.media.title.displayTitle,
-                image: entry.media.coverImage.best ?? "",
-                href: href)
-            pendingAnimeDetailModuleId = source.moduleId
-            animeDetailLinkActive = true
-            return
-        }
-
-        // Branch 2: no linked module — open AniListDetailView which has
-        // its own data loading (doesn't need a module href). This is the
-        // same page that Search/Browse/Home navigate to for anime.
         pendingAnimeMedia = entry.media
         animeLinkActive = true
     }
@@ -652,39 +611,28 @@ struct LibraryView: View {
 
     // MARK: - Toolbar
 
-    /// The account chip — notifications and profile, or signing in.
+    /// The account chip — the profile (or signing in). v2.33: the
+    /// notifications bell is gone from the Library toolbar (Home's bell
+    /// and the Profile sheet remain the notification entry points); the
+    /// chip keeps its shape so the toolbar stays aligned.
     @ViewBuilder
     private var accountToolbarItem: some View {
         if isActiveProviderAuthenticated {
-            HStack(spacing: 10) {
-                if activeProviderType == .anilist {
-                    Button {
-                        anilistAuth.unreadNotificationCount = 0
-                        showNotifications = true
-                    } label: {
-                        Image(systemName: "bell")
-                            .font(.system(size: 17, weight: .medium))
-                            .notificationBadge(count: anilistAuth.unreadNotificationCount)
+            Button {
+                showProfile = true
+            } label: {
+                HStack(spacing: 6) {
+                    if let url = activeAvatarURL {
+                        CachedAsyncImage(urlString: url)
+                            .frame(width: 28, height: 28)
+                            .clipShape(Circle())
                     }
-                    Divider().frame(height: 16)
+                    Text(displayUsername)
+                        .font(.subheadline.weight(.medium))
+                        .layoutPriority(1)
                 }
-
-                Button {
-                    showProfile = true
-                } label: {
-                    HStack(spacing: 6) {
-                        if let url = activeAvatarURL {
-                            CachedAsyncImage(urlString: url)
-                                .frame(width: 28, height: 28)
-                                .clipShape(Circle())
-                        }
-                        Text(displayUsername)
-                            .font(.subheadline.weight(.medium))
-                            .layoutPriority(1)
-                    }
-                }
-                .buttonStyle(.plain)
             }
+            .buttonStyle(.plain)
             .padding(.horizontal, 8)
         } else {
             Menu {
@@ -719,13 +667,6 @@ struct LibraryView: View {
     }
 
     // MARK: - Entries list
-
-    /// Refreshes the AniList unread-notification count when signed in to AniList; no-op otherwise.
-    private func refreshUnreadCountIfNeeded() async {
-        if activeProviderType == .anilist && anilistAuth.isLoggedIn {
-            await anilistAuth.refreshUnreadCount()
-        }
-    }
 
     @ViewBuilder
     private func entryRow(_ entry: LibraryEntry) -> some View {
@@ -814,19 +755,14 @@ struct LibraryView: View {
     }
 
     /// Module-scraped and AniList/MAL entries navigate to a detail screen. Anime rows use
-    /// `openAnime` (module-first routing → DetailView with episodes) instead of a synchronous
-    /// NavigationLink to AniListDetailView (which has no episode list).
+    /// `openAnime` — v2.33: the same shared AniListDetailView Home, Search and Browse push,
+    /// so both entry points land on the identical detail experience.
     @ViewBuilder
     private func navigableRow(_ entry: LibraryEntry) -> some View {
         LibraryRowView(entry: entry, scoreFormat: scoreFormat) {
             editEntry(entry)
         }
         .zoomSource(entry.id, in: sheetZoom)
-        .overlay(alignment: .center) {
-            if resolvingAnimeId == entry.media.id {
-                ProgressView()
-            }
-        }
         .contentShape(Rectangle())
         .onTapGesture { openAnime(entry) }
     }
@@ -901,9 +837,7 @@ struct LibraryView: View {
     private func refreshLibrary() async {
         // An explicit user request, so it always checks — the away-time throttle is
         // for automatic checks only.
-        async let count: Void = refreshUnreadCountIfNeeded()
         await vm.refresh()
-        await count
     }
 
     @ViewBuilder
@@ -1103,14 +1037,12 @@ struct LibraryView: View {
             }
             #endif
         }
-        // Hidden programmatic links — ours: module-first routing for anime + manga rows.
+        // Hidden programmatic links — ours: shared detail-page routing for
+        // anime + manga rows (v2.33: anime rows use the same
+        // AniListDetailView every other surface pushes).
         .background { mangaNavLink }
         .background { aniListMangaNavLink }
-        .background { animeDetailNavLink }
         .background { animeNavLink }
-        .navigationDestinationCompat(isPresented: $showNotifications) {
-            NotificationsView(vm: profileVM)
-        }
         .toolbarZoomSource("sort", in: sheetZoom, placement: toolbarItemPlacement[0]) { sortMenu }
         .toolbarZoomSource("account", in: sheetZoom, placement: toolbarItemPlacement[1]) { accountToolbarItem }
         .task { await vm.autoRefreshIfNeeded() }
@@ -1121,7 +1053,6 @@ struct LibraryView: View {
                 .compactMap { $0 as? UIWindowScene }
                 .flatMap { $0.windows }
                 .first { $0.isKeyWindow }
-            Task { await refreshUnreadCountIfNeeded() }
         }
         #endif
         .onChangeOf(anilistAuth.isLoggedIn) { newValue in

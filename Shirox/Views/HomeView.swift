@@ -115,24 +115,35 @@ struct HomeView: View {
             }
             #endif
             ZStack(alignment: .topLeading) {
-                VStack(alignment: .leading, spacing: 24) {
+                // v2.33 — LazyVStack: the chart rows below the fold load on
+                // approach (one chain-cached request each) instead of every
+                // discovery query firing the moment Home opens. The stack's
+                // identity/transition behavior (the provider page-turn) is
+                // unchanged — lazy realization is orthogonal to it.
+                LazyVStack(alignment: .leading, spacing: 24) {
                     if browseCategoriesGridLayout {
                         browseCategoriesGrid
                     } else {
                         AnimeSection(title: "This Season", items: vm.seasonal, query: .category(.seasonal))
+                        // v2.33 — the Top Charts: windowable discovery rows
+                        // (Top Anime — Weekly ▾) plus the fixed-signal charts.
+                        // Each row owns its load through the same unified
+                        // chain, keeps its own period selection, and its See
+                        // All pages THE SAME chart+period query.
+                        ChartSection(chart: .topAnime)
                         AnimeSection(title: "Trending Now", items: vm.trending, query: .category(.trending))
+                        ChartSection(chart: .topMovies)
+                        ChartSection(chart: .mostFavorited)
                         AnimeSection(title: "All-Time Popular", items: vm.popular, query: .category(.popular))
                         AnimeSection(title: "Top Rated", items: vm.topRated, query: .category(.topRated))
+                        ChartSection(chart: .topAiring)
                         AnimeSection(title: "Recently Completed", items: vm.recentlyCompleted, query: .category(.recentlyCompleted))
                         AnimeSection(title: "Upcoming", items: vm.upcoming, query: .category(.upcoming))
-                        // Batch 26 — genre shelves from the discovery database's own
-                        // category taxonomy; each row is page 1 of the SAME genre query
-                        // its See All page pages through.
-                        ForEach(DiscoveryService.homeShelfGenres) { genre in
-                            if let items = vm.genreShelves[genre.slug], !items.isEmpty {
-                                AnimeSection(title: genre.displayName, items: items, query: .genre(genre))
-                            }
+                        ForEach(TopChart.genreCharts) { chart in
+                            ChartSection(chart: chart)
                         }
+                        ChartSection(chart: .hiddenGems)
+                        ChartSection(chart: .underrated)
                     }
                 }
                 .id(homePage)
@@ -1321,7 +1332,10 @@ private struct AnimeSection: View {
 
 // MARK: - Press Style
 
-private struct HomePressStyle: ButtonStyle {
+/// v2.33 — internal (was file-private): the Top Chart sections in
+/// BrowseView.swift reuse this exact press style so every Home card
+/// behaves identically.
+struct HomePressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.94 : 1.0)

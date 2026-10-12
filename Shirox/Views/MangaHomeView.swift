@@ -99,6 +99,13 @@ struct MangaHomeContent: View {
                             mangaBrowseGrid
                         } else {
                             MangaSection(title: "Trending Manga", items: vm.trending)
+                            // v2.33 — the Top Manga chart: the top of what
+                            // premiered in the selected window (Weekly by
+                            // default), the same period-chip + See All
+                            // system the anime home's Top Charts use.
+                            ForEach(TopChart.mangaCharts) { chart in
+                                ChartSection(chart: chart)
+                            }
                             MangaSection(title: "All-Time Popular", items: vm.popular)
                             MangaSection(title: "Top Rated", items: vm.topRated)
                             MangaSection(title: "Latest Manga", items: vm.latest)

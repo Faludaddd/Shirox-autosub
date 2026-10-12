@@ -39,10 +39,49 @@ struct NotificationsView: View {
     /// Layout toggle: list (default, full row per notification) or grid
     /// (2×2 compact cards). Persists across launches.
     @AppStorage("notificationsGridLayout") private var isGridLayout = false
+    /// v2.33 — the welcome banner shows once per user (until dismissed).
+    @AppStorage("notificationsWelcomeDismissed") private var welcomeDismissed = false
+    /// v2.33 — onboarding state, observed so the Get Started card appears
+    /// and retires itself live as the user's setup state changes.
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @AppStorage("onboardingWasSkipped") private var onboardingWasSkipped = false
+    @State private var showOnboardingFromCard = false
+
+    /// The welcome banner is for users who haven't finished (or skipped)
+    /// onboarding — existing installs never see it — and disappears for
+    /// good once dismissed.
+    private var showsWelcomeBanner: Bool {
+        (!hasCompletedOnboarding || onboardingWasSkipped) && !welcomeDismissed
+    }
+
+    /// The Get Started card stays while onboarding was skipped, and
+    /// retires itself the moment the guide is finished for real.
+    private var showsOnboardingCard: Bool {
+        onboardingWasSkipped
+    }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                // v2.33 — the welcome banner and the Get Started card sit
+                // at the top of the Notifications screen (in-app cards, not
+                // system notifications, and never popups).
+                if showsWelcomeBanner || showsOnboardingCard {
+                    VStack(spacing: 10) {
+                        if showsWelcomeBanner {
+                            welcomeBanner
+                                .transition(.move(edge: .top).combined(with: .opacity))
+                        }
+                        if showsOnboardingCard {
+                            onboardingCard
+                                .transition(.move(edge: .top).combined(with: .opacity))
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+                    .padding(.bottom, 4)
+                }
+
                 filterBar
                     .padding(.horizontal)
                     .padding(.vertical, 8)
@@ -96,6 +135,14 @@ struct NotificationsView: View {
             }
         }
         .task { if vm.notifications.isEmpty { await vm.loadNotifications() } }
+        .fullScreenCoverCompat(isPresented: $showOnboardingFromCard) {
+            // The actual onboarding flow — the same screen a fresh install
+            // sees, reopened from the Get Started card. Finishing (or
+            // skipping) it writes the persistent flags, and the card behind
+            // updates itself the moment the cover comes down.
+            OnboardingView()
+                .environmentObject(ModuleManager.shared)
+        }
         #if os(iOS)
         // Full-height sheet — medium detent constrains the List and prevents
         // swipe gestures from registering properly.
@@ -106,6 +153,120 @@ struct NotificationsView: View {
         .frame(minWidth: 480, minHeight: 360)
 
         #endif
+    }
+
+    // MARK: - Welcome banner (v2.33)
+
+    /// A friendly, one-time greeting for new (or skipped-setup) users —
+    /// matching the app's design and theme, dismissible, never repeating
+    /// once dismissed. This is an in-app card, not a system notification.
+    private var welcomeBanner: some View {
+        HStack(alignment: .center, spacing: 12) {
+            Image(systemName: "hand.wave.fill")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(Color.appAccent)
+                .frame(width: 40, height: 40)
+                .background(Circle().fill(Color.appAccent.opacity(0.12)))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Welcome to Shirox")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                Text("New episodes, activity and alerts land here.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 4)
+
+            Button {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    welcomeDismissed = true
+                }
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Dismiss welcome message")
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.appAccent.opacity(0.08))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.appAccent.opacity(0.18), lineWidth: 1)
+        )
+    }
+
+    // MARK: - Onboarding card (v2.33)
+
+    /// The "Get Started with Shirox" card — the way back into the
+    /// onboarding guide for users who skipped it or want to revisit it.
+    /// Tapping opens the actual onboarding flow; the card retires itself
+    /// once the guide is finished for real.
+    private var onboardingCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                // The app's own mark on the accent tile — the same emblem
+                // the onboarding screen carries.
+                Image("ShiroMark")
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 22, height: 22)
+                    .foregroundStyle(Color.appAccentForeground)
+                    .frame(width: 40, height: 40)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color.appAccent)
+                    )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Get Started with Shirox")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.primary)
+                    Text("Learn the app's features and finish setting up your sources and accounts.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            Button {
+                Haptics.light()
+                showOnboardingFromCard = true
+            } label: {
+                HStack(spacing: 6) {
+                    Text("Start Guide")
+                        .font(.subheadline.weight(.semibold))
+                    Image(systemName: "arrow.right")
+                        .font(.caption.weight(.semibold))
+                }
+                .foregroundStyle(Color.appAccentForeground)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.appAccent)
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Start the Shirox guide")
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.secondary.opacity(0.08))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.appAccent.opacity(0.15), lineWidth: 1)
+        )
     }
 
     // MARK: - Filter bar

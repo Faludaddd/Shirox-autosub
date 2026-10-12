@@ -911,6 +911,107 @@ final class AniListService {
         return try await fetchPage(query: query, variables: variables)
     }
 
+    /// v2.33 — one Top Chart's windowed query (the data layer under
+    /// `UnifiedProviderSystem.browse(chart:)`). The chart carries its own
+    /// sort (POPULARITY_DESC / FAVOURITES_DESC / SCORE_DESC), optional
+    /// format / genre / airing filters, optional score-and-popularity
+    /// caps (Hidden Gems / Underrated), and — when a period is selected —
+    /// a `startDate_greater` window (FuzzyDateInt), the SAME parameter
+    /// shape advanced search uses. Every filter is a real AniList Media
+    /// argument; nothing is ranked or invented client-side.
+    func chartBrowse(chart: TopChart, period: ChartPeriod?, page: Int) async throws -> [AniListMedia] {
+        // The anime chart template mirrors browse(category:) (episodes,
+        // duration, next airing, studios); the manga template mirrors
+        // mangaGenreBrowse (chapters, volumes). One function, two field
+        // sets — the same single-template discipline as the siblings.
+        var mediaArgs: [String]
+        var fields: String
+        if chart.isManga {
+            mediaArgs = ["type: MANGA", "isAdult: false"]
+            fields = """
+              id
+              idMal
+              title { romaji english native }
+              coverImage { large extraLarge }
+              bannerImage
+              description(asHtml: false)
+              chapters
+              volumes
+              status
+              format
+              seasonYear
+              startDate { year month day }
+              averageScore
+              popularity
+              genres
+              countryOfOrigin
+            """
+        } else {
+            mediaArgs = ["type: ANIME", "isAdult: false", "countryOfOrigin: \"JP\""]
+            fields = """
+              id
+              idMal
+              title { romaji english native }
+              coverImage { large extraLarge }
+              bannerImage
+              description(asHtml: false)
+              episodes
+              duration
+              status
+              source
+              format
+              season
+              seasonYear
+              startDate { year month day }
+              endDate { year month day }
+              nextAiringEpisode { episode airingAt timeUntilAiring }
+              averageScore
+              popularity
+              genres
+              countryOfOrigin
+              studios { edges { isMain node { id name } } }
+            """
+        }
+
+        mediaArgs.append("sort: \(chart.sort)")
+        if let format = chart.format {
+            mediaArgs.append("format: \(format)")
+        }
+        if chart.airingOnly {
+            mediaArgs.append("status: RELEASING")
+        }
+        if let slug = chart.genreSlug, let genre = DiscoveryGenre.bySlug(slug) {
+            mediaArgs.append("genre_in: [\(Self.graphqlQuoted(genre.anilistName))]")
+        }
+        if let minScore = chart.minScore {
+            mediaArgs.append("averageScore_greater: \(minScore)")
+        }
+        if let maxPopularity = chart.maxPopularity {
+            mediaArgs.append("popularity_lesser: \(maxPopularity)")
+        }
+
+        var varDecls = ["$page: Int"]
+        var variables: [String: Any] = ["page": page]
+        if let period {
+            mediaArgs.append("startDate_greater: $startDate")
+            varDecls.append("$startDate: FuzzyDateInt")
+            variables["startDate"] = period.fuzzyStart
+        }
+
+        let argList = mediaArgs.joined(separator: ", ")
+        let varDeclList = varDecls.joined(separator: ", ")
+        let query = """
+        query (\(varDeclList)) {
+          Page(page: $page, perPage: 20) {
+            media(\(argList)) {
+              \(fields)
+            }
+          }
+        }
+        """
+        return try await fetchPage(query: query, variables: variables)
+    }
+
     /// Batch 26 — anime in one GENRE (the discovery chain's AniList leg).
     /// `genre_in` takes genre names; AniList's taxonomy is narrower than
     /// Kitsu's (no "Historical" GENRE — it is a tag there), so a genre

@@ -9,10 +9,10 @@ final class HomeViewModel: ObservableObject {
     @Published var topRated: [Media] = []
     @Published var recentlyCompleted: [Media] = []
     @Published var upcoming: [Media] = []
-    /// Batch 26 — genre shelves (Action / Fantasy / Romance / Drama /
-    /// Comedy / Sci-Fi), keyed by genre SLUG (the stable routing
-    /// identifier — the shelf and its See All page share ONE query).
-    @Published var genreShelves: [String: [Media]] = [:]
+    /// v2.33 — the genre shelves moved out of the view model into the
+    /// Top Chart sections (`ChartSection` owns its row's load, lazily,
+    /// through the same unified chain). What remains here is the six
+    /// standard shelves plus the snapshot bookkeeping.
     @Published var isLoading = false
     @Published var error: String?
     /// v2.30 (original's home) — whose page Home is showing, driving the
@@ -76,8 +76,7 @@ final class HomeViewModel: ObservableObject {
         async let r: Void = loadTopRated()
         async let rc: Void = loadRecentlyCompleted()
         async let u: Void = loadUpcoming()
-        async let g: Void = loadGenreShelves()
-        _ = await (t, s, p, r, rc, u, g)
+        _ = await (t, s, p, r, rc, u)
 
         // Persist the last-good shelves AFTER everything settles so the
         // snapshot captures the fully-populated page. Saved per provider page
@@ -85,7 +84,6 @@ final class HomeViewModel: ObservableObject {
         if !trending.isEmpty {
             SnapshotStore.saveHomeShelves(trending: trending, seasonal: seasonal, popular: popular, topRated: topRated,
                                           recentlyCompleted: recentlyCompleted, upcoming: upcoming,
-                                          genreShelves: genreShelves,
                                           provider: feedProvider)
         }
 
@@ -146,27 +144,6 @@ final class HomeViewModel: ObservableObject {
         }
     }
 
-    /// Batch 26 — genre shelves through the SAME discovery chain the See
-    /// All genre pages use (the shelf IS page 1 of that query — one
-    /// shared, cached, health-gated request per genre). A failing genre
-    /// shelf stays empty (its row simply doesn't render) — the standard
-    /// shelves carry the page.
-    private func loadGenreShelves() async {
-        await withTaskGroup(of: (String, [Media]?).self) { group in
-            for genre in DiscoveryService.homeShelfGenres {
-                group.addTask {
-                    let list = try? await UnifiedProviderSystem.shared.browse(genre: genre, page: 1)
-                    return (genre.slug, list ?? [])
-                }
-            }
-            for await (slug, list) in group {
-                if let list, !list.isEmpty {
-                    genreShelves[slug] = list
-                }
-            }
-        }
-    }
-
     /// v2.23 — Requirement: primary trending source → fallback provider →
     /// cached trending results → offline snapshot. When both providers
     /// fail, the last-good shelves (6h TTL) keep the Home page — and its
@@ -216,9 +193,6 @@ final class HomeViewModel: ObservableObject {
         if topRated.isEmpty { topRated = snapshot.topRated ?? [] }
         if recentlyCompleted.isEmpty { recentlyCompleted = snapshot.recentlyCompleted ?? [] }
         if upcoming.isEmpty { upcoming = snapshot.upcoming ?? [] }
-        for (slug, list) in snapshot.genreShelves ?? [:] where genreShelves[slug] == nil {
-            genreShelves[slug] = list
-        }
     }
 }
 

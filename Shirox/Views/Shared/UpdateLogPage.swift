@@ -131,6 +131,32 @@ struct UpdateLogEntry {
 /// page's version buttons and the per-version changelog views read from.
 let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.33",
+        date: "2026-10-12",
+        added: [
+            "Top Charts with time windows — Top Anime, Top Movies and Most Favorited rows on Home, each with a period chip (Weekly ▾) that opens a bottom-sheet picker: Daily, Weekly, Monthly, Quarterly or Yearly. A period is a real AniList query (premieres inside the window, ranked by the chart's own metric), so switching the period genuinely changes the list — the row and its See All page always carry the same chart-and-period query, and every category remembers its own selection independently.",
+            "Fifteen genre charts — Top Romance, Top Action, Top Adventure, Top Comedy, Top Fantasy, Top Sci-Fi, Top Mystery, Top Thriller, Top Drama, Top Horror, Top Slice of Life, Top Sports, Top Supernatural, Top Psychological and Top Isekai — replace the old six fixed genre shelves, each windowable by period (Isekai honestly offers none: AniList indexes it as a tag, so its list comes from MyAnimeList's own real genre ranking rather than a window no provider can query).",
+            "Top Airing, Hidden Gems and Underrated — three more real charts: what's airing now ranked by popularity, and two score-and-audience tiers (score 75+ under 150k popularity, score 80+ under 60k) built from AniList's own filter parameters, not hand-picked lists. Top Manga joins the manga home with the same period-window system.",
+            "A rebuilt onboarding flow — a short paged introduction (Welcome, Discover, Library, Downloads, Schedule & Notifications, then the live setup checklist) with Next, Back, Skip and Finish, progress dots, and the app's own accent so it follows your theme. Skipping is always allowed and nothing is required; the guide never reappears on launch once completed, and reopening it later never touches your saved settings or accounts.",
+            "The Notifications screen greets new users: a friendly welcome banner (dismissible, never repeats once dismissed) and a Get Started with Shirox card for anyone who skipped setup — a proper in-app card with a Start Guide button that opens the real onboarding flow, and retires itself the moment the guide is finished.",
+            "Accounts & Tracking now leads Settings: a profile header at the very top with your real avatar, account name and connected services (AniList, MyAnimeList — or a polished sign-in prompt when logged out), tapping it opens the existing account page with every login, logout, linking and sync control unchanged.",
+            "Settings search is now a top-right toolbar icon — the always-visible search row is gone; tapping the magnifying glass reveals and focuses the search field (the same live SettingsSearchIndex results, deep links and filtering as before), tapping it again restores the plain category list. Works on iPhone, iPad and Mac."
+        ],
+        fixed: [
+            "Library and Home open the same anime detail page now: Library rows used to push a separate module-first detail screen, so the same show looked and behaved differently depending on where you tapped it. Both entry points land on the one shared detail experience — metadata, recommendations, images, actions, episodes — and the back button returns to the screen you came from.",
+            "The Notifications bell is gone from the Library toolbar — it duplicated the Home bell and crowded the account chip. Notifications themselves are untouched: the Home bell, the badge count, the Notifications screen and every alert setting stay as they were.",
+            "Home's discovery rows load lazily now — the sections below the fold (and there are many more of them) fetch on approach instead of all at once, and the old duplicate genre-shelf requests the view model fired eagerly are gone."
+        ],
+        changed: [
+            "Chart rows that can't be served honestly stay hidden instead of showing a mislabeled list: period-windowed queries run on the providers that can actually express the window (AniList), and an empty result collapses the row quietly while the standard shelves carry the page."
+        ],
+        improved: [
+            "Isekai joins the discovery genre taxonomy (MAL's real genre id), the Library drops an unread-count network request it no longer displayed, and dead state from the old module-first Library routing is removed."
+        ],
+        removed: [],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "2.32",
         date: "2026-10-12",
         added: [

@@ -847,6 +847,59 @@ final class UnifiedProviderSystem: ObservableObject {
         return Self.japaneseCatalogOnly(list)
     }
 
+    /// v2.33 — Top Chart browse: a Home chart row and its See All page
+    /// (both pages 1…N) run THIS one call, so a row titled "Top Anime —
+    /// Weekly" and the grid it opens share one cached, health-gated,
+    /// deduplicated request per (chart, period, page).
+    ///
+    /// The AniList leg is the ONLY leg that serves chart queries: the
+    /// window (`startDate_greater`), the score/popularity caps and the
+    /// format filter are AniList-expressible, and a fallback provider
+    /// would answer a DIFFERENT list under the same "Weekly" heading —
+    /// an honestly empty row (which collapses away) beats a mislabeled
+    /// one. Genre charts without AniList coverage (Isekai) also live
+    /// here; AniList returns empty for them and the row stays empty
+    /// until the MAL genre chart (below) serves it.
+    ///
+    /// For genre charts whose genre IS AniList-indexed the plain
+    /// `browse(genre:)` chain already covers MAL/Kitsu fallback; the
+    /// chart query adds the period window on top, which is why it runs
+    /// here — with its own cache key per period.
+    func browse(chart: TopChart, period: ChartPeriod?, page: Int) async throws -> [Media] {
+        let periodKey = period?.rawValue ?? "all"
+        // NOTE the explicit return-type annotations — the generic chain
+        // call needs the anchors to stay inside the type checker's budget
+        // (the same CI lesson the sibling browse functions carry).
+        let list: [Media] = try await runChain(
+            domain: chart.isManga ? .manga : .discovery,
+            operation: "chart-\(chart.id)",
+            cacheKey: "p\(page)-\(periodKey)",
+            cacheTTL: 15 * 60) { kind -> [Media]? in
+            switch kind {
+            case .anilist:
+                let anilist = try await AniListService.shared.chartBrowse(chart: chart, period: period, page: page)
+                if anilist.isEmpty { return nil }
+                return anilist.map { chart.isManga ? AniListProvider.shared.mapMangaMedia($0) : AniListProvider.shared.mapMedia($0) }
+            case .mal:
+                // Isekai is a MAL genre but only an AniList tag — when the
+                // chart is a genre chart MAL can express (any page), the
+                // MAL genre list serves the un-windowed fallback. Charts
+                // with windows/caps never fall back (see doc comment).
+                guard let slug = chart.genreSlug,
+                      let genre = DiscoveryGenre.bySlug(slug),
+                      period == nil,
+                      chart.minScore == nil, chart.maxPopularity == nil,
+                      chart.format == nil, !chart.airingOnly,
+                      !chart.isManga else { return nil }
+                let list = try await MALDiscoveryService.shared.genreBrowse(genre: genre, page: page)
+                return list.isEmpty ? nil : list.map { MALDiscoveryService.shared.mapToMedia($0) }
+            default:
+                return nil
+            }
+        }.value
+        return chart.isManga ? list : Self.japaneseCatalogOnly(list)
+    }
+
     /// Batch 26 — manga genre browse through the manga domain's chain
     /// (MangaBaka honestly doesn't serve genre charts — its public API is
     /// search + detail; MAL/AniList/Kitsu do).

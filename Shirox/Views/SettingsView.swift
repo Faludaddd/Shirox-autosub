@@ -30,10 +30,13 @@ struct SettingsView: View {
     // that previously lived here were migrated to those sub-pages (Appearance,
     // Playback, Advanced, …), so this view now holds no state of its own.
     //
-    // #125 — A search bar at the top lets the user type a feature name and
-    // jump directly to the setting (even deep inside a sub-page). When the
-    // search text is non-empty, the category list is replaced by a results
-    // list; tapping a result pushes the containing page.
+    // v2.33 — the page opens with the Accounts & Tracking profile header:
+    // the signed-in user's real avatar and name (or a sign-in prompt),
+    // tapping it opens the account/tracking page. Below it, the categories.
+    //
+    // #125 — Settings search lives behind the top-right magnifying glass:
+    // when the search text is non-empty, the category list is replaced by a
+    // results list; tapping a result pushes the containing page.
 
     @State private var searchText: String = ""
     @State private var searchResults: [SettingsSearchEntry] = []
@@ -41,6 +44,12 @@ struct SettingsView: View {
     /// (the app's NavigationStack shim doesn't reliably honor
     /// `navigationDestination(item:)`). Set when the user taps a search result.
     @State private var pushedPage: SettingsPage? = nil
+    /// v2.33 — the search field lives behind a top-right toolbar icon
+    /// instead of an always-visible `.searchable` row: tapping the
+    /// magnifying glass reveals (and focuses) the field; tapping it again
+    /// closes the search and restores the plain category list.
+    @State private var isSearching = false
+    @FocusState private var searchFieldFocused: Bool
 
     var body: some View {
         // Issue #5 — SettingsView no longer wraps in its own NavigationStack.
@@ -48,19 +57,37 @@ struct SettingsView: View {
         // since Settings is not a bottom tab), the parent NavigationStack
         // provides the navigation context. The previous nested NavigationStack
         // caused duplicate back arrows and a black bar at the top.
-        Group {
-            if searchText.isEmpty {
-                categoryList
-            } else {
-                searchResultsList
+        VStack(spacing: 0) {
+            if isSearching {
+                settingsSearchBar
+                    .transition(.move(edge: .top).combined(with: .opacity))
             }
+            Group {
+                if searchText.isEmpty {
+                    categoryList
+                } else {
+                    searchResultsList
+                }
+            }
+            #if os(iOS)
+            .listStyle(.insetGrouped)
+            #endif
         }
-        #if os(iOS)
-        .listStyle(.insetGrouped)
-        #endif
         .navigationTitle("Settings")
         .inlineNavBar()
-        .searchable(text: $searchText, prompt: "Search settings…")
+        #if os(iOS)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                searchToggleButton
+            }
+        }
+        #else
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                searchToggleButton
+            }
+        }
+        #endif
         .onChangeOf(searchText) { query in
             searchResults = SettingsSearchIndex.search(query)
         }
@@ -88,6 +115,69 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - Search toggle (v2.33)
+
+    /// The top-right magnifying glass — the Settings search entry point.
+    /// Opens/closes the inline search bar; closing also clears the query so
+    /// the category list comes back exactly as it was.
+    private var searchToggleButton: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                if isSearching {
+                    searchText = ""
+                    searchFieldFocused = false
+                    isSearching = false
+                } else {
+                    isSearching = true
+                }
+            }
+        } label: {
+            Image(systemName: isSearching ? "xmark" : "magnifyingglass")
+                .font(.system(size: 17, weight: .medium))
+        }
+        .accessibilityLabel(isSearching ? "Close Settings search" : "Search settings")
+    }
+
+    /// The revealed search bar — the same field the `.searchable` row used
+    /// to provide (same prompt, same SettingsSearchIndex live filtering),
+    /// now on a rounded system-style surface that follows light/dark.
+    private var settingsSearchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.secondary)
+            TextField("Search settings…", text: $searchText)
+                .focused($searchFieldFocused)
+                .submitLabel(.search)
+                .autocorrectionDisabled()
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.secondary.opacity(0.12))
+        )
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 4)
+        .onAppear {
+            // Focus once the field actually exists on screen (the reveal
+            // transition has to install it first).
+            searchFieldFocused = true
+        }
+    }
+
     // MARK: - Category List (default, no search)
     //
     // Issue #11 — Settings items were too spread out because each category
@@ -97,6 +187,22 @@ struct SettingsView: View {
 
     private var categoryList: some View {
         List {
+            // Section 0: Accounts & Tracking (v2.33) — the profile-oriented
+            // header at the VERY top of Settings: the signed-in user's real
+            // avatar, name and connected tracking services, or a friendly
+            // sign-in prompt for logged-out users. Tapping opens the existing
+            // Accounts & Tracking page (login, logout, linking, sync — the
+            // page itself is unchanged).
+            Section {
+                NavigationLink {
+                    TrackersSettingsPage()
+                } label: {
+                    AccountsProfileHeaderRow()
+                }
+            }
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets())
+
             // Section 1: Content & Playback (Appearance, Playback, Subtitles)
             Section {
                 NavigationLink {
@@ -116,17 +222,13 @@ struct SettingsView: View {
                 }
             }
 
-            // Section 2: Library & Tracking
+            // Section 2: Library (v2.33 — Trackers moved to the top profile
+            // header; its page is the Accounts & Tracking screen now)
             Section {
                 NavigationLink {
                     LibrarySettingsPage()
                 } label: {
                     SettingsCategoryRow(icon: "books.vertical.fill", title: "Library", subtitle: "Tracking, sync, scores")
-                }
-                NavigationLink {
-                    TrackersSettingsPage()
-                } label: {
-                    SettingsCategoryRow(icon: "antenna.radiowaves.left.and.right", title: "Trackers", subtitle: "AniList, MAL, sync settings")
                 }
             }
 
@@ -5483,6 +5585,125 @@ struct AboutSettingsPage: View {
 
 // MARK: - Trackers Settings Page
 
+// MARK: - Accounts & Tracking profile header (v2.33)
+
+/// The top-of-Settings profile header: the signed-in user's REAL avatar,
+/// name and connected tracking services — or a polished sign-in prompt for
+/// logged-out users. The avatar and name come straight from the account
+/// managers (fetched live from the signed-in service, nothing fabricated).
+/// The row itself is the NavigationLink to the Accounts & Tracking page.
+struct AccountsProfileHeaderRow: View {
+    @ObservedObject private var anilistAuth = AniListAuthManager.shared
+    @ObservedObject private var malAuth = MALAuthManager.shared
+
+    /// The account that presents: the primary connected service first
+    /// (matching the app's provider convention), else whichever is signed
+    /// in, else nil (the sign-in presentation).
+    private var presenter: (name: String, avatar: String?)? {
+        if anilistAuth.isLoggedIn {
+            return (anilistAuth.username ?? "AniList", anilistAuth.avatarURL)
+        }
+        if malAuth.isLoggedIn {
+            return (malAuth.username ?? "MyAnimeList", malAuth.avatarURL)
+        }
+        return nil
+    }
+
+    private var connectedServices: [String] {
+        var services: [String] = []
+        if anilistAuth.isLoggedIn { services.append("AniList") }
+        if malAuth.isLoggedIn { services.append("MyAnimeList") }
+        return services
+    }
+
+    var body: some View {
+        if let account = presenter {
+            HStack(spacing: 14) {
+                avatarView(url: account.avatar)
+                    .frame(width: 56, height: 56)
+                    .clipShape(Circle())
+                    .overlay(
+                        Circle().strokeBorder(Color.appAccent.opacity(0.4), lineWidth: 2)
+                    )
+                    .shadow(
+                        color: Color.glowEnabled ? Color.appAccent.opacity(Color.glowOpacity(0.3)) : .clear,
+                        radius: Color.glowRadiusSelection
+                    )
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(account.name)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    if !connectedServices.isEmpty {
+                        Text("\(connectedServices.joined(separator: " · ")) connected")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    Text("Accounts & Tracking")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.appAccent)
+                }
+                Spacer(minLength: 8)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color.appAccent.opacity(0.10))
+            )
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+        } else {
+            HStack(spacing: 14) {
+                Image(systemName: "person.crop.circle.badge.plus")
+                    .font(.system(size: 34, weight: .medium))
+                    .foregroundStyle(Color.appAccent)
+                    .frame(width: 56, height: 56)
+                    .background(Circle().fill(Color.appAccent.opacity(0.10)))
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Sign In")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Text("Connect AniList or MyAnimeList to sync your library and progress")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("Accounts & Tracking")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.appAccent)
+                }
+                Spacer(minLength: 8)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color.secondary.opacity(0.08))
+            )
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+        }
+    }
+
+    /// The real avatar, or the person placeholder while it hasn't loaded.
+    @ViewBuilder
+    private func avatarView(url: String?) -> some View {
+        if let url, !url.isEmpty {
+            CachedAsyncImage(urlString: url)
+        } else {
+            Image(systemName: "person.crop.circle.fill")
+                .font(.system(size: 52, weight: .regular))
+                .foregroundStyle(Color.secondary.opacity(0.4))
+                .frame(width: 56, height: 56)
+                .background(Circle().fill(Color.secondary.opacity(0.10)))
+        }
+    }
+}
+
 struct TrackersSettingsPage: View {
     @ObservedObject private var anilistAuth = AniListAuthManager.shared
     @ObservedObject private var malAuth = MALAuthManager.shared
@@ -5545,7 +5766,7 @@ struct TrackersSettingsPage: View {
             }
             .padding()
         }
-        .navigationTitle("Trackers")
+        .navigationTitle("Accounts & Tracking")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {

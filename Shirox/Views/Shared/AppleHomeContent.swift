@@ -34,7 +34,9 @@ struct AppleHomeContent: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            // v2.33 — LazyVStack to match the Shirox home: the chart rows
+            // below the fold load on approach, not all at once.
+            LazyVStack(alignment: .leading, spacing: 24) {
                 if !heroItems.isEmpty {
                     nativeHero
                 }
@@ -51,17 +53,24 @@ struct AppleHomeContent: View {
                     // Shared grid tiles (native-styled already).
                     AppleCategoriesGrid(vm: vm)
                 } else {
+                    // v2.33 — the SAME Top Chart rows the Shirox home
+                    // carries (same queries, same period persistence),
+                    // rendered in the Apple presentation's plain design.
                     nativeSection("This Season", items: vm.seasonal, category: .seasonal)
+                    ChartSection(chart: .topAnime, nativeStyle: true)
                     nativeSection("Trending Now", items: vm.trending, category: .trending)
+                    ChartSection(chart: .topMovies, nativeStyle: true)
+                    ChartSection(chart: .mostFavorited, nativeStyle: true)
                     nativeSection("All-Time Popular", items: vm.popular, category: .popular)
                     nativeSection("Top Rated", items: vm.topRated, category: .topRated)
+                    ChartSection(chart: .topAiring, nativeStyle: true)
                     nativeSection("Recently Completed", items: vm.recentlyCompleted, category: .recentlyCompleted)
                     nativeSection("Upcoming", items: vm.upcoming, category: .upcoming)
-                    ForEach(DiscoveryService.homeShelfGenres) { genre in
-                        if let items = vm.genreShelves[genre.slug], !items.isEmpty {
-                            nativeSection(genre.displayName, items: items, genre: genre)
-                        }
+                    ForEach(TopChart.genreCharts) { chart in
+                        ChartSection(chart: chart, nativeStyle: true)
                     }
+                    ChartSection(chart: .hiddenGems, nativeStyle: true)
+                    ChartSection(chart: .underrated, nativeStyle: true)
                 }
                 Spacer().frame(height: 28)
             }
@@ -105,10 +114,6 @@ struct AppleHomeContent: View {
     /// and a horizontal scroll of simple poster cards.
     private func nativeSection(_ title: String, items: [Media], category: BrowseCategory) -> some View {
         AppleMediaSection(title: title, items: items, query: .category(category))
-    }
-
-    private func nativeSection(_ title: String, items: [Media], genre: DiscoveryGenre) -> some View {
-        AppleMediaSection(title: title, items: items, query: .genre(genre))
     }
 }
 

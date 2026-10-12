@@ -105,11 +105,11 @@ enum SettingsSearchIndex {
         .init("Subtitle Delay", aliases: ["subtitle sync", "caption offset", "subtitle timing"], category: "Subtitles", page: .subtitles, anchor: "subtitleDelay", icon: "clock"),
         .init("Landscape Subtitle Preview", aliases: ["true size preview", "fullscreen subtitle test"], category: "Subtitles", page: .subtitles, anchor: "landscapePreview", icon: "rectangle.landscape.rotate"),
 
-        // Library & Trackers
+        // Library & Accounts
         .init("Library", aliases: ["my library", "tracking list", "watch list", "reading list"], category: "Library", page: .library, anchor: "library", icon: "books.vertical.fill"),
-        .init("Trackers", aliases: ["anilist", "myanimelist", "mal", "sync"], category: "Trackers", page: .trackers, anchor: "trackers", icon: "antenna.radiowaves.left.and.right"),
-        .init("Enable Sync", aliases: ["auto sync", "push to anilist", "push to mal"], category: "Trackers", page: .trackers, anchor: "enableSync", icon: "arrow.triangle.2.circlepath"),
-        .init("Auto Sync Ratings", aliases: ["rate after finishing", "auto rate", "rating prompt"], category: "Trackers", page: .trackers, anchor: "autoSyncRatings", icon: "star.fill"),
+        .init("Accounts & Tracking", aliases: ["trackers", "anilist", "myanimelist", "mal", "sync", "sign in", "account", "login"], category: "Accounts & Tracking", page: .trackers, anchor: "trackers", icon: "person.crop.circle"),
+        .init("Enable Sync", aliases: ["auto sync", "push to anilist", "push to mal"], category: "Accounts & Tracking", page: .trackers, anchor: "enableSync", icon: "arrow.triangle.2.circlepath"),
+        .init("Auto Sync Ratings", aliases: ["rate after finishing", "auto rate", "rating prompt"], category: "Accounts & Tracking", page: .trackers, anchor: "autoSyncRatings", icon: "star.fill"),
 
         // Sources & Modules
         .init("Sources", aliases: ["anilist account", "mal account", "provider", "animeschedule token", "anidb client", "search database", "kitsu", "tvdb", "provider"], category: "Sources", page: .sources, anchor: "sources", icon: "person.crop.circle.badge.checkmark"),
