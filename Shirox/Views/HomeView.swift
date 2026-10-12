@@ -149,21 +149,46 @@ struct HomeView: View {
                     if browseCategoriesGridLayout {
                         browseCategoriesGrid
                     } else {
-                        AnimeSection(title: "This Season", items: vm.seasonal, query: .category(.seasonal))
-                        // v2.33 — the Top Charts: windowable discovery rows
-                        // (Top Anime — Weekly ▾) plus the fixed-signal charts.
-                        // Each row owns its load through the same unified
-                        // chain, keeps its own period selection, and its See
-                        // All pages THE SAME chart+period query.
+                        // v2.36 — THE ORIGINAL APP'S five discovery shelves,
+                        // in the original's order and with the original's
+                        // conditional display (a shelf only renders when it
+                        // has content): Trending Now → This Season →
+                        // Last Season · Complete → All-Time Popular →
+                        // Top Rated. The hero above remains the original's
+                        // trending carousel, and every shelf still runs the
+                        // unified chain's queries (which match the
+                        // original's AniList selection: TRENDING_DESC /
+                        // current season / previous season FINISHED /
+                        // POPULARITY_DESC / SCORE_DESC).
+                        if !vm.trending.isEmpty {
+                            AnimeSection(title: "Trending Now", items: vm.trending, query: .category(.trending))
+                        }
+                        if !vm.seasonal.isEmpty {
+                            AnimeSection(title: "This Season", items: vm.seasonal, query: .category(.seasonal))
+                        }
+                        if !vm.recentlyCompleted.isEmpty {
+                            // The original's "Last Season · Complete" shelf:
+                            // the same query it always ran (previous season,
+                            // FINISHED, popularity) — the shelf the current
+                            // app had renamed and misplaced.
+                            AnimeSection(title: "Last Season · Complete", items: vm.recentlyCompleted, query: .category(.recentlyCompleted))
+                        }
+                        if !vm.popular.isEmpty {
+                            AnimeSection(title: "All-Time Popular", items: vm.popular, query: .category(.popular))
+                        }
+                        if !vm.topRated.isEmpty {
+                            AnimeSection(title: "Top Rated", items: vm.topRated, query: .category(.topRated))
+                        }
+                        // The Top Charts (v2.33) and the remaining discovery
+                        // rows follow the original five — preserved below
+                        // the restored selection, unchanged.
                         ChartSection(chart: .topAnime)
-                        AnimeSection(title: "Trending Now", items: vm.trending, query: .category(.trending))
                         ChartSection(chart: .topMovies)
                         ChartSection(chart: .mostFavorited)
-                        AnimeSection(title: "All-Time Popular", items: vm.popular, query: .category(.popular))
-                        AnimeSection(title: "Top Rated", items: vm.topRated, query: .category(.topRated))
                         ChartSection(chart: .topAiring)
-                        AnimeSection(title: "Recently Completed", items: vm.recentlyCompleted, query: .category(.recentlyCompleted))
-                        AnimeSection(title: "Upcoming", items: vm.upcoming, query: .category(.upcoming))
+                        if !vm.upcoming.isEmpty {
+                            AnimeSection(title: "Upcoming", items: vm.upcoming, query: .category(.upcoming))
+                        }
                         ForEach(TopChart.genreCharts) { chart in
                             ChartSection(chart: chart)
                         }
@@ -1413,11 +1438,11 @@ private struct AnimeSection: View {
                     .foregroundStyle(Color.appAccent)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
+                    // v2.36 — fill-only capsule: this 1pt strokeBorder was
+                    // the last bordered pill on the home shelves (the stray
+                    // thin line beside the category rows — Anime + Manga
+                    // share this header style).
                     .background(.ultraThinMaterial, in: Capsule())
-                    .overlay(
-                        Capsule()
-                            .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
-                    )
                 }
                 .buttonStyle(.plain)
             }

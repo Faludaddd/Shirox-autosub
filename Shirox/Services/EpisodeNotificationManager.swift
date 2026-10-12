@@ -8,6 +8,60 @@ extension Notification.Name {
     /// Posted when the user taps an episode-airing notification.
     /// The `object` is the AniList `mediaId` (as `Int`) to open.
     static let openAnimeDetail = Notification.Name("OpenAnimeDetail")
+
+    /// v2.36 — posted when an onboarding DEMO notification is actually
+    /// presented by the system (from `willPresent`). The demo UI listens
+    /// for this so its "Delivered" confirmation can never be a claim —
+    /// it only ever appears after iOS really showed the banner.
+    static let onboardingDemoDelivered = Notification.Name("OnboardingDemoDelivered")
+}
+
+// MARK: - Notification defaults
+
+/// v2.36 — the one place that decides what "notifications enabled" means
+/// for a first-time setup: EVERY supported category turns on together.
+///
+/// The seed runs exactly once per install, at the moment notifications are
+/// first genuinely enabled (the user grants permission from Settings or
+/// completes onboarding's Alerts step). A user who has customized ANY
+/// category is never touched again — `markCustomized()` is tripped by the
+/// settings page the moment a category toggle is changed by hand, and the
+/// seed itself is a no-op once its flag is set. Master/category states stay
+/// synchronized: the categories are only reachable while the master toggle
+/// is on, and the seed flips them together with it.
+enum NotificationDefaults {
+    private static let seededFlag = "notifications.categoriesSeeded"
+
+    /// Whether every supported notification category should be turned on
+    /// now. True only the first time notifications are enabled on this
+    /// install, and never again after the user has customized anything.
+    static var shouldSeed: Bool {
+        !UserDefaults.standard.bool(forKey: seededFlag)
+    }
+
+    /// Turns on every supported category (anime episode reminders, airing
+    /// alerts, manga chapter alerts and both toasts) and flips the master
+    /// phone-notification toggles on. No-op once seeded or customized.
+    static func seedAllCategoriesIfUncustomized() {
+        guard shouldSeed else { return }
+        let d = UserDefaults.standard
+        d.set(true, forKey: "episodeReminders")
+        d.set(true, forKey: "airingNotifications")
+        d.set(true, forKey: "phoneNotificationsEnabled")
+        d.set(true, forKey: "inAppToastsEnabled")
+        d.set(true, forKey: "manga.chapterNotificationsEnabled")
+        d.set(true, forKey: "manga.inAppToastsEnabled")
+        d.set(true, forKey: "manga.phoneNotificationsEnabled")
+        d.set(true, forKey: seededFlag)
+    }
+
+    /// Records that the user has made their own choice about notification
+    /// categories. From this point on the defaults seeder will never run,
+    /// so a later re-enable of the master toggle restores the user's own
+    /// selections instead of overwriting them.
+    static func markCustomized() {
+        UserDefaults.standard.set(true, forKey: seededFlag)
+    }
 }
 
 // MARK: - EpisodeNotificationManager
@@ -87,17 +141,37 @@ final class EpisodeNotificationManager: NSObject, ObservableObject {
     // MARK: - Authorization
 
     /// Requests notification authorization from the user. Returns `true` if authorized.
+    ///
+    /// v2.36 — checks the CURRENT authorization status first so the system
+    /// prompt is only ever shown when there is a genuine choice to make:
+    /// already authorized → immediate `true` (no re-prompt, no duplicate
+    /// dialogs); already denied → honest `false` (iOS never re-shows the
+    /// prompt; the caller routes to iOS Settings); only `.notDetermined`
+    /// actually asks. Every caller is an explicit user action (the bell on
+    /// a schedule entry, the Notifications settings page, onboarding's
+    /// Enable button) — nothing requests on launch.
     @discardableResult
     func requestAuthorization() async -> Bool {
         let center = UNUserNotificationCenter.current()
-        do {
-            let granted = try await center.requestAuthorization(options: [.alert, .badge, .sound])
-            if !granted {
-                Logger.shared.log("[EpisodeNotification] User declined notification authorization", type: "Debug")
+        let settings = await center.notificationSettings()
+        switch settings.authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            return true
+        case .denied:
+            Logger.shared.log("[EpisodeNotification] Authorization previously denied — routing to Settings", type: "Debug")
+            return false
+        case .notDetermined:
+            do {
+                let granted = try await center.requestAuthorization(options: [.alert, .badge, .sound])
+                if !granted {
+                    Logger.shared.log("[EpisodeNotification] User declined notification authorization", type: "Debug")
+                }
+                return granted
+            } catch {
+                Logger.shared.log("[EpisodeNotification] Authorization request failed: \(error)", type: "Error")
+                return false
             }
-            return granted
-        } catch {
-            Logger.shared.log("[EpisodeNotification] Authorization request failed: \(error)", type: "Error")
+        @unknown default:
             return false
         }
     }
@@ -265,11 +339,45 @@ extension EpisodeNotificationManager: UNUserNotificationCenterDelegate {
     }
 
     /// Foreground presentation: still show a banner + play the sound while the app is open.
+    /// The onboarding demo identifiers also announce their delivery so the
+    /// demo card can confirm — honestly — that the banner really appeared.
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
+        if notification.request.identifier.hasPrefix(Self.onboardingDemoIDPrefix) {
+            NotificationCenter.default.post(name: .onboardingDemoDelivered, object: nil)
+        }
         completionHandler([.banner, .sound])
+    }
+
+    /// Identifier prefix for the onboarding demo notifications (v2.36).
+    static let onboardingDemoIDPrefix = "onboarding-demo-"
+
+    /// v2.36 — schedules the onboarding DEMO notification: a real local
+    /// notification, clearly labeled as a demonstration, that fires a few
+    /// seconds from now so the user sees exactly how a Shirox alert looks
+    /// in iOS's own banner presentation. Returns true only when the system
+    /// accepted the request.
+    @discardableResult
+    func scheduleOnboardingDemo() async -> Bool {
+        let content = UNMutableNotificationContent()
+        content.title = "Shirox — demo notification"
+        content.body = "This is what a real Shirox alert looks like. Nothing actually aired — it's just a demo."
+        content.sound = .default
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 3, repeats: false)
+        let request = UNNotificationRequest(
+            identifier: Self.onboardingDemoIDPrefix + UUID().uuidString,
+            content: content,
+            trigger: trigger
+        )
+        do {
+            try await UNUserNotificationCenter.current().add(request)
+            return true
+        } catch {
+            Logger.shared.log("[EpisodeNotification] Demo scheduling failed: \(error)", type: "Error")
+            return false
+        }
     }
 }

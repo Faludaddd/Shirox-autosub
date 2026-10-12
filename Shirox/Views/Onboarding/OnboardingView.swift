@@ -423,19 +423,30 @@ struct OnboardingView: View {
         }
     }
 
-    /// Tab 4 — Alerts: the simulated notification demonstration.
+    /// Tab 4 — Alerts: the REAL notification demonstration (a genuine iOS
+    /// banner when permission allows, honestly labeled) with the in-app
+    /// simulated preview as the fallback.
     private var alertsPage: some View {
         onboardingScroll {
             Text("Never miss an episode")
                 .font(.system(size: 27, weight: .bold))
                 .multilineTextAlignment(.center)
 
-            Text("See it before you set it up — a quick look at how Shirox keeps you posted. Entirely simulated; nothing is being sent to your device.")
+            Text("See a real Shirox notification land on your phone — iOS's own banner, clearly marked as a demo. Nothing is ever sent without your tap, and the app never asks for permission just for opening.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.top, 8)
                 .padding(.bottom, 22)
+
+            RealNotificationDemoCard(onRequestPermission: { showPermissionSheet = true })
+
+            Text("And this is how alerts look inside the app — a simulation, nothing is delivered:")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+                .padding(.top, 18)
+                .padding(.bottom, 6)
 
             SimulatedNotificationDemo(media: flow.demoMedia)
 

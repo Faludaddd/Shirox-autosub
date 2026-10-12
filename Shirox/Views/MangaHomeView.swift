@@ -1464,6 +1464,22 @@ private struct MangaNotificationsSettingsPage: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        // v2.36 — the phone-notifications toggle is the explicit "enable"
+        // action: permission is requested here (and only here — never on
+        // launch), and a grant seeds every category ON the first time.
+        .onChangeOf(phoneNotificationsEnabled) { enabled in
+            guard enabled else { return }
+            Task { @MainActor in
+                let granted = await EpisodeNotificationManager.shared.requestAuthorization()
+                if granted {
+                    NotificationDefaults.seedAllCategoriesIfUncustomized()
+                }
+            }
+        }
+        // A hand-changed category is a customization — the defaults seeder
+        // never overwrites it afterwards.
+        .onChange(of: chapterNotificationsEnabled) { _ in NotificationDefaults.markCustomized() }
+        .onChange(of: inAppToastsEnabled) { _ in NotificationDefaults.markCustomized() }
     }
 
     private func notifCard(icon: String, title: String, description: String, toggle: Binding<Bool>) -> some View {

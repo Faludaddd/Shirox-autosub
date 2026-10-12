@@ -387,7 +387,6 @@ struct ChartSection: View {
     /// independent — Top Anime can sit on Monthly while Top Movies is on
     /// Weekly, and both survive relaunches.
     @AppStorage private var periodRaw: String
-    @State private var showPeriodDialog = false
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.cinematicRows) private var cinematic
 
@@ -433,23 +432,6 @@ struct ChartSection: View {
         .onChangeOf(periodRaw) { _ in
             Task { await model.load(period: currentPeriod) }
         }
-        #if !os(macOS)
-        .confirmationDialog("Time Period", isPresented: $showPeriodDialog, titleVisibility: .visible) {
-            ForEach(chart.periods) { period in
-                Button {
-                    selectPeriod(period)
-                } label: {
-                    HStack {
-                        Text("\(period.title) — \(period.subtitle)")
-                        if period == currentPeriod {
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-            }
-            Button("Cancel", role: .cancel) {}
-        }
-        #endif
     }
 
     // MARK: Header
@@ -458,14 +440,14 @@ struct ChartSection: View {
     private var header: some View {
         if nativeStyle {
             // The Apple presentation's plain system header — the same
-            // shape AppleMediaSection uses, with the period chip beside
+            // shape AppleMediaSection uses, with the period selector beside
             // the borderless See All link.
             HStack(alignment: .firstTextBaseline) {
                 Text(chart.title)
                     .font(.title3.weight(.semibold))
                 Spacer()
                 HStack(spacing: 12) {
-                    periodChip
+                    periodSelector
                     seeAllButton
                 }
             }
@@ -473,60 +455,68 @@ struct ChartSection: View {
         } else {
             HomeRowHeader(title: chart.title) {
                 HStack(spacing: 8) {
-                    periodChip
+                    periodSelector
                     seeAllButton
                 }
             }
         }
     }
 
-    /// "Weekly ▾" — the dropdown arrow the period picker grows out of.
+    /// v2.36 — the ARROW-BASED period selector: ‹ Weekly ›. One tap on an
+    /// arrow steps to the previous/next window this chart offers (Daily →
+    /// Weekly → Monthly → Quarterly → Yearly as offered); the label and
+    /// the shelf's data reload together through the same persisted
+    /// `periodRaw` the dropdown used. The arrows disable at the boundaries
+    /// so there is no invalid navigation, and — per the category-pill
+    /// line fix — the capsule is fill-only: no strokeBorder hairline.
     @ViewBuilder
-    private var periodChip: some View {
-        if chart.hasPeriods {
-            #if os(macOS)
-            Menu {
-                ForEach(chart.periods) { period in
-                    Button {
-                        selectPeriod(period)
-                    } label: {
-                        HStack {
-                            Text(period.title)
-                            if period == currentPeriod {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
-            } label: {
-                chipLabel
+    private var periodSelector: some View {
+        if chart.hasPeriods, let current = currentPeriod,
+           let index = chart.periods.firstIndex(of: current) {
+            HStack(spacing: 4) {
+                selectorArrow(direction: -1, enabled: index > 0)
+                Text(current.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.appAccent)
+                    .frame(minWidth: 68)
+                    .lineLimit(1)
+                    .accessibilityLabel("\(current.title) — \(current.subtitle)")
+                selectorArrow(direction: 1, enabled: index < chart.periods.count - 1)
             }
-            #else
-            Button {
-                showPeriodDialog = true
-            } label: {
-                chipLabel
-            }
-            .buttonStyle(.plain)
-            #endif
+            .padding(.horizontal, 6)
+            .padding(.vertical, 5)
+            .background(.ultraThinMaterial, in: Capsule())
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Time period: \(current.title)")
+            .accessibilityHint("Use the arrows to move between \(chart.periods.map(\.title).joined(separator: ", "))")
         }
     }
 
-    private var chipLabel: some View {
-        HStack(spacing: 4) {
-            Text(currentPeriod?.title ?? "")
-                .font(.subheadline.weight(.semibold))
-            Image(systemName: "chevron.down")
-                .font(.caption2.weight(.bold))
+    private func selectorArrow(direction: Int, enabled: Bool) -> some View {
+        Button {
+            stepPeriod(direction)
+        } label: {
+            Image(systemName: direction < 0 ? "chevron.left" : "chevron.right")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(Color.appAccent)
+                .frame(width: 22, height: 22)
+                .contentShape(Rectangle())
         }
-        .foregroundStyle(Color.appAccent)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay(
-            Capsule()
-                .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
-        )
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.3)
+        .accessibilityLabel(direction < 0 ? "Previous period" : "Next period")
+    }
+
+    /// Steps the selection by one offered window in `direction`, clamped
+    /// to the chart's offerings (invalid steps are impossible — the arrows
+    /// disable at the boundaries, and this re-guards anyway).
+    private func stepPeriod(_ direction: Int) {
+        guard let current = currentPeriod,
+              let index = chart.periods.firstIndex(of: current) else { return }
+        let next = index + direction
+        guard chart.periods.indices.contains(next) else { return }
+        selectPeriod(chart.periods[next])
     }
 
     private var seeAllButton: some View {
@@ -553,10 +543,6 @@ struct ChartSection: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .background(.ultraThinMaterial, in: Capsule())
-                .overlay(
-                    Capsule()
-                        .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
-                )
             }
         }
         .buttonStyle(.plain)

@@ -284,11 +284,11 @@ struct CharacterDetailView: View {
                     descriptionSection(desc: desc)
                         .padding(.top, 16)
                 }
-                if let role = edge.role, !role.isEmpty {
-                    roleSection(role: role)
-                        .padding(.top, 16)
-                }
-                infoSection
+                // v2.36 — ONE merged information card (the old page showed
+                // the same facts twice: an info grid AND a "Quick Stats"
+                // card with the same gender/age/blood/favourites rows).
+                // The role chip lives here now too.
+                infoCard
                     .padding(.top, 16)
                 // siteUrl is remote API data — parse safely instead of
                 // force-unwrapping (a malformed URL from a cache/API glitch
@@ -311,10 +311,6 @@ struct CharacterDetailView: View {
                     voiceActorsSection(vas: vas)
                         .padding(.top, 16)
                 }
-                characterStatsCard
-                    .padding(.top, 16)
-                    .padding(.horizontal, 16)
-                // Animeography — all anime this character appears in
                 animeographySection
                     .padding(.top, 16)
                 relatedCastSection
@@ -409,33 +405,59 @@ struct CharacterDetailView: View {
         .padding(.horizontal, 16)
     }
 
-    // MARK: - Info section (gender, age, birthday, favourites)
+    // MARK: - Info card (v2.36 — ONE card, every real fact once)
 
+    /// The character's identity card: the role chip (this series) and the
+    /// fact grid — native name, gender, age, birthday, blood type,
+    /// favourites, AniList id. Each field appears exactly once (the old
+    /// page's duplicate "Quick Stats" card is gone), and every value comes
+    /// from the SAME record the page renders — the Jikan profile only
+    /// fills gaps through AniList outages.
     @ViewBuilder
-    private var infoSection: some View {
+    private var infoCard: some View {
         let items = infoItems
-        if !items.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Information")
-                    .font(.headline)
-                    .padding(.horizontal, 16)
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
-                    ForEach(items, id: \.0) { item in
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(item.0)
-                                .font(.caption2.weight(.medium))
-                                .foregroundStyle(.secondary)
-                                .textCase(.uppercase)
-                            Text(item.1)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(.primary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(10)
-                        .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.08)))
+        if !items.isEmpty || edge.role != nil {
+            VStack(alignment: .leading, spacing: 12) {
+                if let role = edge.role, !role.isEmpty {
+                    // The role this character plays in the series the user
+                    // came FROM — a chip, not a wall of text.
+                    HStack(spacing: 8) {
+                        Image(systemName: "theatermasks.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color.appAccent)
+                        Text("Role in this \(sourceIsManga ? "series" : "anime")")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .textCase(.uppercase)
+                        Spacer()
+                        Text(role.capitalized)
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(Color.appAccent)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(Capsule().fill(Color.appAccent.opacity(0.15)))
                     }
+                    .padding(.horizontal, 16)
                 }
-                .padding(.horizontal, 16)
+                if !items.isEmpty {
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                        ForEach(items, id: \.0) { item in
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(item.0)
+                                    .font(.caption2.weight(.medium))
+                                    .foregroundStyle(.secondary)
+                                    .textCase(.uppercase)
+                                Text(item.1)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(.primary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(10)
+                            .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.08)))
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                }
             }
         }
     }
@@ -516,26 +538,25 @@ struct CharacterDetailView: View {
     }
 
     @ViewBuilder
-    private func roleSection(role: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Role")
-                .font(.headline)
-            Text(role.capitalized)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.appAccent)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(Capsule().fill(Color.appAccent.opacity(0.15)))
-        }
-        .padding(.horizontal, 16)
-    }
-
-    @ViewBuilder
     private func voiceActorsSection(vas: [AniListVoiceActor]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Voice Actors")
-                .font(.headline)
-                .padding(.horizontal, 16)
+            HStack(spacing: 8) {
+                Image(systemName: "waveform.circle.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.appAccent)
+                Text("Voice Actors")
+                    .font(.headline)
+                // v2.36 — the count, same capsule style as the other
+                // section headers (animeography / staff credits).
+                Text("\(vas.count)")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(Color.secondary.opacity(0.15)))
+                Spacer()
+            }
+            .padding(.horizontal, 16)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
@@ -598,64 +619,6 @@ struct CharacterDetailView: View {
     }
 
     // MARK: - Load
-
-    /// Character stats card — shows a quick summary of key character info
-    /// in a visually appealing card layout.
-    @ViewBuilder
-    private var characterStatsCard: some View {
-        let items = statsCardItems
-        if !items.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Quick Stats")
-                    .font(.headline)
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                    ForEach(items, id: \.0) { item in
-                        HStack(spacing: 6) {
-                            Image(systemName: item.2)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(item.0)
-                                    .font(.caption2.weight(.medium))
-                                    .foregroundStyle(.secondary)
-                                    .textCase(.uppercase)
-                                Text(item.1)
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.primary)
-                                    .lineLimit(2)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(8)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.06)))
-                    }
-                }
-            }
-        }
-    }
-
-    private var statsCardItems: [(String, String, String)] {
-        var items: [(String, String, String)] = []
-        if let fav = displayCharacter.favourites, fav > 0 {
-            items.append(("Favourites", "\(fav)", "heart.fill"))
-        }
-        if let id = displayCharacter.siteUrl?.components(separatedBy: "/").last, !id.isEmpty {
-            items.append(("AniList ID", id, "number"))
-        }
-        if let gender = displayCharacter.gender, !gender.isEmpty {
-            items.append(("Gender", gender.capitalized, "person.fill"))
-        }
-        if let age = displayCharacter.age, !age.isEmpty {
-            items.append(("Age", age, "calendar"))
-        }
-        if let blood = displayCharacter.bloodType, !blood.isEmpty {
-            items.append(("Blood", blood, "drop.fill"))
-        }
-        if let alt = displayCharacter.name?.alternative, !alt.isEmpty {
-            items.append(("Also known as", alt.joined(separator: ", "), "tag.fill"))
-        }
-        return items
-    }
 
     /// The character edge from the parent already has name + image + role +
     /// voiceActors, but the description may be missing (AniList sometimes
@@ -1065,154 +1028,41 @@ struct RecommendationsSection: View {
     }
 }
 
-// MARK: - VoiceActorDetailView
+// MARK: - VoiceActorDetailView (v2.36 — the staff page, redesigned)
 //
-// Full profile for a voice actor/person. Shows their photo, name,
-// bio (about), birthday, website link, and a horizontal scroll of
-// all anime they've voiced characters in. Fetched from MAL/Jikan's
-// /people/{id}/anime endpoint.
+// A person's full profile: photo + names, bio, key facts, and their
+// complete credited works — anime (with the REAL credited position:
+// "Director", "Character Design", voice roles with the voiced character)
+// and manga (story & art positions). Everything shown comes from the
+// live Jikan person endpoints; nothing is invented, and missing data
+// simply doesn't render.
 
 struct VoiceActorDetailView: View {
     let voiceActor: AniListVoiceActor
 
     @State private var person: MALDiscoveryService.JikanPerson?
     @State private var animeRoles: [MALDiscoveryService.JikanPersonAnimeEntry] = []
+    @State private var mangaCredits: [MALDiscoveryService.JikanPersonMangaEntry] = []
     @State private var isLoading = false
+    @State private var isLoadingManga = false
+    @State private var aboutExpanded = false
+
+    // MARK: Body
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                // Hero with VA photo
-                ZStack(alignment: .bottomLeading) {
-                    CachedAsyncImage(urlString: voiceActor.image?.large ?? voiceActor.image?.medium ?? "")
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 280)
-                        .clipped()
-                        .overlay(
-                            LinearGradient(
-                                stops: [
-                                    .init(color: .clear, location: 0.3),
-                                    .init(color: Color(.systemBackground).opacity(0.9), location: 1)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                    VStack(alignment: .leading, spacing: 4) {
-                        Spacer()
-                        Text(voiceActor.name?.full ?? "Unknown")
-                            .font(.title2.weight(.bold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 16)
-                    }
-                }
-                .frame(height: 280)
-
-                // About / bio
-                if let about = person?.about, !about.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("About")
-                            .font(.headline)
-                            .padding(.horizontal, 16)
-                            .padding(.top, 16)
-                        Text(about.cleanMarkdownAndHTML())
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .lineSpacing(4)
-                            .padding(.horizontal, 16)
-                    }
-                }
-
-                // Info section
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Information")
-                        .font(.headline)
-                        .padding(.horizontal, 16)
-                        .padding(.top, 16)
-                    if let birthday = person?.birthday, !birthday.isEmpty {
-                        infoRow("calendar", "Birthday", birthday)
-                    }
-                    if let website = person?.website, !website.isEmpty {
-                        if let url = URL(string: website) {
-                            Link(destination: url) {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "globe")
-                                        .foregroundStyle(.secondary)
-                                    Text("Website")
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                    Spacer()
-                                    Text(website)
-                                        .font(.subheadline.weight(.medium))
-                                        .foregroundStyle(Color.appAccent)
-                                        .lineLimit(1)
-                                }
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 6)
-                            }
-                        }
-                    }
-                }
-
-                // Anime roles — all anime this person voiced characters in
-                if !animeRoles.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Anime Roles")
-                            .font(.headline)
-                            .padding(.horizontal, 16)
-                            .padding(.top, 16)
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 12) {
-                                ForEach(animeRoles.indices, id: \.self) { idx in
-                                    if let anime = animeRoles[idx].anime {
-                                        NavigationLink {
-                                            AniListDetailView(
-                                                mediaId: anime.mal_id,
-                                                preloadedMedia: MALDiscoveryService.shared.mapToMedia(anime))
-                                        } label: {
-                                            VStack(alignment: .leading, spacing: 4) {
-                                                CachedAsyncImage(urlString: anime.images?.jpg?.large_image_url ?? anime.images?.jpg?.image_url ?? "")
-                                                    .aspectRatio(2/3, contentMode: .fill)
-                                                    .frame(width: CharacterPortraitCard.cardWidth, height: CharacterPortraitCard.cardHeight)
-                                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                                                Text(anime.title ?? "Unknown")
-                                                    .font(.caption.weight(.semibold))
-                                                    .foregroundStyle(.primary)
-                                                    .lineLimit(2)
-                                                    .frame(width: CharacterPortraitCard.cardWidth, alignment: .leading)
-                                                if let char = animeRoles[idx].character {
-                                                    Text(char.name ?? "")
-                                                        .font(.system(size: 10, weight: .medium))
-                                                        .foregroundStyle(.secondary)
-                                                        .lineLimit(1)
-                                                }
-                                            }
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
-                                }
-                            }
-                            .padding(.horizontal, 16)
-                        }
-                    }
-                } else if isLoading {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Anime Roles")
-                            .font(.headline)
-                            .padding(.horizontal, 16)
-                            .padding(.top, 16)
-                        HStack(spacing: 8) {
-                            ProgressView().scaleEffect(0.8)
-                            Text("Loading roles…")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.vertical, 20)
-                    }
-                }
-
+                heroSection
+                nameSection
+                    .padding(.top, 16)
+                infoCard
+                    .padding(.top, 16)
+                aboutCard
+                    .padding(.top, 16)
+                animeCreditsSection
+                    .padding(.top, 16)
+                mangaCreditsSection
+                    .padding(.top, 16)
                 Spacer().frame(height: 32)
             }
         }
@@ -1226,34 +1076,383 @@ struct VoiceActorDetailView: View {
         .task { await loadData() }
     }
 
-    private func infoRow(_ icon: String, _ label: String, _ value: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: icon)
-                .foregroundStyle(.secondary)
-            Text(label)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            Spacer()
-            Text(value)
-                .font(.subheadline.weight(.medium))
+    // MARK: Hero
+
+    private var heroSection: some View {
+        ZStack(alignment: .bottomLeading) {
+            CachedAsyncImage(urlString: portraitURL)
+                .frame(maxWidth: .infinity)
+                .frame(height: 300)
+                .clipped()
+                .overlay(
+                    LinearGradient(
+                        stops: [
+                            .init(color: .clear, location: 0.3),
+                            .init(color: detailCardBackground.opacity(0.92), location: 1)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+
+            HStack(alignment: .bottom, spacing: 14) {
+                CachedAsyncImage(urlString: portraitURL)
+                    .frame(width: 110, height: 150)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.3), radius: 6, x: 0, y: 3)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Spacer()
+                    Text(voiceActor.language.map { $0.capitalized + " voice actor · staff" } ?? "Anime staff")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(Color.appAccent))
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 16)
+        }
+        .frame(height: 300)
+    }
+
+    private var portraitURL: String {
+        person?.images?.jpg?.image_url
+            ?? voiceActor.image?.large
+            ?? voiceActor.image?.medium
+            ?? ""
+    }
+
+    // MARK: Name
+
+    @ViewBuilder
+    private var nameSection: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(voiceActor.name?.full ?? person?.name ?? "Unknown")
+                .font(.title2.weight(.bold))
                 .foregroundStyle(.primary)
+            if let given = person?.given_name, !given.isEmpty, given != voiceActor.name?.full {
+                Text("Given name: \(given)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if let family = person?.family_name, !family.isEmpty, family != voiceActor.name?.full {
+                Text("Family name: \(family)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 6)
     }
+
+    // MARK: Info card
+
+    @ViewBuilder
+    private var infoCard: some View {
+        let items = infoItems
+        if !items.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                sectionTitle("Information", icon: "info.circle.fill")
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                    ForEach(items, id: \.0) { item in
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(item.0)
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(.secondary)
+                                .textCase(.uppercase)
+                            Text(item.1)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.primary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(10)
+                        .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.08)))
+                    }
+                }
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(detailCardBackground)
+            )
+            .padding(.horizontal, 16)
+        }
+    }
+
+    private var infoItems: [(String, String)] {
+        var items: [(String, String)] = []
+        if let birthday = person?.birthday, !birthday.isEmpty {
+            items.append(("Birthday", birthday))
+        }
+        if let website = person?.website, !website.isEmpty {
+            items.append(("Website", website))
+        }
+        if let malId = person?.mal_id, malId > 0 {
+            items.append(("MAL ID", "\(malId)"))
+        }
+        return items
+    }
+
+    // MARK: About
+
+    @ViewBuilder
+    private var aboutCard: some View {
+        if let about = person?.about, !about.isEmpty {
+            VStack(alignment: .leading, spacing: 0) {
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        aboutExpanded.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "text.alignleft")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                        Text("About")
+                            .font(.headline)
+                        Spacer()
+                        Image(systemName: aboutExpanded ? "chevron.down" : "chevron.right")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 14)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                if aboutExpanded {
+                    Text(about.cleanMarkdownAndHTML())
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineSpacing(4)
+                        .padding(.horizontal, 14)
+                        .padding(.bottom, 14)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+            }
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(detailCardBackground)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+            )
+            .padding(.horizontal, 16)
+        }
+    }
+
+    // MARK: Anime credits
+
+    @ViewBuilder
+    private var animeCreditsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                sectionTitle("Anime Credits", icon: "tv.circle.fill")
+                if !animeRoles.isEmpty {
+                    Text("\(animeRoles.count)")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(Color.secondary.opacity(0.15)))
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+
+            if !animeRoles.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: 12) {
+                        ForEach(animeRoles.indices, id: \.self) { idx in
+                            if let anime = animeRoles[idx].anime {
+                                NavigationLink {
+                                    AniListDetailView(
+                                        mediaId: anime.mal_id,
+                                        preloadedMedia: MALDiscoveryService.shared.mapToMedia(anime))
+                                } label: {
+                                    animeCreditCard(anime, entry: animeRoles[idx])
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                }
+            } else if isLoading {
+                HStack(spacing: 8) {
+                    ProgressView().scaleEffect(0.8)
+                    Text("Loading credited works…")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, 20)
+            } else {
+                Text("No credited anime found.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 12)
+            }
+        }
+    }
+
+    /// One credited anime: poster, title, the REAL credited position, and
+    /// the voiced character (portrait + name) when the credit is a voice
+    /// role — both straight from the provider's record.
+    private func animeCreditCard(_ anime: MALDiscoveryService.JikanAnime,
+                                 entry: MALDiscoveryService.JikanPersonAnimeEntry) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            CachedAsyncImage(urlString: anime.images?.jpg?.large_image_url ?? anime.images?.jpg?.image_url ?? "")
+                .frame(width: CharacterPortraitCard.cardWidth, height: CharacterPortraitCard.cardHeight)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+            Text(anime.title ?? "Unknown")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(2)
+                .frame(width: CharacterPortraitCard.cardWidth, alignment: .leading)
+
+            if let position = entry.positionSummary, !position.isEmpty {
+                Text(position)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Color.appAccent)
+                    .lineLimit(1)
+                    .frame(width: CharacterPortraitCard.cardWidth, alignment: .leading)
+            }
+
+            if let character = entry.character, let charName = character.name, !charName.isEmpty {
+                HStack(spacing: 5) {
+                    CachedAsyncImage(urlString: character.images?.jpg?.image_url ?? "")
+                        .frame(width: 20, height: 20)
+                        .clipShape(Circle())
+                    Text(charName)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                .frame(width: CharacterPortraitCard.cardWidth, alignment: .leading)
+            }
+        }
+        .frame(width: CharacterPortraitCard.cardWidth)
+    }
+
+    // MARK: Manga credits
+
+    @ViewBuilder
+    private var mangaCreditsSection: some View {
+        // Only the section with something real to say: hidden entirely until
+        // its load produced something (or is still in flight).
+        if isLoadingManga || !mangaCredits.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    sectionTitle("Manga Credits", icon: "book.circle.fill")
+                    if !mangaCredits.isEmpty {
+                        Text("\(mangaCredits.count)")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(Color.secondary.opacity(0.15)))
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+
+                if !mangaCredits.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(alignment: .top, spacing: 12) {
+                            ForEach(mangaCredits.indices, id: \.self) { idx in
+                                if let manga = mangaCredits[idx].manga {
+                                    // MAL ids can't route to the AniList manga
+                                    // page honestly, so manga credits inform
+                                    // (cover, title, position) without a
+                                    // dead or wrong navigation link.
+                                    VStack(alignment: .leading, spacing: 5) {
+                                        CachedAsyncImage(urlString: manga.coverURL ?? "")
+                                            .frame(width: CharacterPortraitCard.cardWidth, height: CharacterPortraitCard.cardHeight)
+                                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                        Text(manga.title ?? "Unknown")
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(.primary)
+                                            .lineLimit(2)
+                                            .frame(width: CharacterPortraitCard.cardWidth, alignment: .leading)
+                                        if let position = mangaCredits[idx].position, !position.isEmpty {
+                                            Text(position)
+                                                .font(.system(size: 10, weight: .medium))
+                                                .foregroundStyle(Color.appAccent)
+                                                .lineLimit(1)
+                                                .frame(width: CharacterPortraitCard.cardWidth, alignment: .leading)
+                                        }
+                                    }
+                                    .frame(width: CharacterPortraitCard.cardWidth)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                    }
+                } else if isLoadingManga {
+                    HStack(spacing: 8) {
+                        ProgressView().scaleEffect(0.8)
+                        Text("Loading manga credits…")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 20)
+                }
+            }
+        }
+    }
+
+    // MARK: Shared
+
+    private var detailCardBackground: Color {
+        #if os(iOS)
+        Color(.secondarySystemGroupedBackground)
+        #else
+        Color(NSColor.controlBackgroundColor)
+        #endif
+    }
+
+    private func sectionTitle(_ title: String, icon: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Color.appAccent)
+            Text(title)
+                .font(.headline)
+        }
+    }
+
+    // MARK: Load
 
     private func loadData() async {
         isLoading = true
+        isLoadingManga = true
         let personId = voiceActor.id
-        guard personId > 0 else { isLoading = false; return }
-        do {
-            async let p = MALDiscoveryService.shared.person(personId: personId)
-            async let roles = MALDiscoveryService.shared.personAnime(personId: personId)
-            person = try await p
-            animeRoles = try await roles
-        } catch {
-            // Best-effort
+        guard personId > 0 else {
+            isLoading = false
+            isLoadingManga = false
+            return
         }
+        // Each list settles independently: one endpoint failing never blanks
+        // the others (separate optional assignments, no shared do-catch).
+        async let p = MALDiscoveryService.shared.person(personId: personId)
+        async let roles = MALDiscoveryService.shared.personAnime(personId: personId)
+        async let manga = MALDiscoveryService.shared.personManga(personId: personId)
+        person = try? await p
+        if let list = try? await roles { animeRoles = list }
+        if let list = try? await manga { mangaCredits = list }
         isLoading = false
+        isLoadingManga = false
     }
 }

@@ -1,5 +1,97 @@
 import SwiftUI
 
+// MARK: - Language grouping (v2.36)
+
+/// One language group of installed modules: the group's display title and
+/// its modules sorted alphabetically by source name. Modules that don't
+/// declare a language land in the trailing "Other" group — never invented,
+/// never dropped.
+struct ModuleLanguageGroup: Identifiable {
+    let title: String
+    let modules: [ModuleDefinition]
+    var id: String { title }
+}
+
+enum ModuleGrouping {
+    /// Groups modules by their declared `language`, each group sorted
+    /// alphabetically (case-insensitive, stable) by source name, groups
+    /// themselves ordered alphabetically with "Other" last.
+    static func groups(from modules: [ModuleDefinition]) -> [ModuleLanguageGroup] {
+        let keyed = Dictionary(grouping: modules) { module in
+            let raw = (module.language ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            return raw.isEmpty ? nil : raw
+        }
+        var groups: [ModuleLanguageGroup] = []
+        for (key, list) in keyed where key != nil {
+            groups.append(ModuleLanguageGroup(
+                title: key!.capitalized,
+                modules: list.sorted { $0.sourceName.localizedCaseInsensitiveCompare($1.sourceName) == .orderedAscending }))
+        }
+        groups.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        if let others = keyed[nil], !others.isEmpty {
+            groups.append(ModuleLanguageGroup(
+                title: "Other",
+                modules: others.sorted { $0.sourceName.localizedCaseInsensitiveCompare($1.sourceName) == .orderedAscending }))
+        }
+        return groups
+    }
+}
+
+// MARK: - Source health (v2.36)
+
+/// The real state of a module's SOURCE — where its manifest lives. Verified
+/// by an actual network probe, never assumed: the module's `jsonUrl` is
+/// fetched and the HTTP verdict is read.
+enum ModuleSourceHealth: Equatable {
+    case reachable
+    /// The manifest is GONE (HTTP 404/410): the source has been
+    /// discontinued — the module can still run from its cached script, but
+    /// it will never update again and its site may follow.
+    case discontinued
+    /// The source couldn't be reached right now (network error, timeout,
+    /// server error). Temporary until proven otherwise.
+    case unreachable(String)
+    /// No known source URL — installed before sources were tracked. No
+    /// verdict, honestly none.
+    case noSourceURL
+
+    var title: String {
+        switch self {
+        case .reachable: return "Source OK"
+        case .discontinued: return "Source discontinued"
+        case .unreachable: return "Source unreachable"
+        case .noSourceURL: return "Source unknown"
+        }
+    }
+}
+
+@MainActor
+enum ModuleSourceProber {
+    /// Probes one module's source manifest URL. Local files are inherently
+    /// present; remote manifests get a real GET with a short timeout —
+    /// 404/410 reads as discontinued, anything else unreachable-by-name.
+    static func probe(_ module: ModuleDefinition) async -> ModuleSourceHealth {
+        guard let json = module.jsonUrl, let url = URL(string: json) else {
+            return .noSourceURL
+        }
+        if url.isFileURL { return .reachable }
+        var req = URLRequest(url: url)
+        req.timeoutInterval = 15
+        req.httpMethod = "GET"
+        do {
+            let (_, response) = try await URLSession.shared.data(for: req)
+            guard let http = response as? HTTPURLResponse else { return .reachable }
+            switch http.statusCode {
+            case 200..<300: return .reachable
+            case 404, 410: return .discontinued
+            default: return .unreachable("HTTP \(http.statusCode)")
+            }
+        } catch {
+            return .unreachable(error.localizedDescription)
+        }
+    }
+}
+
 struct ModuleListView: View {
     @EnvironmentObject private var moduleManager: ModuleManager
     @ObservedObject private var providerManager = ProviderManager.shared
@@ -19,6 +111,10 @@ struct ModuleListView: View {
     /// v2.32 — the module whose details page is open (icon tap on a row).
     @State private var detailModule: ModuleDefinition?
     @FocusState private var isTextFieldFocused: Bool
+    // v2.36 — real source health per module (keyed by module id), probed
+    // on open and re-probed from the refresh button. [String: ModuleSourceHealth]
+    @State private var sourceHealth: [String: ModuleSourceHealth] = [:]
+    @State private var isProbingSources = false
 
     private let localFilesModuleURL = "https://raw.githubusercontent.com/xibrox/local-files-module/refs/heads/main/local.json"
     private let jellyfinModuleURL = "https://raw.githubusercontent.com/xibrox/jellyfin-module/refs/heads/main/jellyfin.json"
@@ -69,41 +165,66 @@ struct ModuleListView: View {
                             .listRowInsets(EdgeInsets())
                             .listRowBackground(Color.clear)
                     }
-
-                    if moduleManager.modules.isEmpty {
-                        emptyModulesView
-                            .listRowInsets(EdgeInsets())
-                            .listRowBackground(Color.clear)
-                    } else {
-                        ForEach(moduleManager.modules) { module in
-                            moduleRow(module)
-                                .listRowInsets(EdgeInsets())
-                                .listRowBackground(Color.clear)
-                                .contextMenu {
-                                    Button {
-                                        detailModule = module
-                                    } label: {
-                                        Label("Module Details", systemImage: "info.circle")
-                                    }
-                                    Button {
-                                        testModule(module)
-                                    } label: {
-                                        Label("Test Module", systemImage: "stethoscope")
-                                    }
-                                    Button(role: .destructive) {
-                                        removeModule(module)
-                                    } label: {
-                                        Label("Remove", systemImage: "trash")
-                                    }
-                                }
-                        }
-                        .onMove(perform: moduleManager.moveModules)
-                    }
                 } header: {
-                    Text("Sources")
+                    Text("Built-in Providers")
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(.secondary)
                         .textCase(.uppercase)
+                }
+
+                if moduleManager.modules.isEmpty {
+                    Section {
+                        emptyModulesView
+                            .listRowInsets(EdgeInsets())
+                            .listRowBackground(Color.clear)
+                    }
+                } else {
+                    // v2.36 — modules grouped by LANGUAGE, each group
+                    // sorted alphabetically by source name. The flat
+                    // drag-to-reorder list is gone by design: a grouped,
+                    // alphabetized listing can't be meaningfully
+                    // hand-ordered (the module PICKER still lists every
+                    // module; selection itself is unchanged).
+                    ForEach(ModuleGrouping.groups(from: moduleManager.modules)) { group in
+                        Section {
+                            ForEach(group.modules) { module in
+                                moduleRow(module)
+                                    .listRowInsets(EdgeInsets())
+                                    .listRowBackground(Color.clear)
+                                    .contextMenu {
+                                        Button {
+                                            detailModule = module
+                                        } label: {
+                                            Label("Module Details", systemImage: "info.circle")
+                                        }
+                                        Button {
+                                            testModule(module)
+                                        } label: {
+                                            Label("Test Module", systemImage: "stethoscope")
+                                        }
+                                        Button {
+                                            Task { await probeModule(module) }
+                                        } label: {
+                                            Label("Check Source", systemImage: "network")
+                                        }
+                                        Button(role: .destructive) {
+                                            removeModule(module)
+                                        } label: {
+                                            Label("Remove", systemImage: "trash")
+                                        }
+                                    }
+                            }
+                        } header: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "globe")
+                                    .font(.caption2)
+                                Text("\(group.title) — \(group.modules.count) module\(group.modules.count == 1 ? "" : "s")")
+                            }
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .textCase(.uppercase)
+                        }
+                    }
                 }
             }
             #if os(iOS)
@@ -143,7 +264,9 @@ struct ModuleListView: View {
                     Button {
                         Task {
                             isRefreshing = true
-                            await moduleManager.checkForUpdates()
+                            async let updates: Void = moduleManager.checkForUpdates()
+                            async let probes: Void = probeAllSources()
+                            _ = await (updates, probes)
                             isRefreshing = false
                         }
                     } label: {
@@ -156,22 +279,45 @@ struct ModuleListView: View {
                     }
                     .disabled(moduleManager.modules.isEmpty || isRefreshing)
                 }
-                #if os(iOS)
-                ToolbarItem(placement: .automatic) {
-                    EditButton()
-                }
-                #endif
             }
         .modifier(DoneItem(isShown: showsDone) { dismiss() })
         .onChangeOf(moduleURL) { _ in
             addModuleError = nil
             moduleManager.errorMessage = nil
         }
+        // v2.36 — probe every module's source once when the page opens
+        // (a few light GETs), so discontinued/unreachable sources are
+        // identified by their REAL verdicts, not guesses.
+        .task { await probeAllSources() }
         // v2.32 — tapping a module's icon opens its details page; the rest of
         // the row keeps its select/deactivate behavior.
         .navigationDestinationCompat(item: $detailModule) { module in
             ModuleDetailView(source: .installed(module))
         }
+    }
+
+    // MARK: - Source probing
+
+    /// Probes every installed module's source URL concurrently; each
+    /// verdict lands in `sourceHealth` the moment it arrives.
+    private func probeAllSources() async {
+        guard !moduleManager.modules.isEmpty else { return }
+        isProbingSources = true
+        await withTaskGroup(of: (String, ModuleSourceHealth).self) { group in
+            for module in moduleManager.modules {
+                group.addTask {
+                    await (module.id, ModuleSourceProber.probe(module))
+                }
+            }
+            for await (id, health) in group {
+                sourceHealth[id] = health
+            }
+        }
+        isProbingSources = false
+    }
+
+    private func probeModule(_ module: ModuleDefinition) async {
+        sourceHealth[module.id] = await ModuleSourceProber.probe(module)
     }
 
     // MARK: - Add Module Card
@@ -559,7 +705,15 @@ struct ModuleListView: View {
                             Text("·").font(.caption).foregroundStyle(.secondary)
                             Text(author.name).font(.caption).foregroundStyle(.secondary)
                         }
+                        if let lang = module.language, !lang.isEmpty {
+                            Text("·").font(.caption).foregroundStyle(.secondary)
+                            Text(lang.capitalized).font(.caption).foregroundStyle(.secondary)
+                        }
                     }
+                    // v2.36 — the module's REAL source verdict, probed from
+                    // its manifest URL. Healthy sources stay quiet; problems
+                    // are named and explained, never guessed.
+                    sourceHealthView(module)
                 }
                 Spacer()
                 if isActive {
@@ -577,6 +731,33 @@ struct ModuleListView: View {
         .buttonStyle(.plain)
         .contentShape(Rectangle())
         .animation(.easeOut(duration: 0.2), value: isActive)
+    }
+
+    /// The honest per-module source status: nothing when healthy (or before
+    /// the first verdict lands), a named explanation when there's a problem.
+    @ViewBuilder
+    private func sourceHealthView(_ module: ModuleDefinition) -> some View {
+        switch sourceHealth[module.id] {
+        case .discontinued:
+            Label("Source discontinued — the manifest is gone (404). The cached copy still runs, but this module can never update; its site may stop working too.", systemImage: "xmark.circle.fill")
+                .font(.caption2)
+                .foregroundStyle(.red)
+                .fixedSize(horizontal: false, vertical: true)
+        case .unreachable(let reason):
+            Label("Source unreachable right now (\(reason)). May be temporary — refresh to re-check.", systemImage: "exclamationmark.triangle.fill")
+                .font(.caption2)
+                .foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+        case .noSourceURL:
+            Label("Source URL unknown — installed before sources were tracked. Test the module to check it works.", systemImage: "questionmark.circle")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        case .reachable, .none:
+            // Healthy (or not yet probed): no line at all. A module whose
+            // source is fine shouldn't wear a badge.
+            EmptyView()
+        }
     }
 
     // MARK: - Empty State

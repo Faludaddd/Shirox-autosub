@@ -2339,6 +2339,27 @@ struct NotificationsSettingsPage: View {
         .navigationTitle("Notifications")
         .inlineNavBar()
         .task { await refreshStatus() }
+        // v2.36 — the master toggle is the explicit "enable notifications"
+        // action. Turning it ON while iOS hasn't decided yet asks for
+        // permission (here, and only here — never on launch); permission
+        // granted (or already granted) seeds every category ON the first
+        // time. Turning it OFF leaves every category selection untouched.
+        .onChangeOf(phoneNotificationsEnabled) { enabled in
+            guard enabled else { return }
+            Task { @MainActor in
+                let granted = await EpisodeNotificationManager.shared.requestAuthorization()
+                if granted {
+                    NotificationDefaults.seedAllCategoriesIfUncustomized()
+                }
+                await refreshStatus()
+            }
+        }
+        // A hand-changed category is a customization: from now on the
+        // defaults seeder never runs again, so re-enabling the master
+        // toggle later restores these exact choices instead of overwriting
+        // them with all-on defaults.
+        .onChangeOf(episodeReminders) { _ in NotificationDefaults.markCustomized() }
+        .onChangeOf(airingNotifications) { _ in NotificationDefaults.markCustomized() }
     }
 
     private var inAppToastsCard: some View {
@@ -2462,6 +2483,29 @@ struct NotificationsSettingsPage: View {
                 Text(authStateText)
                     .font(.subheadline)
                     .foregroundStyle(authStateColor)
+            }
+
+            // v2.36 — denied permission is explained honestly, with the
+            // only real remedy: iOS Settings. iOS will never re-show the
+            // permission prompt once denied, so "try again" here would be
+            // a dead button pretending to work.
+            if authStatus == .denied {
+                VStack(spacing: 8) {
+                    Text("Shirox can't show notifications until you allow them in iOS Settings. Open Settings → Notifications → Shirox and turn Allow Notifications on.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button {
+                        openSystemSettings()
+                    } label: {
+                        Label("Open iOS Settings", systemImage: "gear")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.appAccent)
+                }
+                .padding(.top, 2)
             }
 
             HStack(spacing: 10) {
@@ -2603,8 +2647,24 @@ struct NotificationsSettingsPage: View {
         pendingCount = await EpisodeNotificationManager.shared.pendingCount()
     }
 
+    /// The denied-permission remedy: straight to iOS Settings for this app.
+    private func openSystemSettings() {
+        #if os(iOS)
+        if let url = URL(string: UIApplication.openSettingsURLString) {
+            UIApplication.shared.open(url, options: [:], completionHandler: nil)
+        }
+        #elseif os(macOS)
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications") {
+            NSWorkspace.shared.open(url)
+        }
+        #endif
+    }
+
     /// Fires a test toast via `ToastManager` and schedules a local UN notification
     /// so the user can verify how episode-airing notifications will look and behave.
+    /// v2.36 — the SYSTEM banner is only scheduled (and only claimed) when
+    /// permission is actually granted; otherwise the honest caption explains
+    /// that the in-app toast is the whole demonstration.
     private func sendTestNotification() async {
         isSendingTest = true
         defer { isSendingTest = false }
@@ -2618,19 +2678,36 @@ struct NotificationsSettingsPage: View {
             duration: 5.0
         )
 
-        // Real local notification so the user can also see the system banner /
-        // lock-screen presentation that fires when an episode airs.
-        let content = UNMutableNotificationContent()
-        content.title = "Test Notification"
-        content.body = "This is how episode airing notifications will appear"
-        content.sound = .default
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
-        let request = UNNotificationRequest(
-            identifier: "test-\(UUID().uuidString)",
-            content: content,
-            trigger: trigger
-        )
-        try? await UNUserNotificationCenter.current().add(request)
+        // v2.36 — the SYSTEM banner is only scheduled when permission has
+        // actually been granted; with it denied or undecided the in-app
+        // toast above is the whole (honest) demonstration, and the toast
+        // says so instead of implying a banner is on its way.
+        let center = UNUserNotificationCenter.current()
+        let settings = await center.notificationSettings()
+        switch settings.authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            let content = UNMutableNotificationContent()
+            content.title = "Test Notification"
+            content.body = "This is how episode airing notifications will appear"
+            content.sound = .default
+            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+            let request = UNNotificationRequest(
+                identifier: "test-\(UUID().uuidString)",
+                content: content,
+                trigger: trigger
+            )
+            try? await center.add(request)
+        case .denied, .notDetermined:
+            ToastManager.shared.show(
+                title: "Notifications",
+                message: "System banners need iOS permission — see Notification Status above",
+                icon: "info.circle.fill",
+                iconColor: .orange,
+                duration: 4.0
+            )
+        @unknown default:
+            break
+        }
 
         // Pending count now includes the scheduled test — refresh so the counter reflects it.
         await refreshStatus()
@@ -5519,6 +5596,19 @@ struct AboutSettingsPage: View {
         Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "-"
     }
 
+    /// The hidden onboarding gesture: four taps on the app logo reopen the
+    /// interactive guide. The counter resets when taps come too slowly
+    /// (>1.2s apart) so an accidental single tap never half-arms it, and it
+    /// clears itself the moment it fires. Works whether onboarding was
+    /// completed, skipped, or hidden — `begin()` resumes the same shared
+    /// flow every other entry point uses, and NOTHING is reset: progress,
+    /// skips, theme choices and every other setting stay exactly as they
+    /// were.
+    @State private var logoTapCount = 0
+    @State private var lastLogoTapAt: Date?
+    private static let logoTapWindow: TimeInterval = 1.2
+    private static let logoTapTarget = 4
+
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
@@ -5538,11 +5628,14 @@ struct AboutSettingsPage: View {
             // #94 — Single clean app icon: just the bundled `app-logo` asset
             // in a rounded rect. No gradient background, no extra frame, no
             // SF-Symbol fallback wrapping — the image speaks for itself.
+            // Four taps (see handleLogoTap) reopen the onboarding guide.
             Image("app-logo")
                 .resizable()
                 .scaledToFit()
                 .frame(width: 80, height: 80)
                 .clipShape(RoundedRectangle(cornerRadius: 18))
+                .contentShape(RoundedRectangle(cornerRadius: 18))
+                .onTapGesture { handleLogoTap() }
 
             VStack(spacing: 4) {
                 Text("Shirox+")
@@ -5567,6 +5660,28 @@ struct AboutSettingsPage: View {
         .frame(maxWidth: .infinity)
         .background(Color.secondary.opacity(0.08),
                     in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
+
+    /// The four-tap gesture on the About logo. Taps slower than the window
+    /// apart restart the count (no accidental activation), the fourth
+    /// intentional tap fires the guide exactly once, and no user data,
+    /// preference or onboarding progress is touched — the same resumable
+    /// flow the Home shortcut and the Getting Started card open.
+    private func handleLogoTap() {
+        let now = Date()
+        if let last = lastLogoTapAt, now.timeIntervalSince(last) > Self.logoTapWindow {
+            logoTapCount = 0
+        }
+        lastLogoTapAt = now
+        logoTapCount += 1
+        if logoTapCount >= Self.logoTapTarget {
+            logoTapCount = 0
+            lastLogoTapAt = nil
+            Haptics.success()
+            OnboardingFlowController.shared.begin()
+        } else {
+            Haptics.light()
+        }
     }
 
     // MARK: - Legal Card

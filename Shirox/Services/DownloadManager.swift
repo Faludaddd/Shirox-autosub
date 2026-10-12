@@ -99,7 +99,15 @@ final class DownloadManager: NSObject, ObservableObject {
             try? await Task.sleep(nanoseconds: 1_000_000_000)
             self?.processQueue()
         }
-        requestNotificationPermission()
+        // v2.36 — NO automatic permission request here. This singleton is
+        // created the moment the app opens (the AppDelegate reconnects its
+        // background tasks at launch), so the unconditional
+        // requestAuthorization() that used to live here fired Apple's
+        // native notification prompt the moment the app opened — before the
+        // user had ever asked for notifications. Permission is now only
+        // ever requested from explicit user intent (enabling notifications
+        // in Settings or proceeding through onboarding), and completion
+        // notifications check the authorization status before posting.
         observeAppLifecycle()
         cellularCancellable = NetworkMonitor.shared.$isOnCellular
             .removeDuplicates()
@@ -173,9 +181,7 @@ final class DownloadManager: NSObject, ObservableObject {
         )
     }
 
-    private func requestNotificationPermission() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
-    }
+
 
     private func observeAppLifecycle() {
         NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
@@ -1130,13 +1136,30 @@ final class DownloadManager: NSObject, ObservableObject {
         }
     }
 
+    /// v2.36 — posts the completion notification ONLY when the user has
+    /// already granted permission. Never prompts: if authorization hasn't
+    /// been given (or was denied), the in-app toast above is the whole
+    /// report and nothing is scheduled with the system.
     private func sendCompletionNotification(item: DownloadItem) {
         let content = UNMutableNotificationContent()
         content.title = item.mediaTitle
         content.body = "Episode \(item.episodeNumber) finished downloading"
         content.sound = .default
         let request = UNNotificationRequest(identifier: item.id.uuidString, content: content, trigger: nil)
-        UNUserNotificationCenter.current().add(request)
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            switch settings.authorizationStatus {
+            case .authorized, .provisional, .ephemeral:
+                UNUserNotificationCenter.current().add(request)
+            case .denied, .notDetermined:
+                // Not determined means the user hasn't chosen yet — respect
+                // that and stay silent; the in-app toast already reported
+                // the completion. Prompting here would be the same uninvited
+                // system dialog this class used to fire on launch.
+                Logger.shared.log("[Downloads] Completion notification skipped — notifications not authorized", type: "Debug")
+            @unknown default:
+                break
+            }
+        }
     }
     
     private func updateError(_ id: UUID, _ error: Error) {

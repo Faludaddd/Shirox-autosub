@@ -661,6 +661,18 @@ final class MALDiscoveryService {
         let anime: JikanAnime?
         let character: JikanPersonAnimeCharacter?
         let role: String?
+        /// v2.36 — Jikan's credited POSITIONS for this work ("Director",
+        /// "Character Design", "Theme Song Performance"…). Absent on
+        /// voice-only entries; decoded tolerantly so it's simply nil when
+        /// the API doesn't send it.
+        let positions: [String]?
+
+        var positionSummary: String? {
+            if let positions, !positions.isEmpty {
+                return positions.joined(separator: ", ")
+            }
+            return role
+        }
     }
 
     struct JikanPersonAnimeCharacter: Decodable {
@@ -679,6 +691,35 @@ final class MALDiscoveryService {
         let url = base.appendingPathComponent("people/\(personId)/anime")
         let (data, _) = try await session.data(for: URLRequest(url: url))
         return try JSONDecoder().decode(JikanPersonData.self, from: data).data
+    }
+
+    // MARK: - v2.36 — Jikan Person manga credits
+
+    struct JikanMangaLite: Decodable {
+        let mal_id: Int
+        let title: String?
+        let images: JikanCharacterImages?
+
+        /// The manga's cover — the one URL Jikan's character-style image
+        /// sets carry.
+        var coverURL: String? { images?.jpg?.image_url }
+    }
+
+    struct JikanPersonMangaEntry: Decodable {
+        let manga: JikanMangaLite?
+        let position: String?
+    }
+
+    struct JikanPersonMangaData: Decodable {
+        let data: [JikanPersonMangaEntry]
+    }
+
+    /// v2.36 — a person's MANGA credits (story & art positions), the
+    /// credited-manga counterpart of `personAnime`.
+    func personManga(personId: Int) async throws -> [JikanPersonMangaEntry] {
+        let url = base.appendingPathComponent("people/\(personId)/manga")
+        let (data, _) = try await session.data(for: URLRequest(url: url))
+        return try JSONDecoder().decode(JikanPersonMangaData.self, from: data).data
     }
 
     /// Fetches a person's (voice actor's) full profile from Jikan.

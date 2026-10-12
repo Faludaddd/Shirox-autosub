@@ -561,20 +561,33 @@ struct SearchView: View {
 
     /// Exactly three visible cards: the width is what remains after the two
     /// inner gaps and the symmetric edge insets, divided by three (guarded
-    /// against a degenerate zero-width first pass).
+    /// against a degenerate zero-width first pass). v2.36 — ROUNDED DOWN so
+    /// three complete posters always fit with a hair of slack: the third
+    /// poster can never be clipped by sub-point rounding on any device.
     private func recommendedCardWidth(for available: CGFloat) -> CGFloat {
         let edgeInset: CGFloat = 16
         let gap: CGFloat = 12
-        return max((available - 2 * edgeInset - 2 * gap) / 3, 80)
+        return max(((available - 2 * edgeInset - 2 * gap) / 3).rounded(.down), 80)
     }
 
-    /// The rail's total height: poster (1.5 × card width) + title block,
-    /// derived from the same width math so the GeometryReader's explicit
-    /// height always matches its content — on every device and window size.
+    /// The rail's total height: poster (1.5 × card width) + the FIXED
+    /// title block, derived from the same width math so the
+    /// GeometryReader's explicit height always matches its content — on
+    /// every device and window size.
     private var recommendedRailHeight: CGFloat {
         let width = recommendedRailWidth > 0 ? recommendedRailWidth : nominalSectionWidth
         let cardWidth = recommendedCardWidth(for: width)
         return ceil(cardWidth * 1.5) + 46
+    }
+
+    /// The FIXED per-card height (poster + 6pt gap + the two-line title
+    /// block). Every card is exactly this tall regardless of whether its
+    /// title wraps to two lines or one — the poster of every card is
+    /// pixel-identical in size and position, the reason the rail ever
+    /// showed "some cards larger or smaller than others" (bottom-center
+    /// aligned cards whose titles wrapped differently).
+    private func recommendedCardHeight(for cardWidth: CGFloat) -> CGFloat {
+        cardWidth * 1.5 + 6 + 34
     }
 
     /// Pre-layout estimate of the section width (replaced by the real
@@ -589,7 +602,11 @@ struct SearchView: View {
 
     private func recommendedRail(cardWidth: CGFloat) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            LazyHStack(spacing: 12) {
+            // v2.36 — top alignment + a FIXED card height: every poster is
+            // identical (same width, same 2:3 height, same corner radius),
+            // every title block occupies the same fixed slot, and no card
+            // can ever sit higher or lower than its neighbours.
+            LazyHStack(alignment: .top, spacing: 12) {
                 ForEach(recommendations) { media in
                     NavigationLink {
                         if isMangaMode {
@@ -600,7 +617,6 @@ struct SearchView: View {
                     } label: {
                         VStack(alignment: .leading, spacing: 6) {
                             CachedAsyncImage(urlString: media.coverImage.extraLarge ?? media.coverImage.large ?? "")
-                                .aspectRatio(2/3, contentMode: .fill)
                                 .frame(width: cardWidth, height: cardWidth * 1.5)
                                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                             Text(media.title.displayTitle)
@@ -608,9 +624,9 @@ struct SearchView: View {
                                 .foregroundStyle(.primary)
                                 .lineLimit(2)
                                 .multilineTextAlignment(.leading)
-                                .frame(width: cardWidth, alignment: .leading)
+                                .frame(width: cardWidth, height: 34, alignment: .topLeading)
                         }
-                        .frame(width: cardWidth)
+                        .frame(width: cardWidth, height: recommendedCardHeight(for: cardWidth), alignment: .top)
                     }
                     .buttonStyle(.plain)
                     .unifiedCardMenu(media, isManga: isMangaMode)

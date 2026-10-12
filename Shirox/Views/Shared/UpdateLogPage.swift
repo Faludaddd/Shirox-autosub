@@ -240,6 +240,37 @@ struct UpdateLogEntry {
 /// page's version buttons and the per-version changelog views read from.
 let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.36",
+        date: "2026-10-13",
+        added: [
+            "Four taps on the About page's app logo reopen the interactive onboarding guide — the same resumable flow every other entry point opens, whether onboarding was completed, skipped, or hidden. The tap counter resets itself when taps come too slowly (no accidental activation), and nothing — settings, progress, theme choices — is reset by reopening.",
+            "Notifications, demonstrated for real: onboarding's Alerts tab now sends a GENUINE iOS local notification (clearly labeled as a demo) that lands in iOS's own banner presentation — on screen or on the lock screen if you lock the phone first. The card never claims delivery on its own: the 'Delivered' confirmation appears only after the system actually presents the banner. Without permission it explains the state honestly and offers the explicit enable step, or the route to iOS Settings when denied; the in-app simulated preview remains as the labeled fallback.",
+            "Every notification category is on by default the first time notifications are enabled (the master toggle in Settings, or onboarding's Enable step): episode reminders, airing alerts, manga chapter alerts and both toast styles turn on together. A user who has customized any category is never overwritten — re-enabling the master toggle later restores THEIR choices.",
+            "Modules are organized by language: the Modules page groups installed modules under clear language headers, each group sorted alphabetically by source name, with the module count in every header and the module's language shown on its row.",
+            "Real source health for every module: on opening Modules (and from the refresh button), each module's source manifest URL is actually probed — a discontinued source (HTTP 404/410) is named in red with a plain-language explanation (the cached copy still runs, but it will never update), a temporarily unreachable source is flagged in orange with the reason, and healthy sources stay quiet rather than wearing a badge. Check Source joins the long-press menu, and nothing is ever labeled broken without a real verdict.",
+            "The Weekly / Monthly / Yearly ARROW SELECTOR on every Top Chart row: ‹ Weekly › steps through the chart's offered time windows (Daily, Weekly, Monthly, Quarterly, Yearly as offered) with one tap per arrow — the label and the shelf's data reload together, the arrows disable at the boundaries so there's no invalid navigation, and the selection persists per chart exactly as before.",
+            "The character page's information card: one cohesive card with the role chip and every real fact exactly once (native name, gender, age, birthday, blood type, favourites) — the old duplicate Quick Stats grid is gone — plus a count capsule on the Voice Actors header.",
+            "The staff page is a full profile now: hero with portrait and language chip, given and family names, an information grid (birthday, website, MAL id), a collapsible About, and complete credited works — ANIME credits showing each work's REAL credited position (Director, Character Design, voice roles with the voiced character's portrait) and new MANGA credits (story & art positions). Every credited anime still navigates to its detail page; each list loads independently so one endpoint failing never blanks the others."
+        ],
+        fixed: [
+            "The automatic notification permission popup on app launch is gone for real: the downloads manager requested notification authorization the moment the app opened, which is what fired Apple's native prompt before you'd ever asked for notifications. Permission is now only ever requested from explicit intent — the notifications toggle in Settings, onboarding's Enable button, or the bell on a schedule entry — and every request first checks the current authorization status (already granted never re-prompts, denied routes to Settings honestly). Download-completion notifications only post when permission actually exists, and the test notification says so when it can't show a system banner.",
+            "The persistent thin line beside the category pills, Anime and Manga both: after the scroll-edge fix (v2.32) and the pill-stroke removal (v2.35), the last remaining bordered pills on the home surfaces were the 1pt strokeBorders around every 'See all' capsule and the chart period chip. Both are fill-only now — the material capsule carries the shape — on every shelf and chart row on both homes.",
+            "Search's Recommended for You posters are pixel-identical now: the rail's cards share one FIXED height with top alignment, so a title that wraps to two lines can no longer shift its poster's position or apparent size, and the card width is rounded down so the third poster is never clipped by sub-point rounding on any device."
+        ],
+        changed: [
+            "Anime Home follows the original Shirox app's selection again: the five discovery shelves render in the original's order — Trending Now, This Season, Last Season · Complete (restored under its original name and query: previous season, finished, popularity), All-Time Popular, Top Rated — each appearing only when it has content, exactly as the original behaved. The hero remains the original's trending carousel; the Top Charts, Upcoming, genre shelves, Hidden Gems and Underrated follow the restored five, unchanged.",
+            "Backup & Restore is a fully redesigned page: a header that explains what a backup is, Create and Restore sections in the app's card design with honest progress, success and error states (backup ready with its real file name; restore in flight; plain-language explanations for missing, invalid or corrupted files), a What a Backup Contains card listing every section, and a destructive-action confirmation before anything is replaced. The underlying operations, the .shiroxbackup format and compatibility are exactly what they were — this is the same engine, not a visual-only shell, and a restore that fails preserves existing data as always.",
+            "Denied notification permission is explained everywhere it matters now: the Notifications settings page shows exactly what to do (iOS Settings → Notifications → Shirox) with a direct Open iOS Settings button, instead of a dead 'try again'."
+        ],
+        improved: [
+            "The Notifications settings page is fully synchronized: turning the master toggle on asks for permission (when iOS hasn't decided) and seeds the categories; the status card reflects the true authorization state after every change; the test notification only claims a system banner when one can actually appear."
+        ],
+        removed: [
+            "The modules list's manual drag-to-reorder: a page grouped by language and sorted alphabetically can't be meaningfully hand-ordered. Module selection, testing, details, installation and removal are unchanged."
+        ],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "2.35",
         date: "2026-10-13",
         added: [

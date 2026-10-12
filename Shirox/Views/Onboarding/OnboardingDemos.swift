@@ -145,6 +145,225 @@ struct OnboardingLoadingScreen: View {
     }
 }
 
+// MARK: - Real notification demonstration (v2.36)
+
+/// The REAL-notification demonstration card. When iOS permission has been
+/// granted, one tap schedules a genuine local notification — clearly labeled
+/// as a demo — that iOS presents in its own banner style a few seconds later,
+/// exactly where real episode alerts land. The card never claims delivery on
+/// its own: the "Delivered" tick appears only when the system actually
+/// presents the banner (`willPresent` announces it). Without permission the
+/// card explains the state honestly and offers the explicit enable path
+/// (the same permission sheet every other surface uses) or the route to iOS
+/// Settings when permission was denied.
+struct RealNotificationDemoCard: View {
+    /// Opens the shared permission sheet — the explicit, user-initiated
+    /// request path. Never triggers the system prompt by itself.
+    var onRequestPermission: () -> Void
+
+    @State private var authState: NotificationAuthState = .notDetermined
+    @State private var isScheduling = false
+    @State private var demoSent = false
+    @State private var demoDelivered = false
+    @State private var scheduleFailed = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        VStack(spacing: 14) {
+            header
+
+            switch authState {
+            case .authorized:
+                authorizedContent
+            case .notDetermined:
+                notDeterminedContent
+            case .denied:
+                deniedContent
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.secondary.opacity(0.07))
+        )
+        .task(id: "demo-auth") { await refreshAuth() }
+        .onReceive(NotificationCenter.default.publisher(for: .onboardingDemoDelivered)) { _ in
+            withAnimation(reduceMotion ? .easeInOut(duration: 0.15) : .spring(response: 0.35, dampingFraction: 0.8)) {
+                demoDelivered = true
+            }
+            Haptics.success()
+        }
+        // Re-check whenever the permission sheet it opened comes back down.
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("OnboardingPermissionSheetDismissed"))) { _ in
+            Task { await refreshAuth() }
+        }
+    }
+
+    private var header: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "iphone.gen3.radiowaves.left.and.right")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(Color.appAccent)
+                .frame(width: 42, height: 42)
+                .background(Circle().fill(Color.appAccent.opacity(0.12)))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("The real thing, on your phone")
+                    .font(.subheadline.weight(.bold))
+                Text("A genuine iOS notification, clearly marked as a demo.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    // MARK: Authorized
+
+    @ViewBuilder
+    private var authorizedContent: some View {
+        Text("Tap below and Shirox sends a real notification to your device. Watch the top of the screen — or lock your phone / swipe home first and see it land on the lock screen, exactly like a real episode alert.")
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+
+        Button {
+            sendDemo()
+        } label: {
+            HStack(spacing: 8) {
+                if isScheduling {
+                    ProgressView().tint(Color.appAccentForeground)
+                } else {
+                    Image(systemName: "bell.badge.fill").font(.footnote)
+                }
+                Text(demoSent ? "Send another demo" : "Send demo notification")
+                    .font(.headline)
+            }
+            .foregroundStyle(Color.appAccentForeground)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 13)
+            .background(RoundedRectangle(cornerRadius: 13, style: .continuous).fill(Color.appAccent))
+        }
+        .buttonStyle(.springPress)
+        .disabled(isScheduling)
+
+        statusLine
+    }
+
+    @ViewBuilder
+    private var statusLine: some View {
+        if isScheduling {
+            Label("Scheduling…", systemImage: "clock")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } else if scheduleFailed {
+            Label("iOS wouldn't accept the request — try again in a moment.", systemImage: "exclamationmark.triangle")
+                .font(.caption)
+                .foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+        } else if demoDelivered {
+            // ONLY reached when the system actually presented the banner —
+            // `willPresent` announced it. Never a guess, never a claim.
+            Label("Delivered — that was a real notification.", systemImage: "checkmark.circle.fill")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.green)
+                .transition(.opacity)
+        } else if demoSent {
+            Label("Sent — watch for the banner (about 3 seconds).", systemImage: "paperplane.fill")
+                .font(.caption)
+                .foregroundStyle(Color.appAccent)
+        }
+    }
+
+    // MARK: Not determined
+
+    @ViewBuilder
+    private var notDeterminedContent: some View {
+        Text("Notifications aren't enabled yet. iOS will ask for your permission the moment you choose to enable them — Shirox never asks on its own just for opening.")
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+
+        Button {
+            onRequestPermission()
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "bell.badge").font(.footnote)
+                Text("Enable Notifications")
+                    .font(.headline)
+            }
+            .foregroundStyle(Color.appAccentForeground)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 13)
+            .background(RoundedRectangle(cornerRadius: 13, style: .continuous).fill(Color.appAccent))
+        }
+        .buttonStyle(.springPress)
+
+        Text("The demo becomes available the moment permission is granted.")
+            .font(.caption)
+            .foregroundStyle(.tertiary)
+            .multilineTextAlignment(.center)
+    }
+
+    // MARK: Denied
+
+    @ViewBuilder
+    private var deniedContent: some View {
+        Text("Notifications are turned off for Shirox in iOS Settings, so a real demo can't be shown. iOS won't ask again — you can turn them on in Settings → Notifications → Shirox.")
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+
+        Button {
+            #if os(iOS)
+            if let url = URL(string: UIApplication.openSettingsURLString) {
+                UIApplication.shared.open(url, options: [:], completionHandler: nil)
+            }
+            #endif
+        } label: {
+            Label("Open iOS Settings", systemImage: "gear")
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 13)
+                .background(RoundedRectangle(cornerRadius: 13, style: .continuous).fill(Color.primary.opacity(0.1)))
+        }
+        .buttonStyle(.springPress)
+
+        Text("The preview below shows the in-app look in the meantime — it's a simulation, clearly labeled, not a delivery.")
+            .font(.caption)
+            .foregroundStyle(.tertiary)
+            .multilineTextAlignment(.center)
+    }
+
+    // MARK: Helpers
+
+    private func refreshAuth() async {
+        let state = await NotificationAuthState.current()
+        withAnimation(.easeOut(duration: 0.2)) { authState = state }
+        if state != .authorized {
+            demoSent = false
+            demoDelivered = false
+        }
+    }
+
+    private func sendDemo() {
+        guard !isScheduling else { return }
+        isScheduling = true
+        scheduleFailed = false
+        demoDelivered = false
+        Task { @MainActor in
+            let ok = await EpisodeNotificationManager.shared.scheduleOnboardingDemo()
+            withAnimation(reduceMotion ? .easeInOut(duration: 0.15) : .spring(response: 0.35, dampingFraction: 0.8)) {
+                isScheduling = false
+                demoSent = ok
+                scheduleFailed = !ok
+            }
+            if !ok { Haptics.warning() }
+        }
+    }
+}
+
 // MARK: - Simulated notification demonstration
 
 /// One simulated banner's content. Demo-only — never delivered to the system,
@@ -694,6 +913,9 @@ struct NotificationPermissionSheet: View {
             startingState = await NotificationAuthState.current()
             if startingState == .denied { outcome = .denied }
         }
+        .onDisappear {
+            NotificationCenter.default.post(name: Self.dismissedNote, object: nil)
+        }
     }
 
     private func benefitRow(icon: String, text: String) -> some View {
@@ -731,8 +953,20 @@ struct NotificationPermissionSheet: View {
         withAnimation(reduceMotion ? .easeInOut(duration: 0.15) : .spring(response: 0.35, dampingFraction: 0.8)) {
             outcome = granted ? .granted : .denied
         }
-        if granted { Haptics.success() } else { Haptics.warning() }
+        if granted {
+            // v2.36 — granting permission here IS "notifications enabled":
+            // every supported category turns on together (first time only —
+            // a user who has customized categories is never overwritten).
+            NotificationDefaults.seedAllCategoriesIfUncustomized()
+            Haptics.success()
+        } else {
+            Haptics.warning()
+        }
     }
+
+    /// Announces the sheet going away so the real-notification demo card
+    /// (and anything else watching) can re-read the authorization state.
+    private static let dismissedNote = Notification.Name("OnboardingPermissionSheetDismissed")
 }
 
 // MARK: - Real authorization state
