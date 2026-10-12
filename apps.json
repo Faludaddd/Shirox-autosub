@@ -28,9 +28,9 @@
       "versions": [
         {
           "version": "2.35",
-          "date": "2026-10-13",
+          "date": "2026-10-12",
           "localizedDescription": "v2.35 — The bug-fix and polish release. Update detection works again (the manifest decoder was rejecting the newest entries, so genuinely-newer releases were never detected — now fixed and verified against the live manifest, with Update Now retrieving the right IPA). Downloaded episodes play on a normal tap (local file, saved progress, subtitles) with the full action set on long-press. The Schedule merges every working source concurrently — priority-ordered, deduplicated — with the recurring failing-sources popup removed, the selected day preserved across refreshes, and new persistent Hide ONA / Show Anime Only filters. Onboarding returns as an interactive tab-based guide (Welcome, Discover, Library, Alerts, Setup) with real actions and honest completion state, reachable from a new Home header shortcut and Settings' redesigned Getting Started card (Replay + Hide). The manga home now uses the anime home's exact hero carousel and pull-to-refresh behavior; indicator dots follow the selected theme's accent; recommendation posters are bigger and regain their long-press menus; Search's Recommended for You shows three consistently-sized posters at a time with more a swipe away; the changelog page is fully redesigned; the Accounts & Tracking card is one cohesive arrow-free component; and the stray hairline around the category pills is gone on both homes.",
-          "size": 0
+          "size": 26504473
         },
         {
           "version": "2.34",
