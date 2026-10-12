@@ -297,6 +297,16 @@ struct SettingsView: View {
                 } label: {
                     SettingsCategoryRow(icon: "info.circle.fill", title: "About", subtitle: "Version, licenses")
                 }
+                // v2.34 — the way back into the interactive guide: the same
+                // tour + setup flow a fresh install runs, resuming wherever
+                // the user last stopped.
+                Button {
+                    Haptics.light()
+                    OnboardingFlowController.shared.begin()
+                } label: {
+                    SettingsCategoryRow(icon: "sparkles", title: "Getting Started", subtitle: "Replay the guided tour and finish setup")
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -1046,6 +1056,9 @@ struct AppearanceSettingsPage: View {
     @AppStorage("reduceMotion") private var reduceMotion = false
     @AppStorage("glowEnabled") private var glowEnabled = true
     @AppStorage("glowIntensity") private var glowIntensity: Double = 0.5
+    /// v2.34 — spring pop on the real tab bar's icons when a tab is selected
+    /// (and the Settings gear's spin on Home).
+    @AppStorage("animatedTabIcons") private var animatedTabIcons = true
     /// Issue #5 — Browse Categories layout toggle. OFF = carousels (default),
     /// ON = grid tiles.
     @AppStorage("browseCategoriesGridLayout") private var browseCategoriesGridLayout = false
@@ -1132,6 +1145,18 @@ struct AppearanceSettingsPage: View {
                 Text("Layout")
             } footer: {
                 Text("Browse Categories as Grid switches the Home browse section between horizontal carousels (default) and a 2-column tile grid. Show Statistics renders the compact metadata grid on detail pages.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            // v2.34 — Motion: the animated tab icon toggle.
+            Section {
+                Toggle("Animated Tab Icons", isOn: $animatedTabIcons)
+                    .tint(Color.appAccent)
+                    .glowEffect(isOn: animatedTabIcons)
+            } header: {
+                Text("Motion")
+            } footer: {
+                Text("Tab icons pop with a small spring when selected, and the Settings gear on Home spins as it opens. Automatically off while Reduce Motion is enabled.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

@@ -80,6 +80,7 @@ enum SettingsSearchIndex {
         .init("Accent Color", aliases: ["accent colour", "tint", "highlight color"], category: "Appearance", page: .appearance, anchor: "accent", icon: "paintpalette.fill"),
         .init("Glow", aliases: ["glow intensity", "halo", "neon"], category: "Appearance", page: .appearance, anchor: "glow", icon: "sparkles"),
         .init("Reduce Motion", aliases: ["animations", "no animation"], category: "Appearance", page: .appearance, anchor: "reduceMotion", icon: "tortoise"),
+        .init("Animated Tab Icons", aliases: ["tab animation", "icon animation", "bounce icons", "tab bar"], category: "Appearance", page: .appearance, anchor: "animatedTabIcons", icon: "sparkles"),
         .init("Show Browse Categories on Home", aliases: ["home categories", "browse tiles"], category: "Appearance", page: .appearance, anchor: "browseCategories", icon: "square.grid.2x2"),
         .init("Show Statistics", aliases: ["stats grid", "library stats"], category: "Appearance", page: .appearance, anchor: "statistics", icon: "chart.bar.fill"),
 

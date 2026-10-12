@@ -131,6 +131,31 @@ struct UpdateLogEntry {
 /// page's version buttons and the per-version changelog views read from.
 let logEntries: [UpdateLogEntry] = [
     UpdateLogEntry(
+        version: "2.34",
+        date: "2026-10-12",
+        added: [
+            "Onboarding is now an interactive guided tour of the REAL app — a spotlight dims everything but the element being explained and zooms between the actual tabs (Home, Library, Search, Downloads, Schedule), the live Top Charts shelf with its period picker, and Home's bell + gear toolbar, with a tooltip card, Next / Back / Skip, and tap-the-highlighted-element-to-continue. The generic introductory slides are gone — the tour starts right at the interface. Every step switches to the real tab it describes, so what you see behind the spotlight is the actual screen.",
+            "A simulated notification demonstration in setup: five example banners slide down from the top exactly like in-app notifications — new episode, airing soon, module installed, download complete, activity — while the bell's badge climbs 1, 2, 3, 4, 5 with a spring on each number. It's clearly labelled DEMO, built entirely from local state, and can never touch your real unread count; the badge and banners clear themselves when the step ends.",
+            "An interactive day/night theme demonstration: drag the sun down and the moon up through a landscape scene — sky, stars, clouds and hills all transitioning — or tap the scene to flip between them. Dragging is pure illustration and writes nothing; the System / Light / Dark buttons beneath it are the real selector, applying your choice through the same preference Settings › Appearance uses (and only an explicit pick marks the theme setup item complete).",
+            "Enable Notifications is now a real setup step: a benefits bottom sheet explains episode reminders, download results and activity alerts, and its Enable button fires the actual system permission prompt — only after that tap. The card reflects the true permission state (granted, undetermined, or blocked with a straight explanation of how to re-enable in system Settings, never a false checkmark), and a denial never re-prompts.",
+            "Animated Tab Icons (Settings › Appearance › Motion): tab icons pop with a small spring when selected — Downloads dips downward, matching its meaning — and the Settings gear on Home spins into its push. The animations are short, restrained, persisted with the setting, and automatically off while Reduce Motion is enabled. Implemented against the real system tab bar (a no-op wherever the bar isn't reachable), so navigation and layout are untouched.",
+            "A conditional asset-loading screen for onboarding: it appears only when there is genuine work (fresh install — fetching a page of real trending titles and warming their poster artwork through the app's existing caches), shows the Shirox logo, honest progress (indeterminate while fetching, an exact percentage per poster while caching) and a live status line — and never on ordinary launches. Failures degrade to neutral demo content instead of blocking; a returning user with cached artwork goes straight to the tour.",
+            "Onboarding now pauses and resumes: backgrounded mid-tour, force-quit mid-setup — the next run (or the Notifications tab's Get Started card, or Settings' new Getting Started row) picks up exactly where you left off. Demo-only state stays quarantined from real app state throughout."
+        ],
+        fixed: [],
+        changed: [
+            "The gooey pull-to-refresh now respects Reduce Motion — it falls back to the same quiet circular spinner the setting uses, instead of running its large travelling drop animation."
+        ],
+        improved: [
+            "In-app notification banners got the physics treatment: icons bounce in with a symbol spring, cards morph through scale+move transitions, and success / warning / error toasts now land with a matching haptic.",
+            "Primary buttons and setup cards across onboarding share a new elastic press style — a small scale-under-finger with a spring-back on release — consistent with the app's existing spring language."
+        ],
+        removed: [
+            "The six generic onboarding slides (Welcome, Discover, Library, Downloads, Schedule & Notifications feature pages) — replaced by the spotlight tour of the actual interface and the hands-on setup phase."
+        ],
+        other: []
+    ),
+    UpdateLogEntry(
         version: "2.33",
         date: "2026-10-12",
         added: [

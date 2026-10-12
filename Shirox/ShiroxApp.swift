@@ -217,11 +217,6 @@ struct ShiroxApp: App {
     /// v2.31: shown on every cold start — the system launch screen is blank, so without
     /// this the app opens on nothing and then snaps to content.
     @State private var showSplash = true
-    /// v2.31: first-run setup. Driven by plain state rather than a binding computed from
-    /// the stored flag — SwiftUI calls a presentation binding's setter with `false`
-    /// whenever the cover isn't showing, and a setter that wrote "finished" on that
-    /// marked onboarding complete before it had ever been seen.
-    @State private var showOnboarding = false
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
 
     // Appearance settings — applied globally via .preferredColorScheme and .tint
@@ -308,20 +303,19 @@ struct ShiroxApp: App {
                 .overlay {
                     ToastContainerView()
                 }
-                // v2.31: first run — the app ships with no sources, so every tab is empty until
-                // one is connected. Onboarding says so and wires up the two things that fix it.
-                .fullScreenCoverCompat(isPresented: $showOnboarding) {
-                    OnboardingView()
-                        .environmentObject(moduleManager)
-                }
+                // v2.34 — the onboarding flow (tour overlay + setup cover)
+                // is driven by OnboardingFlowController from RootTabView;
+                // after the splash hands over, a first run begins the flow.
                 .overlay {
                     if showSplash { SplashView(isPresented: $showSplash) }
                 }
                 .onChangeOf(showSplash) { stillShowing in
-                    // Decide once, after the splash hands over: presenting a cover underneath
-                    // it would just be revealed by the fade instead of arriving on its own.
+                    // Decide once, after the splash hands over: starting the
+                    // flow under the splash would just be hidden by the fade.
                     guard !stillShowing else { return }
-                    showOnboarding = !hasCompletedOnboarding
+                    if !hasCompletedOnboarding {
+                        OnboardingFlowController.shared.begin()
+                    }
                 }
                 .task {
                     // Update check — fire on launch, then periodically while
@@ -477,6 +471,12 @@ private struct RootTabView: View {
     @ObservedObject private var updateManager = AppUpdateManager.shared
     #endif
     @State private var selectedTab = 0
+    // v2.34 — the onboarding flow controller: drives the tour overlay
+    // (spotlights over the real app) and the setup cover. Observed here so
+    // the cover binding and the overlay follow the flow's single source of
+    // truth.
+    @ObservedObject private var onboardingFlow = OnboardingFlowController.shared
+    @State private var showOnboardingCover = false
     #if targetEnvironment(macCatalyst) || os(macOS)
     @State private var sidebarTab: SidebarTab = .home
     #endif
@@ -584,13 +584,43 @@ private struct RootTabView: View {
             }
         }
         .smoothTabSwitch(value: selectedTab)
-        // #96 — Selection haptic whenever the user switches tabs.
-        .onChange(of: selectedTab) { _ in Haptics.selection() }
+        // #96 — Selection haptic whenever the user switches tabs, plus the
+        // v2.34 animated tab icon pop (Settings › Appearance › Animated Tab
+        // Icons; no-op when the system bar isn't reachable or Reduce Motion
+        // is on).
+        .onChange(of: selectedTab) { tab in
+            Haptics.selection()
+            #if os(iOS)
+            TabIconAnimator.animateSelection(index: tab, count: 5)
+            #endif
+        }
         .onReceive(NotificationCenter.default.publisher(for: .switchToDownloadsTab)) { _ in
             #if os(iOS)
             selectedTab = 2
             #endif
         }
+        // v2.34 — the guided tour lives OVER the real app so its
+        // spotlights land on the actual interface. Loading/setup phases
+        // present the full-screen cover instead.
+        .overlay {
+            if onboardingFlow.phase == .tour {
+                GuidedTourOverlay()
+            }
+        }
+        .fullScreenCoverCompat(isPresented: $showOnboardingCover) {
+            OnboardingView()
+                .environmentObject(moduleManager)
+        }
+        // Live tour-anchor frames from the real view tree.
+        .onPreferenceChange(TourAnchorKey.self) { rects in
+            onboardingFlow.anchorRects = rects
+        }
+        // The cover is up exactly while the flow is loading or in setup.
+        .onReceive(onboardingFlow.$phase) { phase in
+            showOnboardingCover = (phase == .loading || phase == .setup)
+        }
+        // Tour steps switch the real tab they describe.
+        .onAppear { onboardingFlow.selectTab = { tab in selectedTab = tab } }
         .onOpenURL { url in
             guard url.scheme == "shirox" else { return }
             AniListAuthManager.shared.handleCallback(url: url)

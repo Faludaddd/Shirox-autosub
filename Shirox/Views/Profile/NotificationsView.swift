@@ -45,7 +45,6 @@ struct NotificationsView: View {
     /// and retires itself live as the user's setup state changes.
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage("onboardingWasSkipped") private var onboardingWasSkipped = false
-    @State private var showOnboardingFromCard = false
 
     /// The welcome banner is for users who haven't finished (or skipped)
     /// onboarding — existing installs never see it — and disappears for
@@ -135,14 +134,10 @@ struct NotificationsView: View {
             }
         }
         .task { if vm.notifications.isEmpty { await vm.loadNotifications() } }
-        .fullScreenCoverCompat(isPresented: $showOnboardingFromCard) {
-            // The actual onboarding flow — the same screen a fresh install
-            // sees, reopened from the Get Started card. Finishing (or
-            // skipping) it writes the persistent flags, and the card behind
-            // updates itself the moment the cover comes down.
-            OnboardingView()
-                .environmentObject(ModuleManager.shared)
-        }
+        // The card starts the shared onboarding flow (tour + setup) through
+        // OnboardingFlowController — the SAME experience a fresh install
+        // runs, presented by RootTabView, resuming wherever the user last
+        // stopped. No second presentation path to keep in sync.
         #if os(iOS)
         // Full-height sheet — medium detent constrains the List and prevents
         // swipe gestures from registering properly.
@@ -239,7 +234,7 @@ struct NotificationsView: View {
 
             Button {
                 Haptics.light()
-                showOnboardingFromCard = true
+                OnboardingFlowController.shared.begin()
             } label: {
                 HStack(spacing: 6) {
                     Text("Start Guide")

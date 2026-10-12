@@ -24,6 +24,13 @@ struct HomeView: View {
     @State private var readerContext: ReaderContext?
     @State private var showNotifications = false
     @State private var showUpcoming = false
+    /// v2.34 — Settings push from the (now spinning) toolbar gear.
+    @State private var showSettingsPush = false
+    /// v2.34 — the gear's spin angle (Animated Tab Icons setting drives
+    /// whether the spin runs).
+    @State private var gearAngle: Double = 0
+    @AppStorage("animatedTabIcons") private var animatedTabIcons = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// The calendar button the Upcoming page grows out of.
     @Namespace private var calendarZoom
     /// Where the page before this one sat in `pagePosition`'s order.
@@ -49,6 +56,18 @@ struct HomeView: View {
     private var usesCinematicLayout: Bool {
         !heroItems.isEmpty
             && DetailLayoutSetting.usesCinematic(enabled: cinematicHome, horizontalSizeClass: horizontalSizeClass)
+    }
+
+    /// v2.34 — the gear's spin-then-push: a full turn with a spring, then
+    /// the Settings page slides in as the gear settles (a settled, reversed
+    /// spin reads as "the gear did something" instead of a snap).
+    private func openSettings() {
+        if animatedTabIcons && !reduceMotion {
+            withAnimation(.spring(response: 0.55, dampingFraction: 0.62)) {
+                gearAngle += 360
+            }
+        }
+        showSettingsPush = true
     }
 
     private func performRefresh() async {
@@ -131,6 +150,7 @@ struct HomeView: View {
                         // chain, keeps its own period selection, and its See
                         // All pages THE SAME chart+period query.
                         ChartSection(chart: .topAnime)
+                            .tourAnchor("home.charts")
                         AnimeSection(title: "Trending Now", items: vm.trending, query: .category(.trending))
                         ChartSection(chart: .topMovies)
                         ChartSection(chart: .mostFavorited)
@@ -193,12 +213,20 @@ struct HomeView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     // Mode-aware settings: Reading Mode opens the manga
-                    // settings, Anime Mode opens the anime settings.
-                    NavigationLink(destination: appMode.mode == .reading ? AnyView(MangaSettingsView()) : AnyView(SettingsView())) {
+                    // settings, Anime Mode opens the anime settings. v2.34:
+                    // the gear spins into its push when Animated Tab Icons is
+                    // on (the system tab bar can't animate its own icons, so
+                    // Shirox's Settings entry — this gear — carries the
+                    // rotation animation instead).
+                    Button {
+                        openSettings()
+                    } label: {
                         Image(systemName: "gearshape")
                             .font(.system(size: 18, weight: .medium))
                             .foregroundStyle(.primary)
+                            .rotationEffect(.degrees(gearAngle))
                     }
+                    .accessibilityLabel("Settings")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     ProviderMenuButton().toolbarItemBackdrop()
@@ -229,6 +257,14 @@ struct HomeView: View {
             .navigationDestinationCompat(isPresented: $showUpcoming) {
                 UpcomingCalendarView()
                     .zoomingOut(of: HomeToolbarCalendar.calendarID, in: calendarZoom)
+            }
+            // v2.34 — Settings push (the spinning gear's destination).
+            .navigationDestinationCompat(isPresented: $showSettingsPush) {
+                if appMode.mode == .reading {
+                    MangaSettingsView()
+                } else {
+                    SettingsView()
+                }
             }
             // Outside the ScrollView, where a navigation destination is honoured.
             .continueWatchingNavigation($cwNavTarget)

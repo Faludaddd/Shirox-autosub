@@ -171,3 +171,134 @@ extension View {
         modifier(SmoothTabTransition(selectedTab: value))
     }
 }
+
+// MARK: - SpringPressStyle (v2.34)
+
+/// An elastic, spring-based press: the control scales down slightly under
+/// the finger and springs back with a touch of overshoot on release — the
+/// tactile counterpart to the gooey pull-to-refresh, applied only where a
+/// control deserves the emphasis (primary onboarding actions, setup cards,
+/// theme options).
+struct SpringPressStyle: ButtonStyle {
+    var pressedScale: CGFloat = 0.955
+    var response: CGFloat = 0.32
+    var damping: CGFloat = 0.62
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? pressedScale : 1)
+            .animation(.spring(response: response, dampingFraction: damping),
+                       value: configuration.isPressed)
+    }
+}
+
+extension ButtonStyle where Self == SpringPressStyle {
+    /// The app's elastic press style — see `SpringPressStyle`.
+    static var springPress: SpringPressStyle { SpringPressStyle() }
+}
+
+// MARK: - TabIconAnimator (v2.34)
+
+#if os(iOS)
+/// Animates the REAL tab bar icons when a tab is selected — Settings ›
+/// Appearance › Animated Tab Icons.
+///
+/// SwiftUI's system tab bar (`Tab`/`tabItem`) exposes no public way to
+/// animate its icons, and replacing the system bar wholesale would risk the
+/// app's navigation behavior. So this works WITH the system bar: it walks
+/// the live view hierarchy for the `UITabBar`, finds the icon view nearest
+/// the selected slot's horizontal position, and runs a small UIKit spring
+/// transform on it — a scale pop for most tabs, a downward nudge for
+/// Downloads (the "download" motion), and a settle-back. Render-only, no
+/// layout change; if the walk finds nothing (an OS redesign, Catalyst's
+/// sidebar, an off-screen bar), it's a clean no-op.
+@MainActor
+enum TabIconAnimator {
+    /// UserDefaults key for the Animated Tab Icons setting.
+    static let settingKey = "animatedTabIcons"
+
+    /// Pop the selected tab's icon. `index` is the tab's position (0-based),
+    /// `count` the number of tabs in the bar.
+    static func animateSelection(index: Int, count: Int) {
+        guard UserDefaults.standard.object(forKey: settingKey) as? Bool ?? true,
+              !UIAccessibility.isReduceMotionEnabled,
+              count > 0, index >= 0, index < count else { return }
+
+        guard let tabBar = Self.tabBar(), let icon = Self.iconView(in: tabBar, slot: index, count: count) else {
+            return
+        }
+
+        // The motion, per tab meaning: Downloads dips down (the direction
+        // downloads go), everything else pops up in place.
+        let transform: CGAffineTransform = index == 2
+            ? CGAffineTransform(translationX: 0, y: 4).concatenating(
+                CGAffineTransform(scaleX: 1.12, y: 1.12))
+            : CGAffineTransform(scaleX: 1.22, y: 1.22)
+
+        UIView.animate(withDuration: 0.16, delay: 0,
+                       usingSpringWithDamping: 0.55, initialSpringVelocity: 0.4,
+                       options: [.allowUserInteraction, .curveEaseOut]) {
+            icon.transform = transform
+        } completion: { _ in
+            UIView.animate(withDuration: 0.3, delay: 0,
+                           usingSpringWithDamping: 0.5, initialSpringVelocity: 0,
+                           options: [.allowUserInteraction, .curveEaseOut]) {
+                icon.transform = .identity
+            }
+        }
+    }
+
+    /// The first live `UITabBar` in the key window's hierarchy (SwiftUI's
+    /// `TabView` hosts a real one on iPhone/iPad).
+    private static func tabBar() -> UITabBar? {
+        let windows = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+        for window in windows where window.isKeyWindow {
+            if let bar = Self.firstSubview(of: UITabBar.self, in: window) {
+                return bar
+            }
+        }
+        // Fall back to any window at all (e.g. during transitions).
+        for window in windows {
+            if let bar = Self.firstSubview(of: UITabBar.self, in: window) {
+                return bar
+            }
+        }
+        return nil
+    }
+
+    private static func firstSubview(of kind: AnyClass, in view: UIView) -> UIView? {
+        if view.isKind(of: kind) { return view }
+        for subview in view.subviews {
+            if let found = firstSubview(of: kind, in: subview) { return found }
+        }
+        return nil
+    }
+
+    /// The tab bar's small square-ish subviews are the icons. The one
+    /// closest to the selected slot's horizontal center wins — no private
+    /// class names, no assumptions about internal structure beyond "icons
+    /// sit above their labels inside the bar".
+    private static func iconView(in tabBar: UITabBar, slot: Int, count: Int) -> UIView? {
+        let slotCenterX = tabBar.bounds.width * (CGFloat(slot) + 0.5) / CGFloat(count)
+        var best: (view: UIView, distance: CGFloat)?
+
+        func visit(_ view: UIView) {
+            let size = view.bounds.size
+            let plausibleIcon = size.width >= 10, size.width <= 44,
+                                  size.height >= 10, size.height <= 44,
+                                  abs(view.center.x - slotCenterX) < tabBar.bounds.width / CGFloat(count)
+            if plausibleIcon {
+                let distance = abs(view.center.x - slotCenterX)
+                if best.map({ distance < $0.distance }) ?? true {
+                    best = (view, distance)
+                }
+            }
+            for subview in view.subviews { visit(subview) }
+        }
+        visit(tabBar)
+        return best?.view
+    }
+}
+#endif

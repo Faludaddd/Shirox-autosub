@@ -47,7 +47,7 @@ final class ToastManager: ObservableObject {
         let toast = ToastData(title: title, message: message, icon: icon,
                               iconColor: iconColor, duration: duration, action: action)
         DispatchQueue.main.async {
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.78)) {
                 self.toasts.append(toast)
             }
             if self.toasts.count > self.maxStacked {
@@ -76,12 +76,15 @@ final class ToastManager: ObservableObject {
     func show(message: String, type: ToastType, duration: TimeInterval = 4.0) {
         switch type {
         case .success:
+            Haptics.success()
             show(title: "Success", message: message,
                  icon: "checkmark.circle.fill", iconColor: .green, duration: duration)
         case .warning:
+            Haptics.warning()
             show(title: "Heads Up", message: message,
                  icon: "exclamationmark.triangle.fill", iconColor: .orange, duration: duration)
         case .error:
+            Haptics.error()
             show(title: "Error", message: message,
                  icon: "exclamationmark.triangle.fill", iconColor: .red, duration: duration)
         }
@@ -138,8 +141,12 @@ struct ToastContainerView: View {
                     ForEach(Array(manager.toasts.enumerated()), id: \.element.id) { index, toast in
                         ToastView(toast: toast, stackIndex: index, total: manager.toasts.count)
                             .transition(.asymmetric(
-                                insertion: .move(edge: .bottom).combined(with: .opacity),
-                                removal: .move(edge: .bottom).combined(with: .opacity).combined(with: .scale(scale: 0.9))
+                                insertion: .move(edge: .bottom)
+                                    .combined(with: .opacity)
+                                    .combined(with: .scale(scale: 0.86)),
+                                removal: .move(edge: .bottom)
+                                    .combined(with: .opacity)
+                                    .combined(with: .scale(scale: 0.92))
                             ))
                             .zIndex(Double(index))
                     }
@@ -188,6 +195,7 @@ struct ToastView: View {
                         Image(systemName: toast.icon)
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(toast.iconColor)
+                            .modifier(ToastIconBounce(id: toast.id))
                     }
                     .frame(width: 36, height: 36)
 
@@ -229,5 +237,20 @@ struct ToastView: View {
         .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
         .scaleEffect(stackIndex == total - 1 ? 1.0 : 0.95)
         .opacity(stackIndex == total - 1 ? 1.0 : 0.8)
+    }
+}
+
+/// The banner icon's entrance: a springy symbol bounce on the OS versions
+/// that support symbol effects (the plain icon elsewhere). SF Symbol effects
+/// respect Reduce Motion on their own.
+private struct ToastIconBounce: ViewModifier {
+    var id: UUID
+
+    func body(content: Content) -> some View {
+        if #available(iOS 17.0, macOS 14.0, tvOS 17.0, *) {
+            content.symbolEffect(.bounce, value: id)
+        } else {
+            content
+        }
     }
 }

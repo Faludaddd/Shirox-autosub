@@ -92,10 +92,13 @@ struct GooeyRefreshModifier: ViewModifier {
     let fallback: GooeyRefreshFallback
     let action: @Sendable () async -> Void
     @AppStorage(GooeyRefreshGeometry.settingKey) private var enabled = true
+    /// v2.34 — Reduce Motion switches the drop (a large travelling
+    /// animation) for the same quiet circle the setting's fallback uses.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
         #if os(iOS)
-        if enabled {
+        if enabled && !reduceMotion {
             content.background(GooeyScrollHook(action: action))
         } else {
             fallbackContent(content)
